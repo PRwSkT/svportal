@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SV Portal - Social Post Assistant</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <meta name="view-transition" content="same-origin">
+    <script src="script.js" defer></script>
+
+    <!-- Styles moved to style.css -->
+</head>
+<body>
+
+<div class="container" style="max-width:820px;">
+
+    <!-- ── Page Header ── -->
+    <div class="sv-page-header">
+        <img src="SV-Portal.png" class="sv-page-logo" alt="SV Portal" fetchpriority="high">
+        <div class="sv-page-title-wrap">
+            <div class="sv-page-title">Social Post Assistant</div>
+            <div class="sv-page-subtitle" data-i18n="page_subtitle">สร้างโพสต์โซเชียลมีเดีย 3 ภาษา + ภาพพร้อมโพสต์</div>
+        </div>
+        <div class="sv-portal-badge">
+            <i class="far fa-star"></i> AI Powered
+        </div>
+        <div class="lang-toggle">
+            <button class="lang-btn active" onclick="setLang('th')" id="lang-th">ไทย</button>
+            <button class="lang-btn" onclick="setLang('en')" id="lang-en">EN</button>
+        </div>
+    </div>
+
+    <!-- ── Form Card ── -->
+    <div class="sv-card" id="section-form">
+
+        <div class="sv-section-title">
+            <span class="step-pill">1</span>
+            <span data-i18n="sec_activity">ข้อมูลกิจกรรม</span>
+        </div>
+
+        <div class="field">
+            <label class="sv-label"><span data-i18n="lbl_name">ชื่อกิจกรรม</span> <span class="req">*</span></label>
+            <input class="sv-input" type="text" id="f-activity-name"
+                placeholder="เช่น กีฬาสี ประจำปี 2568, วันไหว้ครู, ทัศนศึกษา จ.เชียงใหม่"
+                oninput="checkFormReady()">
+        </div>
+
+        <div class="field-row">
+            <div class="field">
+                <label class="sv-label"><span data-i18n="lbl_date">วันที่จัดกิจกรรม</span> <span class="req">*</span></label>
+                <input class="sv-input" type="date" id="f-date" oninput="checkFormReady()">
+            </div>
+            <div class="field">
+                <label class="sv-label" data-i18n="lbl_grade">ระดับ/กลุ่มนักเรียนที่เข้าร่วม</label>
+                <input class="sv-input" type="text" id="f-grade" placeholder="เช่น ป.4–ป.6, ทุกระดับ">
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="sv-label"><span data-i18n="lbl_type">ประเภทกิจกรรม</span> <span class="hint" data-i18n="hint_type">(เลือกได้หลายประเภท)</span></label>
+            <div class="tag-group" id="tag-group">
+                <button type="button" class="tag-btn" data-val="กีฬา" onclick="toggleTag(this)"><i class="far fa-futbol"></i> กีฬา</button>
+                <button type="button" class="tag-btn" data-val="วิชาการ" onclick="toggleTag(this)"><i class="far fa-book-open"></i> วิชาการ</button>
+                <button type="button" class="tag-btn" data-val="ศิลปวัฒนธรรม" onclick="toggleTag(this)"><i class="far fa-image"></i> ศิลปวัฒนธรรม</button>
+                <button type="button" class="tag-btn" data-val="ทัศนศึกษา" onclick="toggleTag(this)"><i class="far fa-compass"></i> ทัศนศึกษา</button>
+                <button type="button" class="tag-btn" data-val="จิตอาสา" onclick="toggleTag(this)"><i class="far fa-hand-paper"></i> จิตอาสา</button>
+                <button type="button" class="tag-btn" data-val="ประชุมผู้ปกครอง" onclick="toggleTag(this)"><i class="far fa-user-circle"></i> ผู้ปกครอง</button>
+                <button type="button" class="tag-btn" data-val="พิธีการ" onclick="toggleTag(this)"><i class="far fa-calendar-check"></i> พิธีการ</button>
+                <button type="button" class="tag-btn" data-val="อบรมสัมมนา" onclick="toggleTag(this)"><i class="far fa-clipboard"></i> อบรม</button>
+                <button type="button" class="tag-btn" data-val="ส่งเสริมสุขภาพ" onclick="toggleTag(this)"><i class="far fa-heart"></i> สุขภาพ</button>
+                <button type="button" class="tag-btn" data-val="เทคโนโลยี" onclick="toggleTag(this)"><i class="far fa-laptop"></i> เทคโนโลยี</button>
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="sv-label">
+                <span data-i18n="lbl_detail">รายละเอียดกิจกรรม / ไฮไลต์ที่อยากเน้น</span>
+                <span class="hint" data-i18n="hint_detail"> — ยิ่งละเอียดยิ่งได้แคปชั่นดี</span>
+            </label>
+            <textarea class="sv-textarea" id="f-detail" rows="4"
+                placeholder="เช่น&#10;- มีการแข่งขันกีฬา 8 ประเภท นักเรียน 450 คนเข้าร่วม&#10;- รับเกียรติบัตรจากผู้อำนวยการโรงเรียน&#10;- บรรยากาศสนุกสนาน ครูและนักเรียนร่วมกันอย่างอบอุ่น"
+                oninput="updateCharCount(this,'cc-detail',1000)"></textarea>
+            <div class="char-count" id="cc-detail">0 / 1000</div>
+        </div>
+
+        <div class="field-row">
+            <div class="field">
+                <label class="sv-label"><span data-i18n="lbl_obj">วัตถุประสงค์หลัก</span> <span class="hint" data-i18n="hint_obj">(สั้นๆ)</span></label>
+                <input class="sv-input" type="text" id="f-objective" placeholder="เช่น เสริมสร้างความสามัคคี">
+            </div>
+            <div class="field">
+                <label class="sv-label" data-i18n="lbl_hashtag">Hashtag ที่อยากใช้</label>
+                <input class="sv-input" type="text" id="f-hashtag" placeholder="เช่น #กีฬาสี2568">
+            </div>
+        </div>
+
+        <div class="field" style="margin-bottom:0;">
+            <label class="sv-label" data-i18n="lbl_tone">โทนเสียงของแคปชั่น</label>
+            <div class="tag-group" id="tone-group">
+                <button type="button" class="tag-btn selected" data-val="อบอุ่น ภาคภูมิใจ" onclick="selectTone(this)">อบอุ่น/ภาคภูมิใจ</button>
+                <button type="button" class="tag-btn" data-val="สนุกสนาน พลังงานสูง" onclick="selectTone(this)">สนุก/พลังงาน</button>
+                <button type="button" class="tag-btn" data-val="เป็นทางการ จริงจัง" onclick="selectTone(this)">เป็นทางการ</button>
+                <button type="button" class="tag-btn" data-val="อ่อนโยน ซาบซึ้ง" onclick="selectTone(this)">ซาบซึ้ง/ขอบคุณ</button>
+                <button type="button" class="tag-btn" data-val="กระตือรือร้น สร้างแรงบันดาลใจ" onclick="selectTone(this)">สร้างแรงบันดาลใจ</button>
+            </div>
+        </div>
+
+        <hr class="sv-divider">
+
+        <div class="sv-section-title" style="border-bottom:none; padding-bottom:0; margin-bottom:12px;">
+            <span class="step-pill">2</span>
+            <span data-i18n="sec_upload">อัปโหลดรูปภาพกิจกรรม</span>
+        </div>
+
+        <div class="upload-zone" id="upload-zone">
+            <input type="file" id="activity-photos" multiple accept="image/*">
+            <div class="upload-icon"><i class="far fa-images"></i></div>
+            <div class="upload-title" id="upload-label" data-i18n="upload_title">คลิกหรือลากไฟล์มาวางที่นี่</div>
+            <div class="upload-hint" data-i18n="upload_hint">รองรับ JPG, PNG — อัปโหลดได้หลายไฟล์ ระบบ AI จะเลือกภาพปกที่ดีที่สุดให้</div>
+        </div>
+
+        <button type="button" id="btn-process" disabled onclick="processPost()">
+            <i class="far fa-paper-plane"></i>
+            <span id="btn-label" data-i18n="btn_process_idle">กรุณากรอกข้อมูลกิจกรรมและเลือกรูปภาพ</span>
+        </button>
+    </div>
+
+    <!-- ── Result Area ── -->
+    <div id="result-area" style="display:none; margin-top:16px;">
+
+        <!-- Status -->
+        <div class="sv-card" id="status-card">
+            <div class="step-track">
+                <div class="step-node" id="step1">1</div>
+                <div class="step-line" id="line1"></div>
+                <div class="step-node" id="step2">2</div>
+                <div class="step-line" id="line2"></div>
+                <div class="step-node" id="step3">3</div>
+                <div class="step-line" id="line3"></div>
+                <div class="step-node" id="step4">4</div>
+                <div class="step-line" id="line4"></div>
+                <div class="step-node" id="step5">5</div>
+            </div>
+            <div class="step-status"><strong data-i18n="lbl_status">สถานะ:</strong> <span id="ai-status" data-i18n="status_processing">กำลังประมวลผล...</span></div>
+        </div>
+
+        <!-- Photo Selector -->
+        <div class="sv-card" id="photo-selector" style="display:none;">
+            <div class="sv-section-title" style="margin-bottom:14px;">
+                <i class="far fa-images" style="color:var(--sv-maroon);"></i>
+                <span data-i18n="sec_photos">ภาพที่ AI คัดเลือกไว้</span>
+                <span class="photo-count-badge" id="photo-count-badge"></span>
+            </div>
+            <div class="photo-grid" id="photo-grid"></div>
+            <div class="photo-selector-hint">
+                <i class="far fa-hand-pointer"></i>
+                <span data-i18n="hint_photos">กดที่รูปเพื่อเปลี่ยนเป็น <strong>ภาพปก</strong> — กรอบ <span style="color:var(--sv-maroon);">■</span> = ปก &nbsp; กรอบ <span style="color:var(--sv-success);">■</span> = ภาพประกอบ</span>
+            </div>
+        </div>
+
+        <!-- Preview -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;" id="preview-grid">
+            <div>
+                <div class="preview-label">Facebook Cover 1:1</div>
+                <img id="final-cover-fb" class="preview-img">
+            </div>
+            <div>
+                <div class="preview-label">Instagram Cover 4:5</div>
+                <img id="final-cover-ig" class="preview-img">
+            </div>
+        </div>
+
+        <!-- Headline Editor -->
+        <div class="sv-card" id="headline-editor" style="display:none;">
+            <div class="sv-section-title" style="margin-bottom:14px;">
+                <i class="far fa-pen-square" style="color:var(--sv-maroon);"></i>
+                <span data-i18n="sec_headline">แก้ไขพาดหัวบนรูปภาพ</span>
+            </div>
+            <div class="field-row">
+                <div class="field">
+                    <label class="sv-label" data-i18n="lbl_hl1">บรรทัดที่ 1 — Main Headline</label>
+                    <input class="sv-input" id="hl-line1" type="text" placeholder="เช่น SPORTS DAY 2026">
+                </div>
+                <div class="field">
+                    <label class="sv-label" data-i18n="lbl_hl2">บรรทัดที่ 2 — Sub Headline</label>
+                    <input class="sv-input" id="hl-line2" type="text" placeholder="เช่น Building Champions Together">
+                </div>
+            </div>
+            <div class="field" style="margin-bottom:12px;">
+                <label class="sv-label" data-i18n="lbl_hl3">บรรทัดที่ 3 — Detail</label>
+                <input class="sv-input" id="hl-line3" type="text" placeholder="เช่น June 2, 2026 · Somkidvittaya School">
+            </div>
+            <button type="button" class="btn-outline" onclick="redrawPreviews()">
+                <i class="far fa-sync-alt"></i> <span data-i18n="btn_redraw">อัปเดตพรีวิว</span>
+            </button>
+        </div>
+
+        <!-- Caption -->
+        <div class="sv-card">
+            <div class="sv-section-title" style="margin-bottom:14px;">
+                <i class="far fa-align-left" style="color:var(--sv-maroon);"></i>
+                <span data-i18n="sec_caption">แคปชั่น (EN · 中文 · ไทย)</span>
+            </div>
+            <div class="caption-box" id="final-caption" contenteditable="false"></div>
+            <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+                <button class="btn-outline success" onclick="copyCaption()">
+                    <i class="far fa-copy"></i> <span data-i18n="btn_copy">คัดลอกแคปชั่น</span>
+                </button>
+                <button class="btn-outline" onclick="toggleEdit()">
+                    <i class="far fa-edit"></i> <span data-i18n="btn_edit">แก้ไข</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Download -->
+        <button type="button" id="btn-download-zip" style="display:none;" onclick="generateAndDownloadZip()">
+            <i class="far fa-arrow-alt-circle-down"></i>
+            <span id="dl-label" data-i18n="btn_download">ดาวน์โหลดรูปภาพทั้งหมด (.zip) — FB + IG Ready</span>
+        </button>
+
+        <!-- Reset -->
+        <button type="button" class="btn-outline" style="width:100%;justify-content:center;margin-top:10px;padding:11px;" onclick="resetAll()">
+            <i class="far fa-redo-alt"></i> <span data-i18n="btn_reset">เริ่มใหม่อีกครั้ง</span>
+        </button>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toast-container" class="toast-container"></div>
+
+<script>
+<!-- Scripts moved to script.js and imageWorker.js -->
+</script>
+</body>
+</html>
