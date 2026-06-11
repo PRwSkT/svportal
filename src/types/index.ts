@@ -17,9 +17,17 @@ export type BaseTransaction = {
   created_at: string; // ISO 8601
 };
 
-export type TuitionPayment = BaseTransaction & {
-  transaction_type: 'tuition_payment';
-  fee_item_id: string;
+export type TuitionPayment = {
+  id: string;
+  student_id: string;      // 4–5 digit numeric string
+  fee_item_ids: string[];
+  total_amount: number;    // Thai Baht
+  payment_method: 'cash' | 'qr' | 'transfer';
+  receipt_number: string;  // e.g. "REC-2568-00001"
+  slip_url: string | null;
+  cashier_note: string | null;
+  svportal_sync_at: string | null;
+  created_at: string;
 };
 
 export type WalletTopup = BaseTransaction & {
@@ -32,15 +40,27 @@ export type WalletDeduct = BaseTransaction & {
   reason: string;
 };
 
+export type FeeType = {
+  id: string;
+  name: string;
+  amount: number;          // Thai Baht
+  academic_year: string;   // e.g. "2568"
+  semester: string | null;
+  due_date: string | null; // ISO 8601 date
+  is_active: boolean;
+  created_at: string;
+};
+
 export type FeeItem = {
   id: string;
-  student_id: string; // strictly string (4-5 digit numeric string)
-  semester: string;
-  description: string;
-  amount_due: number; // Thai Baht, 2 decimal places
-  amount_paid: number; // Thai Baht, 2 decimal places
-  due_date: string; // ISO 8601
-  created_at: string; // ISO 8601
+  student_id: string;      // strictly string (4-5 digit numeric string)
+  fee_type_id: string;
+  fee_type?: FeeType;      // joined
+  amount: number;          // Thai Baht
+  status: 'unpaid' | 'paid' | 'waived';
+  svportal_ref: string | null;
+  created_at: string;      // ISO 8601
+  updated_at: string;      // ISO 8601
 };
 
 export type Product = {
