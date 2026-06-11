@@ -136,9 +136,9 @@ export default function ImportFeesPage() {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-    } catch (err: unknown) {
-      console.error(err);
-      setError('เกิดข้อผิดพลาดในการนำเข้าข้อมูล');
+    } catch (err: any) {
+      console.error('Import Error:', err);
+      setError(`เกิดข้อผิดพลาดในการนำเข้าข้อมูล: ${err.message || JSON.stringify(err)}`);
     } finally {
       setIsImporting(false);
       setProgress(100);
