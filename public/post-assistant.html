@@ -204,9 +204,17 @@
         <div class="sv-card">
             <div class="sv-section-title" style="margin-bottom:14px;">
                 <i class="far fa-align-left" style="color:var(--sv-maroon);"></i>
-                <span data-i18n="sec_caption">แคปชั่น (EN · 中文 · ไทย)</span>
+                <span data-i18n="sec_caption">แคปชั่น (แก้ไขได้)</span>
             </div>
-            <div class="caption-box" id="final-caption" contenteditable="false"></div>
+            
+            <div class="caption-tabs">
+                <button type="button" class="tab-btn active" id="tab-fb" onclick="switchCaptionTab('fb')"><i class="fab fa-facebook"></i> Facebook</button>
+                <button type="button" class="tab-btn" id="tab-ig" onclick="switchCaptionTab('ig')"><i class="fab fa-instagram"></i> Instagram</button>
+            </div>
+
+            <div class="caption-box" id="final-caption-fb" contenteditable="false"></div>
+            <div class="caption-box" id="final-caption-ig" contenteditable="false" style="display:none;"></div>
+
             <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
                 <button class="btn-outline success" onclick="copyCaption()">
                     <i class="far fa-copy"></i> <span data-i18n="btn_copy">คัดลอกแคปชั่น</span>
@@ -217,16 +225,75 @@
             </div>
         </div>
 
-        <!-- Download -->
-        <button type="button" id="btn-download-zip" style="display:none;" onclick="generateAndDownloadZip()">
-            <i class="far fa-arrow-alt-circle-down"></i>
-            <span id="dl-label" data-i18n="btn_download">ดาวน์โหลดรูปภาพทั้งหมด (.zip) — FB + IG Ready</span>
-        </button>
+        <!-- Download & Publish -->
+        <div style="display:grid; grid-template-columns: 1fr; gap: 10px; margin-top:10px;">
+            <button type="button" id="btn-review-publish" style="display:none;" onclick="openPublishModal()" class="btn-publish">
+                <i class="fas fa-paper-plane"></i>
+                <span id="pub-label" data-i18n="btn_publish">ตรวจสอบและโพสต์ (Review & Publish)</span>
+            </button>
+            <button type="button" id="btn-download-zip" style="display:none;" onclick="generateAndDownloadZip()">
+                <i class="far fa-arrow-alt-circle-down"></i>
+                <span id="dl-label" data-i18n="btn_download">ดาวน์โหลดรูปภาพทั้งหมด (.zip) — FB + IG Ready</span>
+            </button>
+        </div>
 
         <!-- Reset -->
         <button type="button" class="btn-outline" style="width:100%;justify-content:center;margin-top:10px;padding:11px;" onclick="resetAll()">
             <i class="far fa-redo-alt"></i> <span data-i18n="btn_reset">เริ่มใหม่อีกครั้ง</span>
         </button>
+    </div>
+</div>
+
+<!-- Final Publish Modal -->
+<div id="publish-modal" class="modal">
+    <div class="modal-background" onclick="closePublishModal()"></div>
+    <div class="modal-card" style="width: 90%; max-width: 1000px; height: 90vh;">
+        <header class="modal-card-head">
+            <p class="modal-card-title"><i class="fas fa-search"></i> ตรวจสอบก่อนโพสต์</p>
+            <button class="delete" aria-label="close" onclick="closePublishModal()"></button>
+        </header>
+        <section class="modal-card-body" style="background-color: #f0f2f5;">
+            <div class="columns">
+                <!-- FB Column -->
+                <div class="column is-half">
+                    <h3 class="title is-5" style="color:#1877f2; display:flex; align-items:center; gap:8px;"><i class="fab fa-facebook"></i> Facebook Post</h3>
+                    <div class="box fb-preview-box" style="padding:16px;">
+                        <div class="preview-header">
+                            <img src="SV-Portal.png" class="sv-page-logo" style="width:40px; height:40px; border-radius:50%; margin-right:10px;">
+                            <div>
+                                <strong>Somkidvittaya School</strong><br>
+                                <span style="font-size:12px; color:#65676b;">Just now · 🌎</span>
+                            </div>
+                        </div>
+                        <div class="preview-text" id="modal-fb-caption" style="white-space:pre-wrap; margin-bottom:12px; font-size:14px;"></div>
+                        <div class="preview-gallery" id="modal-fb-gallery" style="display:grid; gap:2px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));"></div>
+                    </div>
+                </div>
+                <!-- IG Column -->
+                <div class="column is-half">
+                    <h3 class="title is-5" style="background:-webkit-linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent; display:flex; align-items:center; gap:8px;">
+                        <i class="fab fa-instagram" style="background:-webkit-linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent; -webkit-text-stroke: 1px transparent; color: black; /* fallback */"></i> Instagram Post
+                    </h3>
+                    <div class="box ig-preview-box" style="padding:16px;">
+                        <div class="preview-header" style="margin-bottom:12px;">
+                            <img src="SV-Portal.png" class="sv-page-logo" style="width:32px; height:32px; border-radius:50%; margin-right:10px; border:2px solid #e1306c;">
+                            <div><strong>somkidvittaya</strong></div>
+                        </div>
+                        <!-- Single image placeholder for carousel -->
+                        <div class="preview-gallery ig-carousel" id="modal-ig-gallery" style="position:relative; padding-top:125%; background:#eee; overflow:hidden; border-radius:4px; margin-bottom:12px;">
+                            <!-- images will be absolute positioned inside -->
+                        </div>
+                        <div style="display:flex; justify-content:center; gap:4px; margin-bottom:12px;" id="modal-ig-dots"></div>
+                        <div class="preview-text" id="modal-ig-caption" style="white-space:pre-wrap; font-size:14px;"></div>
+                        <p class="help is-danger" id="modal-ig-warning" style="display:none; margin-top:10px;"></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <footer class="modal-card-foot" style="justify-content: flex-end;">
+            <button class="button" onclick="closePublishModal()">ยกเลิก</button>
+            <button class="button is-link" id="btn-confirm-publish" onclick="confirmPublish()"><i class="fas fa-paper-plane" style="margin-right:8px;"></i> โพสต์ทันที</button>
+        </footer>
     </div>
 </div>
 

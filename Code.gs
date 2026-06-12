@@ -5,6 +5,11 @@
 
 function doPost(e) {
   try {
+    var action = e.parameter.action;
+    if (action === 'publishToSocial') {
+      return handlePublishToSocial(e);
+    }
+
     var imagesDataJson = e.parameter.images;
     var mimeType       = e.parameter.mimeType || "image/jpeg";
     var activityInfo   = e.parameter.activityInfo || "";
@@ -114,6 +119,189 @@ ${activityInfo}
     return ContentService
       .createTextOutput(JSON.stringify({ "error": error.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ==========================================
+// Publish to Social Media (Meta Graph API Framework)
+// ==========================================
+function handlePublishToSocial(e) {
+  var fbImages = JSON.parse(e.parameter.fbImages || "[]");
+  var igImages = JSON.parse(e.parameter.igImages || "[]");
+  var fbCaption = e.parameter.fbCaption || "";
+  var igCaption = e.parameter.igCaption || "";
+  
+  // ข้อมูล Meta Graph API ของคุณ
+  var PAGE_ACCESS_TOKEN = "YOUR_PAGE_ACCESS_TOKEN";
+  var PAGE_ID = "YOUR_PAGE_ID";
+  var IG_ACCOUNT_ID = "YOUR_IG_ACCOUNT_ID";
+  
+  try {
+    // ==========================================
+    // 1. FACEBOOK POSTING
+    // ==========================================
+    var fbMediaIds = [];
+    if (fbImages.length > 0) {
+      for (var i = 0; i < fbImages.length; i++) {
+        // ดึงเฉพาะ data base64 (ตัด data:image/jpeg;base64, ออก)
+        var b64Data = fbImages[i].indexOf(",") !== -1 ? fbImages[i].split(",")[1] : fbImages[i];
+        var blob = Utilities.newBlob(Utilities.base64Decode(b64Data), 'image/jpeg', 'fb_img_' + i + '.jpg');
+        
+        var fbUploadUrl = "https://graph.facebook.com/v20.0/" + PAGE_ID + "/photos";
+        var fbUploadPayload = {
+          "access_token": PAGE_ACCESS_TOKEN,
+          "published": "false", // โหลดรูปเก็บไว้ก่อน ยังไม่โพสต์
+          "source": blob
+        };
+        var fbUploadOptions = {
+          "method": "post",
+          "payload": fbUploadPayload,
+          "muteHttpExceptions": true
+        };
+        
+        var fbUploadRes = UrlFetchApp.fetch(fbUploadUrl, fbUploadOptions);
+        var fbUploadData = JSON.parse(fbUploadRes.getContentText());
+        
+        if (fbUploadData.error) {
+          throw new Error("Facebook Upload Error: " + fbUploadData.error.message);
+        }
+        fbMediaIds.push(fbUploadData.id);
+      }
+      
+      // สร้างโพสต์รวม Facebook
+      var fbPostUrl = "https://graph.facebook.com/v20.0/" + PAGE_ID + "/feed";
+      var fbPostPayload = {
+        "access_token": PAGE_ACCESS_TOKEN,
+        "message": fbCaption
+      };
+      
+      // แนบรูปภาพทั้งหมดที่อัปโหลดไว้
+      for (var j = 0; j < fbMediaIds.length; j++) {
+        fbPostPayload["attached_media[" + j + "]"] = JSON.stringify({"media_fbid": fbMediaIds[j]});
+      }
+      
+      var fbPostOptions = {
+        "method": "post",
+        "payload": fbPostPayload,
+        "muteHttpExceptions": true
+      };
+      
+      var fbPostRes = UrlFetchApp.fetch(fbPostUrl, fbPostOptions);
+      var fbPostData = JSON.parse(fbPostRes.getContentText());
+      if (fbPostData.error) {
+        throw new Error("Facebook Publish Error: " + fbPostData.error.message);
+      }
+    }
+
+    // ==========================================
+    // 2. INSTAGRAM POSTING (Carousel)
+    // ==========================================
+    var driveFiles = [];
+    var igContainerIds = [];
+    
+    if (igImages.length > 0) {
+      try {
+        // 2.1 สร้างไฟล์ชั่วคราวใน Google Drive
+        for (var k = 0; k < igImages.length; k++) {
+          var igB64Data = igImages[k].indexOf(",") !== -1 ? igImages[k].split(",")[1] : igImages[k];
+          var igBlob = Utilities.newBlob(Utilities.base64Decode(igB64Data), 'image/jpeg', 'ig_temp_' + k + '.jpg');
+          
+          var file = DriveApp.createFile(igBlob);
+          file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+          driveFiles.push(file);
+          
+          var imageUrl = "https://drive.google.com/uc?export=download&id=" + file.getId();
+          
+          // 2.2 สร้าง IG Item Container สำหรับแต่ละรูป
+          var igItemUrl = "https://graph.facebook.com/v20.0/" + IG_ACCOUNT_ID + "/media";
+          var igItemPayload = {
+            "access_token": PAGE_ACCESS_TOKEN,
+            "image_url": imageUrl,
+            "is_carousel_item": "true"
+          };
+          var igItemOptions = {
+            "method": "post",
+            "payload": igItemPayload,
+            "muteHttpExceptions": true
+          };
+          
+          var igItemRes = UrlFetchApp.fetch(igItemUrl, igItemOptions);
+          var igItemData = JSON.parse(igItemRes.getContentText());
+          
+          if (igItemData.error) {
+            throw new Error("IG Item Container Error: " + igItemData.error.message);
+          }
+          igContainerIds.push(igItemData.id);
+        }
+        
+        // รอสักครู่ให้ Meta ประมวลผลรูปภาพเสร็จ
+        Utilities.sleep(2000);
+        
+        // 2.3 สร้าง IG Carousel Container (รวมทุกรูป + แคปชั่น)
+        var igCarouselUrl = "https://graph.facebook.com/v20.0/" + IG_ACCOUNT_ID + "/media";
+        var igCarouselPayload = {
+          "access_token": PAGE_ACCESS_TOKEN,
+          "media_type": "CAROUSEL",
+          "caption": igCaption,
+          "children": igContainerIds.join(",")
+        };
+        var igCarouselOptions = {
+          "method": "post",
+          "payload": igCarouselPayload,
+          "muteHttpExceptions": true
+        };
+        
+        var igCarouselRes = UrlFetchApp.fetch(igCarouselUrl, igCarouselOptions);
+        var igCarouselData = JSON.parse(igCarouselRes.getContentText());
+        
+        if (igCarouselData.error) {
+          throw new Error("IG Carousel Container Error: " + igCarouselData.error.message);
+        }
+        
+        // รอสักครู่ให้ Container ประกอบร่างเสร็จ
+        Utilities.sleep(2000);
+        
+        // 2.4 Publish Instagram Post
+        var igPublishUrl = "https://graph.facebook.com/v20.0/" + IG_ACCOUNT_ID + "/media_publish";
+        var igPublishPayload = {
+          "access_token": PAGE_ACCESS_TOKEN,
+          "creation_id": igCarouselData.id
+        };
+        var igPublishOptions = {
+          "method": "post",
+          "payload": igPublishPayload,
+          "muteHttpExceptions": true
+        };
+        
+        var igPublishRes = UrlFetchApp.fetch(igPublishUrl, igPublishOptions);
+        var igPublishData = JSON.parse(igPublishRes.getContentText());
+        
+        if (igPublishData.error) {
+          throw new Error("IG Publish Error: " + igPublishData.error.message);
+        }
+
+      } finally {
+        // 2.5 Clean up: ลบไฟล์ชั่วคราวออกจาก Google Drive เสมอ (แม้ว่าจะ Error)
+        for (var f = 0; f < driveFiles.length; f++) {
+          try {
+            driveFiles[f].setTrashed(true);
+          } catch(e) {
+            // Ignore error in cleanup
+          }
+        }
+      }
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({
+      success: true,
+      message: "โพสต์ลง Facebook และ Instagram สำเร็จเรียบร้อยแล้ว!"
+    })).setMimeType(ContentService.MimeType.JSON);
+
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({
+      success: false,
+      message: error.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
   }
 }
 

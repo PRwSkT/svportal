@@ -432,3 +432,72 @@ body {
 .skeleton-text { height: 16px; margin-bottom: 10px; width: 100%; }
 .skeleton-text:last-child { width: 80%; }
 .skeleton-img { width: 100%; aspect-ratio: 1; border-radius: 12px; }
+
+/* ── Caption Tabs ── */
+.caption-tabs {
+    display: flex; gap: 8px; margin-bottom: 12px;
+}
+.caption-tabs .tab-btn {
+    padding: 8px 16px; border-radius: 8px 8px 0 0;
+    border: none; border-bottom: 2px solid transparent;
+    background: transparent; font-family: 'Sukhumvit Set', 'Kanit', sans-serif;
+    font-size: 14px; font-weight: 600; color: var(--sv-text-muted);
+    cursor: pointer; transition: all 0.2s;
+    display: flex; align-items: center; gap: 6px;
+}
+.caption-tabs .tab-btn:hover {
+    background: var(--sv-maroon-light);
+    color: var(--sv-maroon);
+}
+.caption-tabs .tab-btn.active {
+    color: var(--sv-maroon);
+    border-bottom: 2px solid var(--sv-maroon);
+}
+.caption-tabs .tab-btn i.fa-facebook { color: #1877f2; }
+.caption-tabs .tab-btn i.fa-instagram { 
+    background: -webkit-linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* ── Exclude Toggle on Thumbnails ── */
+.btn-exclude {
+    position: absolute; top: 6px; right: 6px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9); border: none;
+    color: var(--sv-text-muted); display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    transition: all 0.2s; z-index: 10;
+}
+.btn-exclude:hover { background: #fff; color: var(--sv-maroon); transform: scale(1.1); }
+.photo-thumb.is-excluded { opacity: 0.4; border-color: transparent; filter: grayscale(100%); }
+.photo-thumb.is-excluded .thumb-badge, .photo-thumb.is-excluded .thumb-order { display: none; }
+.photo-thumb.is-excluded .btn-exclude { background: var(--sv-maroon); color: #fff; }
+.photo-thumb.is-cover .btn-exclude { display: none; }
+
+/* ── Publish Button ── */
+.btn-publish {
+    background: linear-gradient(135deg, #2D6A4F, #1b4d36); /* Success green */
+    width: 100%; color: #fff; border: none;
+    border-radius: var(--radius-btn);
+    padding: 16px 24px; font-size: 15px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    cursor: pointer; transition: all 0.2s;
+    font-family: 'Sukhumvit Set','Kanit',sans-serif; letter-spacing: 0.02em;
+    box-shadow: 0 4px 15px rgba(45,106,79,0.3);
+}
+.btn-publish:hover {
+    transform: translateY(-2px); box-shadow: 0 6px 20px rgba(45,106,79,0.4);
+}
+
+/* ── IG Carousel ── */
+.ig-carousel-item {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    object-fit: cover; opacity: 0; transition: opacity 0.3s;
+}
+.ig-carousel-item.active { opacity: 1; }
+.ig-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #ccc; transition: background 0.2s;
+}
+.ig-dot.active { background: #0095f6; }

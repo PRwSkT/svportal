@@ -161,6 +161,42 @@ self.onmessage = async function(e) {
             const content = await zip.generateAsync({type:"blob"});
             self.postMessage({ id, status: 'success', data: content });
         }
+        else if (action === 'prepareImagesForSocial') {
+            const { files, hl, templates } = e.data.payload;
+            const fbImages = [];
+            const igImages = [];
+            
+            const tplBtmFB = templates.fbCover ? await createImageBitmap(templates.fbCover) : null;
+            const tplBtmIG = templates.igCover ? await createImageBitmap(templates.igCover) : null;
+            const tplBtmFBSub = templates.fbSub ? await createImageBitmap(templates.fbSub) : null;
+            const tplBtmIGSub = templates.igSub ? await createImageBitmap(templates.igSub) : null;
+            
+            // Limit IG to max 10
+            const maxIGPhotos = Math.min(10, files.length);
+
+            for (let i = 0; i < files.length; i++) {
+                self.postMessage({ action: 'progress', text: `กำลังเตรียมไฟล์รูปที่ ${i + 1}...` });
+                const bmp = await createImageBitmap(files[i]);
+                const eB64 = await autoEnhanceAndWarm(bmp);
+                const eBmp = await createImageBitmap(await fetch(eB64).then(r => r.blob()));
+
+                if (i === 0) {
+                    fbImages.push((await drawCoverTemplate(eBmp, hl, tplBtmFB)).split(',')[1]);
+                    igImages.push((await drawIGCover(eBmp, hl, tplBtmIG)).split(',')[1]);
+                } else {
+                    // FB image
+                    const fbRatio = (i <= 4) ? '1:1' : '4:5';
+                    const fbTpl   = (fbRatio === '1:1') ? tplBtmFBSub : tplBtmIGSub;
+                    fbImages.push((await processSubPhoto(eBmp, fbRatio, fbTpl)).split(',')[1]);
+                    
+                    // IG image (only first 10)
+                    if (i < maxIGPhotos) {
+                        igImages.push((await processSubPhoto(eBmp, '4:5', tplBtmIGSub)).split(',')[1]);
+                    }
+                }
+            }
+            self.postMessage({ id, status: 'success', data: { fbImages, igImages } });
+        }
     } catch (err) {
         self.postMessage({ id, status: 'error', error: err.message });
     }

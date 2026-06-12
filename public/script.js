@@ -5,9 +5,12 @@ const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwtl4265ih1xovbR2aR
 
 let currentAIResult = null;
 let uploadedFiles = [];
+let excludedIndices = new Set();
 let templateFBCover = null, templateIGCover = null, templateFBSub = null, templateIGSub = null;
 let hasFiles = false;
 let currentLang = 'th';
+let currentCaptionFB = "";
+let currentCaptionIG = "";
 
 // Initialize Web Worker
 const imageWorker = new Worker('imageWorker.js');
@@ -201,7 +204,8 @@ async function processPost() {
     btn.classList.add('loading');
     
     // Show skeleton initially
-    document.getElementById('final-caption').innerHTML = '<div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div>';
+    document.getElementById('final-caption-fb').innerHTML = '<div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div>';
+    document.getElementById('final-caption-ig').innerHTML = '<div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div>';
     document.getElementById('final-cover-fb').src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiNlN2U3ZTciLz48L3N2Zz4=';
     document.getElementById('final-cover-ig').src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiNlN2U3ZTciLz48L3N2Zz4=';
 
@@ -270,7 +274,11 @@ async function processPost() {
         }
         
         currentAIResult = parsedData;
-        document.getElementById('final-caption').innerText = parsedData.post_caption;
+        currentCaptionFB = parsedData.post_caption;
+        currentCaptionIG = parseIGCaption(parsedData.post_caption);
+        
+        document.getElementById('final-caption-fb').innerText = currentCaptionFB;
+        document.getElementById('final-caption-ig').innerText = currentCaptionIG;
 
         const hl = parsedData.cover_headline;
         document.getElementById('hl-line1').value = hl.headline || '';
@@ -297,6 +305,7 @@ async function processPost() {
 
         document.getElementById('headline-editor').style.display = 'block';
         document.getElementById('btn-download-zip').style.display = 'flex';
+        document.getElementById('btn-review-publish').style.display = 'flex';
         document.getElementById('dl-label').innerText = `ดาวน์โหลด ${uploadedFiles.length} รูปภาพ (.zip) — FB + IG Ready`;
         
         btn.disabled = false;
@@ -310,7 +319,8 @@ async function processPost() {
         btn.disabled = false;
         btn.classList.remove('loading');
         // Remove skeleton if failed
-        document.getElementById('final-caption').innerText = 'เกิดข้อผิดพลาดในการสร้างแคปชั่น';
+        document.getElementById('final-caption-fb').innerText = 'เกิดข้อผิดพลาดในการสร้างแคปชั่น';
+        document.getElementById('final-caption-ig').innerText = 'เกิดข้อผิดพลาดในการสร้างแคปชั่น';
     }
 }
 
@@ -322,29 +332,57 @@ async function renderPhotoSelector(files) {
     const badge = document.getElementById('photo-count-badge');
     const panel = document.getElementById('photo-selector');
     grid.innerHTML = '';
-    badge.innerText = `${files.length} รูป`;
+    
+    const activeCount = files.filter((_, i) => !excludedIndices.has(i)).length;
+    badge.innerText = `${activeCount} รูป`;
     panel.style.display = 'block';
 
     for (let i = 0; i < files.length; i++) {
-        // Just create simple object URL for thumbnail to avoid blocking
         const url = URL.createObjectURL(files[i]);
         const div = document.createElement('div');
         div.className = 'photo-thumb ' + (i === 0 ? 'is-cover' : 'is-kept');
+        if (excludedIndices.has(i)) div.classList.add('is-excluded');
         div.dataset.index = i;
         div.innerHTML = `
-            <img src="${url}" loading="lazy">
+            <img src="${url}" loading="lazy" onclick="setAsCover(${i})">
             <div class="thumb-badge">${I18N[currentLang].cover_badge}</div>
-            <div class="thumb-order">#${i + 1}</div>`;
-        div.addEventListener('click', () => setAsCover(i));
+            <div class="thumb-order">#${i + 1}</div>
+            <button class="btn-exclude" onclick="toggleExclude(event, ${i})"><i class="fas fa-times"></i></button>`;
         grid.appendChild(div);
     }
 }
 
+function toggleExclude(event, idx) {
+    event.stopPropagation();
+    if (idx === 0) {
+        showToast("ไม่สามารถซ่อนภาพปกได้ (เปลี่ยนเป็นรูปอื่นก่อน)", "error");
+        return;
+    }
+    if (excludedIndices.has(idx)) {
+        excludedIndices.delete(idx);
+    } else {
+        excludedIndices.add(idx);
+    }
+    renderPhotoSelector(uploadedFiles);
+    
+    // Update button counts
+    const activeCount = uploadedFiles.length - excludedIndices.size;
+    document.getElementById('dl-label').innerText = `ดาวน์โหลด ${activeCount} รูปภาพ (.zip) — FB + IG Ready`;
+}
+
 async function setAsCover(newCoverIdx) {
-    if (newCoverIdx === 0) return;
+    if (newCoverIdx === 0 || excludedIndices.has(newCoverIdx)) return;
 
     const picked = uploadedFiles.splice(newCoverIdx, 1)[0];
     uploadedFiles.unshift(picked);
+    
+    // Re-map excluded indices so they point to correct files after shift
+    let newSet = new Set();
+    for (let ex of excludedIndices) {
+        if (ex < newCoverIdx) newSet.add(ex + 1);
+        else if (ex > newCoverIdx) newSet.add(ex);
+    }
+    excludedIndices = newSet;
 
     await renderPhotoSelector(uploadedFiles);
 
@@ -397,15 +435,39 @@ async function redrawPreviews() {
     }
 }
 
+let activeTab = 'fb';
+function switchCaptionTab(tab) {
+    activeTab = tab;
+    document.getElementById('tab-fb').classList.toggle('active', tab === 'fb');
+    document.getElementById('tab-ig').classList.toggle('active', tab === 'ig');
+    document.getElementById('final-caption-fb').style.display = tab === 'fb' ? 'block' : 'none';
+    document.getElementById('final-caption-ig').style.display = tab === 'ig' ? 'block' : 'none';
+}
+
+function parseIGCaption(fullCaption) {
+    // English text is the first block before _______________
+    // Contact us is the 4th block, Hashtag is 5th
+    const blocks = fullCaption.split('_______________').map(s => s.trim());
+    if (blocks.length >= 4) {
+        const enText = blocks[0];
+        const contactText = blocks[3];
+        const hashtagText = blocks[4] || "";
+        return `${enText}\n\n_______________\n\n${contactText}\n\n_______________\n\n${hashtagText}`;
+    }
+    return fullCaption;
+}
+
 let isEditing = false;
 function toggleEdit() {
-    const box = document.getElementById('final-caption');
+    const boxId = activeTab === 'fb' ? 'final-caption-fb' : 'final-caption-ig';
+    const box = document.getElementById(boxId);
     isEditing = !isEditing;
     box.contentEditable = isEditing ? 'true' : 'false';
     if (isEditing) box.focus();
 }
 function copyCaption() {
-    const text = document.getElementById('final-caption').innerText;
+    const boxId = activeTab === 'fb' ? 'final-caption-fb' : 'final-caption-ig';
+    const text = document.getElementById(boxId).innerText;
     navigator.clipboard.writeText(text)
         .then(() => showToast("คัดลอกแคปชั่นเรียบร้อยแล้วครับ!"))
         .catch(() => { document.execCommand('copy'); showToast("คัดลอกแคปชั่นเรียบร้อยแล้วครับ!"); });
@@ -420,16 +482,17 @@ async function generateAndDownloadZip() {
     btn.disabled = true; lbl.innerText = "กำลังประมวลผลและแพ็คไฟล์...";
 
     try {
-        const maxPhotos = Math.min(uploadedFiles.length, 40);
+        const activeFiles = uploadedFiles.filter((_, i) => !excludedIndices.has(i));
+        const maxPhotos = Math.min(activeFiles.length, 40);
         const hl = getHeadlineFromEditor();
-        const caption = document.getElementById('final-caption').innerText;
+        const captionFB = document.getElementById('final-caption-fb').innerText;
+        const captionIG = document.getElementById('final-caption-ig').innerText;
 
-        // Note: Can't use saveAs directly in worker without extra polyfills, so we let worker zip, return blob, and save here.
         const zipBlob = await runWorkerTask('generateZip', {
-            files: uploadedFiles.slice(0, maxPhotos),
+            files: activeFiles.slice(0, maxPhotos),
             maxPhotos: maxPhotos,
             hl: hl,
-            caption: caption,
+            caption: `=== FACEBOOK CAPTION ===\n${captionFB}\n\n=== INSTAGRAM CAPTION ===\n${captionIG}`,
             templates: { fbCover: templateFBCover, igCover: templateIGCover, fbSub: templateFBSub, igSub: templateIGSub }
         });
 
@@ -468,9 +531,10 @@ function resetAll() {
         document.getElementById('photo-selector').style.display='none';
         document.getElementById('photo-grid').innerHTML='';
         document.getElementById('btn-download-zip').style.display='none';
+        document.getElementById('btn-review-publish').style.display='none';
         document.getElementById('btn-download-zip').classList.remove('success');
         document.getElementById('dl-label').innerText='ดาวน์โหลดรูปภาพทั้งหมด (.zip) — FB + IG Ready';
-        currentAIResult=null; uploadedFiles=[]; hasFiles=false;
+        currentAIResult=null; uploadedFiles=[]; hasFiles=false; excludedIndices.clear();
         checkFormReady();
         window.scrollTo({top:0,behavior:'smooth'});
     };
@@ -483,6 +547,149 @@ function resetAll() {
 }
 
 document.getElementById('f-date').valueAsDate = new Date();
+
+// ==========================================
+// PUBLISH MODAL & SOCIAL MEDIA
+// ==========================================
+let igCarouselInterval = null;
+
+function getActiveFiles() {
+    return uploadedFiles.filter((_, i) => !excludedIndices.has(i));
+}
+
+async function openPublishModal() {
+    const fbCaption = document.getElementById('final-caption-fb').innerText;
+    const igCaption = document.getElementById('final-caption-ig').innerText;
+    
+    document.getElementById('modal-fb-caption').innerText = fbCaption;
+    document.getElementById('modal-ig-caption').innerText = igCaption;
+
+    const fbGallery = document.getElementById('modal-fb-gallery');
+    fbGallery.innerHTML = '';
+    
+    const igGallery = document.getElementById('modal-ig-gallery');
+    igGallery.innerHTML = '';
+    const igDots = document.getElementById('modal-ig-dots');
+    igDots.innerHTML = '';
+
+    const activeFiles = getActiveFiles();
+    
+    const fbCoverSrc = document.getElementById('final-cover-fb').src;
+    const igCoverSrc = document.getElementById('final-cover-ig').src;
+
+    // FB Gallery (preview up to 5)
+    let fbImgs = [fbCoverSrc];
+    for (let i = 1; i < Math.min(5, activeFiles.length); i++) {
+        fbImgs.push(URL.createObjectURL(activeFiles[i]));
+    }
+    fbImgs.forEach(src => {
+        const img = document.createElement('img');
+        img.src = src;
+        img.style.width = '100%'; img.style.height = '120px'; img.style.objectFit = 'cover'; img.style.borderRadius = '8px';
+        fbGallery.appendChild(img);
+    });
+
+    // IG Gallery (Carousel up to 10)
+    const igCount = Math.min(10, activeFiles.length);
+    let igImgs = [igCoverSrc];
+    for (let i = 1; i < igCount; i++) {
+        igImgs.push(URL.createObjectURL(activeFiles[i]));
+    }
+    
+    igImgs.forEach((src, idx) => {
+        const img = document.createElement('img');
+        img.src = src;
+        img.className = 'ig-carousel-item' + (idx === 0 ? ' active' : '');
+        igGallery.appendChild(img);
+        
+        const dot = document.createElement('div');
+        dot.className = 'ig-dot' + (idx === 0 ? ' active' : '');
+        igDots.appendChild(dot);
+    });
+    
+    const warning = document.getElementById('modal-ig-warning');
+    if (activeFiles.length > 10) {
+        warning.style.display = 'block';
+        warning.innerText = `* รูปสำหรับ Instagram จะถูกเลือกเฉพาะ ${igCount} รูปแรกเท่านั้น`;
+    } else {
+        warning.style.display = 'none';
+    }
+
+    document.getElementById('publish-modal').classList.add('is-active');
+    
+    // Simple carousel animation
+    if (igCarouselInterval) clearInterval(igCarouselInterval);
+    if (igCount > 1) {
+        let curIdx = 0;
+        igCarouselInterval = setInterval(() => {
+            const items = igGallery.querySelectorAll('.ig-carousel-item');
+            const dots = igDots.querySelectorAll('.ig-dot');
+            if(items.length === 0) return;
+            items[curIdx].classList.remove('active');
+            dots[curIdx].classList.remove('active');
+            curIdx = (curIdx + 1) % igCount;
+            items[curIdx].classList.add('active');
+            dots[curIdx].classList.add('active');
+        }, 2000);
+    }
+}
+
+function closePublishModal() {
+    document.getElementById('publish-modal').classList.remove('is-active');
+    if (igCarouselInterval) clearInterval(igCarouselInterval);
+}
+
+async function confirmPublish() {
+    const btn = document.getElementById('btn-confirm-publish');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังโพสต์...';
+    btn.disabled = true;
+    
+    try {
+        const activeFiles = getActiveFiles();
+        const fbCaption = document.getElementById('final-caption-fb').innerText;
+        const igCaption = document.getElementById('final-caption-ig').innerText;
+        const hl = getHeadlineFromEditor();
+
+        // Prepare images in Worker
+        const processedImages = await runWorkerTask('prepareImagesForSocial', {
+            files: activeFiles.slice(0, 40),
+            hl: hl,
+            templates: { fbCover: templateFBCover, igCover: templateIGCover, fbSub: templateFBSub, igSub: templateIGSub }
+        });
+
+        // Backend call
+        const response = await fetch(WEB_APP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                'action': 'publishToSocial',
+                'fbImages': JSON.stringify(processedImages.fbImages),
+                'igImages': JSON.stringify(processedImages.igImages),
+                'fbCaption': fbCaption,
+                'igCaption': igCaption
+            })
+        });
+
+        const rawText = await response.text();
+        let resData;
+        try {
+            resData = JSON.parse(rawText);
+        } catch(e) {
+            throw new Error(rawText);
+        }
+        
+        if (resData.error) throw new Error(resData.error);
+        
+        showToast("โพสต์สำเร็จเรียบร้อย!", "success");
+        closePublishModal();
+    } catch(err) {
+        alert("Publish Failed: " + err.message);
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
 
 // ==========================================
 // i18n — Thai / English
