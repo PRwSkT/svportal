@@ -413,7 +413,7 @@ function getHeadlineFromEditor() {
     return {
         headline: document.getElementById('hl-line1').value || 'SOMKIDVITTAYA SCHOOL',
         subhead:  document.getElementById('hl-line2').value || 'Creating the Best Experience',
-        detail:   document.getElementById('hl-line3').value || 'Somkidvittaya School, Chonburi'
+        detail:   document.getElementById('hl-line3').value || 'Somkidvittaya School, Rayong'
     };
 }
 async function redrawPreviews() {
@@ -775,7 +775,8 @@ async function confirmPublish() {
             throw new Error(rawText);
         }
         
-        if (resData.error) throw new Error(resData.error);
+        if (resData.error) throw new Error(resData.error.message || resData.error);
+        if (resData.success === false) throw new Error(resData.message || "เกิดข้อผิดพลาดในการโพสต์");
         
         showToast("โพสต์สำเร็จเรียบร้อย!", "success");
         closePublishModal();
