@@ -452,7 +452,7 @@ function parseIGCaption(fullCaption) {
         const enText = blocks[0];
         const contactText = blocks[3];
         const hashtagText = blocks[4] || "";
-        return `${enText}\n\n_______________\n\n${contactText}\n\n_______________\n\n${hashtagText}`;
+        return `${enText}\n_______________\n\n${contactText}\n_______________\n\n${hashtagText}`;
     }
     return fullCaption;
 }
@@ -464,6 +464,78 @@ function toggleEdit() {
     isEditing = !isEditing;
     box.contentEditable = isEditing ? 'true' : 'false';
     if (isEditing) box.focus();
+    
+    // Show translate button only when editing FB tab
+    const btnTrans = document.getElementById('btn-translate-th');
+    if (btnTrans) {
+        btnTrans.style.display = (isEditing && activeTab === 'fb') ? 'inline-block' : 'none';
+    }
+}
+
+async function translateFromThai() {
+    const fbBox = document.getElementById('final-caption-fb');
+    const fullText = fbBox.innerText;
+    
+    const blocks = fullText.split('_______________').map(s => s.trim());
+    if (blocks.length < 4) {
+        alert("คำเตือน: ไม่พบโครงสร้างเส้นคั่น _______________ ตามรูปแบบเดิม ระบบไม่สามารถดึงภาษาไทยไปแปลอัตโนมัติได้ กรุณาใส่เส้นคั่น 15 ขีดให้ครบถ้วน");
+        return;
+    }
+    
+    // Thai is block index 2
+    const thaiText = blocks[2];
+    if (!thaiText || thaiText.trim() === '') {
+        alert("ไม่พบข้อความภาษาไทยระหว่างเส้นคั่น");
+        return;
+    }
+
+    const btnTrans = document.getElementById('btn-translate-th');
+    const originalBtn = btnTrans.innerHTML;
+    btnTrans.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังแปล...';
+    btnTrans.disabled = true;
+
+    try {
+        const response = await fetch(WEB_APP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                'action': 'translateCaption',
+                'thaiCaption': thaiText
+            })
+        });
+
+        if (!response.ok) throw new Error("เซิร์ฟเวอร์ผิดพลาด");
+        const rawText = await response.text();
+        const cleaned = rawText.replace(/```json/gi,'').replace(/```/g,'').trim();
+        const parsed = JSON.parse(cleaned);
+
+        if (parsed.error) throw new Error(parsed.error.message || "เกิดข้อผิดพลาด");
+
+        // Reconstruct FB caption
+        blocks[0] = parsed.english;
+        blocks[1] = parsed.chinese;
+        
+        const newFbCaption = `${blocks[0]}\n_______________\n\n${blocks[1]}\n_______________\n\n${blocks[2]}\n_______________\n\n${blocks[3]}\n_______________\n\n${blocks[4] || ""}`;
+        
+        fbBox.innerText = newFbCaption;
+        currentCaptionFB = newFbCaption;
+        
+        // Update IG caption
+        const newIgCaption = parseIGCaption(newFbCaption);
+        document.getElementById('final-caption-ig').innerText = newIgCaption;
+        currentCaptionIG = newIgCaption;
+
+        showToast("แปลภาษาและอัปเดตแคปชั่น IG เรียบร้อยแล้ว!", 'success');
+        
+        // Disable editing mode to prevent accidents
+        if (isEditing) toggleEdit();
+
+    } catch (e) {
+        alert("เกิดข้อผิดพลาดในการแปล: " + e.message);
+    } finally {
+        btnTrans.innerHTML = originalBtn;
+        btnTrans.disabled = false;
+    }
 }
 function copyCaption() {
     const boxId = activeTab === 'fb' ? 'final-caption-fb' : 'final-caption-ig';
