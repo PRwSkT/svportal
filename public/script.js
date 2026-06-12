@@ -509,7 +509,11 @@ async function translateFromThai() {
         const cleaned = rawText.replace(/```json/gi,'').replace(/```/g,'').trim();
         const parsed = JSON.parse(cleaned);
 
-        if (parsed.error) throw new Error(parsed.error.message || "เกิดข้อผิดพลาด");
+        if (parsed.error) {
+            console.error("Translation error details:", parsed.error);
+            const rawMsg = parsed.error.raw ? JSON.stringify(parsed.error.raw) : "";
+            throw new Error((parsed.error.message || "เกิดข้อผิดพลาด") + (rawMsg ? " - Details: " + rawMsg : ""));
+        }
 
         // Reconstruct FB caption
         blocks[0] = parsed.english;
