@@ -558,79 +558,96 @@ function getActiveFiles() {
 }
 
 async function openPublishModal() {
-    const fbCaption = document.getElementById('final-caption-fb').innerText;
-    const igCaption = document.getElementById('final-caption-ig').innerText;
-    
-    document.getElementById('modal-fb-caption').innerText = fbCaption;
-    document.getElementById('modal-ig-caption').innerText = igCaption;
-
-    const fbGallery = document.getElementById('modal-fb-gallery');
-    fbGallery.innerHTML = '';
-    
-    const igGallery = document.getElementById('modal-ig-gallery');
-    igGallery.innerHTML = '';
-    const igDots = document.getElementById('modal-ig-dots');
-    igDots.innerHTML = '';
-
-    const activeFiles = getActiveFiles();
-    
-    const fbCoverSrc = document.getElementById('final-cover-fb').src;
-    const igCoverSrc = document.getElementById('final-cover-ig').src;
-
-    // FB Gallery (preview up to 5)
-    let fbImgs = [fbCoverSrc];
-    for (let i = 1; i < Math.min(5, activeFiles.length); i++) {
-        fbImgs.push(URL.createObjectURL(activeFiles[i]));
+    const btnPublish = document.getElementById('btn-review-publish');
+    const originalBtnText = btnPublish ? btnPublish.innerHTML : '';
+    if (btnPublish) {
+        btnPublish.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังเตรียมภาพพรีวิว...';
+        btnPublish.disabled = true;
     }
-    fbImgs.forEach(src => {
-        const img = document.createElement('img');
-        img.src = src;
-        img.style.width = '100%'; img.style.height = '120px'; img.style.objectFit = 'cover'; img.style.borderRadius = '8px';
-        fbGallery.appendChild(img);
-    });
 
-    // IG Gallery (Carousel up to 10)
-    const igCount = Math.min(10, activeFiles.length);
-    let igImgs = [igCoverSrc];
-    for (let i = 1; i < igCount; i++) {
-        igImgs.push(URL.createObjectURL(activeFiles[i]));
-    }
-    
-    igImgs.forEach((src, idx) => {
-        const img = document.createElement('img');
-        img.src = src;
-        img.className = 'ig-carousel-item' + (idx === 0 ? ' active' : '');
-        igGallery.appendChild(img);
+    try {
+        const fbCaption = document.getElementById('final-caption-fb').innerText;
+        const igCaption = document.getElementById('final-caption-ig').innerText;
         
-        const dot = document.createElement('div');
-        dot.className = 'ig-dot' + (idx === 0 ? ' active' : '');
-        igDots.appendChild(dot);
-    });
-    
-    const warning = document.getElementById('modal-ig-warning');
-    if (activeFiles.length > 10) {
-        warning.style.display = 'block';
-        warning.innerText = `* รูปสำหรับ Instagram จะถูกเลือกเฉพาะ ${igCount} รูปแรกเท่านั้น`;
-    } else {
-        warning.style.display = 'none';
-    }
+        document.getElementById('modal-fb-caption').innerText = fbCaption;
+        document.getElementById('modal-ig-caption').innerText = igCaption;
 
-    document.getElementById('publish-modal').classList.add('is-active');
-    
-    // Simple carousel animation
-    if (igCarouselInterval) clearInterval(igCarouselInterval);
-    if (igCount > 1) {
-        let curIdx = 0;
-        igCarouselInterval = setInterval(() => {
-            const items = igGallery.querySelectorAll('.ig-carousel-item');
-            const dots = igDots.querySelectorAll('.ig-dot');
-            if(items.length === 0) return;
-            items[curIdx].classList.remove('active');
-            dots[curIdx].classList.remove('active');
-            curIdx = (curIdx + 1) % igCount;
-            items[curIdx].classList.add('active');
-            dots[curIdx].classList.add('active');
-        }, 2000);
+        const fbGallery = document.getElementById('modal-fb-gallery');
+        fbGallery.innerHTML = '';
+        
+        const igGallery = document.getElementById('modal-ig-gallery');
+        igGallery.innerHTML = '';
+        const igDots = document.getElementById('modal-ig-dots');
+        igDots.innerHTML = '';
+
+        const activeFiles = getActiveFiles();
+        const hl = getHeadlineFromEditor();
+
+        // Process images for preview so user sees the overlays
+        const processedImages = await runWorkerTask('prepareImagesForSocial', {
+            files: activeFiles.slice(0, 40),
+            hl: hl,
+            templates: { fbCover: templateFBCover, igCover: templateIGCover, fbSub: templateFBSub, igSub: templateIGSub }
+        });
+        
+        // Cache globally for confirmPublish
+        window.socialProcessedImagesCache = processedImages;
+
+        // FB Gallery (preview up to 5)
+        let fbImgs = processedImages.fbImages.map(b64 => "data:image/jpeg;base64," + b64);
+        fbImgs.slice(0, 5).forEach(src => {
+            const img = document.createElement('img');
+            img.src = src;
+            img.style.width = '100%'; img.style.height = '120px'; img.style.objectFit = 'cover'; img.style.borderRadius = '8px';
+            fbGallery.appendChild(img);
+        });
+
+        // IG Gallery (Carousel up to 10)
+        let igImgs = processedImages.igImages.map(b64 => "data:image/jpeg;base64," + b64);
+        igImgs.forEach((src, idx) => {
+            const img = document.createElement('img');
+            img.src = src;
+            img.className = 'ig-carousel-item' + (idx === 0 ? ' active' : '');
+            igGallery.appendChild(img);
+            
+            const dot = document.createElement('div');
+            dot.className = 'ig-dot' + (idx === 0 ? ' active' : '');
+            igDots.appendChild(dot);
+        });
+        
+        const igCount = igImgs.length;
+        const warning = document.getElementById('modal-ig-warning');
+        if (activeFiles.length > 10) {
+            warning.style.display = 'block';
+            warning.innerText = `* รูปสำหรับ Instagram จะถูกเลือกเฉพาะ 10 รูปแรกเท่านั้น`;
+        } else {
+            warning.style.display = 'none';
+        }
+
+        document.getElementById('publish-modal').classList.add('is-active');
+        
+        // Simple carousel animation
+        if (igCarouselInterval) clearInterval(igCarouselInterval);
+        if (igCount > 1) {
+            let curIdx = 0;
+            igCarouselInterval = setInterval(() => {
+                const items = igGallery.querySelectorAll('.ig-carousel-item');
+                const dots = igDots.querySelectorAll('.ig-dot');
+                if(items.length === 0) return;
+                items[curIdx].classList.remove('active');
+                dots[curIdx].classList.remove('active');
+                curIdx = (curIdx + 1) % igCount;
+                items[curIdx].classList.add('active');
+                dots[curIdx].classList.add('active');
+            }, 2000);
+        }
+    } catch (e) {
+        showToast("เกิดข้อผิดพลาดในการเตรียมรูปภาพพรีวิว: " + e.message, 'error');
+    } finally {
+        if (btnPublish) {
+            btnPublish.innerHTML = originalBtnText;
+            btnPublish.disabled = false;
+        }
     }
 }
 
@@ -651,12 +668,15 @@ async function confirmPublish() {
         const igCaption = document.getElementById('final-caption-ig').innerText;
         const hl = getHeadlineFromEditor();
 
-        // Prepare images in Worker
-        const processedImages = await runWorkerTask('prepareImagesForSocial', {
-            files: activeFiles.slice(0, 40),
-            hl: hl,
-            templates: { fbCover: templateFBCover, igCover: templateIGCover, fbSub: templateFBSub, igSub: templateIGSub }
-        });
+        // Use cached processed images or prepare them if missing
+        let processedImages = window.socialProcessedImagesCache;
+        if (!processedImages) {
+            processedImages = await runWorkerTask('prepareImagesForSocial', {
+                files: activeFiles.slice(0, 40),
+                hl: hl,
+                templates: { fbCover: templateFBCover, igCover: templateIGCover, fbSub: templateFBSub, igSub: templateIGSub }
+            });
+        }
 
         // Backend call
         const response = await fetch(WEB_APP_URL, {
