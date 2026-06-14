@@ -1161,3 +1161,4 @@ function setLang(lang) {
 }
 
 checkFormReady();
+console.log('trigger build');
