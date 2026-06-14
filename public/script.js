@@ -262,10 +262,16 @@ async function processPost() {
 
         let keptIndices = parsedData.kept_image_indices;
         if (keptIndices && keptIndices.length > 0) {
+            let coverIdx = keptIndices[0];
+            let restIndices = keptIndices.slice(1).sort((a, b) => a - b);
+            let sortedIndices = [coverIdx, ...restIndices];
+            
             let filteredFiles = [];
-            for (let idx of keptIndices) {
+            for (let idx of sortedIndices) {
                 if (idx >= 0 && idx < uploadedFiles.length) {
-                    filteredFiles.push(uploadedFiles[idx]);
+                    if (!filteredFiles.includes(uploadedFiles[idx])) {
+                        filteredFiles.push(uploadedFiles[idx]);
+                    }
                 }
             }
             if (filteredFiles.length > 0) {
@@ -445,16 +451,21 @@ function switchCaptionTab(tab) {
 }
 
 function parseIGCaption(fullCaption) {
-    // English text is the first block before _______________
-    // Contact us is the 4th block, Hashtag is 5th
     const blocks = fullCaption.split('_______________').map(s => s.trim());
-    if (blocks.length >= 4) {
-        const enText = blocks[0];
-        const contactText = blocks[3];
-        const hashtagText = blocks[4] || "";
-        return `${enText}\n_______________\n\n${contactText}\n_______________\n\n${hashtagText}`;
-    }
-    return fullCaption;
+    if (blocks.length < 4) return fullCaption;
+
+    // EN contact block (สำหรับ IG ใช้ EN อย่างเดียว)
+    const enContact = `Contact us\nCall (+66) 38 611 251\nEmail: mail@somkidvittaya.ac.th\nWebsite: somkidvittaya.ac.th\nSchool visit: https://calendar.app.google/HhhN11dAj8r3HehM7`;
+
+    // แยก EN content ออกจาก contact
+    const enBlock = blocks[0];
+    const contactIdx = enBlock.indexOf('Contact us');
+    const enContentOnly = contactIdx !== -1 
+        ? enBlock.substring(0, contactIdx).trim() 
+        : enBlock.trim();
+
+    // IG format: content → เส้น → contact → เส้น → hashtag
+    return `${enContentOnly}\n_______________\n\n${enContact}\n_______________\n\n${blocks[3]}`;
 }
 
 let isEditing = false;
@@ -478,16 +489,17 @@ async function translateFromThai() {
     
     const blocks = fullText.split('_______________').map(s => s.trim());
     if (blocks.length < 4) {
-        alert("คำเตือน: ไม่พบโครงสร้างเส้นคั่น _______________ ตามรูปแบบเดิม ระบบไม่สามารถดึงภาษาไทยไปแปลอัตโนมัติได้ กรุณาใส่เส้นคั่น 15 ขีดให้ครบถ้วน");
+        showToast("ไม่สามารถแยกส่วนภาษาไทยได้ กรุณารีเซ็ตแคปชั่นก่อนแปล", "error");
         return;
     }
-    
-    // Thai is block index 2
-    const thaiText = blocks[2];
-    if (!thaiText || thaiText.trim() === '') {
-        alert("ไม่พบข้อความภาษาไทยระหว่างเส้นคั่น");
-        return;
-    }
+
+    // Contact info แต่ละภาษา
+    const enContact = `Contact us\nCall (+66) 38 611 251\nEmail: mail@somkidvittaya.ac.th\nWebsite: somkidvittaya.ac.th\nSchool visit: https://calendar.app.google/HhhN11dAj8r3HehM7`;
+    const cnContact = `联系我们\n电话: (+66) 38 611 251\n电子邮箱: mail@somkidvittaya.ac.th\n官方网站: somkidvittaya.ac.th\n预约参观学校: https://calendar.app.google/HhhN11dAj8r3HehM7`;
+    const thaiContact = `ติดต่อเรา\nโทรศัพท์: (+66) 38 611 251\nอีเมล: mail@somkidvittaya.ac.th\nเว็บไซต์: somkidvittaya.ac.th\nนัดหมายเยี่ยมชมโรงเรียน: https://calendar.app.google/HhhN11dAj8r3HehM7`;
+
+    // ดึงเฉพาะ text ภาษาไทย ตัด contact ออกก่อนส่งแปล
+    const thaiTextOnly = blocks[2].replace(thaiContact, '').trim();
 
     const btnTrans = document.getElementById('btn-translate-th');
     const originalBtn = btnTrans.innerHTML;
@@ -500,7 +512,7 @@ async function translateFromThai() {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: new URLSearchParams({
                 'action': 'translateCaption',
-                'thaiCaption': thaiText
+                'thaiCaption': thaiTextOnly  // ส่งเฉพาะ text ไม่มี contact
             })
         });
 
@@ -509,29 +521,24 @@ async function translateFromThai() {
         const cleaned = rawText.replace(/```json/gi,'').replace(/```/g,'').trim();
         const parsed = JSON.parse(cleaned);
 
-        if (parsed.error) {
-            console.error("Translation error details:", parsed.error);
-            const rawMsg = parsed.error.raw ? JSON.stringify(parsed.error.raw) : "";
-            throw new Error((parsed.error.message || "เกิดข้อผิดพลาด") + (rawMsg ? " - Details: " + rawMsg : ""));
-        }
+        if (parsed.error) throw new Error(parsed.error.message || "เกิดข้อผิดพลาด");
 
-        // Reconstruct FB caption
-        blocks[0] = parsed.english;
-        blocks[1] = parsed.chinese;
-        
-        const newFbCaption = `${blocks[0]}\n_______________\n\n${blocks[1]}\n_______________\n\n${blocks[2]}\n_______________\n\n${blocks[3]}\n_______________\n\n${blocks[4] || ""}`;
-        
+        // Reconstruct — แทนเฉพาะ EN และ CN, คง TH และ hashtag ไว้เดิม
+        blocks[0] = parsed.english.trim() + "\n\n" + enContact;
+        blocks[1] = parsed.chinese.trim() + "\n\n" + cnContact;
+        // blocks[2] = TH (ไม่แตะ)
+        // blocks[3] = hashtag (ไม่แตะ)
+
+        const newFbCaption = blocks.join('\n_______________\n\n');
         fbBox.innerText = newFbCaption;
         currentCaptionFB = newFbCaption;
-        
+
         // Update IG caption
         const newIgCaption = parseIGCaption(newFbCaption);
         document.getElementById('final-caption-ig').innerText = newIgCaption;
         currentCaptionIG = newIgCaption;
 
         showToast("แปลภาษาและอัปเดตแคปชั่น IG เรียบร้อยแล้ว!", 'success');
-        
-        // Disable editing mode to prevent accidents
         if (isEditing) toggleEdit();
 
     } catch (e) {
@@ -541,6 +548,7 @@ async function translateFromThai() {
         btnTrans.disabled = false;
     }
 }
+
 function copyCaption() {
     const boxId = activeTab === 'fb' ? 'final-caption-fb' : 'final-caption-ig';
     const text = document.getElementById(boxId).innerText;
