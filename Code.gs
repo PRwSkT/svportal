@@ -455,6 +455,17 @@ function handleTranslateCaption(e) {
 }
 
 // ==========================================
+// Helper: Meta API Config
+// ==========================================
+function getMetaConfig_() {
+  return {
+    token: "EAAYA0g05EhoBRkw8us77ykfLJI1V5p0c6RCS1BUKvDv5Uzj0uHysQALJm9iATqlNjFNSCzakf3EfCM5ktVahwnheASgGjNNm2RSg3DeQJZCic0rK43W8fdmbzxPJZBfdk8HZCa5serZBMk2OUosKJj2EZBvwPmFzDbs4uJoffPMHRZAzTT8dJTtss3Qm3KenEpidsZD",
+    pageId: "192831060756593",
+    igUserId: "17841446069053774"
+  };
+}
+
+// ==========================================
 // VIDEO STEP: Facebook Upload
 // step=start: เริ่ม session (รับ session_id)
 // step=transfer: รับ chunkBase64 แล้วส่งไป FB
