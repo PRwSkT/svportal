@@ -160,6 +160,7 @@ const videoZone = document.getElementById('upload-zone-video');
 
 function setupUploadZone(zone, input, isVideo) {
     zone.addEventListener('click', () => input.click());
+    input.addEventListener('click', (e) => e.stopPropagation()); // Prevent double trigger
     input.addEventListener('change', () => handleFiles(input, zone, isVideo));
     zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
     zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
