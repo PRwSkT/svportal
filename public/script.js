@@ -633,8 +633,6 @@ function resetAll() {
     }
 }
 
-document.getElementById('f-date').valueAsDate = new Date();
-
 // ==========================================
 // PUBLISH MODAL & SOCIAL MEDIA
 // ==========================================
