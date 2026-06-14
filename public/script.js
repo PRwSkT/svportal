@@ -859,10 +859,15 @@ async function confirmPublish() {
                 'igCaption': igCaption
             });
         } else {
-            // Video Mode
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังอัปโหลดวิดีโอ...';
+            // ==========================================
+            // Video Mode — Multi-Step Upload
+            // ==========================================
             const videoFile = activeFiles[0];
-            
+            const fileSize = videoFile.size;
+            const CHUNK_THRESHOLD = 45 * 1024 * 1024; // 45MB
+
+            // --- Step 1: อัปโหลดวิดีโอเข้า Google Drive ---
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังอัปโหลดวิดีโอ...';
             const urlRes = await fetch(WEB_APP_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -875,26 +880,113 @@ async function confirmPublish() {
             });
             const urlData = await urlRes.json();
             if (urlData.error) throw new Error(urlData.error);
-            
+
             const uploadRes = await fetch(urlData.uploadUrl, {
                 method: 'PUT',
                 body: videoFile
             });
             const uploadData = await uploadRes.json();
             if (!uploadData.id) throw new Error("Upload to Drive failed");
-            
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังโพสต์...';
-            
-            requestBody = new URLSearchParams({
-                'action': 'publishToSocial',
-                'mediaMode': 'video',
-                'driveFileId': uploadData.id,
-                'fbCaption': fbCaption,
-                'igCaption': igCaption
-            });
+            const driveFileId = uploadData.id;
+
+            // --- Helper: เรียก API ย่อย ---
+            async function callStep(params) {
+                const res = await fetch(WEB_APP_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams(params)
+                });
+                const text = await res.text();
+                let data;
+                try { data = JSON.parse(text); } catch(e) { throw new Error(text); }
+                if (data.error) throw new Error(data.error);
+                return data;
+            }
+
+            try {
+                // --- Step 2: โพสต์ Facebook Video ---
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังโพสต์ Facebook Video...';
+                if (fileSize <= CHUNK_THRESHOLD) {
+                    await callStep({ action: 'videoStepFB', step: 'simple', driveFileId, fbCaption });
+                } else {
+                    // Chunked FB Upload
+                    const startData = await callStep({ action: 'videoStepFB', step: 'start', fileSize: fileSize.toString() });
+                    let fbOff = parseInt(startData.startOffset);
+                    let fbEnd = parseInt(startData.endOffset);
+                    let chunkNum = 1;
+                    while (fbOff < fileSize) {
+                        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> FB Upload chunk ${chunkNum}...`;
+                        const transData = await callStep({
+                            action: 'videoStepFB', step: 'transfer', driveFileId,
+                            sessionId: startData.sessionId,
+                            startOffset: fbOff.toString(), endOffset: fbEnd.toString(), fileSize: fileSize.toString()
+                        });
+                        fbOff = parseInt(transData.startOffset);
+                        fbEnd = parseInt(transData.endOffset);
+                        chunkNum++;
+                    }
+                    await callStep({ action: 'videoStepFB', step: 'finish', sessionId: startData.sessionId, fbCaption });
+                }
+
+                // --- Step 3: โพสต์ Instagram Reels ---
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังอัปโหลด Instagram Reels...';
+                let igContainerId;
+                if (fileSize <= CHUNK_THRESHOLD) {
+                    const igData = await callStep({ action: 'videoStepIG', step: 'simple', driveFileId, igCaption, fileSize: fileSize.toString() });
+                    igContainerId = igData.containerId;
+                } else {
+                    // Chunked IG Upload
+                    const igCreate = await callStep({ action: 'videoStepIG', step: 'create', igCaption });
+                    igContainerId = igCreate.containerId;
+                    let igOff = 0;
+                    let igChunkNum = 1;
+                    while (igOff < fileSize) {
+                        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> IG Upload chunk ${igChunkNum}...`;
+                        const igTrans = await callStep({
+                            action: 'videoStepIG', step: 'transfer', driveFileId,
+                            uploadUri: igCreate.uploadUri,
+                            offset: igOff.toString(), fileSize: fileSize.toString()
+                        });
+                        igOff = parseInt(igTrans.nextOffset);
+                        igChunkNum++;
+                    }
+                }
+
+                // --- Step 4: รอ IG ประมวลผล ---
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> รอ Instagram ประมวลผล...';
+                let igReady = false;
+                for (let attempt = 0; attempt < 30; attempt++) {
+                    await new Promise(r => setTimeout(r, 5000));
+                    const status = await callStep({ action: 'videoCheckIG', containerId: igContainerId });
+                    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> รอ IG ประมวลผล (${attempt + 1}/30)...`;
+                    if (status.status === 'FINISHED') { igReady = true; break; }
+                    if (status.status === 'ERROR') throw new Error('Instagram ประมวลผลล้มเหลว');
+                }
+                if (!igReady) throw new Error('Instagram ประมวลผลหมดเวลา');
+
+                // --- Step 5: เผยแพร่ IG Reel ---
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> เผยแพร่ Instagram Reels...';
+                await callStep({ action: 'videoPublishIG', containerId: igContainerId });
+
+                // --- Step 6: ลบไฟล์ชั่วคราว ---
+                callStep({ action: 'videoCleanup', driveFileId }).catch(() => {}); // fire-and-forget
+
+                showToast("โพสต์วิดีโอสำเร็จทั้ง Facebook และ Instagram!", "success");
+                closePublishModal();
+
+            } catch(videoErr) {
+                // ลบไฟล์ Drive แม้เกิดข้อผิดพลาด
+                callStep({ action: 'videoCleanup', driveFileId }).catch(() => {});
+                throw videoErr;
+            }
+
+            // จบ video flow ตรงนี้ — ข้าม backend call ด้านล่าง
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            return;
         }
 
-        // Backend call
+        // Backend call (for Photo mode only)
         const response = await fetch(WEB_APP_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
