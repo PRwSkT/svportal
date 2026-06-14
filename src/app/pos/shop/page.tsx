@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { Product, CartItem, ShopTransaction } from '@/types';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Product, CartItem, ShopTransaction, WalletAccount } from '@/types';
 import { searchProducts, getProductByBarcode, createShopTransaction } from '@/lib/supabase/shop';
+import { getWalletByCardUID, getWalletByStudentId, getTodaySpend } from '@/lib/supabase/wallet';
 
 export default function POSShopPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -16,6 +17,14 @@ export default function POSShopPage() {
   const [studentId, setStudentId] = useState('');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
+  // NFC Wallet state
+  const [walletAccount, setWalletAccount] = useState<WalletAccount | null>(null);
+  const [walletStudentName, setWalletStudentName] = useState('');
+  const [walletTodaySpend, setWalletTodaySpend] = useState(0); // Thai Baht
+  const [walletSearching, setWalletSearching] = useState(false);
+  const [walletInput, setWalletInput] = useState('');
+  const [nfcMode] = useState<'hid' | 'serial' | 'manual'>('manual');
   
   const [successSlip, setSuccessSlip] = useState<ShopTransaction | null>(null);
 
@@ -110,6 +119,54 @@ export default function POSShopPage() {
     }
   };
 
+  // NFC card scan handler for wallet checkout
+  const handleWalletCardScan = useCallback(async (uid: string) => {
+    setWalletSearching(true);
+    setCheckoutError(null);
+    try {
+      const isStudentId = /^\d{4,5}$/.test(uid.trim());
+      const w = isStudentId
+        ? await getWalletByStudentId(uid.trim())
+        : await getWalletByCardUID(uid.trim());
+
+      if (!w) {
+        setCheckoutError(isStudentId ? `ไม่พบ Wallet ของนักเรียนรหัส ${uid}` : 'ไม่พบบัตรในระบบ กรุณาลองใหม่หรือกรอกรหัสนักเรียน');
+        return;
+      }
+      if (!w.is_active) {
+        setCheckoutError('Wallet ถูกระงับการใช้งาน');
+        return;
+      }
+
+      setWalletAccount(w);
+      setStudentId(w.student_id);
+
+      // Fetch student name
+      try {
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+        const { data } = await supabase.from('students').select('name').eq('id', w.student_id).single();
+        setWalletStudentName(data?.name || 'ไม่พบชื่อ');
+      } catch { setWalletStudentName('ไม่พบชื่อ'); }
+
+      const spend = await getTodaySpend(w.student_id);
+      setWalletTodaySpend(spend); // Thai Baht
+
+      // Pre-flight checks — compute cart total from cart state
+      const cartTotal = cart.reduce((sum, item) => sum + item.subtotal, 0); // Thai Baht
+      if (w.balance < cartTotal) {
+        setCheckoutError(`ยอดเงินไม่เพียงพอ (คงเหลือ ${w.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })} บาท)`);
+      }
+      if (w.daily_limit !== null && (spend + cartTotal) > w.daily_limit) {
+        setCheckoutError(`เกินวงเงินรายวัน (ใช้ไปแล้ว ${spend.toLocaleString('en-US', { minimumFractionDigits: 2 })} บาท / วงเงิน ${w.daily_limit.toLocaleString('en-US')} บาท)`);
+      }
+    } catch {
+      setCheckoutError('เกิดข้อผิดพลาดในการค้นหาข้อมูลบัตร');
+    } finally {
+      setWalletSearching(false);
+    }
+  }, [cart]);
+
   const handleCheckout = async () => {
     setIsCheckingOut(true);
     setCheckoutError(null);
@@ -120,9 +177,24 @@ export default function POSShopPage() {
       setShowCheckout(false);
       setStudentId('');
       setPaymentMethod('cash');
+      setWalletAccount(null);
+      setWalletStudentName('');
+      setWalletTodaySpend(0);
+      setWalletInput('');
     } catch (err: unknown) {
       const error = err as Error;
-      setCheckoutError(error.message || 'เกิดข้อผิดพลาดในการชำระเงิน');
+      const msg = error.message || '';
+      if (msg.includes('INSUFFICIENT_BALANCE')) {
+        setCheckoutError(`ยอดเงินไม่เพียงพอ (คงเหลือ ${walletAccount?.balance.toLocaleString('en-US', { minimumFractionDigits: 2 }) || '?'} บาท)`);
+      } else if (msg.includes('DAILY_LIMIT_EXCEEDED')) {
+        setCheckoutError(`เกินวงเงินรายวัน (วงเงิน ${walletAccount?.daily_limit?.toLocaleString('en-US') || '?'} บาท)`);
+      } else if (msg.includes('WALLET_NOT_FOUND')) {
+        setCheckoutError('ไม่พบ Wallet ของนักเรียนรายนี้');
+      } else if (msg.includes('WALLET_INACTIVE')) {
+        setCheckoutError('Wallet ถูกระงับการใช้งาน');
+      } else {
+        setCheckoutError(msg || 'เกิดข้อผิดพลาดในการชำระเงิน');
+      }
     } finally {
       setIsCheckingOut(false);
     }
@@ -327,15 +399,83 @@ export default function POSShopPage() {
 
               {paymentMethod === 'wallet' && (
                 <div className="mb-8 bg-blue-50/50 p-6 rounded-2xl border border-blue-100 animate-in slide-in-from-top-2 duration-200">
-                  <label className="block font-bold text-lg mb-3 text-blue-900">รหัสนักเรียน (4-5 หลัก)</label>
-                  <input 
-                    type="text" 
-                    placeholder="สแกนหรือพิมพ์รหัสนักเรียน..." 
-                    className="w-full text-2xl p-4 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:ring-0 outline-none transition-colors bg-white shadow-sm"
-                    value={studentId}
-                    onChange={e => setStudentId(e.target.value)}
-                    autoFocus
-                  />
+                  {/* NFC Mode Badge */}
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="font-bold text-lg text-blue-900">ชำระด้วย Wallet</span>
+                    <span className="text-xs bg-gray-100 text-gray-500 px-3 py-1 rounded-full">
+                      {nfcMode === 'hid' ? 'HID' : nfcMode === 'serial' ? 'Serial' : 'Manual'}
+                    </span>
+                  </div>
+
+                  {!walletAccount ? (
+                    /* NFC Tap / Manual Entry */
+                    <div className="text-center py-4">
+                      <div className="text-5xl mb-4 animate-pulse">💳</div>
+                      <p className="text-lg font-medium text-gray-700 mb-4">แตะบัตรนักเรียน หรือกรอกรหัส</p>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={walletInput}
+                          onChange={e => setWalletInput(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter' && walletInput.trim()) handleWalletCardScan(walletInput); }}
+                          placeholder="รหัสนักเรียน หรือ UID บัตร..."
+                          className="flex-1 text-lg p-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 outline-none bg-white"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => walletInput.trim() && handleWalletCardScan(walletInput)}
+                          disabled={walletSearching}
+                          className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          {walletSearching ? '...' : 'ค้นหา'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Wallet Info Display */
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center bg-white p-4 rounded-xl border">
+                        <div>
+                          <p className="font-bold text-lg text-gray-800">{walletStudentName}</p>
+                          <p className="text-sm text-gray-400">รหัส: {walletAccount.student_id}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className={`text-2xl font-extrabold ${walletAccount.balance < total ? 'text-red-600' : 'text-green-600'}`}>
+                            ฿{walletAccount.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </p>
+                          <p className="text-xs text-gray-400">ยอดคงเหลือ</p>
+                        </div>
+                      </div>
+
+                      {/* Daily Limit Progress */}
+                      {walletAccount.daily_limit !== null && (
+                        <div className="bg-white p-4 rounded-xl border">
+                          <div className="flex justify-between text-sm mb-2">
+                            <span className="text-gray-500">วงเงินรายวัน</span>
+                            <span className="font-medium">
+                              {walletTodaySpend.toLocaleString('en-US', { minimumFractionDigits: 2 })} / {walletAccount.daily_limit.toLocaleString('en-US')} บาท
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2.5">
+                            <div
+                              className={`h-2.5 rounded-full transition-all ${
+                                (walletTodaySpend + total) > walletAccount.daily_limit ? 'bg-red-500' :
+                                walletTodaySpend / walletAccount.daily_limit > 0.8 ? 'bg-amber-500' : 'bg-green-500'
+                              }`}
+                              style={{ width: `${Math.min(100, (walletTodaySpend / walletAccount.daily_limit) * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      <button
+                        onClick={() => { setWalletAccount(null); setStudentId(''); setWalletInput(''); setCheckoutError(null); }}
+                        className="text-sm text-blue-600 hover:underline"
+                      >
+                        เปลี่ยนบัตร
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -353,7 +493,7 @@ export default function POSShopPage() {
               </button>
               <button 
                 onClick={handleCheckout} 
-                disabled={isCheckingOut || (paymentMethod === 'wallet' && !studentId)}
+                disabled={isCheckingOut || (paymentMethod === 'wallet' && !walletAccount)}
                 className="flex-[2] py-4 text-xl font-bold text-white bg-green-500 rounded-2xl hover:bg-green-600 disabled:opacity-50 disabled:bg-gray-300 flex justify-center items-center shadow-md transition-all active:scale-[0.98]"
               >
                 {isCheckingOut ? (

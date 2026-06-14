@@ -40,32 +40,46 @@ export async function getProductByBarcode(barcode: string): Promise<Product | nu
 export async function createShopTransaction(
   cart: CartItem[],
   paymentMethod: 'cash' | 'wallet',
-  studentId?: string | null
+  studentId?: string | null // 4–5 digit numeric string
 ): Promise<ShopTransaction> {
-  const totalAmount = cart.reduce((sum, item) => sum + item.subtotal, 0);
-
-  // If wallet, we validate balance online before queueing
-  if (paymentMethod === 'wallet') {
-    if (!studentId) throw new Error('INSUFFICIENT_WALLET');
-    if (!navigator.onLine) {
-        throw new Error('ระบบออฟไลน์: ไม่สามารถชำระเงินผ่าน Wallet ได้ กรุณาเชื่อมต่ออินเทอร์เน็ต');
-    }
-    const supabase = createClient();
-    const { data: student, error } = await supabase
-      .from('students')
-      .select('wallet_balance')
-      .eq('id', studentId)
-      .single();
-      
-    if (error || !student) throw new Error('DB_ERROR');
-    
-    if (student.wallet_balance < totalAmount) {
-      throw new Error('INSUFFICIENT_WALLET');
-    }
-  }
+  const totalAmount = cart.reduce((sum, item) => sum + item.subtotal, 0); // Thai Baht
 
   const transactionId = crypto.randomUUID();
 
+  // Wallet payments: online-only, atomic RPC — never through queue
+  if (paymentMethod === 'wallet') {
+    if (!studentId) throw new Error('INSUFFICIENT_WALLET');
+    if (!navigator.onLine) {
+      throw new Error('ระบบออฟไลน์: ไม่สามารถชำระเงินผ่าน Wallet ได้ กรุณาเชื่อมต่ออินเทอร์เน็ต');
+    }
+
+    // Atomic deduction via RPC (handles balance check + daily limit + ledger entry)
+    const { deductWallet } = await import('./wallet');
+    await deductWallet(studentId, totalAmount, transactionId);
+
+    // Also save the shop transaction itself through queue
+    const payload = {
+      id: transactionId,
+      student_id: studentId,
+      total_amount: totalAmount,
+      payment_method: paymentMethod,
+      cashier_note: null,
+      items: cart,
+    };
+    saveToQueue('checkout_shop_transaction', payload, 'rpc');
+
+    return {
+      id: transactionId,
+      student_id: studentId,
+      total_amount: totalAmount, // Thai Baht
+      payment_method: paymentMethod,
+      cashier_note: null,
+      items: cart,
+      created_at: new Date().toISOString(),
+    };
+  }
+
+  // Cash payments: continue using offline queue
   const payload = {
     id: transactionId,
     student_id: studentId || null,
@@ -80,7 +94,7 @@ export async function createShopTransaction(
   return {
     id: transactionId,
     student_id: studentId || null,
-    total_amount: totalAmount,
+    total_amount: totalAmount, // Thai Baht
     payment_method: paymentMethod,
     cashier_note: null,
     items: cart,

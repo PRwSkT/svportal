@@ -7,7 +7,7 @@ export type Student = {
   updated_at: string; // ISO 8601
 };
 
-export type TransactionType = 'tuition_payment' | 'shop_sale' | 'wallet_topup' | 'wallet_deduct';
+export type TransactionType = 'tuition_payment' | 'shop_sale' | 'wallet_topup' | 'wallet_deduct' | 'wallet_purchase';
 
 export type BaseTransaction = {
   id: string;
@@ -101,6 +101,38 @@ export type AuditLog = {
   performed_by: string;
   details: Record<string, unknown>;
   created_at: string; // ISO 8601
+};
+
+export type WalletAccount = {
+  id: string;
+  student_id: string;           // 4–5 digit numeric string
+  balance: number;              // Thai Baht, 2 decimal places, never negative
+  daily_limit: number | null;   // Thai Baht, null = no limit
+  card_uid: string | null;      // NFC UID hex string, e.g. "A3F2C1B0"
+  is_active: boolean;
+  created_at: string;           // ISO 8601
+  updated_at: string;           // ISO 8601
+};
+
+export type WalletTransaction = {
+  id: string;
+  student_id: string;           // 4–5 digit numeric string
+  type: 'topup' | 'purchase' | 'refund' | 'adjustment';
+  amount: number;               // Thai Baht, always positive
+  balance_before: number;       // Thai Baht, snapshot
+  balance_after: number;        // Thai Baht, snapshot
+  channel: 'counter' | 'svportal' | 'system' | null;
+  reference_id: string | null;
+  svportal_ref: string | null;
+  cashier_note: string | null;
+  created_at: string;           // ISO 8601
+};
+
+export type DailySpendTracking = {
+  id: string;
+  student_id: string;           // 4–5 digit numeric string
+  spend_date: string;           // ISO 8601 date
+  total_spent: number;          // Thai Baht
 };
 
 export type GoogleBackupPayload = {

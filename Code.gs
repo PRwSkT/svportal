@@ -9,12 +9,21 @@ function doPost(e) {
     if (action === 'publishToSocial') {
       return handlePublishToSocial(e);
     }
+    if (action === 'translateCaption') {
+      return handleTranslateCaption(e);
+    }
+    // === Video Multi-Step Endpoints ===
+    if (action === 'videoStepFB')    return handleVideoStepFB(e);
+    if (action === 'videoStepIG')    return handleVideoStepIG(e);
+    if (action === 'videoCheckIG')   return handleVideoCheckIG(e);
+    if (action === 'videoPublishIG') return handleVideoPublishIG(e);
 
     var imagesDataJson = e.parameter.images;
     var mimeType       = e.parameter.mimeType || "image/jpeg";
     var activityInfo   = e.parameter.activityInfo || "";
 
-    var base64ImagesArray = JSON.parse(imagesDataJson);
+    var base64ImagesArray = JSON.parse(imagesDataJson || "[]");
+    var mediaMode = e.parameter.mediaMode || 'photo';
 
     var prompt = `
 คุณคือผู้เชี่ยวชาญโซเชียลมีเดียและการตลาดของ "โรงเรียนสมคิดวิทยา" (Somkidvittaya School)
@@ -23,7 +32,10 @@ function doPost(e) {
 ---
 ${activityInfo}
 ---
+`;
 
+    if (mediaMode === 'photo') {
+        prompt += `
 หน้าที่ของคุณ: วิเคราะห์รูปภาพทั้งหมด คัดเลือกภาพที่ดี และสร้างเนื้อหาโพสต์ตามโครงสร้างที่กำหนด
 
 ══════════════════════════════════════════
@@ -49,9 +61,16 @@ ${activityInfo}
   • headline: ตัวพิมพ์ใหญ่ทั้งหมด สั้นกระชับ 3-5 คำ อ้างอิงชื่อกิจกรรม
   • subhead: Title Case ขยายความ ไม่เกิน 6 คำ
   • detail: วันที่ภาษาอังกฤษ · สถานที่ เช่น "June 2, 2026 · Somkidvittaya School"
+`;
+    } else {
+        prompt += `
+หน้าที่ของคุณ: สร้างเนื้อหาแคปชั่นสำหรับ "วิดีโอ (Reels/TikTok)" ตามโครงสร้างที่กำหนด โดยไม่ต้องวิเคราะห์รูปภาพ
+`;
+    }
 
+    prompt += `
 ══════════════════════════════════════════
-กฎข้อที่ 3: post_caption — เรียงลำดับ อังกฤษ → จีน → ไทย
+กฎข้อที่ ${mediaMode === 'photo' ? '3' : '1'}: post_caption — เรียงลำดับ อังกฤษ → จีน → ไทย
 ══════════════════════════════════════════
 โครงสร้างแต่ละภาษา:
   1. ชื่อกิจกรรม
@@ -94,6 +113,28 @@ ${activityInfo}
   • ชื่อโรงเรียน: "โรงเรียนสมคิดวิทยา" / "Somkidvittaya School" / "somkidvittaya学校" เท่านั้น
   • โทนเหมือนโรงเรียนนานาชาติ มืออาชีพ ภาคภูมิใจ
   • ใส่ emoji ได้บ้างเล็กน้อยในส่วน catchy line
+
+══════════════════════════════════════════
+รูปแบบผลลัพธ์ (JSON เท่านั้น):
+══════════════════════════════════════════
+ตอบกลับมาเป็น JSON ตาม format ด้านล่างนี้ โดยไม่ต้องมีคำอธิบายอื่น:
+{`;
+    if (mediaMode === 'photo') {
+        prompt += `
+  "kept_image_indices": [0, 1, 2],
+  "cover_headline": {
+    "headline": "EXAMPLE HEADLINE",
+    "subhead": "Example Subhead Text",
+    "detail": "June 2, 2026 · Somkidvittaya School"
+  },`;
+    }
+    prompt += `
+  "post_caption": {
+    "english": "English caption...",
+    "chinese": "Chinese caption...",
+    "thai": "Thai caption..."
+  }
+}
 `;
 
     var rawResponse = callGeminiAPI(base64ImagesArray, mimeType, prompt);
@@ -127,167 +168,152 @@ ${activityInfo}
 // Publish to Social Media (Meta Graph API Framework)
 // ==========================================
 function handlePublishToSocial(e) {
-  var fbImages = JSON.parse(e.parameter.fbImages || "[]");
-  var igImages = JSON.parse(e.parameter.igImages || "[]");
+  var mediaMode = e.parameter.mediaMode || "photo";
   var fbCaption = e.parameter.fbCaption || "";
   var igCaption = e.parameter.igCaption || "";
   
   // ข้อมูล Meta Graph API ของคุณ
-  var PAGE_ACCESS_TOKEN = "YOUR_PAGE_ACCESS_TOKEN";
-  var PAGE_ID = "YOUR_PAGE_ID";
-  var IG_ACCOUNT_ID = "YOUR_IG_ACCOUNT_ID";
+  var PAGE_ACCESS_TOKEN = "EAAYA0g05EhoBRkw8us77ykfLJI1V5p0c6RCS1BUKvDv5Uzj0uHysQALJm9iATqlNjFNSCzakf3EfCM5ktVahwnheASgGjNNm2RSg3DeQJZCic0rK43W8fdmbzxPJZBfdk8HZCa5serZBMk2OUosKJj2EZBvwPmFzDbs4uJoffPMHRZAzTT8dJTtss3Qm3KenEpidsZD";
+  var PAGE_ID = "192831060756593";
+  var IG_ACCOUNT_ID = "17841446069053774";
   
   try {
-    // ==========================================
-    // 1. FACEBOOK POSTING
-    // ==========================================
-    var fbMediaIds = [];
-    if (fbImages.length > 0) {
-      for (var i = 0; i < fbImages.length; i++) {
-        // ดึงเฉพาะ data base64 (ตัด data:image/jpeg;base64, ออก)
-        var b64Data = fbImages[i].indexOf(",") !== -1 ? fbImages[i].split(",")[1] : fbImages[i];
-        var blob = Utilities.newBlob(Utilities.base64Decode(b64Data), 'image/jpeg', 'fb_img_' + i + '.jpg');
-        
-        var fbUploadUrl = "https://graph.facebook.com/v20.0/" + PAGE_ID + "/photos";
-        var fbUploadPayload = {
-          "access_token": PAGE_ACCESS_TOKEN,
-          "published": "false", // โหลดรูปเก็บไว้ก่อน ยังไม่โพสต์
-          "source": blob
-        };
-        var fbUploadOptions = {
-          "method": "post",
-          "payload": fbUploadPayload,
-          "muteHttpExceptions": true
-        };
-        
-        var fbUploadRes = UrlFetchApp.fetch(fbUploadUrl, fbUploadOptions);
-        var fbUploadData = JSON.parse(fbUploadRes.getContentText());
-        
-        if (fbUploadData.error) {
-          throw new Error("Facebook Upload Error: " + fbUploadData.error.message);
-        }
-        fbMediaIds.push(fbUploadData.id);
-      }
-      
-      // สร้างโพสต์รวม Facebook
-      var fbPostUrl = "https://graph.facebook.com/v20.0/" + PAGE_ID + "/feed";
-      var fbPostPayload = {
-        "access_token": PAGE_ACCESS_TOKEN,
-        "message": fbCaption
-      };
-      
-      // แนบรูปภาพทั้งหมดที่อัปโหลดไว้
-      for (var j = 0; j < fbMediaIds.length; j++) {
-        fbPostPayload["attached_media[" + j + "]"] = JSON.stringify({"media_fbid": fbMediaIds[j]});
-      }
-      
-      var fbPostOptions = {
-        "method": "post",
-        "payload": fbPostPayload,
-        "muteHttpExceptions": true
-      };
-      
-      var fbPostRes = UrlFetchApp.fetch(fbPostUrl, fbPostOptions);
-      var fbPostData = JSON.parse(fbPostRes.getContentText());
-      if (fbPostData.error) {
-        throw new Error("Facebook Publish Error: " + fbPostData.error.message);
-      }
-    }
+    if (mediaMode === "video") {
+      // Video mode ใช้ multi-step endpoints แทน (videoStepFB, videoStepIG, etc.)
+      throw new Error("Video mode ให้ใช้ multi-step endpoints แทน");
 
-    // ==========================================
-    // 2. INSTAGRAM POSTING (Carousel)
-    // ==========================================
-    var driveFiles = [];
-    var igContainerIds = [];
-    
-    if (igImages.length > 0) {
-      try {
-        // 2.1 สร้างไฟล์ชั่วคราวใน Google Drive
-        for (var k = 0; k < igImages.length; k++) {
-          var igB64Data = igImages[k].indexOf(",") !== -1 ? igImages[k].split(",")[1] : igImages[k];
-          var igBlob = Utilities.newBlob(Utilities.base64Decode(igB64Data), 'image/jpeg', 'ig_temp_' + k + '.jpg');
+    } else {
+      // ==========================================
+      // PHOTO POSTING LOGIC
+      // ==========================================
+      var fbImages = JSON.parse(e.parameter.fbImages || "[]");
+      var igImages = JSON.parse(e.parameter.igImages || "[]");
+
+      // 1. FACEBOOK POSTING
+      var fbMediaIds = [];
+      if (fbImages.length > 0) {
+        for (var i = 0; i < fbImages.length; i++) {
+          var b64Data = fbImages[i].indexOf(",") !== -1 ? fbImages[i].split(",")[1] : fbImages[i];
+          var blob = Utilities.newBlob(Utilities.base64Decode(b64Data), 'image/jpeg', 'fb_img_' + i + '.jpg');
           
-          var file = DriveApp.createFile(igBlob);
-          file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-          driveFiles.push(file);
-          
-          var imageUrl = "https://drive.google.com/uc?export=download&id=" + file.getId();
-          
-          // 2.2 สร้าง IG Item Container สำหรับแต่ละรูป
-          var igItemUrl = "https://graph.facebook.com/v20.0/" + IG_ACCOUNT_ID + "/media";
-          var igItemPayload = {
+          var fbUploadUrl = "https://graph.facebook.com/v20.0/" + PAGE_ID + "/photos";
+          var fbUploadPayload = {
             "access_token": PAGE_ACCESS_TOKEN,
-            "image_url": imageUrl,
-            "is_carousel_item": "true"
+            "published": "false",
+            "source": blob
           };
-          var igItemOptions = {
+          var fbUploadRes = UrlFetchApp.fetch(fbUploadUrl, {
             "method": "post",
-            "payload": igItemPayload,
+            "payload": fbUploadPayload,
             "muteHttpExceptions": true
-          };
+          });
+          var fbUploadData = JSON.parse(fbUploadRes.getContentText());
           
-          var igItemRes = UrlFetchApp.fetch(igItemUrl, igItemOptions);
-          var igItemData = JSON.parse(igItemRes.getContentText());
-          
-          if (igItemData.error) {
-            throw new Error("IG Item Container Error: " + igItemData.error.message);
+          if (fbUploadData.error) {
+            throw new Error("Facebook Upload Error: " + fbUploadData.error.message);
           }
-          igContainerIds.push(igItemData.id);
+          fbMediaIds.push(fbUploadData.id);
         }
         
-        // รอสักครู่ให้ Meta ประมวลผลรูปภาพเสร็จ
-        Utilities.sleep(2000);
-        
-        // 2.3 สร้าง IG Carousel Container (รวมทุกรูป + แคปชั่น)
-        var igCarouselUrl = "https://graph.facebook.com/v20.0/" + IG_ACCOUNT_ID + "/media";
-        var igCarouselPayload = {
+        // สร้างโพสต์รวม Facebook
+        var fbPostUrl = "https://graph.facebook.com/v20.0/" + PAGE_ID + "/feed";
+        var fbPostPayload = {
           "access_token": PAGE_ACCESS_TOKEN,
-          "media_type": "CAROUSEL",
-          "caption": igCaption,
-          "children": igContainerIds.join(",")
+          "message": fbCaption
         };
-        var igCarouselOptions = {
-          "method": "post",
-          "payload": igCarouselPayload,
-          "muteHttpExceptions": true
-        };
-        
-        var igCarouselRes = UrlFetchApp.fetch(igCarouselUrl, igCarouselOptions);
-        var igCarouselData = JSON.parse(igCarouselRes.getContentText());
-        
-        if (igCarouselData.error) {
-          throw new Error("IG Carousel Container Error: " + igCarouselData.error.message);
+      
+        // แนบรูปภาพทั้งหมดที่อัปโหลดไว้โดยมัดรวมเป็น Array (บังคับ Facebook เรียงภาพเป๊ะๆ)
+        var attachedMediaArr = [];
+        for (var j = 0; j < fbMediaIds.length; j++) {
+          attachedMediaArr.push({"media_fbid": fbMediaIds[j]});
         }
+        fbPostPayload["attached_media"] = JSON.stringify(attachedMediaArr);
         
-        // รอสักครู่ให้ Container ประกอบร่างเสร็จ
-        Utilities.sleep(2000);
-        
-        // 2.4 Publish Instagram Post
-        var igPublishUrl = "https://graph.facebook.com/v20.0/" + IG_ACCOUNT_ID + "/media_publish";
-        var igPublishPayload = {
-          "access_token": PAGE_ACCESS_TOKEN,
-          "creation_id": igCarouselData.id
-        };
-        var igPublishOptions = {
+        var fbPostRes = UrlFetchApp.fetch(fbPostUrl, {
           "method": "post",
-          "payload": igPublishPayload,
+          "payload": fbPostPayload,
           "muteHttpExceptions": true
-        };
-        
-        var igPublishRes = UrlFetchApp.fetch(igPublishUrl, igPublishOptions);
-        var igPublishData = JSON.parse(igPublishRes.getContentText());
-        
-        if (igPublishData.error) {
-          throw new Error("IG Publish Error: " + igPublishData.error.message);
+        });
+        var fbPostData = JSON.parse(fbPostRes.getContentText());
+        if (fbPostData.error) {
+          throw new Error("Facebook Publish Error: " + fbPostData.error.message);
         }
+      }
 
-      } finally {
-        // 2.5 Clean up: ลบไฟล์ชั่วคราวออกจาก Google Drive เสมอ (แม้ว่าจะ Error)
-        for (var f = 0; f < driveFiles.length; f++) {
-          try {
-            driveFiles[f].setTrashed(true);
-          } catch(e) {
-            // Ignore error in cleanup
+      // 2. INSTAGRAM POSTING
+      var driveFiles = [];
+      var igContainerIds = [];
+      
+      if (igImages.length > 0) {
+        try {
+          for (var k = 0; k < igImages.length; k++) {
+            var igB64Data = igImages[k].indexOf(",") !== -1 ? igImages[k].split(",")[1] : igImages[k];
+            var igBlob = Utilities.newBlob(Utilities.base64Decode(igB64Data), 'image/jpeg', 'ig_temp_' + k + '.jpg');
+            
+            var file = DriveApp.createFile(igBlob);
+            file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+            driveFiles.push(file);
+            
+            var imageUrl = "https://drive.google.com/uc?export=download&id=" + file.getId();
+            
+            var igItemUrl = "https://graph.facebook.com/v20.0/" + IG_ACCOUNT_ID + "/media";
+            var igItemPayload = {
+              "access_token": PAGE_ACCESS_TOKEN,
+              "image_url": imageUrl,
+              "is_carousel_item": "true"
+            };
+            var igItemRes = UrlFetchApp.fetch(igItemUrl, {
+              "method": "post",
+              "payload": igItemPayload,
+              "muteHttpExceptions": true
+            });
+            var igItemData = JSON.parse(igItemRes.getContentText());
+            
+            if (igItemData.error) {
+              throw new Error("IG Upload Error: " + igItemData.error.message);
+            }
+            igContainerIds.push(igItemData.id);
+          }
+          
+          var igCarouselUrl = "https://graph.facebook.com/v20.0/" + IG_ACCOUNT_ID + "/media";
+          var igCarouselPayload = {
+            "access_token": PAGE_ACCESS_TOKEN,
+            "media_type": "CAROUSEL",
+            "children": igContainerIds.join(","),
+            "caption": igCaption
+          };
+          var igCarouselRes = UrlFetchApp.fetch(igCarouselUrl, {
+            "method": "post",
+            "payload": igCarouselPayload,
+            "muteHttpExceptions": true
+          });
+          var igCarouselData = JSON.parse(igCarouselRes.getContentText());
+          
+          if (igCarouselData.error) {
+            throw new Error("IG Carousel Container Error: " + igCarouselData.error.message);
+          }
+          
+          Utilities.sleep(2000);
+          
+          var igPublishUrl = "https://graph.facebook.com/v20.0/" + IG_ACCOUNT_ID + "/media_publish";
+          var igPublishPayload = {
+            "access_token": PAGE_ACCESS_TOKEN,
+            "creation_id": igCarouselData.id
+          };
+          var igPublishRes = UrlFetchApp.fetch(igPublishUrl, {
+            "method": "post",
+            "payload": igPublishPayload,
+            "muteHttpExceptions": true
+          });
+          var igPublishData = JSON.parse(igPublishRes.getContentText());
+          
+          if (igPublishData.error) {
+            throw new Error("IG Publish Error: " + igPublishData.error.message);
+          }
+
+        } finally {
+          for (var f = 0; f < driveFiles.length; f++) {
+            try { driveFiles[f].setTrashed(true); } catch(e) {}
           }
         }
       }
@@ -295,7 +321,7 @@ function handlePublishToSocial(e) {
 
     return ContentService.createTextOutput(JSON.stringify({
       success: true,
-      message: "โพสต์ลง Facebook และ Instagram สำเร็จเรียบร้อยแล้ว!"
+      message: "โพสต์สำเร็จเรียบร้อยแล้ว!"
     })).setMimeType(ContentService.MimeType.JSON);
 
   } catch (error) {
@@ -310,7 +336,7 @@ function handlePublishToSocial(e) {
 // เรียก Gemini API (รองรับหลายรูปภาพ + JSON Schema)
 // ==========================================
 function callGeminiAPI(base64ImagesArray, mimeType, prompt) {
-   var apiKey = "YOUR_API_KEY_HERE"; // ใส่คีย์ของคุณระหว่างเครื่องหมาย " "
+   var apiKey = "YOUR_GEMINI_API_KEY"; // ใส่คีย์ของคุณระหว่างเครื่องหมาย " "
    var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=" + apiKey;
 
   var jsonSchema = {
@@ -364,5 +390,200 @@ function callGeminiAPI(base64ImagesArray, mimeType, prompt) {
     return JSON.parse(responseText);
   } catch (e) {
     return { "error": { "message": "JSON Parse Error จากฝั่งเซิร์ฟเวอร์ Google: " + responseText } };
+  }
+}
+
+// ==========================================
+// แปลภาษาแคปชั่นอัตโนมัติจากภาษาไทย
+// ==========================================
+function handleTranslateCaption(e) {
+  var thaiCaption = e.parameter.thaiCaption || "";
+  if (!thaiCaption) {
+    return ContentService.createTextOutput(JSON.stringify({error: "No Thai caption provided"})).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  var apiKey = "YOUR_GEMINI_API_KEY"; // ใส่คีย์ของคุณระหว่างเครื่องหมาย " "
+  var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=" + apiKey;
+
+  var jsonSchema = {
+    "type": "OBJECT",
+    "properties": {
+      "english": { "type": "STRING", "description": "แปลเป็นภาษาอังกฤษล้วน สไตล์มืออาชีพ กระตือรือร้น แบบอินเตอร์ และคงการจัดตำแหน่งทุกอย่างให้เหมือนเดิม" },
+      "chinese": { "type": "STRING", "description": "แปลเป็นภาษาจีนล้วน สไตล์มืออาชีพ กระตือรือร้น แบบอินเตอร์ และคงการจัดตำแหน่งทุกอย่างให้เหมือนเดิม" }
+    },
+    "required": ["english", "chinese"]
+  };
+
+  var prompt = "Translate the following Thai social media caption into English and Chinese. Maintain the friendly, professional, and enthusiastic tone of an international school. Do not include hashtags or contact information, just translate the text provided.\n\nThai Caption:\n" + thaiCaption;
+
+  var payload = {
+    "contents": [
+      {
+        "role": "user",
+        "parts": [{ "text": prompt }]
+      }
+    ],
+    "generationConfig": {
+      "responseMimeType": "application/json",
+      "responseSchema": jsonSchema
+    }
+  };
+
+  var options = { 
+    "method": "post", 
+    "contentType": "application/json",
+    "payload": JSON.stringify(payload), 
+    "muteHttpExceptions": true
+  };
+
+  var response = UrlFetchApp.fetch(url, options);
+  var responseText = response.getContentText();
+  
+  try {
+    var data = JSON.parse(responseText);
+    // Return the successfully generated content directly
+    if (data.candidates && data.candidates[0].content.parts[0].text) {
+      return ContentService.createTextOutput(data.candidates[0].content.parts[0].text).setMimeType(ContentService.MimeType.JSON);
+    } else if (data.error && data.error.message) {
+      return ContentService.createTextOutput(JSON.stringify({error: {message: "Gemini API Error: " + data.error.message, raw: data}})).setMimeType(ContentService.MimeType.JSON);
+    } else {
+      return ContentService.createTextOutput(JSON.stringify({error: {message: "Unexpected response format from Gemini", raw: data}})).setMimeType(ContentService.MimeType.JSON);
+    }
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({error: {message: "JSON Parse error from Gemini", raw: responseText}})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ==========================================
+// VIDEO STEP: Facebook Upload
+// step=start: เริ่ม session (รับ session_id)
+// step=transfer: รับ chunkBase64 แล้วส่งไป FB
+// step=finish: จบ session
+// ==========================================
+function handleVideoStepFB(e) {
+  var c = getMetaConfig_();
+  var step = e.parameter.step || "start";
+  try {
+    if (step === "start") {
+      var res = UrlFetchApp.fetch("https://graph-video.facebook.com/v20.0/" + c.pageId + "/videos", {
+        method: "post",
+        payload: { "access_token": c.token, "upload_phase": "start", "file_size": e.parameter.fileSize },
+        muteHttpExceptions: true
+      });
+      var d = JSON.parse(res.getContentText());
+      if (d.error) throw new Error(d.error.message);
+      return ContentService.createTextOutput(JSON.stringify({
+        sessionId: d.upload_session_id, startOffset: d.start_offset, endOffset: d.end_offset
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+    if (step === "transfer") {
+      var off = e.parameter.startOffset;
+      var base64Data = e.parameter.chunkBase64;
+      var bytes = Utilities.base64Decode(base64Data);
+      var chunkBlob = Utilities.newBlob(bytes, "video/mp4", "chunk.mp4");
+
+      var res = UrlFetchApp.fetch("https://graph-video.facebook.com/v20.0/" + c.pageId + "/videos", {
+        method: "post",
+        payload: {
+          "access_token": c.token, "upload_phase": "transfer",
+          "upload_session_id": e.parameter.sessionId,
+          "start_offset": off, "video_file_chunk": chunkBlob
+        },
+        muteHttpExceptions: true
+      });
+      var d = JSON.parse(res.getContentText());
+      if (d.error) throw new Error(d.error.message);
+      return ContentService.createTextOutput(JSON.stringify({
+        startOffset: d.start_offset, endOffset: d.end_offset
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+    if (step === "finish") {
+      var res = UrlFetchApp.fetch("https://graph-video.facebook.com/v20.0/" + c.pageId + "/videos", {
+        method: "post",
+        payload: {
+          "access_token": c.token, "upload_phase": "finish",
+          "upload_session_id": e.parameter.sessionId, "description": e.parameter.fbCaption || ""
+        },
+        muteHttpExceptions: true
+      });
+      var d = JSON.parse(res.getContentText());
+      if (d.error) throw new Error(d.error.message);
+      return ContentService.createTextOutput(JSON.stringify({success:true})).setMimeType(ContentService.MimeType.JSON);
+    }
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ==========================================
+// VIDEO STEP: Instagram Reel Upload (Resumable)
+// step=create: สร้าง container รับ uploadUri
+// step=transfer: รับ chunkBase64 แล้วส่งไป uploadUri
+// ==========================================
+function handleVideoStepIG(e) {
+  var c = getMetaConfig_();
+  var step = e.parameter.step || "create";
+  try {
+    if (step === "create") {
+      var res = UrlFetchApp.fetch("https://graph.facebook.com/v20.0/" + c.igId + "/media", {
+        method: "post",
+        payload: { "access_token": c.token, "media_type": "REELS", "upload_type": "resumable", "caption": e.parameter.igCaption || "" },
+        muteHttpExceptions: true
+      });
+      var d = JSON.parse(res.getContentText());
+      if (d.error) throw new Error(d.error.message);
+      return ContentService.createTextOutput(JSON.stringify({containerId: d.id, uploadUri: d.uri})).setMimeType(ContentService.MimeType.JSON);
+    }
+    if (step === "transfer") {
+      var offset = e.parameter.offset;
+      var fileSize = e.parameter.fileSize;
+      
+      var base64Data = e.parameter.chunkBase64;
+      var bytes = Utilities.base64Decode(base64Data);
+      var chunkBlob = Utilities.newBlob(bytes, "application/octet-stream", "chunk.mp4");
+
+      UrlFetchApp.fetch(e.parameter.uploadUri, {
+        method: "post",
+        headers: { "Authorization": "OAuth " + c.token, "offset": offset, "file_size": fileSize },
+        contentType: "application/octet-stream", payload: chunkBlob, muteHttpExceptions: true
+      });
+      var nextOff = parseInt(offset) + bytes.length;
+      return ContentService.createTextOutput(JSON.stringify({nextOffset: nextOff, done: nextOff >= parseInt(fileSize)})).setMimeType(ContentService.MimeType.JSON);
+    }
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ==========================================
+// VIDEO STEP: Check IG Reel Status
+// ==========================================
+function handleVideoCheckIG(e) {
+  var c = getMetaConfig_();
+  try {
+    var res = UrlFetchApp.fetch("https://graph.facebook.com/v20.0/" + e.parameter.containerId + "?fields=status_code&access_token=" + c.token, {muteHttpExceptions:true});
+    var d = JSON.parse(res.getContentText());
+    return ContentService.createTextOutput(JSON.stringify({status: d.status_code || "IN_PROGRESS"})).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ==========================================
+// VIDEO STEP: Publish IG Reel
+// ==========================================
+function handleVideoPublishIG(e) {
+  var c = getMetaConfig_();
+  try {
+    var res = UrlFetchApp.fetch("https://graph.facebook.com/v20.0/" + c.igId + "/media_publish", {
+      method: "post",
+      payload: { "access_token": c.token, "creation_id": e.parameter.containerId },
+      muteHttpExceptions: true
+    });
+    var d = JSON.parse(res.getContentText());
+    if (d.error) throw new Error(d.error.message);
+    return ContentService.createTextOutput(JSON.stringify({success:true})).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
   }
 }
