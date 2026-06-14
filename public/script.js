@@ -11,6 +11,23 @@ let hasFiles = false;
 let currentLang = 'th';
 let currentCaptionFB = "";
 let currentCaptionIG = "";
+let mediaMode = 'photo'; // 'photo' or 'video'
+
+function setMediaMode(mode) {
+    mediaMode = mode;
+    document.getElementById('btn-mode-photo').classList.toggle('selected', mode === 'photo');
+    document.getElementById('btn-mode-video').classList.toggle('selected', mode === 'video');
+    document.getElementById('upload-zone-photo').style.display = (mode === 'photo') ? 'block' : 'none';
+    document.getElementById('upload-zone-video').style.display = (mode === 'video') ? 'block' : 'none';
+    
+    // Clear selections
+    document.getElementById('activity-photos').value = '';
+    document.getElementById('activity-video').value = '';
+    document.getElementById('video-preview-container').style.display = 'none';
+    document.getElementById('video-preview').src = '';
+    hasFiles = false;
+    checkFormReady();
+}
 
 // Initialize Web Worker
 const imageWorker = new Worker('imageWorker.js');
@@ -136,27 +153,52 @@ function buildActivityContext() {
 // ==========================================
 // FILE UPLOAD
 // ==========================================
-const fileInput  = document.getElementById('activity-photos');
-const uploadZone = document.getElementById('upload-zone');
+const photoInput  = document.getElementById('activity-photos');
+const videoInput  = document.getElementById('activity-video');
+const photoZone = document.getElementById('upload-zone-photo');
+const videoZone = document.getElementById('upload-zone-video');
 
-fileInput.addEventListener('change', handleFiles);
-uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
-uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
-uploadZone.addEventListener('drop', e => {
-    e.preventDefault();
-    uploadZone.classList.remove('drag-over');
-    fileInput.files = e.dataTransfer.files;
-    handleFiles();
-});
+function setupUploadZone(zone, input, isVideo) {
+    zone.addEventListener('click', () => input.click());
+    input.addEventListener('change', () => handleFiles(input, zone, isVideo));
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => {
+        e.preventDefault();
+        zone.classList.remove('drag-over');
+        input.files = e.dataTransfer.files;
+        handleFiles(input, zone, isVideo);
+    });
+}
 
-function handleFiles() {
-    uploadedFiles = Array.from(fileInput.files);
-    const n = uploadedFiles.length;
-    hasFiles = n > 0;
+setupUploadZone(photoZone, photoInput, false);
+setupUploadZone(videoZone, videoInput, true);
+
+function handleFiles(input, zone, isVideo) {
+    uploadedFiles = Array.from(input.files);
+    hasFiles = uploadedFiles.length > 0;
+    
     if (hasFiles) {
-        uploadZone.classList.add('has-files');
-        const t = I18N[currentLang];
-        document.getElementById('upload-label').innerText = `${t.files_selected} ${n} ${t.files_unit}`;
+        zone.classList.add('has-files');
+        if (isVideo) {
+            const file = uploadedFiles[0];
+            document.getElementById('upload-label-video').innerText = `เลือกวิดีโอแล้ว: ${file.name} (${(file.size / (1024*1024)).toFixed(1)} MB)`;
+            const previewContainer = document.getElementById('video-preview-container');
+            const previewVideo = document.getElementById('video-preview');
+            previewContainer.style.display = 'block';
+            previewVideo.src = URL.createObjectURL(file);
+        } else {
+            const t = I18N[currentLang];
+            document.getElementById('upload-label-photo').innerText = `${t.files_selected} ${uploadedFiles.length} ${t.files_unit}`;
+        }
+    } else {
+        zone.classList.remove('has-files');
+        if (isVideo) {
+            document.getElementById('upload-label-video').innerText = 'คลิกหรือลากไฟล์วิดีโอมาวางที่นี่ (MP4/MOV)';
+            document.getElementById('video-preview-container').style.display = 'none';
+        } else {
+            document.getElementById('upload-label-photo').innerText = 'คลิกหรือลากไฟล์รูปมาวางที่นี่';
+        }
     }
     checkFormReady();
 }
@@ -236,8 +278,11 @@ async function processPost() {
         const maxProcess = Math.min(uploadedFiles.length, 40);
         const filesToProcess = uploadedFiles.slice(0, maxProcess);
         
-        // Run resize in worker
-        const imagesDataForAI = await runWorkerTask('resizeImagesForAI', { images: filesToProcess, maxW: 600 });
+        // Run resize in worker only if photo mode
+        let imagesDataForAI = [];
+        if (mediaMode === 'photo') {
+            imagesDataForAI = await runWorkerTask('resizeImagesForAI', { images: filesToProcess, maxW: 600 });
+        }
 
         setStep(3); statusText.innerText = "AI กำลังคัดกรองรูปภาพและเขียนแคปชั่น... (รอประมาณ 15-30 วินาที)";
 
@@ -247,7 +292,8 @@ async function processPost() {
             body: new URLSearchParams({
                 'images': JSON.stringify(imagesDataForAI),
                 'mimeType': 'image/jpeg',
-                'activityInfo': activityContext
+                'activityInfo': activityContext,
+                'mediaMode': mediaMode
             })
         });
 
@@ -261,27 +307,8 @@ async function processPost() {
             throw new Error("AI ตอบผิดรูปแบบ: " + rawText.substring(0,150));
         }
         if (parsedData.error) throw new Error(parsedData.error);
-        if (!parsedData.kept_image_indices) throw new Error("ไม่ได้รับข้อมูลการคัดภาพจาก AI");
+        if (mediaMode === 'photo' && !parsedData.kept_image_indices) throw new Error("ไม่ได้รับข้อมูลการคัดภาพจาก AI");
 
-        let keptIndices = parsedData.kept_image_indices;
-        if (keptIndices && keptIndices.length > 0) {
-            let coverIdx = keptIndices[0];
-            let restIndices = keptIndices.slice(1).sort((a, b) => a - b);
-            let sortedIndices = [coverIdx, ...restIndices];
-            
-            let filteredFiles = [];
-            for (let idx of sortedIndices) {
-                if (idx >= 0 && idx < uploadedFiles.length) {
-                    if (!filteredFiles.includes(uploadedFiles[idx])) {
-                        filteredFiles.push(uploadedFiles[idx]);
-                    }
-                }
-            }
-            if (filteredFiles.length > 0) {
-                uploadedFiles = filteredFiles;
-            }
-        }
-        
         currentAIResult = parsedData;
         currentCaptionFB = parsedData.post_caption;
         currentCaptionIG = parseIGCaption(parsedData.post_caption);
@@ -289,34 +316,72 @@ async function processPost() {
         document.getElementById('final-caption-fb').innerText = currentCaptionFB;
         document.getElementById('final-caption-ig').innerText = currentCaptionIG;
 
-        const hl = parsedData.cover_headline;
-        document.getElementById('hl-line1').value = hl.headline || '';
-        document.getElementById('hl-line2').value = hl.subhead  || '';
-        document.getElementById('hl-line3').value = hl.detail   || '';
+        if (mediaMode === 'photo') {
+            let keptIndices = parsedData.kept_image_indices;
+            if (keptIndices && keptIndices.length > 0) {
+                let coverIdx = keptIndices[0];
+                let restIndices = keptIndices.slice(1).sort((a, b) => a - b);
+                let sortedIndices = [coverIdx, ...restIndices];
+                
+                let filteredFiles = [];
+                for (let idx of sortedIndices) {
+                    if (idx >= 0 && idx < uploadedFiles.length) {
+                        if (!filteredFiles.includes(uploadedFiles[idx])) {
+                            filteredFiles.push(uploadedFiles[idx]);
+                        }
+                    }
+                }
+                if (filteredFiles.length > 0) {
+                    uploadedFiles = filteredFiles;
+                }
+            }
 
-        setStep(4); statusText.innerText = "ปรับแสงสีและวาดภาพปก...";
-        
-        // Let worker draw covers
-        const leadFile = uploadedFiles[0];
-        const covers = await runWorkerTask('drawCovers', {
-            leadImgBlob: leadFile,
-            hl: getHeadlineFromEditor(),
-            templates: { fbCover: templateFBCover, igCover: templateIGCover }
-        });
-        
-        document.getElementById('final-cover-fb').src = covers.fbData;
-        document.getElementById('final-cover-ig').src = covers.igData;
+            const hl = parsedData.cover_headline;
+            document.getElementById('hl-line1').value = hl.headline || '';
+            document.getElementById('hl-line2').value = hl.subhead  || '';
+            document.getElementById('hl-line3').value = hl.detail   || '';
 
-        setStep(5);
-        statusText.innerText = `เสร็จสมบูรณ์! AI ได้คัดภาพที่ดี ไว้ให้คุณแล้ว ${uploadedFiles.length} รูป (ตัดภาพซ้ำ/เบลอ) ตรวจสอบแล้วกดดาวน์โหลดได้เลย`;
-        
-        await renderPhotoSelector(uploadedFiles);
+            setStep(4); statusText.innerText = "ปรับแสงสีและวาดภาพปก...";
+            
+            const leadFile = uploadedFiles[0];
+            const covers = await runWorkerTask('drawCovers', {
+                leadImgBlob: leadFile,
+                hl: getHeadlineFromEditor(),
+                templates: { fbCover: templateFBCover, igCover: templateIGCover }
+            });
+            
+            document.getElementById('final-cover-fb').src = covers.fbData;
+            document.getElementById('final-cover-ig').src = covers.igData;
 
-        document.getElementById('headline-editor').style.display = 'block';
-        document.getElementById('btn-download-zip').style.display = 'flex';
+            setStep(5);
+            statusText.innerText = `เสร็จสมบูรณ์! AI ได้คัดภาพที่ดี ไว้ให้คุณแล้ว ${uploadedFiles.length} รูป (ตัดภาพซ้ำ/เบลอ) ตรวจสอบแล้วกดดาวน์โหลดได้เลย`;
+            
+            document.getElementById('photo-selector').style.display = 'block';
+            document.getElementById('preview-grid').style.display = 'grid';
+            document.getElementById('headline-editor').style.display = 'block';
+            
+            await renderPhotoSelector(uploadedFiles);
+        } else {
+            // Video Mode
+            setStep(5);
+            statusText.innerText = `เสร็จสมบูรณ์! AI ได้เขียนแคปชั่นสำหรับวิดีโอเรียบร้อยแล้ว กดยืนยันเพื่ออัปโหลดและโพสต์ลงโซเชียลได้เลย`;
+            
+            document.getElementById('photo-selector').style.display = 'none';
+            document.getElementById('preview-grid').style.display = 'none';
+            document.getElementById('headline-editor').style.display = 'none';
+            
+            // Show video download/publish UI
+        }
+
+        if (mediaMode === 'photo') {
+            document.getElementById('headline-editor').style.display = 'block';
+            document.getElementById('btn-download-zip').style.display = 'flex';
+            document.getElementById('dl-label').innerText = `ดาวน์โหลด ${uploadedFiles.length} รูปภาพ (.zip) — FB + IG Ready`;
+        } else {
+            document.getElementById('headline-editor').style.display = 'none';
+            document.getElementById('btn-download-zip').style.display = 'none';
+        }
         document.getElementById('btn-review-publish').style.display = 'flex';
-        document.getElementById('dl-label').innerText = `ดาวน์โหลด ${uploadedFiles.length} รูปภาพ (.zip) — FB + IG Ready`;
-        
         btn.disabled = false;
         btn.classList.remove('loading');
         showToast("ประมวลผลเสร็จสมบูรณ์!", "success");
@@ -668,66 +733,85 @@ async function openPublishModal() {
         const activeFiles = getActiveFiles();
         const hl = getHeadlineFromEditor();
 
-        // Process images for preview so user sees the overlays
-        const processedImages = await runWorkerTask('prepareImagesForSocial', {
-            files: activeFiles.slice(0, 40),
-            hl: hl,
-            templates: { fbCover: templateFBCover, igCover: templateIGCover, fbSub: templateFBSub, igSub: templateIGSub }
-        });
-        
-        // Cache globally for confirmPublish
-        window.socialProcessedImagesCache = processedImages;
+        if (mediaMode === 'photo') {
+            document.getElementById('modal-fb-gallery').style.display = 'block';
+            document.getElementById('modal-ig-gallery-wrapper').style.display = 'block';
+            document.getElementById('modal-video-preview-wrapper').style.display = 'none';
+            document.getElementById('modal-video-preview-wrapper-fb').style.display = 'none';
 
-        // FB Gallery (preview up to 5)
-        let fbImgs = processedImages.fbImages.map(b64 => "data:image/jpeg;base64," + b64);
-        fbImgs.slice(0, 5).forEach(src => {
-            const img = document.createElement('img');
-            img.src = src;
-            img.style.width = '100%'; img.style.height = '120px'; img.style.objectFit = 'cover'; img.style.borderRadius = '8px';
-            fbGallery.appendChild(img);
-        });
-
-        // IG Gallery (Carousel up to 10)
-        let igImgs = processedImages.igImages.map(b64 => "data:image/jpeg;base64," + b64);
-        igImgs.forEach((src, idx) => {
-            const img = document.createElement('img');
-            img.src = src;
-            img.className = 'ig-carousel-item' + (idx === 0 ? ' active' : '');
-            igGallery.appendChild(img);
+            // Process images for preview so user sees the overlays
+            const processedImages = await runWorkerTask('prepareImagesForSocial', {
+                files: activeFiles.slice(0, 40),
+                hl: hl,
+                templates: { fbCover: templateFBCover, igCover: templateIGCover, fbSub: templateFBSub, igSub: templateIGSub }
+            });
             
-            const dot = document.createElement('div');
-            dot.className = 'ig-dot' + (idx === 0 ? ' active' : '');
-            igDots.appendChild(dot);
-        });
-        
-        const igCount = igImgs.length;
-        const warning = document.getElementById('modal-ig-warning');
-        if (activeFiles.length > 10) {
-            warning.style.display = 'block';
-            warning.innerText = `* รูปสำหรับ Instagram จะถูกเลือกเฉพาะ 10 รูปแรกเท่านั้น`;
+            // Cache globally for confirmPublish
+            window.socialProcessedImagesCache = processedImages;
+
+            // FB Gallery (preview up to 5)
+            let fbImgs = processedImages.fbImages.map(b64 => "data:image/jpeg;base64," + b64);
+            fbImgs.slice(0, 5).forEach(src => {
+                const img = document.createElement('img');
+                img.src = src;
+                img.style.width = '100%'; img.style.height = '120px'; img.style.objectFit = 'cover'; img.style.borderRadius = '8px';
+                fbGallery.appendChild(img);
+            });
+
+            // IG Gallery (Carousel up to 10)
+            let igImgs = processedImages.igImages.map(b64 => "data:image/jpeg;base64," + b64);
+            igImgs.forEach((src, idx) => {
+                const img = document.createElement('img');
+                img.src = src;
+                img.className = 'ig-carousel-item' + (idx === 0 ? ' active' : '');
+                igGallery.appendChild(img);
+                
+                const dot = document.createElement('div');
+                dot.className = 'ig-dot' + (idx === 0 ? ' active' : '');
+                igDots.appendChild(dot);
+            });
+            
+            const igCount = igImgs.length;
+            const warning = document.getElementById('modal-ig-warning');
+            if (activeFiles.length > 10) {
+                warning.style.display = 'block';
+                warning.innerText = `* รูปสำหรับ Instagram จะถูกเลือกเฉพาะ 10 รูปแรกเท่านั้น`;
+            } else {
+                warning.style.display = 'none';
+            }
+
+            // Simple carousel animation
+            if (igCarouselInterval) clearInterval(igCarouselInterval);
+            if (igCount > 1) {
+                let curIdx = 0;
+                igCarouselInterval = setInterval(() => {
+                    const items = igGallery.querySelectorAll('.ig-carousel-item');
+                    const dots = igDots.querySelectorAll('.ig-dot');
+                    if(items.length === 0) return;
+                    items[curIdx].classList.remove('active');
+                    dots[curIdx].classList.remove('active');
+                    curIdx = (curIdx + 1) % igCount;
+                    items[curIdx].classList.add('active');
+                    dots[curIdx].classList.add('active');
+                }, 2000);
+            }
         } else {
-            warning.style.display = 'none';
+            // Video Mode
+            document.getElementById('modal-fb-gallery').style.display = 'none';
+            document.getElementById('modal-ig-gallery-wrapper').style.display = 'none';
+            document.getElementById('modal-video-preview-wrapper').style.display = 'block';
+            document.getElementById('modal-video-preview-wrapper-fb').style.display = 'block';
+            
+            const videoUrl = URL.createObjectURL(uploadedFiles[0]);
+            document.getElementById('modal-video-preview').src = videoUrl;
+            document.getElementById('modal-video-preview-fb').src = videoUrl;
+            
+            document.getElementById('modal-ig-warning').style.display = 'none';
         }
 
         document.getElementById('publish-modal').classList.add('is-active');
-        
-        // Simple carousel animation
-        if (igCarouselInterval) clearInterval(igCarouselInterval);
-        if (igCount > 1) {
-            let curIdx = 0;
-            igCarouselInterval = setInterval(() => {
-                const items = igGallery.querySelectorAll('.ig-carousel-item');
-                const dots = igDots.querySelectorAll('.ig-dot');
-                if(items.length === 0) return;
-                items[curIdx].classList.remove('active');
-                dots[curIdx].classList.remove('active');
-                curIdx = (curIdx + 1) % igCount;
-                items[curIdx].classList.add('active');
-                dots[curIdx].classList.add('active');
-            }, 2000);
-        }
     } catch (e) {
-        showToast("เกิดข้อผิดพลาดในการเตรียมรูปภาพพรีวิว: " + e.message, 'error');
+        showToast("เกิดข้อผิดพลาดในการเตรียมพรีวิว: " + e.message, 'error');
     } finally {
         if (btnPublish) {
             btnPublish.innerHTML = originalBtnText;
@@ -753,13 +837,59 @@ async function confirmPublish() {
         const igCaption = document.getElementById('final-caption-ig').innerText;
         const hl = getHeadlineFromEditor();
 
-        // Use cached processed images or prepare them if missing
-        let processedImages = window.socialProcessedImagesCache;
-        if (!processedImages) {
-            processedImages = await runWorkerTask('prepareImagesForSocial', {
-                files: activeFiles.slice(0, 40),
-                hl: hl,
-                templates: { fbCover: templateFBCover, igCover: templateIGCover, fbSub: templateFBSub, igSub: templateIGSub }
+        let requestBody;
+
+        if (mediaMode === 'photo') {
+            // Use cached processed images or prepare them if missing
+            let processedImages = window.socialProcessedImagesCache;
+            if (!processedImages) {
+                processedImages = await runWorkerTask('prepareImagesForSocial', {
+                    files: activeFiles.slice(0, 40),
+                    hl: hl,
+                    templates: { fbCover: templateFBCover, igCover: templateIGCover, fbSub: templateFBSub, igSub: templateIGSub }
+                });
+            }
+            requestBody = new URLSearchParams({
+                'action': 'publishToSocial',
+                'mediaMode': 'photo',
+                'fbImages': JSON.stringify(processedImages.fbImages),
+                'igImages': JSON.stringify(processedImages.igImages),
+                'fbCaption': fbCaption,
+                'igCaption': igCaption
+            });
+        } else {
+            // Video Mode
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังอัปโหลดวิดีโอ...';
+            const videoFile = activeFiles[0];
+            
+            const urlRes = await fetch(WEB_APP_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    'action': 'getUploadUrl',
+                    'fileName': videoFile.name,
+                    'mimeType': videoFile.type,
+                    'fileSize': videoFile.size
+                })
+            });
+            const urlData = await urlRes.json();
+            if (urlData.error) throw new Error(urlData.error);
+            
+            const uploadRes = await fetch(urlData.uploadUrl, {
+                method: 'PUT',
+                body: videoFile
+            });
+            const uploadData = await uploadRes.json();
+            if (!uploadData.id) throw new Error("Upload to Drive failed");
+            
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังโพสต์...';
+            
+            requestBody = new URLSearchParams({
+                'action': 'publishToSocial',
+                'mediaMode': 'video',
+                'driveFileId': uploadData.id,
+                'fbCaption': fbCaption,
+                'igCaption': igCaption
             });
         }
 
@@ -767,13 +897,7 @@ async function confirmPublish() {
         const response = await fetch(WEB_APP_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-                'action': 'publishToSocial',
-                'fbImages': JSON.stringify(processedImages.fbImages),
-                'igImages': JSON.stringify(processedImages.igImages),
-                'fbCaption': fbCaption,
-                'igCaption': igCaption
-            })
+            body: requestBody
         });
 
         const rawText = await response.text();
