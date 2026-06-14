@@ -94,8 +94,7 @@ function updateCharCount(el, counterId, max) {
 }
 function checkFormReady() {
     const name = document.getElementById('f-activity-name').value.trim();
-    const date = document.getElementById('f-date').value;
-    const ready = name && date && hasFiles;
+    const ready = name && hasFiles;
     
     const btn = document.getElementById('btn-process');
     const lbl = document.getElementById('btn-label');
@@ -115,13 +114,17 @@ function buildActivityContext() {
     const hashtag  = document.getElementById('f-hashtag').value.trim();
     const tone     = getSelectedTone();
 
-    let dateStr = date;
-    try {
-        const d = new Date(date);
-        dateStr = d.toLocaleDateString('th-TH', {day:'numeric', month:'long', year:'numeric'});
-    } catch(e) {}
+    let dateStr = "";
+    if (date) {
+        try {
+            const d = new Date(date);
+            dateStr = `\nวันที่: ${d.toLocaleDateString('th-TH', {day:'numeric', month:'long', year:'numeric'})}`;
+        } catch(e) {
+            dateStr = `\nวันที่: ${date}`;
+        }
+    }
 
-    let ctx = `ชื่อกิจกรรม: ${name}\nวันที่: ${dateStr}\nประเภท: ${types}`;
+    let ctx = `ชื่อกิจกรรม: ${name}${dateStr}\nประเภท: ${types}`;
     if (grade)   ctx += `\nกลุ่มนักเรียน: ${grade}`;
     if (detail)  ctx += `\nรายละเอียด: ${detail}`;
     if (obj)     ctx += `\nวัตถุประสงค์: ${obj}`;
@@ -184,8 +187,8 @@ function setStep(n) {
 // MAIN PROCESS
 // ==========================================
 async function processPost() {
-    if (!document.getElementById('f-activity-name').value.trim()) return showToast("กรุณากรอกชื่อกิจกรรม", "error");
-    if (!document.getElementById('f-date').value) return showToast("กรุณาเลือกวันที่จัดกิจกรรม", "error");
+    const name = document.getElementById('f-activity-name').value.trim();
+    if (!name) return showToast("กรุณาใส่ชื่อกิจกรรม", "error");
     if (!hasFiles) return showToast("กรุณาเลือกรูปภาพ", "error");
 
     const btn = document.getElementById('btn-process');

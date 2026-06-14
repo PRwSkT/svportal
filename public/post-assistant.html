@@ -52,11 +52,11 @@
 
         <div class="field-row">
             <div class="field">
-                <label class="sv-label"><span data-i18n="lbl_date">วันที่จัดกิจกรรม</span> <span class="req">*</span></label>
-                <input class="sv-input" type="date" id="f-date" oninput="checkFormReady()">
+                <label class="sv-label"><span data-i18n="lbl_date">วันที่จัดกิจกรรม</span> <span class="hint" style="color:#888;">(ไม่บังคับ)</span></label>
+                <input class="sv-input" type="date" id="f-date">
             </div>
             <div class="field">
-                <label class="sv-label" data-i18n="lbl_grade">ระดับ/กลุ่มนักเรียนที่เข้าร่วม</label>
+                <label class="sv-label"><span data-i18n="lbl_grade">กลุ่มนักเรียน</span> <span class="hint" data-i18n="hint_grade">(ไม่บังคับ)</span></label>
                 <input class="sv-input" type="text" id="f-grade" placeholder="เช่น ป.4–ป.6, ทุกระดับ">
             </div>
         </div>
@@ -64,16 +64,19 @@
         <div class="field">
             <label class="sv-label"><span data-i18n="lbl_type">ประเภทกิจกรรม</span> <span class="hint" data-i18n="hint_type">(เลือกได้หลายประเภท)</span></label>
             <div class="tag-group" id="tag-group">
-                <button type="button" class="tag-btn" data-val="กีฬา" onclick="toggleTag(this)"><i class="far fa-futbol"></i> กีฬา</button>
                 <button type="button" class="tag-btn" data-val="วิชาการ" onclick="toggleTag(this)"><i class="far fa-book-open"></i> วิชาการ</button>
-                <button type="button" class="tag-btn" data-val="ศิลปวัฒนธรรม" onclick="toggleTag(this)"><i class="far fa-image"></i> ศิลปวัฒนธรรม</button>
-                <button type="button" class="tag-btn" data-val="ทัศนศึกษา" onclick="toggleTag(this)"><i class="far fa-compass"></i> ทัศนศึกษา</button>
-                <button type="button" class="tag-btn" data-val="จิตอาสา" onclick="toggleTag(this)"><i class="far fa-hand-paper"></i> จิตอาสา</button>
-                <button type="button" class="tag-btn" data-val="ประชุมผู้ปกครอง" onclick="toggleTag(this)"><i class="far fa-user-circle"></i> ผู้ปกครอง</button>
-                <button type="button" class="tag-btn" data-val="พิธีการ" onclick="toggleTag(this)"><i class="far fa-calendar-check"></i> พิธีการ</button>
-                <button type="button" class="tag-btn" data-val="อบรมสัมมนา" onclick="toggleTag(this)"><i class="far fa-clipboard"></i> อบรม</button>
-                <button type="button" class="tag-btn" data-val="ส่งเสริมสุขภาพ" onclick="toggleTag(this)"><i class="far fa-heart"></i> สุขภาพ</button>
-                <button type="button" class="tag-btn" data-val="เทคโนโลยี" onclick="toggleTag(this)"><i class="far fa-laptop"></i> เทคโนโลยี</button>
+                <button type="button" class="tag-btn" data-val="กีฬา/สุขภาพ" onclick="toggleTag(this)"><i class="far fa-futbol"></i> กีฬา/สุขภาพ</button>
+                <button type="button" class="tag-btn" data-val="ศิลปะ/ดนตรี/การแสดง" onclick="toggleTag(this)"><i class="far fa-image"></i> ศิลปะ/ดนตรี</button>
+                <button type="button" class="tag-btn" data-val="ทัศนศึกษา/นอกสถานที่" onclick="toggleTag(this)"><i class="far fa-compass"></i> นอกสถานที่</button>
+                <button type="button" class="tag-btn" data-val="ค่าย/แคมป์" onclick="toggleTag(this)"><i class="far fa-campground"></i> ค่าย/แคมป์</button>
+                <button type="button" class="tag-btn" data-val="จิตอาสา/เพื่อสังคม" onclick="toggleTag(this)"><i class="far fa-hand-paper"></i> จิตอาสา</button>
+                <button type="button" class="tag-btn" data-val="แข่งขัน/ประกวด" onclick="toggleTag(this)"><i class="far fa-trophy"></i> ประกวด/แข่งขัน</button>
+                <button type="button" class="tag-btn" data-val="เทศกาล/นานาชาติ" onclick="toggleTag(this)"><i class="far fa-globe"></i> เทศกาล/นานาชาติ</button>
+                <button type="button" class="tag-btn" data-val="นิทรรศการ/โชว์ผลงาน" onclick="toggleTag(this)"><i class="far fa-lightbulb"></i> โชว์ผลงาน</button>
+                <button type="button" class="tag-btn" data-val="ผู้ปกครอง/สัมพันธ์" onclick="toggleTag(this)"><i class="far fa-user-circle"></i> ผู้ปกครอง</button>
+                <button type="button" class="tag-btn" data-val="พิธีการ/ทางการ" onclick="toggleTag(this)"><i class="far fa-calendar-check"></i> พิธีการ</button>
+                <button type="button" class="tag-btn" data-val="อบรม/สัมมนา" onclick="toggleTag(this)"><i class="far fa-clipboard"></i> อบรม</button>
+                <button type="button" class="tag-btn" data-val="ปฐมนิเทศ/ปัจฉิม" onclick="toggleTag(this)"><i class="far fa-graduation-cap"></i> เรียนจบ/รับน้อง</button>
             </div>
         </div>
 
@@ -102,11 +105,15 @@
         <div class="field" style="margin-bottom:0;">
             <label class="sv-label" data-i18n="lbl_tone">โทนเสียงของแคปชั่น</label>
             <div class="tag-group" id="tone-group">
-                <button type="button" class="tag-btn selected" data-val="อบอุ่น ภาคภูมิใจ" onclick="selectTone(this)">อบอุ่น/ภาคภูมิใจ</button>
-                <button type="button" class="tag-btn" data-val="สนุกสนาน พลังงานสูง" onclick="selectTone(this)">สนุก/พลังงาน</button>
-                <button type="button" class="tag-btn" data-val="เป็นทางการ จริงจัง" onclick="selectTone(this)">เป็นทางการ</button>
-                <button type="button" class="tag-btn" data-val="อ่อนโยน ซาบซึ้ง" onclick="selectTone(this)">ซาบซึ้ง/ขอบคุณ</button>
-                <button type="button" class="tag-btn" data-val="กระตือรือร้น สร้างแรงบันดาลใจ" onclick="selectTone(this)">สร้างแรงบันดาลใจ</button>
+                <button type="button" class="tag-btn selected" data-val="อบอุ่น ภาคภูมิใจ เป็นกันเอง" onclick="selectTone(this)">อบอุ่น/ภาคภูมิใจ</button>
+                <button type="button" class="tag-btn" data-val="สนุกสนาน พลังงานสูง ร่าเริง" onclick="selectTone(this)">สนุกสนาน/ร่าเริง</button>
+                <button type="button" class="tag-btn" data-val="เป็นทางการ น่าเชื่อถือ มืออาชีพ" onclick="selectTone(this)">เป็นทางการ/มืออาชีพ</button>
+                <button type="button" class="tag-btn" data-val="อินเตอร์ ทันสมัย เปิดกว้าง" onclick="selectTone(this)">อินเตอร์/ทันสมัย</button>
+                <button type="button" class="tag-btn" data-val="ตื่นเต้น เชิญชวน น่าสนใจ" onclick="selectTone(this)">ตื่นเต้น/เชิญชวน</button>
+                <button type="button" class="tag-btn" data-val="เล่าเรื่องแบบสบายๆ Narrative" onclick="selectTone(this)">เล่าเรื่องสบายๆ</button>
+                <button type="button" class="tag-btn" data-val="กระชับ ตรงประเด็น อ่านง่าย" onclick="selectTone(this)">กระชับ/อ่านง่าย</button>
+                <button type="button" class="tag-btn" data-val="ซาบซึ้ง ขอบคุณ ลึกซึ้ง" onclick="selectTone(this)">ซาบซึ้ง/ขอบคุณ</button>
+                <button type="button" class="tag-btn" data-val="สร้างแรงบันดาลใจ วิสัยทัศน์ก้าวไกล" onclick="selectTone(this)">สร้างแรงบันดาลใจ</button>
             </div>
         </div>
 
