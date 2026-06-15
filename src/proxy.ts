@@ -41,6 +41,11 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
+  // Bypass auth for post-assistant and any public html files
+  if (request.nextUrl.pathname.endsWith('.html')) {
+    return response;
+  }
+
   // Handle protected routes
   if (!user) {
     return NextResponse.redirect(new URL('/login', request.url));
