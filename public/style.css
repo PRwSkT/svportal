@@ -517,3 +517,10 @@ body {
 ::-webkit-scrollbar-thumb:hover {
     background: rgba(123, 28, 62, 0.5);
 }
+
+/* ── Windows Font Rendering Fix ── */
+body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
