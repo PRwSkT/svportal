@@ -1055,6 +1055,11 @@ const I18N = {
         photos_unit:'รูป', cover_badge:'ปก',
         copy_alert:'คัดลอกแคปชั่นเรียบร้อยแล้วครับ!',
         confirm_reset:'เริ่มต้นใหม่? ข้อมูลปัจจุบันจะหายครับ',
+        btn_publish: 'ตรวจสอบและโพสต์ (Review & Publish)',
+        btn_update_from_thai: 'แปลอัปเดตจากภาษาไทย',
+        modal_title: 'ตรวจสอบก่อนโพสต์',
+        btn_cancel: 'ยกเลิก',
+        btn_confirm: 'โพสต์ทันที',
     },
     en: {
         page_subtitle:    'Generate trilingual social posts + ready-to-publish images',
@@ -1105,6 +1110,11 @@ const I18N = {
         photos_unit:'photo(s)', cover_badge:'Cover',
         copy_alert:'Caption copied to clipboard!',
         confirm_reset:'Start over? Current data will be lost.',
+        btn_publish: 'Review & Publish',
+        btn_update_from_thai: 'Update from Thai',
+        modal_title: 'Review Before Publishing',
+        btn_cancel: 'Cancel',
+        btn_confirm: 'Publish Now',
     }
 };
 

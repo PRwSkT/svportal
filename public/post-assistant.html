@@ -249,7 +249,7 @@
                     <i class="far fa-edit"></i> <span data-i18n="btn_edit">แก้ไข</span>
                 </button>
                 <button class="btn-outline" id="btn-translate-th" onclick="translateFromThai()" style="display:none; color: #4CAF50; border-color: #4CAF50;">
-                    <i class="fas fa-language"></i> <span>แปลอัปเดตจากภาษาไทย</span>
+                    <i class="fas fa-language"></i> <span data-i18n="btn_update_from_thai">แปลอัปเดตจากภาษาไทย</span>
                 </button>
             </div>
         </div>
@@ -278,7 +278,7 @@
     <div class="modal-background" onclick="closePublishModal()"></div>
     <div class="modal-card" style="width: 90%; max-width: 1000px; height: 90vh;">
         <header class="modal-card-head">
-            <p class="modal-card-title"><i class="fas fa-search"></i> ตรวจสอบก่อนโพสต์</p>
+            <p class="modal-card-title"><i class="fas fa-search"></i> <span data-i18n="modal_title">ตรวจสอบก่อนโพสต์</span></p>
             <button class="delete" aria-label="close" onclick="closePublishModal()"></button>
         </header>
         <section class="modal-card-body" style="background-color: #f0f2f5;">
@@ -328,8 +328,8 @@
             </div>
         </section>
         <footer class="modal-card-foot" style="justify-content: flex-end;">
-            <button class="button" onclick="closePublishModal()">ยกเลิก</button>
-            <button class="button is-link" id="btn-confirm-publish" onclick="confirmPublish()"><i class="fas fa-paper-plane" style="margin-right:8px;"></i> โพสต์ทันที</button>
+            <button class="button" onclick="closePublishModal()" data-i18n="btn_cancel">ยกเลิก</button>
+            <button class="button is-link" id="btn-confirm-publish" onclick="confirmPublish()"><i class="fas fa-paper-plane" style="margin-right:8px;"></i> <span data-i18n="btn_confirm">โพสต์ทันที</span></button>
         </footer>
     </div>
 </div>
