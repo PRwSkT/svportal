@@ -3,6 +3,8 @@ export type Student = {
   name: string;
   grade: string;
   wallet_balance: number; // Thai Baht, 2 decimal places
+  status: 'active' | 'graduated' | 'dropped_out';
+  profile_data: Record<string, any>; // JSONB for guardian info, etc.
   created_at: string; // ISO 8601
   updated_at: string; // ISO 8601
 };

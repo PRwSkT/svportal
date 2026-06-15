@@ -21,6 +21,7 @@ export function AppNav() {
     { href: '/dashboard', label: 'แดชบอร์ด' },
     { href: '/admin/reports', label: 'รายงาน' },
     { href: '/admin/users', label: 'จัดการผู้ใช้' },
+    { href: '/admin/students', label: 'งานระเบียน' },
     { href: '/admin/products', label: 'จัดการสินค้า' },
     { href: '/admin/wallet/students', label: 'Wallet นักเรียน' },
   ];
