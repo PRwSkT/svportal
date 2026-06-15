@@ -42,7 +42,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Bypass auth for post-assistant and any public html files
-  if (request.nextUrl.pathname.endsWith('.html')) {
+  if (request.nextUrl.pathname.endsWith('.html') || request.nextUrl.pathname.includes('post-assistant')) {
     return response;
   }
 
