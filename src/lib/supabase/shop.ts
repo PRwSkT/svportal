@@ -1,6 +1,7 @@
 import { createClient } from './client';
 import { Product, CartItem, ShopTransaction } from '@/types';
 import { saveToQueue } from '../queue/offline';
+import { logAction } from '../audit';
 
 export async function searchProducts(query: string): Promise<Product[]> {
   const supabase = createClient();
@@ -68,6 +69,13 @@ export async function createShopTransaction(
     };
     saveToQueue('checkout_shop_transaction', payload, 'rpc');
 
+    logAction({
+      action: 'shop_checkout',
+      tableName: 'shop_transactions',
+      recordId: transactionId,
+      newValue: { totalAmount, paymentMethod, studentId, items: cart }
+    });
+
     return {
       id: transactionId,
       student_id: studentId,
@@ -90,6 +98,13 @@ export async function createShopTransaction(
   };
 
   saveToQueue('checkout_shop_transaction', payload, 'rpc');
+
+  logAction({
+    action: 'shop_checkout',
+    tableName: 'shop_transactions',
+    recordId: transactionId,
+    newValue: { totalAmount, paymentMethod, studentId, items: cart }
+  });
 
   return {
     id: transactionId,

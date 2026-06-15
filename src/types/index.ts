@@ -93,14 +93,36 @@ export type ShopTransaction = {
 
 export type Transaction = TuitionPayment | ShopTransaction | WalletTopup | WalletDeduct;
 
+export type AppUser = {
+  id: string;
+  full_name: string;
+  role: 'cashier' | 'admin';
+  is_active: boolean;
+  created_at: string;
+};
+
 export type AuditLog = {
   id: string;
+  user_id: string | null;
+  user_name: string | null;
   action: string;
   table_name: string;
   record_id: string;
-  performed_by: string;
-  details: Record<string, unknown>;
-  created_at: string; // ISO 8601
+  old_value: Record<string, unknown> | null;
+  new_value: Record<string, unknown> | null;
+  ip_address: string | null;
+  created_at: string;
+};
+
+export type DailySummary = {
+  date: string;              // ISO 8601 date
+  total_received: number;    // Thai Baht
+  tuition_count: number;
+  tuition_amount: number;    // Thai Baht
+  shop_count: number;
+  shop_amount: number;       // Thai Baht
+  topup_count: number;
+  topup_amount: number;      // Thai Baht
 };
 
 export type WalletAccount = {

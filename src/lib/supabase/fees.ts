@@ -1,5 +1,6 @@
 import { createClient } from './client';
 import { FeeType, FeeItem, Student } from '@/types';
+import { logAction } from '../audit';
 
 export type StudentWithFees = Student & {
   unpaid_fees: FeeItem[];
@@ -68,7 +69,16 @@ export async function createTuitionPayment(
   const { data, error } = await supabase.rpc('process_tuition_payment', { payload });
   if (error) throw error;
 
-  return data as { payment_id: string, receipt_number: string };
+  const result = data as { payment_id: string, receipt_number: string };
+
+  logAction({
+    action: 'pay_tuition',
+    tableName: 'tuition_payments',
+    recordId: result.payment_id,
+    newValue: { studentId, feeItemIds, paymentMethod, totalAmount, academicYear }
+  });
+
+  return result;
 }
 
 export async function importFeeItemsFromCSV(rows: {student_id: string, fee_type_id: string, amount: number}[]): Promise<{ inserted: number, skipped: number }> {

@@ -1,5 +1,6 @@
 import { createClient } from './client';
 import { WalletAccount, WalletTransaction, GoogleBackupPayload } from '@/types';
+import { logAction } from '../audit';
 
 // ---------------------------------------------------------------------------
 // Wallet Lookups
@@ -108,6 +109,13 @@ export async function topupWallet(
   // Google Sheets backup — fire-and-forget
   backupWalletTransaction(transaction).catch(console.error);
 
+  logAction({
+    action: 'wallet_topup',
+    tableName: 'wallet_transactions',
+    recordId: result.transaction_id,
+    newValue: { studentId, amount, channel, note, balance_after: result.balance_after }
+  });
+
   return transaction;
 }
 
@@ -166,6 +174,13 @@ export async function deductWallet(
 
   // Low balance notification — fire-and-forget
   notifyLowBalance(studentId, result.balance_after).catch(console.error);
+
+  logAction({
+    action: 'wallet_deduct',
+    tableName: 'wallet_transactions',
+    recordId: result.transaction_id,
+    newValue: { studentId, amount, referenceId, balance_after: result.balance_after }
+  });
 
   return transaction;
 }
