@@ -256,7 +256,7 @@ export default function POSShopPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100 overflow-hidden font-sans">
+    <div className="h-screen flex flex-col bg-background overflow-hidden font-sans">
       {isOffline && (
         <div className="bg-orange-500 text-white text-center py-2 font-bold z-50 text-lg shadow">
           ออฟไลน์ — ข้อมูลจะซิงค์เมื่อเชื่อมต่อใหม่
@@ -265,9 +265,9 @@ export default function POSShopPage() {
       
       <div className="flex flex-1 overflow-hidden">
         {/* Left Panel: Cart */}
-        <div className="w-[60%] bg-white border-r flex flex-col shadow-lg z-10">
-          <div className="p-6 bg-gray-50 border-b flex justify-between items-center">
-            <h2 className="text-2xl font-bold text-gray-800">ตะกร้าสินค้า ({cart.reduce((s, i) => s + i.quantity, 0)} ชิ้น)</h2>
+        <div className="w-[60%] bg-surface border-r flex flex-col shadow-lg z-10">
+          <div className="p-6 bg-background/50 border-b flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-primary">ตะกร้าสินค้า ({cart.reduce((s, i) => s + i.quantity, 0)} ชิ้น)</h2>
             <button 
               onClick={() => setCart([])} 
               disabled={cart.length === 0}
@@ -285,33 +285,33 @@ export default function POSShopPage() {
               </div>
             ) : (
               cart.map(item => (
-                <div key={item.product.id} className="flex justify-between items-center border-b border-gray-100 pb-4">
+                <div key={item.product.id} className="flex justify-between items-center border-b border-foreground/5 pb-4">
                   <div className="flex-1 pr-4">
-                    <p className="font-semibold text-xl text-gray-800 truncate">{item.product.name}</p>
-                    <p className="text-gray-500 text-lg">฿{item.product.price.toFixed(2)} / ชิ้น</p>
+                    <p className="font-semibold text-xl text-primary truncate">{item.product.name}</p>
+                    <p className="text-foreground/70 text-lg">฿{item.product.price.toFixed(2)} / ชิ้น</p>
                   </div>
-                  <div className="flex items-center gap-4 bg-gray-50 p-2 rounded-xl">
-                    <button onClick={() => removeFromCart(item.product.id)} className="w-12 h-12 rounded-lg bg-white shadow-sm text-2xl font-bold flex items-center justify-center text-gray-600 hover:bg-gray-100 transition-colors">−</button>
-                    <span className="text-2xl font-bold w-10 text-center text-gray-800">{item.quantity}</span>
-                    <button onClick={() => addToCart(item.product)} disabled={item.quantity >= item.product.stock_qty} className="w-12 h-12 rounded-lg bg-white shadow-sm text-2xl font-bold flex items-center justify-center text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50">+</button>
+                  <div className="flex items-center gap-4 bg-background/50 p-2 rounded-xl">
+                    <button onClick={() => removeFromCart(item.product.id)} className="w-12 h-12 rounded-lg bg-surface shadow-sm text-2xl font-bold flex items-center justify-center text-foreground/70 hover:bg-background transition-colors">−</button>
+                    <span className="text-2xl font-bold w-10 text-center text-primary">{item.quantity}</span>
+                    <button onClick={() => addToCart(item.product)} disabled={item.quantity >= item.product.stock_qty} className="w-12 h-12 rounded-lg bg-surface shadow-sm text-2xl font-bold flex items-center justify-center text-foreground/70 hover:bg-background transition-colors disabled:opacity-50">+</button>
                   </div>
                   <div className="w-32 text-right">
-                    <p className="font-bold text-2xl text-blue-600">฿{item.subtotal.toFixed(2)}</p>
+                    <p className="font-bold text-2xl text-primary">฿{item.subtotal.toFixed(2)}</p>
                   </div>
                 </div>
               ))
             )}
           </div>
 
-          <div className="p-8 bg-gray-50 border-t">
+          <div className="p-8 bg-background/50 border-t border-foreground/5">
             <div className="flex justify-between items-center mb-6">
-              <span className="text-2xl font-bold text-gray-500">ยอดรวมทั้งสิ้น</span>
-              <span className="text-5xl font-extrabold text-blue-600 tracking-tight">฿{total.toFixed(2)}</span>
+              <span className="text-2xl font-bold text-foreground/70">ยอดรวมทั้งสิ้น</span>
+              <span className="text-5xl font-extrabold text-primary tracking-tight">฿{total.toFixed(2)}</span>
             </div>
             <button 
               onClick={() => setShowCheckout(true)}
               disabled={cart.length === 0}
-              className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white text-3xl font-bold py-6 rounded-2xl shadow-lg transition-all active:scale-[0.98]"
+              className="w-full bg-secondary hover:bg-secondary/90 disabled:bg-foreground/20 text-white text-3xl font-bold py-6 rounded-2xl shadow-lg transition-all active:scale-[0.98]"
             >
               ชำระเงิน
             </button>
@@ -319,23 +319,23 @@ export default function POSShopPage() {
         </div>
 
         {/* Right Panel: Search/Scan */}
-        <div className="w-[40%] bg-gray-100 flex flex-col p-8">
+        <div className="w-[40%] bg-background flex flex-col p-8">
           <div className="mb-6 relative">
             <input 
               ref={barcodeInputRef}
               type="text" 
               placeholder="ค้นหาสินค้า หรือ สแกนบาร์โค้ด..." 
-              className="w-full p-5 pl-14 text-xl border-2 border-transparent shadow-sm rounded-2xl focus:border-blue-500 focus:ring-0 transition-all outline-none"
+              className="w-full p-5 pl-14 text-xl border-2 border-transparent shadow-sm rounded-2xl focus:border-primary focus:ring-0 transition-all outline-none"
               value={searchQuery}
               onChange={handleSearchChange}
               onKeyDown={handleSearchKeyDown}
             />
-            <div className="absolute left-5 top-5 text-gray-400">
+            <div className="absolute left-5 top-5 text-foreground/40">
               <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
             </div>
             {isSearching && (
               <div className="absolute right-5 top-5">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
               </div>
             )}
           </div>
@@ -347,13 +347,13 @@ export default function POSShopPage() {
                   key={p.id}
                   onClick={() => addToCart(p)}
                   disabled={p.stock_qty <= 0}
-                  className="bg-white p-5 rounded-2xl shadow-sm border-2 border-transparent text-left hover:border-blue-500 hover:shadow-md focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden transition-all group"
+                  className="bg-surface p-5 rounded-2xl shadow-sm border-2 border-transparent text-left hover:border-primary hover:shadow-md focus:outline-none focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden transition-all group"
                 >
-                  {p.stock_qty <= 0 && <div className="absolute top-3 right-3 bg-red-500 text-white text-sm font-bold px-3 py-1 rounded-lg">หมด</div>}
-                  <h3 className="font-bold text-lg mb-3 text-gray-800 leading-tight group-hover:text-blue-600 transition-colors">{p.name}</h3>
+                  {p.stock_qty <= 0 && <div className="absolute top-3 right-3 bg-secondary text-white text-sm font-bold px-3 py-1 rounded-lg">หมด</div>}
+                  <h3 className="font-bold text-lg mb-3 text-primary leading-tight group-hover:text-primary transition-colors">{p.name}</h3>
                   <div className="flex justify-between items-end">
-                    <span className="text-2xl font-extrabold text-blue-600">฿{p.price.toFixed(2)}</span>
-                    <span className="text-sm font-medium text-gray-400">คงเหลือ {p.stock_qty}</span>
+                    <span className="text-2xl font-extrabold text-primary">฿{p.price.toFixed(2)}</span>
+                    <span className="text-sm font-medium text-foreground/50">คงเหลือ {p.stock_qty}</span>
                   </div>
                 </button>
               ))}
@@ -370,27 +370,27 @@ export default function POSShopPage() {
 
       {/* Checkout Modal */}
       {showCheckout && (
-        <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-6 bg-gray-50 border-b flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-800">ยืนยันการชำระเงิน</h2>
-              <button onClick={() => setShowCheckout(false)} className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-gray-600 text-2xl font-bold transition-colors">&times;</button>
+        <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-surface w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 bg-background/50 border-b border-foreground/5 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-primary">ยืนยันการชำระเงิน</h2>
+              <button onClick={() => setShowCheckout(false)} className="w-10 h-10 rounded-full bg-foreground/5 hover:bg-foreground/10 flex items-center justify-center text-foreground/60 text-2xl font-bold transition-colors">&times;</button>
             </div>
             
             <div className="p-8 flex-1 overflow-auto">
-              <div className="flex justify-between items-end mb-8 border-b border-gray-100 pb-6">
-                <span className="text-xl font-medium text-gray-500">ยอดรวมที่ต้องชำระ</span>
-                <span className="text-5xl font-extrabold text-blue-600 tracking-tight">฿{total.toFixed(2)}</span>
+              <div className="flex justify-between items-end mb-8 border-b border-foreground/5 pb-6">
+                <span className="text-xl font-medium text-foreground/70">ยอดรวมที่ต้องชำระ</span>
+                <span className="text-5xl font-extrabold text-primary tracking-tight">฿{total.toFixed(2)}</span>
               </div>
 
               <div className="mb-8">
-                <p className="font-bold text-lg mb-4 text-gray-700">เลือกช่องทางการชำระเงิน</p>
+                <p className="font-bold text-lg mb-4 text-foreground/80">เลือกช่องทางการชำระเงิน</p>
                 <div className="flex gap-4">
-                  <label className={`flex-1 border-2 p-5 rounded-2xl cursor-pointer text-center font-bold text-xl transition-all ${paymentMethod === 'cash' ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-inner' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
+                  <label className={`flex-1 border-2 p-5 rounded-2xl cursor-pointer text-center font-bold text-xl transition-all ${paymentMethod === 'cash' ? 'border-primary bg-background/50 text-primary shadow-inner' : 'border-foreground/10 hover:border-foreground/20 text-foreground/60'}`}>
                     <input type="radio" name="payment" className="hidden" checked={paymentMethod === 'cash'} onChange={() => setPaymentMethod('cash')} />
                     เงินสด
                   </label>
-                  <label className={`flex-1 border-2 p-5 rounded-2xl cursor-pointer text-center font-bold text-xl transition-all ${paymentMethod === 'wallet' ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-inner' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
+                  <label className={`flex-1 border-2 p-5 rounded-2xl cursor-pointer text-center font-bold text-xl transition-all ${paymentMethod === 'wallet' ? 'border-primary bg-background/50 text-primary shadow-inner' : 'border-foreground/10 hover:border-foreground/20 text-foreground/60'}`}>
                     <input type="radio" name="payment" className="hidden" checked={paymentMethod === 'wallet'} onChange={() => setPaymentMethod('wallet')} />
                     Wallet บัตรนักเรียน
                   </label>
@@ -398,11 +398,11 @@ export default function POSShopPage() {
               </div>
 
               {paymentMethod === 'wallet' && (
-                <div className="mb-8 bg-blue-50/50 p-6 rounded-2xl border border-blue-100 animate-in slide-in-from-top-2 duration-200">
+                <div className="mb-8 bg-background/50 p-6 rounded-2xl border border-foreground/10 animate-in slide-in-from-top-2 duration-200">
                   {/* NFC Mode Badge */}
                   <div className="flex justify-between items-center mb-4">
-                    <span className="font-bold text-lg text-blue-900">ชำระด้วย Wallet</span>
-                    <span className="text-xs bg-gray-100 text-gray-500 px-3 py-1 rounded-full">
+                    <span className="font-bold text-lg text-primary">ชำระด้วย Wallet</span>
+                    <span className="text-xs bg-surface border border-foreground/10 text-foreground/50 px-3 py-1 rounded-full">
                       {nfcMode === 'hid' ? 'HID' : nfcMode === 'serial' ? 'Serial' : 'Manual'}
                     </span>
                   </div>
@@ -411,7 +411,7 @@ export default function POSShopPage() {
                     /* NFC Tap / Manual Entry */
                     <div className="text-center py-4">
                       <div className="text-5xl mb-4 animate-pulse">💳</div>
-                      <p className="text-lg font-medium text-gray-700 mb-4">แตะบัตรนักเรียน หรือกรอกรหัส</p>
+                      <p className="text-lg font-medium text-foreground/70 mb-4">แตะบัตรนักเรียน หรือกรอกรหัส</p>
                       <div className="flex gap-2">
                         <input
                           type="text"
@@ -419,13 +419,13 @@ export default function POSShopPage() {
                           onChange={e => setWalletInput(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Enter' && walletInput.trim()) handleWalletCardScan(walletInput); }}
                           placeholder="รหัสนักเรียน หรือ UID บัตร..."
-                          className="flex-1 text-lg p-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 outline-none bg-white"
+                          className="flex-1 text-lg p-3 border-2 border-foreground/20 rounded-xl focus:border-primary outline-none bg-surface text-foreground"
                           autoFocus
                         />
                         <button
                           onClick={() => walletInput.trim() && handleWalletCardScan(walletInput)}
                           disabled={walletSearching}
-                          className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 disabled:opacity-50"
+                          className="px-6 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 disabled:opacity-50"
                         >
                           {walletSearching ? '...' : 'ค้นหา'}
                         </button>
@@ -434,33 +434,33 @@ export default function POSShopPage() {
                   ) : (
                     /* Wallet Info Display */
                     <div className="space-y-4">
-                      <div className="flex justify-between items-center bg-white p-4 rounded-xl border">
+                      <div className="flex justify-between items-center bg-surface p-4 rounded-xl border border-foreground/10">
                         <div>
-                          <p className="font-bold text-lg text-gray-800">{walletStudentName}</p>
-                          <p className="text-sm text-gray-400">รหัส: {walletAccount.student_id}</p>
+                          <p className="font-bold text-lg text-primary">{walletStudentName}</p>
+                          <p className="text-sm text-foreground/50">รหัส: {walletAccount.student_id}</p>
                         </div>
                         <div className="text-right">
-                          <p className={`text-2xl font-extrabold ${walletAccount.balance < total ? 'text-red-600' : 'text-green-600'}`}>
+                          <p className={`text-2xl font-extrabold ${walletAccount.balance < total ? 'text-secondary' : 'text-primary'}`}>
                             ฿{walletAccount.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                           </p>
-                          <p className="text-xs text-gray-400">ยอดคงเหลือ</p>
+                          <p className="text-xs text-foreground/50">ยอดคงเหลือ</p>
                         </div>
                       </div>
 
                       {/* Daily Limit Progress */}
                       {walletAccount.daily_limit !== null && (
-                        <div className="bg-white p-4 rounded-xl border">
+                        <div className="bg-surface p-4 rounded-xl border border-foreground/10">
                           <div className="flex justify-between text-sm mb-2">
-                            <span className="text-gray-500">วงเงินรายวัน</span>
-                            <span className="font-medium">
+                            <span className="text-foreground/50">วงเงินรายวัน</span>
+                            <span className="font-medium text-primary">
                               {walletTodaySpend.toLocaleString('en-US', { minimumFractionDigits: 2 })} / {walletAccount.daily_limit.toLocaleString('en-US')} บาท
                             </span>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2.5">
+                          <div className="w-full bg-foreground/10 rounded-full h-2.5">
                             <div
                               className={`h-2.5 rounded-full transition-all ${
-                                (walletTodaySpend + total) > walletAccount.daily_limit ? 'bg-red-500' :
-                                walletTodaySpend / walletAccount.daily_limit > 0.8 ? 'bg-amber-500' : 'bg-green-500'
+                                (walletTodaySpend + total) > walletAccount.daily_limit ? 'bg-secondary' :
+                                walletTodaySpend / walletAccount.daily_limit > 0.8 ? 'bg-[#C9A227]' : 'bg-primary'
                               }`}
                               style={{ width: `${Math.min(100, (walletTodaySpend / walletAccount.daily_limit) * 100)}%` }}
                             />
@@ -470,7 +470,7 @@ export default function POSShopPage() {
 
                       <button
                         onClick={() => { setWalletAccount(null); setStudentId(''); setWalletInput(''); setCheckoutError(null); }}
-                        className="text-sm text-blue-600 hover:underline"
+                        className="text-sm text-primary underline"
                       >
                         เปลี่ยนบัตร
                       </button>
@@ -480,21 +480,21 @@ export default function POSShopPage() {
               )}
 
               {checkoutError && (
-                <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-5 rounded-r-xl mb-6 font-semibold flex items-center gap-3 shadow-sm">
-                  <svg className="w-6 h-6 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <div className="bg-secondary/10 border-l-4 border-secondary text-secondary p-5 rounded-r-xl mb-6 font-semibold flex items-center gap-3 shadow-sm">
+                  <svg className="w-6 h-6 text-secondary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                   {checkoutError}
                 </div>
               )}
             </div>
 
-            <div className="p-6 bg-gray-50 border-t flex gap-4">
-              <button onClick={() => setShowCheckout(false)} className="flex-1 py-4 text-xl font-bold text-gray-600 bg-white border-2 border-gray-200 rounded-2xl hover:bg-gray-50 hover:border-gray-300 transition-all">
+            <div className="p-6 bg-background/50 border-t flex gap-4 border-foreground/5">
+              <button onClick={() => setShowCheckout(false)} className="flex-1 py-4 text-xl font-bold text-foreground/70 bg-surface border-2 border-foreground/10 rounded-2xl hover:bg-background/50 hover:border-foreground/20 transition-all">
                 ยกเลิก
               </button>
               <button 
                 onClick={handleCheckout} 
                 disabled={isCheckingOut || (paymentMethod === 'wallet' && !walletAccount)}
-                className="flex-[2] py-4 text-xl font-bold text-white bg-green-500 rounded-2xl hover:bg-green-600 disabled:opacity-50 disabled:bg-gray-300 flex justify-center items-center shadow-md transition-all active:scale-[0.98]"
+                className="flex-[2] py-4 text-xl font-bold text-white bg-primary rounded-2xl hover:bg-primary/90 disabled:opacity-50 disabled:bg-foreground/20 flex justify-center items-center shadow-md transition-all active:scale-[0.98]"
               >
                 {isCheckingOut ? (
                   <div className="flex items-center gap-2">

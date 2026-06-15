@@ -186,16 +186,16 @@ export default function TopupPage() {
   const quickAmounts = [50, 100, 200, 500]; // Thai Baht
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100 overflow-hidden font-sans">
+    <div className="h-screen flex flex-col bg-background overflow-hidden font-sans">
       {/* Header */}
-      <div className="bg-white border-b shadow-sm px-8 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-gray-800">💰 เติมเงิน Wallet นักเรียน</h1>
+      <div className="bg-surface border-b shadow-sm px-8 py-4 flex justify-between items-center border-foreground/5">
+        <h1 className="text-xl font-bold text-primary">💰 เติมเงิน Wallet นักเรียน</h1>
         <div className="flex items-center gap-3">
-          <span className="text-xs bg-gray-100 text-gray-500 px-3 py-1 rounded-full">
+          <span className="text-xs bg-foreground/5 text-foreground/50 px-3 py-1 rounded-full">
             โหมด: {nfcMode === 'hid' ? 'HID' : nfcMode === 'serial' ? 'Serial' : 'Manual'}
           </span>
           {step !== 'identify' && (
-            <button onClick={handleReset} className="text-sm text-blue-600 hover:underline">เริ่มใหม่</button>
+            <button onClick={handleReset} className="text-sm text-primary hover:underline">เริ่มใหม่</button>
           )}
         </div>
       </div>
@@ -205,10 +205,10 @@ export default function TopupPage() {
         <div className="w-full max-w-xl">
           {/* STEP 1: Identify Student */}
           {step === 'identify' && (
-            <div className="bg-white rounded-3xl shadow-xl p-12 text-center">
+            <div className="bg-surface rounded-3xl shadow-xl p-12 text-center border border-foreground/5">
               <div className="text-8xl mb-6 animate-pulse">💳</div>
-              <h2 className="text-3xl font-bold text-gray-800 mb-2">แตะบัตรนักเรียน</h2>
-              <p className="text-gray-500 mb-8">หรือกรอกรหัสนักเรียนด้วยตนเอง</p>
+              <h2 className="text-3xl font-bold text-primary mb-2">แตะบัตรนักเรียน</h2>
+              <p className="text-foreground/70 mb-8">หรือกรอกรหัสนักเรียนด้วยตนเอง</p>
 
               <div className="flex gap-3">
                 <input
@@ -217,37 +217,37 @@ export default function TopupPage() {
                   onChange={e => setInputValue(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleSearch()}
                   placeholder="รหัสนักเรียน หรือ UID บัตร..."
-                  className="flex-1 px-5 py-4 border-2 border-gray-200 rounded-xl text-lg focus:border-blue-500 outline-none"
+                  className="flex-1 px-5 py-4 border-2 border-foreground/10 rounded-xl text-lg focus:border-primary outline-none bg-surface text-foreground"
                   autoFocus
                 />
                 <button
                   onClick={handleSearch}
                   disabled={searching}
-                  className="px-8 py-4 bg-blue-600 text-white rounded-xl font-bold text-lg hover:bg-blue-700 disabled:opacity-50"
+                  className="px-8 py-4 bg-primary text-white rounded-xl font-bold text-lg hover:bg-primary/90 disabled:opacity-50"
                 >
                   {searching ? '...' : 'ค้นหา'}
                 </button>
               </div>
 
               {error && (
-                <div className="mt-6 p-4 bg-red-50 text-red-600 rounded-xl text-sm border border-red-200">{error}</div>
+                <div className="mt-6 p-4 bg-secondary/10 text-secondary rounded-xl text-sm border border-secondary/20">{error}</div>
               )}
             </div>
           )}
 
           {/* STEP 2: Enter Amount */}
           {step === 'amount' && wallet && (
-            <div className="bg-white rounded-3xl shadow-xl p-10">
+            <div className="bg-surface rounded-3xl shadow-xl p-10 border border-foreground/5">
               {/* Student Info */}
-              <div className="text-center mb-8 pb-6 border-b">
-                <p className="text-sm text-gray-500">นักเรียน</p>
-                <h2 className="text-2xl font-bold text-gray-800">{studentName}</h2>
-                <p className="text-sm text-gray-400">รหัส: {wallet.student_id}</p>
-                <div className={`mt-3 inline-block px-6 py-2 rounded-full ${wallet.balance < 100 ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+              <div className="text-center mb-8 pb-6 border-b border-foreground/10">
+                <p className="text-sm text-foreground/70">นักเรียน</p>
+                <h2 className="text-2xl font-bold text-primary">{studentName}</h2>
+                <p className="text-sm text-foreground/50">รหัส: {wallet.student_id}</p>
+                <div className={`mt-3 inline-block px-6 py-2 rounded-full ${wallet.balance < 100 ? 'bg-secondary/10 text-secondary' : 'bg-primary/10 text-primary'}`}>
                   ยอดปัจจุบัน: <strong>฿{wallet.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
                 </div>
                 {wallet.daily_limit !== null && (
-                  <p className="text-xs text-gray-400 mt-2">
+                  <p className="text-xs text-foreground/50 mt-2">
                     ใช้ไปวันนี้: ฿{todaySpend.toLocaleString('en-US', { minimumFractionDigits: 2 })} / {wallet.daily_limit.toLocaleString('en-US')} บาท
                   </p>
                 )}
@@ -255,7 +255,7 @@ export default function TopupPage() {
 
               {/* Amount Input */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-600 mb-2">จำนวนเงินที่ต้องการเติม (บาท)</label>
+                <label className="block text-sm font-medium text-foreground/70 mb-2">จำนวนเงินที่ต้องการเติม (บาท)</label>
                 <input
                   type="number"
                   value={amount}
@@ -263,7 +263,7 @@ export default function TopupPage() {
                   min="20"
                   step="10"
                   placeholder="ขั้นต่ำ 20 บาท"
-                  className="w-full px-6 py-5 border-2 border-gray-200 rounded-xl text-3xl font-bold text-center focus:border-blue-500 outline-none"
+                  className="w-full px-6 py-5 border-2 border-foreground/10 rounded-xl text-3xl font-bold text-center focus:border-primary outline-none bg-surface text-foreground"
                   autoFocus
                 />
               </div>
@@ -275,7 +275,7 @@ export default function TopupPage() {
                     key={qa}
                     onClick={() => setAmount(qa.toString())}
                     className={`py-3 rounded-xl font-bold text-lg transition-colors
-                      ${amount === qa.toString() ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                      ${amount === qa.toString() ? 'bg-primary text-white' : 'bg-foreground/5 text-foreground/70 hover:bg-foreground/10'}`}
                   >
                     ฿{qa}
                   </button>
@@ -283,11 +283,11 @@ export default function TopupPage() {
               </div>
 
               {error && (
-                <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-xl text-sm border border-red-200">{error}</div>
+                <div className="mb-6 p-4 bg-secondary/10 text-secondary rounded-xl text-sm border border-secondary/20">{error}</div>
               )}
 
               <div className="flex gap-4">
-                <button onClick={handleReset} className="flex-1 py-4 bg-gray-100 text-gray-600 rounded-xl font-medium text-lg hover:bg-gray-200">
+                <button onClick={handleReset} className="flex-1 py-4 bg-foreground/5 text-foreground/70 rounded-xl font-medium text-lg hover:bg-foreground/10">
                   ยกเลิก
                 </button>
                 <button
@@ -300,7 +300,7 @@ export default function TopupPage() {
                     setError(null);
                     setStep('confirm');
                   }}
-                  className="flex-[2] py-4 bg-blue-600 text-white rounded-xl font-bold text-lg hover:bg-blue-700"
+                  className="flex-[2] py-4 bg-primary text-white rounded-xl font-bold text-lg hover:bg-primary/90"
                 >
                   ถัดไป →
                 </button>
@@ -310,42 +310,42 @@ export default function TopupPage() {
 
           {/* STEP 3: Confirm */}
           {step === 'confirm' && wallet && (
-            <div className="bg-white rounded-3xl shadow-xl p-10 text-center">
-              <h2 className="text-2xl font-bold text-gray-800 mb-8">ยืนยันการเติมเงิน</h2>
+            <div className="bg-surface rounded-3xl shadow-xl p-10 text-center border border-foreground/5">
+              <h2 className="text-2xl font-bold text-primary mb-8">ยืนยันการเติมเงิน</h2>
 
-              <div className="bg-gray-50 rounded-2xl p-6 mb-8 space-y-4">
+              <div className="bg-background/50 rounded-2xl p-6 mb-8 space-y-4 border border-foreground/10">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">นักเรียน</span>
-                  <span className="font-bold">{studentName} ({wallet.student_id})</span>
+                  <span className="text-foreground/70">นักเรียน</span>
+                  <span className="font-bold text-primary">{studentName} ({wallet.student_id})</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">ยอดปัจจุบัน</span>
-                  <span>฿{wallet.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-foreground/70">ยอดปัจจุบัน</span>
+                  <span className="text-primary">฿{wallet.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                 </div>
-                <div className="border-t pt-4 flex justify-between">
-                  <span className="text-gray-500">จำนวนเติม</span>
-                  <span className="text-3xl font-extrabold text-green-600">+฿{parseFloat(amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                <div className="border-t border-foreground/10 pt-4 flex justify-between">
+                  <span className="text-foreground/70">จำนวนเติม</span>
+                  <span className="text-3xl font-extrabold text-secondary">+฿{parseFloat(amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">ยอดหลังเติม</span>
-                  <span className="font-bold text-blue-700">
+                  <span className="text-foreground/70">ยอดหลังเติม</span>
+                  <span className="font-bold text-primary">
                     ฿{(wallet.balance + parseFloat(amount)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
 
               {error && (
-                <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-xl text-sm border border-red-200">{error}</div>
+                <div className="mb-6 p-4 bg-secondary/10 text-secondary rounded-xl text-sm border border-secondary/20">{error}</div>
               )}
 
               <div className="flex gap-4">
-                <button onClick={() => setStep('amount')} className="flex-1 py-4 bg-gray-100 text-gray-600 rounded-xl font-medium text-lg hover:bg-gray-200">
+                <button onClick={() => setStep('amount')} className="flex-1 py-4 bg-foreground/5 text-foreground/70 rounded-xl font-medium text-lg hover:bg-foreground/10">
                   ← กลับ
                 </button>
                 <button
                   onClick={handleConfirmTopup}
                   disabled={processing}
-                  className="flex-[2] py-4 bg-green-500 text-white rounded-xl font-bold text-lg hover:bg-green-600 disabled:opacity-50"
+                  className="flex-[2] py-4 bg-secondary text-white rounded-xl font-bold text-lg hover:bg-secondary/90 disabled:opacity-50"
                 >
                   {processing ? (
                     <span className="flex items-center justify-center gap-2">
@@ -360,23 +360,23 @@ export default function TopupPage() {
 
           {/* STEP 4: Success */}
           {step === 'success' && transaction && (
-            <div className="bg-white rounded-3xl shadow-xl p-10 text-center">
+            <div className="bg-surface rounded-3xl shadow-xl p-10 text-center border border-foreground/5">
               <div className="text-7xl mb-4">✅</div>
-              <h2 className="text-3xl font-bold text-green-600 mb-2">เติมเงินสำเร็จ!</h2>
-              <p className="text-gray-500 mb-8">รหัสอ้างอิง: {transaction.id.slice(-8).toUpperCase()}</p>
+              <h2 className="text-3xl font-bold text-secondary mb-2">เติมเงินสำเร็จ!</h2>
+              <p className="text-foreground/50 mb-8">รหัสอ้างอิง: {transaction.id.slice(-8).toUpperCase()}</p>
 
-              <div className="bg-green-50 rounded-2xl p-6 mb-8 space-y-3">
+              <div className="bg-secondary/10 rounded-2xl p-6 mb-8 space-y-3 border border-secondary/20">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">นักเรียน</span>
-                  <span className="font-bold">{studentName}</span>
+                  <span className="text-foreground/70">นักเรียน</span>
+                  <span className="font-bold text-primary">{studentName}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">จำนวนเติม</span>
-                  <span className="font-bold text-green-600">+฿{transaction.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-foreground/70">จำนวนเติม</span>
+                  <span className="font-bold text-secondary">+฿{transaction.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                 </div>
-                <div className="border-t border-green-200 pt-3 flex justify-between">
-                  <span className="text-gray-500">ยอดคงเหลือ</span>
-                  <span className="text-2xl font-extrabold text-blue-700">
+                <div className="border-t border-secondary/20 pt-3 flex justify-between">
+                  <span className="text-foreground/70">ยอดคงเหลือ</span>
+                  <span className="text-2xl font-extrabold text-primary">
                     ฿{transaction.balance_after.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
@@ -384,7 +384,7 @@ export default function TopupPage() {
 
               <button
                 onClick={handleReset}
-                className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold text-lg hover:bg-blue-700"
+                className="w-full py-4 bg-primary text-white rounded-xl font-bold text-lg hover:bg-primary/90"
               >
                 เติมเงินรายการถัดไป ({countdown})
               </button>

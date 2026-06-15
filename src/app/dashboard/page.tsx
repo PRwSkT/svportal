@@ -27,55 +27,55 @@ export default async function DashboardPage() {
       <DashboardRefresh intervalMs={15000} /> {/* Refresh every 15s */}
       
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">แดชบอร์ดสรุปยอดประจำวัน</h1>
-        <p className="text-gray-500 mt-2">ข้อมูล ณ วันที่ {thaiDate}</p>
+        <h1 className="text-3xl font-bold text-primary">แดชบอร์ดสรุปยอดประจำวัน</h1>
+        <p className="text-foreground/70 mt-2">ข้อมูล ณ วันที่ {thaiDate}</p>
       </div>
 
       {/* Top Level Summary */}
-      <div className="bg-white rounded-2xl shadow-sm border p-8 flex items-center justify-between">
+      <div className="bg-surface rounded-2xl shadow-sm border p-8 flex items-center justify-between">
         <div>
-          <p className="text-lg font-medium text-gray-500">ยอดรับรวมทั้งสิ้น</p>
-          <p className="text-5xl font-extrabold text-blue-600 mt-2">{formatTHB(summary.total_received)}</p>
+          <p className="text-lg font-medium text-foreground/70">ยอดรับรวมทั้งสิ้น</p>
+          <p className="text-5xl font-extrabold text-primary mt-2">{formatTHB(summary.total_received)}</p>
         </div>
         <div className="text-right">
-          <p className="text-sm text-gray-500">อัปเดตล่าสุด: {new Date().toLocaleTimeString('th-TH')}</p>
+          <p className="text-sm text-foreground/70">อัปเดตล่าสุด: {new Date().toLocaleTimeString('th-TH')}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Tuition Fees */}
-        <div className="bg-white rounded-2xl shadow-sm border p-6 hover:shadow-md transition-shadow">
-          <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-purple-500"></span>
+        <div className="bg-surface rounded-2xl shadow-sm border p-6 hover:shadow-md transition-shadow">
+          <h2 className="text-lg font-bold text-primary mb-4 flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-secondary"></span>
             ค่าเทอม
           </h2>
           <div className="space-y-2">
-            <p className="text-3xl font-bold text-gray-900">{formatTHB(summary.tuition_amount)}</p>
-            <p className="text-sm text-gray-500">{summary.tuition_count} รายการ</p>
+            <p className="text-3xl font-bold text-primary">{formatTHB(summary.tuition_amount)}</p>
+            <p className="text-sm text-foreground/70">{summary.tuition_count} รายการ</p>
           </div>
         </div>
 
         {/* Co-op Shop */}
-        <div className="bg-white rounded-2xl shadow-sm border p-6 hover:shadow-md transition-shadow">
-          <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-green-500"></span>
+        <div className="bg-surface rounded-2xl shadow-sm border p-6 hover:shadow-md transition-shadow">
+          <h2 className="text-lg font-bold text-primary mb-4 flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-primary/70"></span>
             ร้านสหกรณ์
           </h2>
           <div className="space-y-2">
-            <p className="text-3xl font-bold text-gray-900">{formatTHB(summary.shop_amount)}</p>
-            <p className="text-sm text-gray-500">{summary.shop_count} รายการ</p>
+            <p className="text-3xl font-bold text-primary">{formatTHB(summary.shop_amount)}</p>
+            <p className="text-sm text-foreground/70">{summary.shop_count} รายการ</p>
           </div>
         </div>
 
         {/* Wallet Topup */}
-        <div className="bg-white rounded-2xl shadow-sm border p-6 hover:shadow-md transition-shadow">
-          <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-orange-500"></span>
+        <div className="bg-surface rounded-2xl shadow-sm border p-6 hover:shadow-md transition-shadow">
+          <h2 className="text-lg font-bold text-primary mb-4 flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-foreground/50"></span>
             เติมเงิน Wallet
           </h2>
           <div className="space-y-2">
-            <p className="text-3xl font-bold text-gray-900">{formatTHB(summary.topup_amount)}</p>
-            <p className="text-sm text-gray-500">{summary.topup_count} รายการ</p>
+            <p className="text-3xl font-bold text-primary">{formatTHB(summary.topup_amount)}</p>
+            <p className="text-sm text-foreground/70">{summary.topup_count} รายการ</p>
           </div>
         </div>
       </div>

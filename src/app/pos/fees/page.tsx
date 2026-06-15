@@ -187,41 +187,41 @@ export default function FeeCollectionPage() {
           {[1, 2, 3, 4].map((s) => (
             <div key={s} className="flex items-center">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
-                ${step === s ? 'bg-blue-600 text-white' : 
-                  step > s ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}`}
+                ${step === s ? 'bg-primary text-white' : 
+                  step > s ? 'bg-secondary text-white' : 'bg-foreground/10 text-foreground/50'}`}
               >
                 {step > s ? '✓' : s}
               </div>
               {s < 4 && (
-                <div className={`w-12 md:w-24 h-1 ${step > s ? 'bg-green-500' : 'bg-gray-200'}`} />
+                <div className={`w-12 md:w-24 h-1 ${step > s ? 'bg-secondary' : 'bg-foreground/10'}`} />
               )}
             </div>
           ))}
         </div>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200 text-center">
+          <div className="mb-6 p-4 bg-secondary/10 text-secondary rounded-lg border border-secondary/20 text-center">
             {error}
           </div>
         )}
 
         {/* STEP 1 */}
         {step === 1 && (
-          <div className="bg-white p-6 md:p-10 rounded-xl shadow-sm border border-gray-100">
-            <h2 className="text-2xl font-bold mb-6 text-center">ค้นหานักเรียน</h2>
+          <div className="bg-surface p-6 md:p-10 rounded-xl shadow-sm border border-foreground/5">
+            <h2 className="text-2xl font-bold mb-6 text-center text-primary">ค้นหานักเรียน</h2>
             <form onSubmit={handleSearch} className="flex gap-4 max-w-xl mx-auto mb-8">
               <input
                 type="text"
                 placeholder="พิมพ์รหัสนักเรียน หรือ ชื่อ-นามสกุล..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-lg"
+                className="flex-1 px-4 py-3 border border-foreground/20 rounded-lg focus:ring-2 focus:ring-primary outline-none text-lg bg-surface text-foreground"
                 autoFocus
               />
               <button 
                 type="submit"
                 disabled={isSearching}
-                className="px-8 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="px-8 py-3 bg-primary text-white font-bold rounded-lg hover:bg-primary/90 disabled:opacity-50"
               >
                 {isSearching ? 'ค้นหา...' : 'ค้นหา'}
               </button>
@@ -233,19 +233,19 @@ export default function FeeCollectionPage() {
                   <div 
                     key={student.id}
                     onClick={() => selectStudent(student)}
-                    className="flex justify-between items-center p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-colors"
+                    className="flex justify-between items-center p-4 border border-foreground/10 rounded-lg hover:border-primary hover:bg-background/50 cursor-pointer transition-colors"
                   >
                     <div>
-                      <h3 className="font-bold text-lg">{student.name}</h3>
-                      <p className="text-gray-500 text-sm">รหัส: {student.id} | ชั้น: {student.grade || '-'}</p>
+                      <h3 className="font-bold text-lg text-primary">{student.name}</h3>
+                      <p className="text-foreground/70 text-sm">รหัส: {student.id} | ชั้น: {student.grade || '-'}</p>
                     </div>
                     <div className="text-right">
                       {student.unpaid_fees.length > 0 ? (
-                        <span className="text-red-500 font-medium bg-red-50 px-3 py-1 rounded-full text-sm">
+                        <span className="text-secondary font-medium bg-secondary/10 px-3 py-1 rounded-full text-sm">
                           ค้างชำระ {student.unpaid_fees.length} รายการ
                         </span>
                       ) : (
-                        <span className="text-green-500 font-medium bg-green-50 px-3 py-1 rounded-full text-sm">
+                        <span className="text-primary font-medium bg-primary/10 px-3 py-1 rounded-full text-sm">
                           ไม่มียอดค้างชำระ
                         </span>
                       )}
@@ -259,13 +259,13 @@ export default function FeeCollectionPage() {
 
         {/* STEP 2 */}
         {step === 2 && selectedStudent && (
-          <div className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-gray-100">
-            <div className="flex justify-between items-center mb-6 pb-4 border-b">
+          <div className="bg-surface p-6 md:p-8 rounded-xl shadow-sm border border-foreground/5">
+            <div className="flex justify-between items-center mb-6 pb-4 border-b border-foreground/5">
               <div>
-                <h2 className="text-xl font-bold">รายการค้างชำระ</h2>
-                <p className="text-gray-500">{selectedStudent.name} (รหัส {selectedStudent.id})</p>
+                <h2 className="text-xl font-bold text-primary">รายการค้างชำระ</h2>
+                <p className="text-foreground/70">{selectedStudent.name} (รหัส {selectedStudent.id})</p>
               </div>
-              <button onClick={() => setStep(1)} className="text-gray-500 hover:text-gray-800">
+              <button onClick={() => setStep(1)} className="text-foreground/50 hover:text-primary">
                 &larr; กลับไปค้นหา
               </button>
             </div>
@@ -284,8 +284,8 @@ export default function FeeCollectionPage() {
                       <label 
                         key={fee.id}
                         className={`flex items-center justify-between p-4 border rounded-lg cursor-pointer transition-colors
-                          ${selectedFeeIds.has(fee.id) ? 'border-blue-500 bg-blue-50/30' : 'border-gray-200'}
-                          ${isOverdue ? 'bg-amber-50/50 border-amber-200' : ''}
+                          ${selectedFeeIds.has(fee.id) ? 'border-primary bg-background/50' : 'border-foreground/10'}
+                          ${isOverdue ? 'bg-secondary/5 border-secondary/20' : ''}
                         `}
                       >
                         <div className="flex items-center gap-4">
@@ -293,17 +293,17 @@ export default function FeeCollectionPage() {
                             type="checkbox"
                             checked={selectedFeeIds.has(fee.id)}
                             onChange={() => toggleFee(fee.id)}
-                            className="w-5 h-5 text-blue-600 rounded"
+                            className="w-5 h-5 text-primary rounded"
                           />
                           <div>
-                            <p className="font-bold">{fee.fee_type?.name || 'ค่าธรรมเนียม'}</p>
-                            <p className="text-sm text-gray-500">
+                            <p className="font-bold text-primary">{fee.fee_type?.name || 'ค่าธรรมเนียม'}</p>
+                            <p className="text-sm text-foreground/70">
                               กำหนดชำระ: {fee.fee_type?.due_date ? new Intl.DateTimeFormat('th-TH').format(new Date(fee.fee_type.due_date)) : '-'}
-                              {isOverdue && <span className="text-red-500 ml-2">(เกินกำหนด)</span>}
+                              {isOverdue && <span className="text-secondary ml-2">(เกินกำหนด)</span>}
                             </p>
                           </div>
                         </div>
-                        <div className="font-bold text-lg">
+                        <div className="font-bold text-lg text-primary">
                           {Number(fee.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </div>
                       </label>
@@ -311,18 +311,18 @@ export default function FeeCollectionPage() {
                   })}
                 </div>
 
-                <div className="flex justify-between items-center pt-6 border-t border-gray-200">
-                  <div className="text-gray-500">
+                <div className="flex justify-between items-center pt-6 border-t border-foreground/10">
+                  <div className="text-foreground/70">
                     เลือกแล้ว {selectedFeeIds.size} รายการ
                   </div>
                   <div className="text-right flex items-center gap-6">
-                    <div className="text-2xl font-bold text-blue-700">
+                    <div className="text-2xl font-bold text-primary">
                       รวม: {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} บาท
                     </div>
                     <button 
                       onClick={proceedToPayment}
                       disabled={selectedFeeIds.size === 0}
-                      className="px-8 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                      className="px-8 py-3 bg-primary text-white font-bold rounded-lg hover:bg-primary/90 disabled:opacity-50"
                     >
                       ดำเนินการชำระเงิน &rarr;
                     </button>
@@ -335,87 +335,87 @@ export default function FeeCollectionPage() {
 
         {/* STEP 3 */}
         {step === 3 && selectedStudent && (
-          <div className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-gray-100 max-w-3xl mx-auto">
-            <div className="flex justify-between items-center mb-6 pb-4 border-b">
-              <h2 className="text-xl font-bold">เลือกวิธีชำระเงิน</h2>
-              <button onClick={() => setStep(2)} className="text-gray-500 hover:text-gray-800">
+          <div className="bg-surface p-6 md:p-8 rounded-xl shadow-sm border border-foreground/5 max-w-3xl mx-auto">
+            <div className="flex justify-between items-center mb-6 pb-4 border-b border-foreground/5">
+              <h2 className="text-xl font-bold text-primary">เลือกวิธีชำระเงิน</h2>
+              <button onClick={() => setStep(2)} className="text-foreground/50 hover:text-primary">
                 &larr; กลับไปเลือกรายการ
               </button>
             </div>
 
             <div className="text-center mb-8">
-              <p className="text-gray-500">ยอดที่ต้องชำระ</p>
-              <h3 className="text-4xl font-bold text-blue-700 my-2">
+              <p className="text-foreground/70">ยอดที่ต้องชำระ</p>
+              <h3 className="text-4xl font-bold text-primary my-2">
                 {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} บาท
               </h3>
-              <p className="text-sm text-gray-400">สำหรับ {selectedStudent.name}</p>
+              <p className="text-sm text-foreground/50">สำหรับ {selectedStudent.name}</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
               {/* Cash */}
               <label className={`
                 flex flex-col items-center justify-center p-6 border-2 rounded-xl cursor-pointer transition-all
-                ${paymentMethod === 'cash' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}
+                ${paymentMethod === 'cash' ? 'border-primary bg-background/50' : 'border-foreground/10 hover:border-primary/50'}
               `}>
                 <input 
                   type="radio" name="payment" value="cash" className="hidden"
                   checked={paymentMethod === 'cash'} onChange={() => setPaymentMethod('cash')} 
                 />
                 <div className="text-4xl mb-3">💵</div>
-                <div className="font-bold text-lg">เงินสด</div>
+                <div className="font-bold text-lg text-primary">เงินสด</div>
               </label>
 
               {/* QR */}
               <label className={`
                 flex flex-col items-center justify-center p-6 border-2 rounded-xl cursor-pointer transition-all
-                ${paymentMethod === 'qr' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}
+                ${paymentMethod === 'qr' ? 'border-primary bg-background/50' : 'border-foreground/10 hover:border-primary/50'}
               `}>
                 <input 
                   type="radio" name="payment" value="qr" className="hidden"
                   checked={paymentMethod === 'qr'} onChange={() => setPaymentMethod('qr')} 
                 />
                 <div className="text-4xl mb-3">📱</div>
-                <div className="font-bold text-lg">สแกน QR Code</div>
+                <div className="font-bold text-lg text-primary">สแกน QR Code</div>
               </label>
 
               {/* Transfer */}
               <label className={`
                 flex flex-col items-center justify-center p-6 border-2 rounded-xl cursor-pointer transition-all
-                ${paymentMethod === 'transfer' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}
+                ${paymentMethod === 'transfer' ? 'border-primary bg-background/50' : 'border-foreground/10 hover:border-primary/50'}
               `}>
                 <input 
                   type="radio" name="payment" value="transfer" className="hidden"
                   checked={paymentMethod === 'transfer'} onChange={() => setPaymentMethod('transfer')} 
                 />
                 <div className="text-4xl mb-3">🏦</div>
-                <div className="font-bold text-lg">โอนธนาคาร</div>
+                <div className="font-bold text-lg text-primary">โอนธนาคาร</div>
               </label>
             </div>
 
             {/* Payment Method Details */}
             {paymentMethod === 'qr' && (
-              <div className="bg-gray-50 p-6 rounded-lg text-center mb-8 border border-gray-200">
-                <div className="w-48 h-48 bg-white border-4 border-gray-300 mx-auto flex items-center justify-center text-gray-400 mb-4 rounded-lg">
+              <div className="bg-background/50 p-6 rounded-lg text-center mb-8 border border-foreground/5">
+                <div className="w-48 h-48 bg-surface border-4 border-foreground/10 mx-auto flex items-center justify-center text-foreground/40 mb-4 rounded-lg">
                   [ QR Code Placeholder ]
                 </div>
-                <p className="text-sm text-gray-500">ให้ผู้ปกครองสแกน QR Code ด้านบนเพื่อชำระเงิน</p>
+                <p className="text-sm text-foreground/70">ให้ผู้ปกครองสแกน QR Code ด้านบนเพื่อชำระเงิน</p>
               </div>
             )}
 
             {paymentMethod === 'transfer' && (
-              <div className="bg-blue-50 p-6 rounded-lg text-center mb-8 border border-blue-100">
-                <p className="text-sm text-gray-500 mb-2">บัญชีรับโอนของโรงเรียน</p>
-                <div className="text-2xl font-bold tracking-wider text-blue-800 mb-1">
+              <div className="bg-background/50 p-6 rounded-lg text-center mb-8 border border-foreground/5">
+                <p className="text-sm text-foreground/70 mb-2">บัญชีรับโอนของโรงเรียน</p>
+                <div className="text-2xl font-bold tracking-wider text-primary mb-1">
                   {process.env.NEXT_PUBLIC_SCHOOL_BANK_ACCOUNT || '123-4-56789-0 (ธนาคารตัวอย่าง)'}
                 </div>
-                <p className="font-medium text-blue-700">ชื่อบัญชี: โรงเรียนสมคิดวิทยา</p>
+                <p className="font-medium text-primary">ชื่อบัญชี: โรงเรียนสมคิดวิทยา</p>
               </div>
             )}
 
             <button 
               onClick={confirmPayment}
               disabled={isProcessing}
-              className="w-full py-4 bg-green-600 text-white font-bold text-xl rounded-xl hover:bg-green-700 disabled:opacity-50 transition-colors"
+              className="w-full py-4 bg-primary text-white font-bold text-xl rounded-xl hover:bg-primary/90 disabled:opacity-50 transition-colors"
             >
               {isProcessing ? 'กำลังประมวลผล...' : 'ยืนยันรับชำระเงิน'}
             </button>
@@ -425,22 +425,22 @@ export default function FeeCollectionPage() {
         {/* STEP 4 */}
         {step === 4 && receiptData && (
           <div className="text-center max-w-2xl mx-auto">
-            <div className="bg-green-100 text-green-700 p-8 rounded-2xl mb-8">
+            <div className="bg-primary/10 text-primary p-8 rounded-2xl mb-8 border border-primary/20">
               <div className="text-6xl mb-4">✅</div>
-              <h2 className="text-3xl font-bold mb-2">ชำระเงินสำเร็จ</h2>
-              <p className="text-lg">เลขที่ใบเสร็จ: {receiptData.number}</p>
+              <h2 className="text-3xl font-bold mb-2 text-primary">ชำระเงินสำเร็จ</h2>
+              <p className="text-lg text-primary">เลขที่ใบเสร็จ: {receiptData.number}</p>
             </div>
 
             <div className="flex gap-4 justify-center">
               <button 
                 onClick={handlePrint}
-                className="px-8 py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 flex items-center gap-2"
+                className="px-8 py-4 bg-primary text-white font-bold rounded-xl hover:bg-primary/90 flex items-center gap-2"
               >
                 🖨️ พิมพ์ใบเสร็จ
               </button>
               <button 
                 onClick={resetFlow}
-                className="px-8 py-4 bg-white text-gray-700 border-2 border-gray-200 font-bold rounded-xl hover:bg-gray-50"
+                className="px-8 py-4 bg-surface text-foreground border-2 border-foreground/10 font-bold rounded-xl hover:bg-background/50"
               >
                 รับชำระรายถัดไป
               </button>

@@ -28,12 +28,12 @@ export function AppNav() {
   const links = role === 'admin' ? [...cashierLinks, ...adminLinks] : cashierLinks;
 
   return (
-    <nav className="bg-white border-b shadow-sm print:hidden">
+    <nav className="bg-surface border-b shadow-sm print:hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
-              <span className="text-xl font-bold text-blue-600">SVPortal POS</span>
+              <span className="text-xl font-bold text-primary">SVPortal POS</span>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               {links.map(link => {
@@ -45,8 +45,8 @@ export function AppNav() {
                     href={link.href}
                     className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
                       isActive
-                        ? 'border-blue-500 text-gray-900'
-                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-foreground/60 hover:border-foreground/30 hover:text-foreground'
                     }`}
                   >
                     {link.label}
@@ -57,17 +57,17 @@ export function AppNav() {
           </div>
           <div className="hidden sm:ml-6 sm:flex sm:items-center">
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-700">
+              <span className="text-sm text-foreground/80">
                 {user.email} 
                 <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'
+                  role === 'admin' ? 'bg-primary/10 text-primary' : 'bg-primary/10 text-primary'
                 }`}>
                   {role === 'admin' ? 'Admin' : 'Cashier'}
                 </span>
               </span>
               <button
                 onClick={signOut}
-                className="text-sm font-medium text-red-600 hover:text-red-500"
+                className="text-sm font-medium text-secondary hover:text-secondary/80"
               >
                 ออกจากระบบ
               </button>
