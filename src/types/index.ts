@@ -1,12 +1,57 @@
 export type Student = {
-  id: string; // Ensure student_id is strictly a string (4-5 digit numeric string)
-  name: string;
-  grade: string;
-  wallet_balance: number; // Thai Baht, 2 decimal places
-  status: 'active' | 'graduated' | 'dropped_out';
-  profile_data: Record<string, any>; // JSONB for guardian info, etc.
-  created_at: string; // ISO 8601
-  updated_at: string; // ISO 8601
+  id: string; // student code
+  name: string; // Full name (legacy support)
+  grade: string; // Class level (legacy support)
+  prefix?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  birth_date?: string | null;
+  gender?: string | null;
+  nationality?: string | null;
+  religion?: string | null;
+  height?: number | null;
+  weight?: number | null;
+  disability?: string | null;
+  enrolled_date?: string | null;
+  wallet_balance: number; // Thai Baht
+  status: string; // 'กำลังศึกษาอยู่' etc.
+  created_at: string;
+  updated_at: string;
+  // Relational joins
+  student_addresses?: StudentAddress[];
+  student_parents?: StudentParent[];
+};
+
+export type StudentAddress = {
+  id: string;
+  student_id: string;
+  house_code?: string | null;
+  house_number?: string | null;
+  moo?: string | null;
+  soi?: string | null;
+  road?: string | null;
+  sub_district?: string | null;
+  district?: string | null;
+  province?: string | null;
+  zip_code?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type StudentParent = {
+  id: string;
+  student_id: string;
+  relationship: string;
+  citizen_id?: string | null;
+  prefix?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  occupation?: string | null;
+  salary?: string | null;
+  phone_number?: string | null;
+  status?: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type TransactionType = 'tuition_payment' | 'shop_sale' | 'wallet_topup' | 'wallet_deduct' | 'wallet_purchase';

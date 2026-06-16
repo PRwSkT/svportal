@@ -7,7 +7,10 @@ export async function getStudents(
   gradeFilter?: string
 ): Promise<Student[]> {
   const supabase = createClient();
-  let query = supabase.from('students').select('*').order('id', { ascending: true });
+  let query = supabase
+    .from('students')
+    .select('*, student_addresses(*), student_parents(*)')
+    .order('id', { ascending: true });
 
   if (searchQuery) {
     query = query.or(`id.ilike.%${searchQuery}%,name.ilike.%${searchQuery}%`);
@@ -28,7 +31,7 @@ export async function getStudentById(id: string): Promise<Student | null> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('students')
-    .select('*')
+    .select('*, student_addresses(*), student_parents(*)')
     .eq('id', id)
     .single();
 
@@ -37,7 +40,7 @@ export async function getStudentById(id: string): Promise<Student | null> {
 }
 
 export async function createStudent(
-  student: Omit<Student, 'wallet_balance' | 'created_at' | 'updated_at'>
+  student: Omit<Student, 'wallet_balance' | 'created_at' | 'updated_at' | 'student_addresses' | 'student_parents'>
 ): Promise<Student> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -47,7 +50,9 @@ export async function createStudent(
       name: student.name,
       grade: student.grade,
       status: student.status,
-      profile_data: student.profile_data
+      first_name: student.first_name,
+      last_name: student.last_name,
+      prefix: student.prefix
     }])
     .select()
     .single();
@@ -58,7 +63,7 @@ export async function createStudent(
 
 export async function updateStudent(
   id: string,
-  updates: Partial<Pick<Student, 'name' | 'grade' | 'status' | 'profile_data'>>
+  updates: Partial<Omit<Student, 'id' | 'wallet_balance' | 'created_at' | 'updated_at' | 'student_addresses' | 'student_parents'>>
 ): Promise<Student> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -77,7 +82,6 @@ export async function updateStudent(
 
 export async function deleteStudent(id: string): Promise<boolean> {
   const supabase = createClient();
-  // Attempt delete (will fail if there are foreign key constraints like transactions)
   const { error } = await supabase
     .from('students')
     .delete()
@@ -88,15 +92,13 @@ export async function deleteStudent(id: string): Promise<boolean> {
 }
 
 export async function importStudentsFromCSV(
-  fileData: { id: string; name: string; grade: string; status?: string; profile_data?: Record<string, any> }[]
+  fileData: { id: string; name: string; grade: string; status?: string; }[]
 ): Promise<{ success: number; failed: number; errors: any[] }> {
   const supabase = createClient();
   let success = 0;
   let failed = 0;
   const errors = [];
 
-  // For safety and detailed error tracking, we'll process them one by one or in batches
-  // Here we use one-by-one for clear error messages per student
   for (const item of fileData) {
     const { error } = await supabase
       .from('students')
@@ -104,9 +106,7 @@ export async function importStudentsFromCSV(
         id: item.id,
         name: item.name,
         grade: item.grade,
-        status: item.status || 'active',
-        profile_data: item.profile_data || {}
-        // we don't update wallet_balance on upsert so it doesn't reset
+        status: item.status || 'active'
       }], { onConflict: 'id', ignoreDuplicates: false });
 
     if (error) {
@@ -118,4 +118,22 @@ export async function importStudentsFromCSV(
   }
 
   return { success, failed, errors };
+}
+
+export async function upsertStudentAddress(address: any): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from('student_addresses').upsert(address);
+  if (error) throw error;
+}
+
+export async function upsertStudentParent(parent: any): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from('student_parents').upsert(parent);
+  if (error) throw error;
+}
+
+export async function deleteStudentParent(id: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from('student_parents').delete().eq('id', id);
+  if (error) throw error;
 }

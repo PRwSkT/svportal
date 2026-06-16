@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Student } from '@/types';
-import { getStudents, createStudent, updateStudent, importStudentsFromCSV } from '@/lib/supabase/students';
+import { getStudents, importStudentsFromCSV } from '@/lib/supabase/students';
+import Link from 'next/link';
 
 export default function StudentRecordsPage() {
   const [students, setStudents] = useState<Student[]>([]);
@@ -11,22 +12,6 @@ export default function StudentRecordsPage() {
   // Search and Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  
-  // Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
-  
-  // Form State
-  const [formData, setFormData] = useState({
-    id: '',
-    name: '',
-    grade: '',
-    status: 'active' as 'active' | 'graduated' | 'dropped_out',
-    parent_name: '',
-    parent_phone: '',
-    health_condition: '',
-    notes: ''
-  });
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -46,62 +31,6 @@ export default function StudentRecordsPage() {
   useEffect(() => {
     fetchStudents();
   }, [searchQuery, statusFilter]);
-
-  const handleOpenModal = (student?: Student) => {
-    if (student) {
-      setEditingStudent(student);
-      setFormData({
-        id: student.id,
-        name: student.name,
-        grade: student.grade,
-        status: student.status,
-        parent_name: student.profile_data?.parent_name || '',
-        parent_phone: student.profile_data?.parent_phone || '',
-        health_condition: student.profile_data?.health_condition || '',
-        notes: student.profile_data?.notes || '',
-      });
-    } else {
-      setEditingStudent(null);
-      setFormData({
-        id: '', name: '', grade: '', status: 'active',
-        parent_name: '', parent_phone: '', health_condition: '', notes: ''
-      });
-    }
-    setIsModalOpen(true);
-  };
-
-  const handleSaveStudent = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const profileData = {
-        parent_name: formData.parent_name,
-        parent_phone: formData.parent_phone,
-        health_condition: formData.health_condition,
-        notes: formData.notes
-      };
-
-      if (editingStudent) {
-        await updateStudent(editingStudent.id, {
-          name: formData.name,
-          grade: formData.grade,
-          status: formData.status,
-          profile_data: profileData
-        });
-      } else {
-        await createStudent({
-          id: formData.id,
-          name: formData.name,
-          grade: formData.grade,
-          status: formData.status,
-          profile_data: profileData
-        });
-      }
-      setIsModalOpen(false);
-      fetchStudents();
-    } catch (err: any) {
-      alert('Error: ' + err.message);
-    }
-  };
 
   const handleCsvImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -132,8 +61,7 @@ export default function StudentRecordsPage() {
             id: cols[idIdx],
             name: cols[nameIdx],
             grade: cols[gradeIdx],
-            status: 'active',
-            profile_data: {}
+            status: 'active'
           });
         }
 
@@ -160,7 +88,7 @@ export default function StudentRecordsPage() {
             onClick={() => fileInputRef.current?.click()}
             className="px-6 py-3 bg-secondary/10 text-secondary font-bold rounded-xl hover:bg-secondary/20 transition-colors"
           >
-            📥 Import CSV
+            📥 Import CSV Basic
           </button>
           <input 
             type="file" 
@@ -169,12 +97,11 @@ export default function StudentRecordsPage() {
             className="hidden" 
             onChange={handleCsvImport}
           />
-          <button 
-            onClick={() => handleOpenModal()}
-            className="px-6 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
-          >
-            + เพิ่มนักเรียน
-          </button>
+          <Link href="/admin/students/new">
+            <button className="px-6 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20">
+              + เพิ่มนักเรียน
+            </button>
+          </Link>
         </div>
       </div>
 
@@ -192,9 +119,10 @@ export default function StudentRecordsPage() {
           onChange={e => setStatusFilter(e.target.value)}
         >
           <option value="all">ทุกสถานะ</option>
-          <option value="active">กำลังศึกษา</option>
-          <option value="graduated">จบการศึกษา</option>
-          <option value="dropped_out">ลาออก</option>
+          <option value="กำลังศึกษาอยู่">กำลังศึกษาอยู่</option>
+          <option value="สำเร็จการศึกษา">สำเร็จการศึกษา</option>
+          <option value="ลาออก">ลาออก</option>
+          <option value="active">Active (Legacy)</option>
         </select>
       </div>
 
@@ -223,20 +151,19 @@ export default function StudentRecordsPage() {
                   <td className="p-4">{s.grade || '-'}</td>
                   <td className="p-4">
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      s.status === 'active' ? 'bg-secondary/10 text-secondary' : 
-                      s.status === 'graduated' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'
+                      s.status?.includes('กำลังศึกษา') || s.status === 'active' ? 'bg-secondary/10 text-secondary' : 
+                      'bg-foreground/10 text-foreground/70'
                     }`}>
-                      {s.status === 'active' ? 'กำลังศึกษา' : s.status === 'graduated' ? 'จบการศึกษา' : 'ลาออก'}
+                      {s.status}
                     </span>
                   </td>
-                  <td className="p-4 text-right">฿{s.wallet_balance.toLocaleString()}</td>
+                  <td className="p-4 text-right">฿{(s.wallet_balance || 0).toLocaleString()}</td>
                   <td className="p-4 text-center">
-                    <button 
-                      onClick={() => handleOpenModal(s)}
-                      className="text-primary hover:underline text-sm font-medium"
-                    >
-                      แก้ไข/ประวัติ
-                    </button>
+                    <Link href={`/admin/students/${s.id}`}>
+                      <button className="text-primary hover:underline text-sm font-medium px-4 py-2 bg-primary/5 rounded-lg hover:bg-primary/10 transition-colors">
+                        แก้ไข / ดูประวัติ
+                      </button>
+                    </Link>
                   </td>
                 </tr>
               ))}
@@ -244,75 +171,6 @@ export default function StudentRecordsPage() {
           </table>
         )}
       </div>
-
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-          <div className="bg-surface rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="p-8 border-b border-foreground/5 sticky top-0 bg-surface z-10 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-primary">{editingStudent ? 'แก้ไขข้อมูลนักเรียน' : 'เพิ่มนักเรียนใหม่'}</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-foreground/50 hover:text-foreground text-xl">✕</button>
-            </div>
-            
-            <form onSubmit={handleSaveStudent} className="p-8 space-y-8">
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-foreground/70 mb-2">รหัสนักเรียน</label>
-                  <input required type="text" disabled={!!editingStudent} value={formData.id} onChange={e => setFormData({...formData, id: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:outline-none disabled:opacity-50 text-foreground" />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-foreground/70 mb-2">ชื่อ-สกุล</label>
-                  <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:outline-none text-foreground" />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-foreground/70 mb-2">ระดับชั้น</label>
-                  <input type="text" value={formData.grade} onChange={e => setFormData({...formData, grade: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:outline-none text-foreground" />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-foreground/70 mb-2">สถานะการศึกษา</label>
-                  <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as any})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:outline-none text-foreground">
-                    <option value="active">กำลังศึกษา</option>
-                    <option value="graduated">จบการศึกษา</option>
-                    <option value="dropped_out">ลาออก</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="pt-6 border-t border-foreground/5 space-y-6">
-                <h3 className="text-lg font-bold text-primary flex items-center gap-2">
-                  <span>📝</span> ข้อมูลประวัติ (สำหรับ AI วิเคราะห์)
-                </h3>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-semibold text-foreground/70 mb-2">ชื่อผู้ปกครอง</label>
-                    <input type="text" value={formData.parent_name} onChange={e => setFormData({...formData, parent_name: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:outline-none text-foreground" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-foreground/70 mb-2">เบอร์โทรผู้ปกครอง</label>
-                    <input type="text" value={formData.parent_phone} onChange={e => setFormData({...formData, parent_phone: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:outline-none text-foreground" />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-sm font-semibold text-foreground/70 mb-2">โรคประจำตัว / ข้อมูลสุขภาพ</label>
-                    <input type="text" value={formData.health_condition} onChange={e => setFormData({...formData, health_condition: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:outline-none text-foreground" />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-sm font-semibold text-foreground/70 mb-2">บันทึกพฤติกรรม / ข้อมูลอื่นๆ ที่สำคัญ</label>
-                    <textarea rows={3} value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:outline-none text-foreground" placeholder="เช่น เป็นนักกีฬาโรงเรียน, เคยได้รับทุนเรียนดี, ฯลฯ" />
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex gap-4 pt-4 sticky bottom-0 bg-surface">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 bg-foreground/5 text-foreground/70 rounded-xl font-bold hover:bg-foreground/10 transition-colors">
-                  ยกเลิก
-                </button>
-                <button type="submit" className="flex-1 py-4 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20">
-                  บันทึกข้อมูล
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
