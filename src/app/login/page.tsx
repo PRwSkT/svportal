@@ -32,8 +32,10 @@ export default function LoginPage() {
     setError(null);
 
     const supabase = createClient();
+    const loginEmail = email.trim().toLowerCase() === 'admin' ? 'admin@svportal.com' : email;
+    
     const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
+      email: loginEmail,
       password,
     });
 
@@ -100,11 +102,11 @@ export default function LoginPage() {
               <input
                 id="email-address"
                 name="email"
-                type="email"
+                type="text"
                 autoComplete="email"
                 required
                 className="appearance-none rounded-xl relative block w-full px-3 py-3 border border-foreground/20 placeholder-foreground/50 text-foreground focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm bg-surface"
-                placeholder="อีเมล"
+                placeholder="อีเมล หรือชื่อผู้ใช้ (admin)"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />

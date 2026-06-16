@@ -55,7 +55,10 @@ export async function proxy(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith('/admin') || request.nextUrl.pathname === '/dashboard') {
     const { data: role, error } = await supabase.rpc('get_user_role');
     if (error || role !== 'admin') {
-      return NextResponse.redirect(new URL('/pos/shop', request.url));
+      const debugUrl = new URL('/pos/shop', request.url);
+      debugUrl.searchParams.set('debug_err', error ? error.message : 'none');
+      debugUrl.searchParams.set('debug_role', String(role));
+      return NextResponse.redirect(debugUrl);
     }
   }
 

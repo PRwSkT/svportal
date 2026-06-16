@@ -36,7 +36,7 @@ export function AppNav() {
             <div className="flex-shrink-0 flex items-center">
               <span className="text-xl font-bold text-primary">SVPortal POS</span>
             </div>
-            <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+            <div className="flex sm:ml-6 space-x-4 sm:space-x-8 overflow-x-auto overflow-y-hidden pb-1">
               {links.map(link => {
                 const isActive = pathname.startsWith(link.href) && 
                                  (link.href !== '/dashboard' || pathname === '/dashboard');
@@ -56,7 +56,7 @@ export function AppNav() {
               })}
             </div>
           </div>
-          <div className="hidden sm:ml-6 sm:flex sm:items-center">
+          <div className="flex items-center ml-auto pl-4">
             <div className="flex items-center space-x-4">
               <span className="text-sm text-foreground/80">
                 {user.email} 
