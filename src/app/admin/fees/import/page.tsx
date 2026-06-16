@@ -109,7 +109,7 @@ export default function ImportFeesPage() {
         
       if (fetchErr) throw fetchErr;
         
-      const existingSet = new Set(existing?.map(e => `${e.student_id}_${e.fee_type_id}`));
+      const existingSet = new Set(existing?.map((e: any) => `${e.student_id}_${e.fee_type_id}`));
       
       const toInsert = validRows
         .filter(r => !existingSet.has(`${r.student_id}_${r.fee_type_id}`))
