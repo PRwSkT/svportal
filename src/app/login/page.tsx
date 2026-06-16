@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import Image from 'next/image';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -55,11 +56,12 @@ export default function LoginPage() {
   return (
     <div className="min-h-[80vh] flex items-center justify-center bg-background py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 bg-surface p-10 rounded-2xl shadow-xl border border-foreground/5">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-primary">
-            ระบบการเงิน SVPortal
+        <div className="flex flex-col items-center">
+          <Image src="/logo.png" alt="School Logo" width={80} height={80} className="mb-4" />
+          <h2 className="text-center text-3xl font-extrabold text-primary flex items-center gap-2">
+            <Image src="/SV-Portal.png" alt="SVPortal Logo" width={140} height={40} className="h-10 w-auto" />
           </h2>
-          <p className="mt-2 text-center text-sm text-foreground/70">
+          <p className="mt-4 text-center text-sm text-foreground/70">
             เข้าสู่ระบบเพื่อใช้งาน (ใช้ระบบจัดการผู้ใช้ของโรงเรียน)
           </p>
         </div>

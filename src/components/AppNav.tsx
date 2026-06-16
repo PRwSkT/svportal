@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import Image from 'next/image';
 
 export function AppNav() {
   const pathname = usePathname();
@@ -29,13 +30,14 @@ export function AppNav() {
   const links = role === 'admin' ? [...cashierLinks, ...adminLinks] : cashierLinks;
 
   return (
-    <nav className="bg-surface border-b shadow-sm print:hidden">
+    <nav className="bg-surface/80 backdrop-blur-md border-b border-foreground/5 shadow-sm sticky top-0 z-50 print:hidden transition-all">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
-          <div className="flex">
-            <div className="flex-shrink-0 flex items-center">
-              <span className="text-xl font-bold text-primary">SVPortal POS</span>
-            </div>
+          <div className="flex items-center">
+            <Link href="/" className="flex-shrink-0 flex items-center gap-3 mr-4">
+              <Image src="/logo.png" alt="School Logo" width={32} height={32} className="h-8 w-auto drop-shadow-sm" />
+              <Image src="/SV-Portal.png" alt="SVPortal" width={100} height={28} className="h-7 w-auto hidden sm:block" />
+            </Link>
             <div className="flex sm:ml-6 space-x-4 sm:space-x-8 overflow-x-auto overflow-y-hidden pb-1">
               {links.map(link => {
                 const isActive = pathname.startsWith(link.href) && 

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AppNav } from "@/components/AppNav";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,6 +20,7 @@ export default function RootLayout({
       className="h-full antialiased"
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
+        <Toaster position="top-right" richColors />
         <AuthProvider>
           <AppNav />
           <main className="flex-1">
