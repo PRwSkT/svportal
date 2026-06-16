@@ -129,6 +129,9 @@ export default function StudentRecordsPage() {
       </div>
 
       <div className="bg-surface rounded-2xl shadow-sm border border-foreground/5 overflow-hidden">
+        <div className="p-4 bg-yellow-50 text-yellow-800 text-xs font-mono mb-4 border-b border-yellow-200">
+          Debug: isLoading={String(isLoading)}, error={String(error)}, students={students.length}, search={searchQuery}, status={statusFilter}
+        </div>
         {error ? (
           <div className="p-12 text-center text-red-500 font-bold bg-red-50">❌ Error: {error}</div>
         ) : isLoading ? (
