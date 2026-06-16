@@ -22,28 +22,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const supabase = createClient();
 
     const fetchSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user || null);
-      if (session?.user) {
-        const { data } = await supabase.rpc('get_user_role');
-        setRole(data as 'admin' | 'cashier');
-      } else {
-        setRole(null);
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) console.error('Session error:', sessionError);
+        setUser(session?.user || null);
+        if (session?.user) {
+          const { data, error: roleError } = await supabase.rpc('get_user_role');
+          if (roleError) console.error('Role error:', roleError);
+          setRole(data as 'admin' | 'cashier');
+        } else {
+          setRole(null);
+        }
+      } catch (err) {
+        console.error('Auth fetch error:', err);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     fetchSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setUser(session?.user || null);
-      if (session?.user) {
-        const { data } = await supabase.rpc('get_user_role');
-        setRole(data as 'admin' | 'cashier');
-      } else {
-        setRole(null);
+      try {
+        setUser(session?.user || null);
+        if (session?.user) {
+          const { data } = await supabase.rpc('get_user_role');
+          setRole(data as 'admin' | 'cashier');
+        } else {
+          setRole(null);
+        }
+      } catch (err) {
+        console.error('Auth state change error:', err);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     });
 
     return () => {
