@@ -8,6 +8,7 @@ import Link from 'next/link';
 export default function StudentRecordsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // Search and Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -17,12 +18,13 @@ export default function StudentRecordsPage() {
 
   const fetchStudents = async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const data = await getStudents(searchQuery, statusFilter);
-      setStudents(data);
-    } catch (err) {
-      console.error(err);
-      alert('เกิดข้อผิดพลาดในการโหลดข้อมูลนักเรียน');
+      setStudents(data || []);
+    } catch (err: any) {
+      console.error('Fetch error:', err);
+      setError(err.message || 'เกิดข้อผิดพลาดในการโหลดข้อมูลนักเรียน');
     } finally {
       setIsLoading(false);
     }
@@ -127,7 +129,9 @@ export default function StudentRecordsPage() {
       </div>
 
       <div className="bg-surface rounded-2xl shadow-sm border border-foreground/5 overflow-hidden">
-        {isLoading ? (
+        {error ? (
+          <div className="p-12 text-center text-red-500 font-bold bg-red-50">❌ Error: {error}</div>
+        ) : isLoading ? (
           <div className="p-12 text-center text-foreground/50">กำลังโหลดข้อมูล...</div>
         ) : students.length === 0 ? (
           <div className="p-12 text-center text-foreground/50">ไม่พบข้อมูลนักเรียน</div>
