@@ -1,0 +1,903 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd"><html><head>
+<title>โปรไฟล์นักเรียน</title>
+<link href="psis/popup/css/animate.css" rel="stylesheet" type="text/css">
+<link href="psis/popup/css/bootstrap.css" rel="stylesheet" type="text/css">
+<link href="psis/popup/css/bootstrap.min.css" rel="stylesheet" type="text/css">
+<link href="psis/popup/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+<link href="psis/popup/css/style.css" rel="stylesheet" type="text/css">
+<link href="psis/ui/css/font.css" rel="stylesheet" type="text/css">
+
+
+<style type="text/css">
+	.topic{
+		font-family:pridi, pridien, Arial;
+	    font-size:17px;
+	}
+	.panel-heading{
+		font-family:pridi, pridien, Arial;
+	    font-size:18px;
+	}
+	
+	.stuName{
+		font-family:pridi, pridien, Arial;
+	    font-size:20px;
+	}
+	.co{
+		background: #4a68a5;
+	}
+
+	.fullname {
+	     font-family:pridi, pridien, Arial;
+	    font-size:18px;
+	    font-weight: bolder;
+	}
+	
+	.studentcode {
+	   font-family:pridi, pridien, Arial;
+	    font-size:30px;
+	    
+	    font-weight: bolder;
+	}
+	
+	.schoolName {
+	   font-family:pridi, pridien, Arial;
+	    font-size:20px;
+	}
+	
+	.table
+	{
+   	 	font-size: 16px;
+    	font-family:pridi, pridien, Arial;
+	}
+	
+	.imgFrame{
+	    border: 1px solid #c4c4c4;
+	    padding: 4px 4px 4px 4px;
+	    box-shadow: 0px 0px 1px #d9d9d9;
+	    -moz-box-shadow: 0px 0px 8px #d9d9d9;
+	    -webkit-box-shadow: 0px 0px 8px #d9d9d9;
+	    background-color: #ffffff;
+	}
+</style>
+
+<style type="text/css">
+    .user-row {
+    margin-bottom: 14px;
+}
+
+.user-row:last-child {
+    margin-bottom: 0;
+}
+
+.dropdown-user {
+    margin: 13px 0;
+    padding: 5px;
+    height: 100%;
+}
+
+.dropdown-user:hover {
+    cursor: pointer;
+}
+
+.table-user-information > tbody > tr {
+    border-top: 1px solid rgb(221, 221, 221);
+}
+
+.table-user-information > tbody > tr:first-child {
+    border-top: 0;
+}
+
+
+.table-user-information > tbody > tr > td {
+    border-top: 0;
+}
+.toppad
+{margin-top:20px;
+}
+.preloading {
+	text-align: center;
+	font-size: 1.2em;
+	color: #0080ff;
+	background: url("/regis/psis/ui/img/preload/ajax-loaders.gif") 50% 0 no-repeat;
+	margin: 0 auto;
+	padding-top: 22px;
+	margin: 5px;
+}
+
+    </style>
+
+</head>
+
+<body id="myPage" data-spy="scroll" data-target=".navbar" data-offset="60">
+  <div class="header">
+    <div class="bg-color">
+      <header id="main-header">
+        <nav class="navbar navbar-default navbar-fixed-top">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#lauraMenu">
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="#"><span class="stuName">เด็กหญิงศรัณย์พัชญ์&nbsp;&nbsp;คำภิรานนท์</span></a>
+            </div>
+            
+            <div class="collapse navbar-collapse" id="lauraMenu">
+              <ul class="nav navbar-nav navbar-right navbar-border">
+                <li class="active"><a href="#main-header"><span class="topic">ข้อมูลส่วนตัว</span></a></li>
+                <li><a href="#about"><span class="topic">ข้อมูลที่อยู่</span></a></li>
+                <li><a href="#portfolio"><span class="topic">ข้อมูลครอบครัว</span></a></li>
+                <li><a href="#parent"><span class="topic">ข้อมูลผู้ปกครอง</span></a></li>
+                <li><a href="#contact"><span class="topic">ข้อมูลการเรียน</span></a></li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </header>
+      <div class="wrapper">
+        <div class="container">
+          <div class="row">
+            <div class="col-md-12 wow fadeIn delay-05s animated" style="visibility: visible; animation-name: fadeIn;">
+
+					<div class="form-group" style="padding-top: 100px;">	
+					       <div class="col-md-6">
+					       <div style="padding-bottom: 12px;text-align: center;">
+					       	                        	
+         					<img class="imgFrame" style="width: 180px;height: 180px;" id="output" src="/regis/Student.htm?mode=showPicture&amp;id=14300185">
+         					</div>
+         
+					       		<div class="panel panel-info">
+						        	<div class="panel-heading">
+						              รายละเอียดนักเรียน
+						            </div>
+						            <div class="panel-body">
+						              	<div class="row">
+						                <div class=" col-md-12 col-lg-12 "> 
+						                
+						                  <table class="table table-user-information table-hover">
+						                    <tbody>
+						                      <tr>
+						                        <td width="180"><b>เลขประจำตัวนักเรียน </b></td>
+						                        <td>10263</td>
+						                      </tr>
+						                      <tr>
+						                        <td><b>ชั้นเรียน</b></td>
+						                        <td>
+						                        	                                
+														อ.1/1    
+													  
+						                        </td>
+						                      </tr>
+						                      
+						                      <tr>
+						                        <td><b>วันที่เข้าเรียน</b></td>
+						                        <td>14 พ.ค. 2569</td>
+						                      </tr>
+						                      
+					                          <tr>
+						                        <td><b>วันที่บันทึก</b></td>
+						                        <td>07 พ.ค. 2569 10:18 น.</td>
+						                      </tr>
+						                      
+						                      <tr>
+						                        <td><b>สถานะนักเรียน</b></td>
+						                        <td>
+						                        	                              
+														นักเรียนเข้าใหม่
+													  
+						                        </td>
+						                      </tr>
+						                      
+						                    </tbody>
+						                  </table>
+						                </div>
+						              </div>
+						            </div>
+			          			</div>
+					       </div>
+					       
+					       
+					                           <div class="col-md-6">
+							<div class="panel panel-info ">
+					            <div class="panel-heading">
+					              	ข้อมูลส่วนตัวนักเรียน
+					            </div>
+					            <div class="panel-body">
+					            
+					              	<div class="row">
+					                <div class=" col-md-12 col-lg-12 "> 
+				                  <table class="table table-user-information table-hover">
+			                    		<tbody>
+					                      	<tr>
+				                        	 	<td width="180"><b>ชื่อ - นามสกุล</b></td>
+					                        	<td>
+					                        	 เด็กหญิงศรัณย์พัชญ์&nbsp;&nbsp;คำภิรานนท์
+					                        	 </td>
+					                      	</tr>
+
+					                      	<tr>
+					                        	<td><b>วันเกิด</b></td>
+					                        	<td>17 ต.ค. 2565</td>
+					                      	</tr>
+					                      	
+						                  	<tr>
+					                        	<td><b>อายุ</b></td>
+					                        	<td>3 ปี 7 เดือน  30 วัน</td>
+					                      	</tr>
+						                  	<tr>
+					                        	<td><b>เพศ</b></td>
+					                        	<td>หญิง</td>
+					                      	</tr>
+					                      	<tr>
+					                        	<td><b>สัญชาติ</b></td>
+					                        	<td>
+					                        		
+							                    		ไทย
+							                    	 
+					                        	</td>
+					                      	</tr>
+					                      	<tr>
+					                        	<td><b>เชื้อชาติ</b></td>
+					                        	<td>
+					                        		 
+					                        			ไทย
+					                        		
+					                        	</td>
+					                      	</tr>
+					                      	<tr>
+					                        	<td><b>ศาสนา</b></td>
+					                        	<td>
+					                        		 
+					                        			พุทธ
+					                        		
+					                        	</td>
+					                      	</tr>
+					                       	<tr>
+				           						<td><b>ความสูง (ซม.)</b></td>
+												<td>
+													
+														
+										            
+												</td>
+											</tr>
+											<tr>
+												<td><b>น้ำหนัก (กก.)</b></td>
+												<td>
+													
+										            	
+										            
+												</td>
+											</tr>
+					                      	<tr>
+					                        	<td><b>ประเภทความพิการ</b></td>
+					                        	<td>
+					                        		
+					                        			ไม่พิการ
+					                        		
+					                        	</td>
+					                      	</tr>
+					                      	
+												
+						                  	
+						                  	
+					                    </tbody>
+				                 	</table>
+					                </div>
+					              </div>
+					            </div>
+					          </div>
+					     	</div>
+					     	
+					  </div>
+					  
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <section id="about" class="section-padding wow fadeIn delay-05s" style="visibility: hidden; animation-name: none;">
+    <div class="container">
+      <div class="row">
+<div class="col-md-12">
+
+			        	<div class="form-group" style="padding-top: 30px;">	
+	                    <div class="col-md-6">
+							<div class="panel panel-success">
+					            <div class="panel-heading" style="background-color: #65cb65; color: #fff;">
+					              ข้อมูลที่อยู่
+					            </div>
+					            <div class="panel-body">
+					              	<div class="row">
+					                <div class=" col-md-12 col-lg-12 "> 
+				                  	<table class="table table-user-information table-hover">
+			                    		<tbody>
+					                      	<tr>
+					                        	<td width="40%"><b>รหัสประจำบ้าน</b></td>
+					                        	<td>
+				                        			62040330615
+					                        	</td>
+					                      	</tr>
+					                      	<tr>
+					                        	<td><b>บ้านเลขที่</b></td>
+					                        	<td>70</td>
+					                      	</tr>
+					                      	<tr>
+					                        	<td><b>หมู่ที่</b></td>
+					                        	<td>
+					                        		8
+					                        	</td>
+					                      	</tr>
+					                      	<tr>
+					                       	 	<td><b>ซอย</b></td>
+					                        	<td>-</td>
+					                      	</tr>
+					                      	<tr>
+					                       	 	<td><b>ถนน</b></td>
+					                        	<td>-</td>
+					                      	</tr>
+					                      	<tr>
+					                       	 	<td><b>ตำบล</b></td>
+					                        	<td>
+					                        		
+					                        			เกาะตาล
+					                        		
+					                        	</td>
+					                      	</tr>
+					                      	<tr>
+					                       	 	<td><b>อำเภอ</b></td>
+					                        	<td>
+					                        		
+					                        			ขาณุวรลักษบุรี
+					                        		
+					                        	</td>
+					                      	</tr>
+					                      	<tr>
+					                       	 	<td><b>จังหวัด</b></td>
+					                        	<td>
+					                        		
+					                        			กำแพงเพชร
+					                        		
+					                        	</td>
+					                      	</tr>
+					                      	<tr>
+					                       	 	<td><b>รหัสไปรษณีย์</b></td>
+					                        	<td>62130</td>
+					                      	</tr>
+					                    </tbody>
+				                 	</table>
+					                		</div>
+					              		</div>
+					            	</div>
+					          	</div>
+		     			</div>
+		     			
+		     			 <div class="col-md-6">
+							<div class="panel panel-success">
+					            <div class="panel-heading" style="background-color: #65cb65; color: #fff;">
+					              ข้อมูลผู้ติดต่อ
+					            </div>
+					            <div class="panel-body">
+					              	<div class="row">
+					                <div class=" col-md-12 col-lg-12 "> 
+				                  	<table class="table table-user-information table-hover">
+			                    		<tbody>
+					                      	<tr>
+					                       	 	<td><b>เบอร์โทรศัพท์</b></td>
+					                        	<td>0812394498</td>
+					                      	</tr>
+					                      	<tr>
+					                       	 	<td><b>โทรสาร</b></td>
+					                        	<td></td>
+					                      	</tr>
+					                      	<tr>
+					                       	 	<td><b>อีเมล</b></td>
+					                        	<td></td>
+					                      	</tr>
+
+					                    </tbody>
+				                 	</table>
+					                		</div>
+					              		</div>
+					            	</div>
+					          	</div>
+		     				</div>
+					  	</div>
+	
+					
+
+</div>
+
+      </div>
+    </div>
+  </section>
+  <section id="portfolio" class="section-padding wow fadeInUp delay-05s" style="visibility: hidden; animation-name: none;">
+    <div class="container">
+      <div class="row">
+        <div class="col-md-12">
+
+		
+
+
+		<!-- 
+		<div class="col-md-12">
+		
+			<div class="panel panel-info">
+          		<div class="panel-heading">
+            		<h3 class="panel-title">ข้อมูลครอบครัว</h3>
+				</div>
+				<div class="panel-body">
+  					<div class="row">
+    					<div class=" col-md-12 col-lg-12 "> 
+     						<table class="table table-user-information table-hover">
+					      		<tbody>
+						          	<tr>
+	            						<td><b>สถานภาพการสมรส</b></td>
+										<td>
+											
+								             	
+								             		
+								             			อยู่ด้วยกัน
+								             		
+								             	
+								            
+										</td>
+										<td></td>
+										<td></td>
+									</tr>
+									<tr>
+										<td><b>จำนวนพี่น้อง</b></td>
+										<td>
+											
+								            	 
+								            		
+								            	
+								            
+										</td>
+										<td><b>จำนวนพี่น้องที่กำลังศึกษาอยู่</b></td>
+										<td>
+											
+								            	 
+								            		
+								            	
+								            
+										</td>
+									</tr>
+
+                 				</tbody>
+             				</table>
+             			</div>
+           			</div>
+         		</div>
+       		</div>
+		</div>
+ -->
+	<div class="form-group" style="padding-top: 30px;">	
+		<div class="col-md-6">
+			<div class="panel panel-primary">
+          		<div class="panel-heading">
+            		<h3 class="panel-title">บิดา</h3>
+				</div>
+				<div class="panel-body">
+  					<div class="row">
+    					<div class=" col-md-12 col-lg-12"> 
+     						<table class="table table-user-information table-hover">
+					      		<tbody>
+						          	<tr>
+	            						<td width="40%"><b>เลขประจำตัวประชาชน</b></td>
+										<td>
+											
+											
+						             			3620400747510
+						             		
+								            
+										</td>
+									</tr>
+									<tr>
+										<td><b>คำนำหน้าชื่อ</b></td>
+										<td>
+											
+												
+								            	 
+				            						นาย
+								            	
+								            	
+								            
+										</td>
+									</tr>
+									<tr>
+										<td><b>ชื่อ</b></td>
+										<td>
+											
+											
+					            				พงษ์ศักดิ์
+					            			
+								            
+										</td>
+									</tr>
+									<tr>
+										<td><b>นามสกุล</b></td>
+										<td>
+											
+											
+					            				คำภิรานนท์
+					            			
+								            
+										</td>
+									</tr>
+									<tr>
+										<td><b>สถานภาพของบิดา</b></td>
+										<td>
+											
+											
+						            			
+             									มีชีวิต
+								            
+								            
+										</td>
+									</tr>
+									<tr>
+										<td><b>อาชีพของบิดา</b></td>
+										<td>
+											
+											
+						            			
+						            		
+								            
+										</td>
+									</tr>
+									<tr>
+										<td><b>สัญชาติ</b></td>
+										<td>
+											
+											
+						            			 
+								            		ไทย
+								            	
+								            
+								            
+										</td>
+									</tr>
+									<tr>
+										<td><b>ประเภทความพิการ</b></td>
+										<td>
+											
+											
+						            			 
+								            		ไม่พิการ
+								            	
+								            
+								            
+										</td>
+									</tr>
+									<tr>
+										<td><b>เงินเดือน(ต่อเดือน)</b></td>
+										<td>
+											
+											
+						            			
+							            	
+								            
+										</td>
+									</tr>
+                 				</tbody>
+             				</table>
+             			</div>
+           			</div>
+         		</div>
+       		</div>
+		</div>
+		<div class="col-md-6">
+		<div class="panel panel-primary">
+          		<div class="panel-heading">
+            		<h3 class="panel-title">มารดา</h3>
+				</div>
+				<div class="panel-body">
+  					<div class="row">
+    					<div class=" col-md-12 col-lg-12"> 
+     						<table class="table table-user-information table-hover">
+					      		<tbody>
+						          	<tr>
+	            						<td width="40%"><b>เลขประจำตัวประชาชน</b></td>
+										<td>
+											
+											
+						             			3620400624957
+						             		
+								            
+										</td>
+									</tr>
+									<tr>
+										<td><b>คำนำหน้าชื่อ</b></td>
+										<td>
+											
+											
+								            	 
+				            						นาง
+								            	
+								            
+								            
+										</td>
+									</tr>
+									<tr>
+										<td><b>ชื่อ</b></td>
+										<td>
+											
+											
+						            			ภิญญาพัชญ์
+						            		
+								            
+										</td>
+									</tr>
+									<tr>
+										<td><b>นามสกุล</b></td>
+										<td>
+											
+											
+						            			คำภิรานนท์
+						            		
+								            
+										</td>
+									</tr>
+									<tr>
+										<td><b>สถานภาพของมารดา</b></td>
+										<td>
+											
+											
+						            			
+             									มีชีวิต
+             								
+								            
+										</td>
+									</tr>
+									<tr>
+										<td><b>อาชีพของมารดา</b></td>
+										<td>
+											
+											
+						            			
+						            		
+								            
+										</td>
+									</tr>
+									<tr>
+										<td><b>สัญชาติ</b></td>
+										<td>
+											
+											
+						            			 
+								            		ไทย
+								            	
+								            	
+								            
+										</td>
+									</tr>
+									<tr>
+										<td><b>ประเภทความพิการ</b></td>
+										<td>
+											
+											
+						            			 
+								            		ไม่พิการ
+								            	
+								            
+								            
+										</td>
+									</tr>
+									<tr>
+										<td><b>เงินเดือน(ต่อเดือน)</b></td>
+										<td>
+											
+											
+						            			
+							            	
+								            
+										</td>
+									</tr>
+                 				</tbody>
+             				</table>
+             			</div>
+           			</div>
+         		</div>
+       		</div>
+		</div>
+	</div>
+</div>
+
+
+        </div>
+      </div>
+    
+  </section>
+  <section id="parent" class="section-padding wow fadeInUp" style="visibility: hidden; animation-name: none;">
+    <div class="container">
+      <div class="row">
+
+<div class="form-group" style="margin-top: 30px;">	
+	<div class="col-md-6">
+		<div class="panel panel-info">
+	      	<div class="panel-heading" style="background-color: #d863ff; color: #fff;">
+	        	<h3 class="panel-title">ผู้ปกครอง</h3>
+			</div>
+			<div class="panel-body">
+						<div class="row">
+	  					<div class=" col-md-12 col-lg-12"> 
+	   						<table class="table table-user-information table-hover">
+				      		<tbody>
+					          	<tr>
+	           						<td width="40%"><b>เลขประจำตัวประชาชน</b></td>
+									<td>
+										
+					             			3620400624957
+							            
+									</td>
+								</tr>
+								<tr>
+									<td><b>คำนำหน้าชื่อ</b></td>
+									<td>
+										
+							            	 
+			            						นาง
+							            	
+							            
+									</td>
+								</tr>
+								<tr>
+									<td><b>ชื่อ</b></td>
+									<td>
+										
+					            			ภิญญาพัชญ์
+							            
+									</td>
+								</tr>
+								<tr>
+									<td><b>นามสกุล</b></td>
+									<td>
+										
+					            			คำภิรานนท์
+							            
+									</td>
+								</tr>
+								<tr>
+									<td><b>อาชีพของผู้ปกครอง</b></td>
+									<td>
+										
+					            			
+							            
+									</td>
+								</tr>
+								<tr>
+									<td><b>เบอร์โทรศัพท์</b></td>
+									<td>
+										
+						            		0812394498
+							            
+									</td>
+								</tr>
+								<tr>
+									<td><b>เงินเดือน(ต่อเดือน)</b></td>
+									<td>
+										
+					            			
+							            
+									</td>
+								</tr>
+								<tr>
+									<td><b>ความสัมพันธ์</b></td>
+									<td>
+										
+					            			มารดา
+							            
+									</td>
+								</tr>
+	               				</tbody>
+	           				</table>
+	           			</div>
+	       			</div>
+	       		</div>
+	   		</div>
+		</div>
+	</div>
+	
+      </div>
+    </div>
+  </section>
+  <section id="contact" class="section-padding wow fadeInUp" style="visibility: hidden; animation-name: none;">
+    <div class="container">
+      <div class="row">
+
+						
+
+	<div class="form-group">	
+		<div class="col-md-12">
+			<div class="panel panel-danger">
+          		<div class="panel-heading" style="background-color: #f65353; color: #fff">
+            		<h3 class="panel-title">ย้ายห้องเรียน</h3>
+				</div>
+				<div class="panel-body">
+  					<div class="row">
+    					<div class=" col-md-12 col-lg-12 "> 
+    					
+						
+							
+             			</div>
+           			</div>
+         		</div>
+       		</div>
+		</div>
+	</div>
+	<div class="form-group">	
+		<div class="col-md-12">
+			<div class="panel panel-danger">
+          		<div class="panel-heading" style="background-color: #f65353; color: #fff">
+            		<h3 class="panel-title">เลื่อนชั้น</h3>
+				</div>
+				<div class="panel-body">
+  					<div class="row">
+    					<div class=" col-md-12 col-lg-12 "> 
+    					 
+						 
+							
+             			</div>
+           			</div>
+         		</div>
+       		</div>
+		</div>
+	</div>
+
+
+
+	<div class="form-group">	
+		<div class="col-md-12">
+			<div class="panel panel-danger">
+          		<div class="panel-heading" style="background-color: #f65353; color: #fff">
+            		<h3 class="panel-title">พักการเรียน</h3>
+				</div>
+				<div class="panel-body">
+  					<div class="row">
+    					<div class=" col-md-12 col-lg-12 "> 
+    					
+						
+							
+             			</div>
+           			</div>
+         		</div>
+       		</div>
+		</div>
+	</div>
+	<div class="form-group">	
+		<div class="col-md-12">
+			<div class="panel panel-danger">
+          		<div class="panel-heading" style="background-color: #f65353; color: #fff">
+            		<h3 class="panel-title">นักเรียนไปโครงการ</h3>
+				</div>
+				<div class="panel-body">
+  					<div class="row">
+    					<div class=" col-md-12 col-lg-12 "> 
+    					
+									
+							
+             			</div>
+           			</div>
+         		</div>
+       		</div>
+		</div>
+	</div>
+
+
+      </div>
+    </div>
+  </section>
+	
+	<script type="text/javascript" src="psis/popup/js/jquery.min.js"></script>
+	<script type="text/javascript" src="psis/popup/js/jquery.easing.min.js"></script>
+	<script type="text/javascript" src="psis/popup/js/bootstrap.min.js"></script>
+	<script type="text/javascript" src="psis/popup/js/wow.js"></script>
+	<script type="text/javascript" src="psis/popup/js/custom.js"></script>
+	
+	
+
+
+
+</body></html>

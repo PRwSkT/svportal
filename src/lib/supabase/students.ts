@@ -45,15 +45,7 @@ export async function createStudent(
   const supabase = createClient();
   const { data, error } = await supabase
     .from('students')
-    .insert([{
-      id: student.id,
-      name: student.name,
-      grade: student.grade,
-      status: student.status,
-      first_name: student.first_name,
-      last_name: student.last_name,
-      prefix: student.prefix
-    }])
+    .insert([student])
     .select()
     .single();
 

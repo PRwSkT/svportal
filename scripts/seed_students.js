@@ -87,7 +87,6 @@ async function seed() {
       prefix,
       first_name,
       last_name,
-      class_level: item['ชั้นเรียน'],
       birth_date: parseThaiDate(item['วันเกิด']),
       gender: item['เพศ'],
       nationality: item['สัญชาติ'],
@@ -141,7 +140,7 @@ async function seed() {
 
             parents.push({
                 student_id: studentCode,
-                relationship: item[`[${f.type}] ความสัมพันธ์`] || f.rel,
+                relationship: f.rel,
                 citizen_id: pCitizenId,
                 prefix: pPrefix,
                 first_name: pFirst,
