@@ -22,8 +22,13 @@ export default function StudentRecordsPage() {
     setError(null);
     setFetchState('start');
     try {
-      setFetchState('calling getStudents...');
-      const data = await getStudents(searchQuery, statusFilter);
+      setFetchState('calling API...');
+      const res = await fetch(`/api/admin/students?q=${encodeURIComponent(searchQuery)}&status=${encodeURIComponent(statusFilter)}`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP error! status: ${res.status}`);
+      }
+      const data = await res.json();
       setFetchState('got data: ' + (data ? data.length : 0));
       setStudents(data || []);
       setFetchState('setStudents done');
