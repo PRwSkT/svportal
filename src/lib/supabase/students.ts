@@ -9,7 +9,7 @@ export async function getStudents(
   const supabase = createClient();
   let query = supabase
     .from('students')
-    .select('*, student_addresses(*), student_parents(*)')
+    .select('*')
     .order('id', { ascending: true });
 
   if (searchQuery) {
