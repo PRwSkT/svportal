@@ -9,6 +9,7 @@ export default function StudentRecordsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fetchState, setFetchState] = useState('init');
   
   // Search and Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -19,13 +20,19 @@ export default function StudentRecordsPage() {
   const fetchStudents = async () => {
     setIsLoading(true);
     setError(null);
+    setFetchState('start');
     try {
+      setFetchState('calling getStudents...');
       const data = await getStudents(searchQuery, statusFilter);
+      setFetchState('got data: ' + (data ? data.length : 0));
       setStudents(data || []);
+      setFetchState('setStudents done');
     } catch (err: any) {
+      setFetchState('caught error');
       console.error('Fetch error:', err);
       setError(err.message || 'เกิดข้อผิดพลาดในการโหลดข้อมูลนักเรียน');
     } finally {
+      setFetchState('in finally block');
       setIsLoading(false);
     }
   };
@@ -130,7 +137,9 @@ export default function StudentRecordsPage() {
 
       <div className="bg-surface rounded-2xl shadow-sm border border-foreground/5 overflow-hidden">
         <div className="p-4 bg-yellow-50 text-yellow-800 text-xs font-mono mb-4 border-b border-yellow-200">
-          Debug: isLoading={String(isLoading)}, error={String(error)}, students={students.length}, search={searchQuery}, status={statusFilter}
+          Debug: isLoading={String(isLoading)}, error={String(error)}, students={students.length}, search={searchQuery}, status={statusFilter}<br/>
+          URL: {process.env.NEXT_PUBLIC_SUPABASE_URL}<br/>
+          <strong>FetchState: {fetchState}</strong>
         </div>
         {error ? (
           <div className="p-12 text-center text-red-500 font-bold bg-red-50">❌ Error: {error}</div>
