@@ -1118,7 +1118,7 @@ const I18N = {
         btn_reset:        'Start Over',
         tag_academic:'Academic', tag_sport:'Sports & Health', tag_art:'Arts & Music', 
         tag_trip:'Field Trip', tag_camp:'Camp', tag_volunteer:'Volunteer', 
-        tag_contest:'Contest', tag_festival:'Festival / Int\\'l', tag_exhibition:'Exhibition', 
+        tag_contest:'Contest', tag_festival:"Festival / Int'l", tag_exhibition:'Exhibition', 
         tag_parents:'Parents', tag_ceremony:'Ceremony', tag_training:'Training', tag_graduation:'Graduation / Welcome',
         tone_warm:'Warm & Proud', tone_fun:'Fun & Energetic', tone_formal:'Formal & Pro',
         tone_inter:'Modern & Inter', tone_exciting:'Exciting', tone_narrative:'Narrative',
