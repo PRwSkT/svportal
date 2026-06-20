@@ -520,21 +520,42 @@ function switchCaptionTab(tab) {
 }
 
 function parseIGCaption(fullCaption) {
-    const blocks = fullCaption.split('_______________').map(s => s.trim());
-    if (blocks.length < 4) return fullCaption;
+    if (typeof fullCaption !== 'string') {
+        try {
+            fullCaption = fullCaption.english ? fullCaption.english + "\n_______________\n" + fullCaption.thai : JSON.stringify(fullCaption);
+        } catch (e) {
+            fullCaption = String(fullCaption);
+        }
+    }
 
+    const blocks = fullCaption.split('_______________').map(s => s.trim());
+    
     // EN contact block (สำหรับ IG ใช้ EN อย่างเดียว)
     const enContact = `Contact us\nCall (+66) 38 611 251\nEmail: mail@somkidvittaya.ac.th\nWebsite: somkidvittaya.ac.th\nSchool visit: https://calendar.app.google/HhhN11dAj8r3HehM7`;
 
     // แยก EN content ออกจาก contact
-    const enBlock = blocks[0];
+    const enBlock = blocks[0] || "";
     const contactIdx = enBlock.indexOf('Contact us');
     const enContentOnly = contactIdx !== -1 
         ? enBlock.substring(0, contactIdx).trim() 
         : enBlock.trim();
 
+    // ดึง Hashtag ออกมาจาก fullCaption
+    let hashtags = "#Somkidvittaya #SomkidvittayaSchool";
+    const hashtagMatch = fullCaption.match(/(?:#[^\s#]+[\s]*)+$/);
+    if (hashtagMatch) {
+        hashtags = hashtagMatch[0].trim();
+    } else {
+        // เผื่อมีบางกรณีหาไม่เจอ ลองดึงบรรทัดที่มี # จาก block สุดท้าย
+        const lastBlock = blocks[blocks.length - 1] || "";
+        const hashLines = lastBlock.split('\n').filter(l => l.includes('#'));
+        if (hashLines.length > 0) {
+            hashtags = hashLines.join(' ').trim();
+        }
+    }
+
     // IG format: content → เส้น → contact → เส้น → hashtag
-    return `${enContentOnly}\n_______________\n\n${enContact}\n_______________\n\n${blocks[3]}`;
+    return `${enContentOnly}\n_______________\n\n${enContact}\n_______________\n\n${hashtags}`;
 }
 
 let isEditing = false;
