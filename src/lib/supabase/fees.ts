@@ -19,7 +19,7 @@ export async function searchStudentsWithFees(query: string): Promise<StudentWith
   if (studentError) throw studentError;
   if (!students || students.length === 0) return [];
 
-  const studentIds = students.map(s => s.id);
+  const studentIds = students.map((s: Student) => s.id);
   const { data: feeItems, error: feeError } = await supabase
     .from('fee_items')
     .select(`
