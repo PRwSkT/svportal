@@ -1060,12 +1060,13 @@ const I18N = {
         btn_edit:         'แก้ไข',
         btn_download:     'ดาวน์โหลดรูปภาพทั้งหมด (.zip) — FB + IG Ready',
         btn_reset:        'เริ่มใหม่อีกครั้ง',
-        tag_sport:'กีฬา', tag_academic:'วิชาการ', tag_art:'ศิลปวัฒนธรรม',
-        tag_trip:'ทัศนศึกษา', tag_volunteer:'จิตอาสา', tag_parents:'ผู้ปกครอง',
-        tag_ceremony:'พิธีการ', tag_training:'อบรม', tag_health:'สุขภาพ', tag_tech:'เทคโนโลยี',
-        tone_warm:'อบอุ่น/ภาคภูมิใจ', tone_fun:'สนุก/พลังงาน', tone_formal:'เป็นทางการ',
-        tone_grateful:'ซาบซึ้ง/ขอบคุณ', tone_inspire:'สร้างแรงบันดาลใจ',
-        ph_name:  'เช่น กีฬาสี ประจำปี 2568, วันไหว้ครู, ทัศนศึกษา จ.เชียงใหม่',
+        tag_academic:'วิชาการ', tag_sport:'กีฬา/สุขภาพ', tag_art:'ศิลปะ/ดนตรี', 
+        tag_trip:'นอกสถานที่', tag_camp:'ค่าย/แคมป์', tag_volunteer:'จิตอาสา', 
+        tag_contest:'ประกวด/แข่งขัน', tag_festival:'เทศกาล/นานาชาติ', tag_exhibition:'โชว์ผลงาน', 
+        tag_parents:'ผู้ปกครอง', tag_ceremony:'พิธีการ', tag_training:'อบรม', tag_graduation:'เรียนจบ/รับน้อง',
+        tone_warm:'อบอุ่น/ภาคภูมิใจ', tone_fun:'สนุกสนาน/ร่าเริง', tone_formal:'เป็นทางการ/มืออาชีพ',
+        tone_inter:'อินเตอร์/ทันสมัย', tone_exciting:'ตื่นเต้น/เชิญชวน', tone_narrative:'เล่าเรื่องสบายๆ',
+        tone_concise:'กระชับ/อ่านง่าย', tone_grateful:'ซาบซึ้ง/ขอบคุณ', tone_inspire:'สร้างแรงบันดาลใจ',
         ph_grade: 'เช่น ป.4–ป.6, ทุกระดับ',
         ph_detail:'เช่น\n- มีการแข่งขันกีฬา 8 ประเภท นักเรียน 450 คนเข้าร่วม\n- รับเกียรติบัตรจากผู้อำนวยการโรงเรียน',
         ph_obj:   'เช่น เสริมสร้างความสามัคคี',
@@ -1115,12 +1116,13 @@ const I18N = {
         btn_edit:         'Edit',
         btn_download:     'Download All Images (.zip) — FB + IG Ready',
         btn_reset:        'Start Over',
-        tag_sport:'Sports', tag_academic:'Academic', tag_art:'Arts & Culture',
-        tag_trip:'Field Trip', tag_volunteer:'Volunteer', tag_parents:'Parents',
-        tag_ceremony:'Ceremony', tag_training:'Training', tag_health:'Health', tag_tech:'Technology',
-        tone_warm:'Warm / Proud', tone_fun:'Fun / Energetic', tone_formal:'Formal',
-        tone_grateful:'Heartfelt / Grateful', tone_inspire:'Inspiring',
-        ph_name:  'e.g. Sports Day 2026, Teacher Appreciation Day',
+        tag_academic:'Academic', tag_sport:'Sports & Health', tag_art:'Arts & Music', 
+        tag_trip:'Field Trip', tag_camp:'Camp', tag_volunteer:'Volunteer', 
+        tag_contest:'Contest', tag_festival:'Festival / Int\\'l', tag_exhibition:'Exhibition', 
+        tag_parents:'Parents', tag_ceremony:'Ceremony', tag_training:'Training', tag_graduation:'Graduation / Welcome',
+        tone_warm:'Warm & Proud', tone_fun:'Fun & Energetic', tone_formal:'Formal & Pro',
+        tone_inter:'Modern & Inter', tone_exciting:'Exciting', tone_narrative:'Narrative',
+        tone_concise:'Concise & Clear', tone_grateful:'Heartfelt & Grateful', tone_inspire:'Inspiring',
         ph_grade: 'e.g. Grades 4–6, All levels',
         ph_detail:'e.g.\n- 8 sports competitions, 450 students\n- Awards presented by the director',
         ph_obj:   'e.g. Build teamwork and school spirit',
@@ -1164,10 +1166,19 @@ function setLang(lang) {
     });
 
     const tagMap = {
-        'กีฬา':'tag_sport','วิชาการ':'tag_academic','ศิลปวัฒนธรรม':'tag_art',
-        'ทัศนศึกษา':'tag_trip','จิตอาสา':'tag_volunteer','ประชุมผู้ปกครอง':'tag_parents',
-        'พิธีการ':'tag_ceremony','อบรมสัมมนา':'tag_training',
-        'ส่งเสริมสุขภาพ':'tag_health','เทคโนโลยี':'tag_tech'
+        'วิชาการ':'tag_academic',
+        'กีฬา/สุขภาพ':'tag_sport',
+        'ศิลปะ/ดนตรี/การแสดง':'tag_art',
+        'ทัศนศึกษา/นอกสถานที่':'tag_trip',
+        'ค่าย/แคมป์':'tag_camp',
+        'จิตอาสา/เพื่อสังคม':'tag_volunteer',
+        'แข่งขัน/ประกวด':'tag_contest',
+        'เทศกาล/นานาชาติ':'tag_festival',
+        'นิทรรศการ/โชว์ผลงาน':'tag_exhibition',
+        'ผู้ปกครอง/สัมพันธ์':'tag_parents',
+        'พิธีการ/ทางการ':'tag_ceremony',
+        'อบรม/สัมมนา':'tag_training',
+        'ปฐมนิเทศ/ปัจฉิม':'tag_graduation'
     };
     document.querySelectorAll('#tag-group .tag-btn').forEach(btn => {
         const key = tagMap[btn.dataset.val];
@@ -1177,7 +1188,10 @@ function setLang(lang) {
         if (icon) btn.prepend(icon);
     });
 
-    const toneKeys = ['tone_warm','tone_fun','tone_formal','tone_grateful','tone_inspire'];
+    const toneKeys = [
+        'tone_warm', 'tone_fun', 'tone_formal', 'tone_inter', 'tone_exciting', 
+        'tone_narrative', 'tone_concise', 'tone_grateful', 'tone_inspire'
+    ];
     document.querySelectorAll('#tone-group .tag-btn').forEach((btn, i) => {
         if (t[toneKeys[i]]) btn.textContent = t[toneKeys[i]];
     });
