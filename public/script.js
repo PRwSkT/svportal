@@ -1082,6 +1082,13 @@ const I18N = {
         modal_title: 'ตรวจสอบก่อนโพสต์',
         btn_cancel: 'ยกเลิก',
         btn_confirm: 'โพสต์ทันที',
+        ph_name: 'เช่น กีฬาสี ประจำปี 2568, วันไหว้ครู',
+        hint_optional: '(ไม่บังคับ)',
+        sec_media: 'อัปโหลดสื่อกิจกรรม (Media)',
+        tab_photo: 'โพสต์รูปภาพ',
+        tab_video: 'โพสต์วิดีโอ (Reels)',
+        upload_video_title: 'คลิกหรือลากไฟล์วิดีโอมาวางที่นี่ (MP4/MOV)',
+        upload_video_hint: 'รองรับวิดีโอแนวตั้ง (Reels/TikTok) — ขนาดไฟล์ระดับ GB ก็รองรับ'
     },
     en: {
         page_subtitle:    'Generate trilingual social posts + ready-to-publish images',
@@ -1138,6 +1145,13 @@ const I18N = {
         modal_title: 'Review Before Publishing',
         btn_cancel: 'Cancel',
         btn_confirm: 'Publish Now',
+        ph_name: 'e.g. Sports Day 2026, Teacher Appreciation Day',
+        hint_optional: '(Optional)',
+        sec_media: 'Upload Activity Media',
+        tab_photo: 'Photo Post',
+        tab_video: 'Video Post (Reels)',
+        upload_video_title: 'Click or drag video file here (MP4/MOV)',
+        upload_video_hint: 'Supports vertical video (Reels/TikTok) — GB size allowed'
     }
 };
 

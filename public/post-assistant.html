@@ -52,11 +52,11 @@
 
         <div class="field-row">
             <div class="field">
-                <label class="sv-label"><span data-i18n="lbl_date">วันที่จัดกิจกรรม</span> <span class="hint" style="color:#888;">(ไม่บังคับ)</span></label>
+                <label class="sv-label"><span data-i18n="lbl_date">วันที่จัดกิจกรรม</span> <span class="hint" data-i18n="hint_optional" style="color:#888;">(ไม่บังคับ)</span></label>
                 <input class="sv-input" type="date" id="f-date">
             </div>
             <div class="field">
-                <label class="sv-label"><span data-i18n="lbl_grade">กลุ่มนักเรียน</span> <span class="hint" data-i18n="hint_grade">(ไม่บังคับ)</span></label>
+                <label class="sv-label"><span data-i18n="lbl_grade">กลุ่มนักเรียน</span> <span class="hint" data-i18n="hint_optional">(ไม่บังคับ)</span></label>
                 <input class="sv-input" type="text" id="f-grade" placeholder="เช่น ป.4–ป.6, ทุกระดับ">
             </div>
         </div>
@@ -121,15 +121,15 @@
 
         <div class="sv-section-title" style="border-bottom:none; padding-bottom:0; margin-bottom:12px;">
             <span class="step-pill">2</span>
-            <span>อัปโหลดสื่อกิจกรรม (Media)</span>
+            <span data-i18n="sec_media">อัปโหลดสื่อกิจกรรม (Media)</span>
         </div>
 
         <div class="tag-group" style="margin-bottom:15px;">
             <button type="button" class="tag-btn selected" id="btn-mode-photo" onclick="setMediaMode('photo')" style="width:calc(50% - 6px); justify-content:center;">
-                <i class="far fa-images"></i> โพสต์รูปภาพ
+                <i class="far fa-images"></i> <span data-i18n="tab_photo">โพสต์รูปภาพ</span>
             </button>
             <button type="button" class="tag-btn" id="btn-mode-video" onclick="setMediaMode('video')" style="width:calc(50% - 6px); justify-content:center;">
-                <i class="fas fa-video"></i> โพสต์วิดีโอ (Reels)
+                <i class="fas fa-video"></i> <span data-i18n="tab_video">โพสต์วิดีโอ (Reels)</span>
             </button>
         </div>
 
@@ -143,8 +143,8 @@
         <div class="upload-zone" id="upload-zone-video" style="display:none;">
             <input type="file" id="activity-video" accept="video/mp4,video/quicktime">
             <div class="upload-icon"><i class="fas fa-film"></i></div>
-            <div class="upload-title" id="upload-label-video">คลิกหรือลากไฟล์วิดีโอมาวางที่นี่ (MP4/MOV)</div>
-            <div class="upload-hint">รองรับวิดีโอแนวตั้ง (Reels/TikTok) — ขนาดไฟล์ระดับ GB ก็รองรับ</div>
+            <div class="upload-title" id="upload-label-video" data-i18n="upload_video_title">คลิกหรือลากไฟล์วิดีโอมาวางที่นี่ (MP4/MOV)</div>
+            <div class="upload-hint" data-i18n="upload_video_hint">รองรับวิดีโอแนวตั้ง (Reels/TikTok) — ขนาดไฟล์ระดับ GB ก็รองรับ</div>
             <div id="video-preview-container" style="display:none; margin-top:15px; width:100%; border-radius:10px; overflow:hidden;">
                 <video id="video-preview" controls style="width:100%; max-height:400px; background:#000;"></video>
             </div>
