@@ -31,7 +31,7 @@ export async function searchStudentsWithFees(query: string): Promise<StudentWith
 
   if (feeError) throw feeError;
 
-  return students.map(student => ({
+  return students.map((student: Student) => ({
     ...student,
     unpaid_fees: feeItems ? feeItems.filter(f => f.student_id === student.id) as FeeItem[] : []
   }));
