@@ -324,15 +324,15 @@ export async function getAllWalletAccounts(): Promise<(WalletAccount & { student
   if (!wallets) return [];
 
   // Fetch student names
-  const studentIds = wallets.map(w => w.student_id);
+  const studentIds = wallets.map((w: any) => w.student_id);
   const { data: students } = await supabase
     .from('students')
     .select('id, name, grade')
     .in('id', studentIds);
 
-  const studentMap = new Map((students || []).map(s => [s.id, s]));
+  const studentMap = new Map<string, any>((students || []).map((s: any) => [s.id, s]));
 
-  return wallets.map(w => ({
+  return wallets.map((w: any) => ({
     ...(w as WalletAccount),
     student_name: studentMap.get(w.student_id)?.name,
     student_grade: studentMap.get(w.student_id)?.grade,

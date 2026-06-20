@@ -33,7 +33,7 @@ export async function searchStudentsWithFees(query: string): Promise<StudentWith
 
   return students.map((student: Student) => ({
     ...student,
-    unpaid_fees: feeItems ? feeItems.filter(f => f.student_id === student.id) as FeeItem[] : []
+    unpaid_fees: feeItems ? feeItems.filter((f: any) => f.student_id === student.id) as FeeItem[] : []
   }));
 }
 
@@ -91,7 +91,7 @@ export async function importFeeItemsFromCSV(rows: {student_id: string, fee_type_
     
   if (fetchErr) throw fetchErr;
     
-  const existingSet = new Set(existing?.map(e => `${e.student_id}_${e.fee_type_id}`));
+  const existingSet = new Set(existing?.map((e: any) => `${e.student_id}_${e.fee_type_id}`));
   
   const toInsert = rows.filter(r => !existingSet.has(`${r.student_id}_${r.fee_type_id}`));
   

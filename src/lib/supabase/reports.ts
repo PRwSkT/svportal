@@ -16,7 +16,7 @@ export async function getDailySummary(dateStr: string): Promise<DailySummary> {
     .gte('created_at', startOfDay)
     .lt('created_at', endOfDay);
     
-  const tuitionAmount = (tuitionData || []).reduce((sum, row) => sum + row.total_amount, 0);
+  const tuitionAmount = (tuitionData || []).reduce((sum: number, row: any) => sum + row.total_amount, 0);
   const tuitionCount = (tuitionData || []).length;
 
   // 2. Get shop transactions
@@ -26,7 +26,7 @@ export async function getDailySummary(dateStr: string): Promise<DailySummary> {
     .gte('created_at', startOfDay)
     .lt('created_at', endOfDay);
     
-  const shopAmount = (shopData || []).reduce((sum, row) => sum + row.total_amount, 0);
+  const shopAmount = (shopData || []).reduce((sum: number, row: any) => sum + row.total_amount, 0);
   const shopCount = (shopData || []).length;
 
   // 3. Get wallet topups
@@ -37,7 +37,7 @@ export async function getDailySummary(dateStr: string): Promise<DailySummary> {
     .gte('created_at', startOfDay)
     .lt('created_at', endOfDay);
     
-  const topupAmount = (topupData || []).reduce((sum, row) => sum + row.amount, 0);
+  const topupAmount = (topupData || []).reduce((sum: number, row: any) => sum + row.amount, 0);
   const topupCount = (topupData || []).length;
 
   return {
