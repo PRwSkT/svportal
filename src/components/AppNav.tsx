@@ -34,9 +34,9 @@ export function AppNav() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <Link href="/" className="flex-shrink-0 flex items-center gap-3 mr-4">
-              <Image src="/logo.png" alt="School Logo" width={32} height={32} className="h-8 w-auto drop-shadow-sm" />
-              <Image src="/SV-Portal.png" alt="SVPortal" width={100} height={28} className="h-7 w-auto hidden sm:block" />
+            <Link href="/" className="flex-shrink-0 flex items-center gap-3 mr-4 group">
+              <Image src="/logo.png" alt="School Logo" width={40} height={40} className="h-10 w-auto drop-shadow-md group-hover:scale-105 transition-transform" />
+              <Image src="/SV-Portal.png" alt="SVPortal" width={120} height={34} className="h-8 w-auto hidden sm:block drop-shadow-sm group-hover:opacity-90 transition-opacity" />
             </Link>
             <div className="flex sm:ml-6 space-x-4 sm:space-x-8 overflow-x-auto overflow-y-hidden pb-1">
               {links.map(link => {
