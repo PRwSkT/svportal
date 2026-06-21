@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, use } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Student, StudentAddress, StudentParent } from '@/types';
 import { getStudentById, updateStudent, createStudent, upsertStudentAddress, upsertStudentParent } from '@/lib/supabase/students';
 import Link from 'next/link';
@@ -9,17 +9,10 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Save, User, MapPin, Users, PlusCircle, CheckCircle2 } from 'lucide-react';
 
-export default function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default function StudentDetailPage() {
   const router = useRouter();
-  const [resolvedId, setResolvedId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (params instanceof Promise) {
-      params.then(p => setResolvedId(p.id)).catch(console.error);
-    } else {
-      setResolvedId((params as any).id);
-    }
-  }, [params]);
+  const params = useParams();
+  const resolvedId = params?.id as string | undefined;
 
   const isNew = resolvedId === 'new';
 
