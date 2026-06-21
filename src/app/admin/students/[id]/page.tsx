@@ -44,7 +44,12 @@ export default function StudentDetailPage() {
   const fetchStudent = async () => {
     try {
       if (!resolvedId) return;
-      const data = await getStudentById(resolvedId);
+      const res = await fetch(`/api/admin/students/${resolvedId}`);
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      const data = await res.json();
+      
       if (data) {
         setStudent(data);
         if (data.student_addresses && data.student_addresses.length > 0) {
@@ -65,7 +70,7 @@ export default function StudentDetailPage() {
         toast.error('ไม่พบข้อมูลนักเรียน', { description: `รหัส: ${resolvedId}` });
       }
     } catch (err: any) {
-      console.error(err);
+      console.error('Fetch student error:', err);
       toast.error('ไม่สามารถโหลดข้อมูลนักเรียนได้', { description: err?.message || 'Unknown error' });
     } finally {
       setIsLoading(false);
