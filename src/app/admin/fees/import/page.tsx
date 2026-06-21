@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { importFeeItemsFromCSV } from '@/lib/supabase/fees';
+
 
 type CSVRow = {
   student_id: string;
@@ -100,36 +100,36 @@ export default function ImportFeesPage() {
       // and call a single-insert or we rewrite the DAL logic here to update UI.
       // We will just do it here to have access to setProgress.
       
-      const { createClient } = await import('@/lib/supabase/client');
-      const supabase = createClient();
-      
-      const { data: existing, error: fetchErr } = await supabase
-        .from('fee_items')
-        .select('student_id, fee_type_id');
-        
-      if (fetchErr) throw fetchErr;
-        
-      const existingSet = new Set(existing?.map((e: any) => `${e.student_id}_${e.fee_type_id}`));
-      
-      const toInsert = validRows
-        .filter(r => !existingSet.has(`${r.student_id}_${r.fee_type_id}`))
-        .map(({ student_id, fee_type_id, amount }) => ({ student_id, fee_type_id, amount }));
+      const toInsert = validRows.map(({ student_id, fee_type_id, amount }) => ({ student_id, fee_type_id, amount }));
       
       let insertedCount = 0;
+      let skippedCount = 0;
       const chunkSize = 50;
       
       for (let i = 0; i < toInsert.length; i += chunkSize) {
         const chunk = toInsert.slice(i, i + chunkSize);
-        const { error: insertErr } = await supabase.from('fee_items').insert(chunk);
-        if (insertErr) throw insertErr;
         
-        insertedCount += chunk.length;
+        const res = await fetch('/api/admin/fees/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rows: chunk })
+        });
+        
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `HTTP error! status: ${res.status}`);
+        }
+        
+        const data = await res.json();
+        insertedCount += data.inserted || 0;
+        skippedCount += data.skipped || 0;
+        
         setProgress(Math.round(((i + chunk.length) / toInsert.length) * 100));
       }
 
       setResult({
         inserted: insertedCount,
-        skipped: validRows.length - insertedCount
+        skipped: skippedCount
       });
       setRows([]);
       setFile(null);

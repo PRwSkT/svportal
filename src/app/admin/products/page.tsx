@@ -1,6 +1,5 @@
 'use client';
 
-import { createClient } from '@/lib/supabase/client';
 import { Product } from '@/types';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -19,7 +18,6 @@ export default function AdminProductsPage() {
   const [barcode, setBarcode] = useState('');
   const [category, setCategory] = useState('');
 
-  const supabase = createClient();
 
   useEffect(() => {
     fetchProducts();
@@ -27,38 +25,56 @@ export default function AdminProductsPage() {
 
   async function fetchProducts() {
     setLoading(true);
-    const { data, error } = await supabase.from('products').select('*').eq('is_active', true).order('name');
-    if (!error && data) setProducts(data);
-    else if (error) toast.error('โหลดข้อมูลล้มเหลว', { description: error.message });
+    try {
+      const res = await fetch('/api/admin/products');
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setProducts(data);
+    } catch (error: any) {
+      toast.error('โหลดข้อมูลล้มเหลว', { description: error.message });
+    }
     setLoading(false);
   }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     const loadingToast = toast.loading('กำลังเพิ่มสินค้า...');
-    const { error } = await supabase.from('products').insert({
-      name,
-      price: parseFloat(price),
-      stock_qty: parseInt(stock, 10),
-      barcode: barcode || null,
-      category: category || null,
-    });
-    if (!error) {
+    try {
+      const res = await fetch('/api/admin/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          price: parseFloat(price),
+          stock_qty: parseInt(stock, 10),
+          barcode: barcode || null,
+          category: category || null,
+        }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to add product');
+      }
       toast.success('เพิ่มสินค้าเรียบร้อยแล้ว', { id: loadingToast });
       setName(''); setPrice(''); setStock(''); setBarcode(''); setCategory('');
       fetchProducts();
-    } else {
+    } catch (error: any) {
       toast.error('ไม่สามารถเพิ่มสินค้าได้', { id: loadingToast, description: error.message });
     }
   }
 
   async function handleSoftDelete(id: string) {
     if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบสินค้านี้?')) return;
-    const { error } = await supabase.from('products').update({ is_active: false }).eq('id', id);
-    if (!error) {
+    try {
+      const res = await fetch('/api/admin/products', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, is_active: false }),
+      });
+      if (!res.ok) throw new Error('Failed to delete product');
       toast.success('ลบสินค้าเรียบร้อยแล้ว');
       fetchProducts();
-    } else {
+    } catch (error: any) {
       toast.error('ไม่สามารถลบสินค้าได้', { description: error.message });
     }
   }
@@ -67,12 +83,16 @@ export default function AdminProductsPage() {
     const numValue = field === 'price' ? parseFloat(value) : parseInt(value, 10);
     if (isNaN(numValue)) return;
     
-    // Don't update if empty or invalid
-    const { error } = await supabase.from('products').update({ [field]: numValue }).eq('id', id);
-    if (!error) {
+    try {
+      const res = await fetch('/api/admin/products', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, [field]: numValue }),
+      });
+      if (!res.ok) throw new Error('Failed to update product');
       toast.success(`อัปเดต${field === 'price' ? 'ราคา' : 'สต็อก'}เรียบร้อยแล้ว`);
       fetchProducts();
-    } else {
+    } catch (error: any) {
       toast.error('อัปเดตล้มเหลว', { description: error.message });
     }
   }

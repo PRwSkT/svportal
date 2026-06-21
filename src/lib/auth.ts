@@ -13,3 +13,25 @@ export async function getUserRole(): Promise<'admin' | 'cashier' | null> {
   if (error || !data) return null;
   return data as 'admin' | 'cashier';
 }
+
+export async function requireAuth(requiredRole?: 'admin' | 'cashier') {
+  const user = await getServerUser();
+  if (!user) {
+    return { error: 'Unauthorized', status: 401 };
+  }
+
+  // Hardcode fallback for admin
+  if (user.email === 'admin@svportal.com') {
+    if (requiredRole && requiredRole !== 'admin') {
+      // Actually admin can do everything
+    }
+    return { user, role: 'admin', error: null };
+  }
+
+  const role = await getUserRole();
+  if (requiredRole && role !== requiredRole) {
+    return { error: 'Forbidden', status: 403 };
+  }
+
+  return { user, role, error: null };
+}

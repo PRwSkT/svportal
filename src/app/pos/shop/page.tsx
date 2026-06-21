@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Product, CartItem, ShopTransaction, WalletAccount } from '@/types';
-import { searchProducts, getProductByBarcode, createShopTransaction } from '@/lib/supabase/shop';
-import { getWalletByCardUID, getWalletByStudentId, getTodaySpend } from '@/lib/supabase/wallet';
+
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingCart, Search, X, CheckCircle2, Wallet, Banknote, CreditCard, SearchIcon, Trash2, Plus, Minus, ScanBarcode, Store, ChevronRight } from 'lucide-react';
@@ -95,17 +94,23 @@ export default function POSShopPage() {
     searchTimeout.current = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const exactMatch = await getProductByBarcode(val);
-        if (exactMatch && exactMatch.stock_qty > 0) {
-          addToCart(exactMatch);
-          setSearchQuery('');
-          setSearchResults([]);
-          setIsSearching(false);
-          return;
+        const exactRes = await fetch(`/api/pos/products?barcode=${encodeURIComponent(val)}`);
+        if (exactRes.ok) {
+          const exactMatch = await exactRes.json();
+          if (exactMatch && exactMatch.stock_qty > 0) {
+            addToCart(exactMatch);
+            setSearchQuery('');
+            setSearchResults([]);
+            setIsSearching(false);
+            return;
+          }
         }
 
-        const results = await searchProducts(val);
-        setSearchResults(results);
+        const searchRes = await fetch(`/api/pos/products?q=${encodeURIComponent(val)}`);
+        if (searchRes.ok) {
+          const results = await searchRes.json();
+          setSearchResults(results);
+        }
       } catch (err: any) {
         toast.error('ค้นหาสินค้าไม่สำเร็จ', { description: err.message });
       } finally {
@@ -130,14 +135,20 @@ export default function POSShopPage() {
     const loadingToast = toast.loading('กำลังค้นหาข้อมูลนักเรียน...');
     try {
       const isStudentId = /^\d{4,5}$/.test(uid.trim());
-      const w = isStudentId
-        ? await getWalletByStudentId(uid.trim())
-        : await getWalletByCardUID(uid.trim());
-
-      if (!w) {
-        toast.error(isStudentId ? `ไม่พบ Wallet ของนักเรียนรหัส ${uid}` : 'ไม่พบบัตรในระบบ', { id: loadingToast });
+      const queryParam = isStudentId ? `student_id=${encodeURIComponent(uid.trim())}` : `card_uid=${encodeURIComponent(uid.trim())}`;
+      const res = await fetch(`/api/pos/wallet?${queryParam}`);
+      
+      if (!res.ok) {
+        if (res.status === 404) {
+          toast.error(isStudentId ? `ไม่พบ Wallet ของนักเรียนรหัส ${uid}` : 'ไม่พบบัตรในระบบ', { id: loadingToast });
+        } else {
+          toast.error('เกิดข้อผิดพลาดในการค้นหา', { id: loadingToast });
+        }
         return;
       }
+      
+      const { wallet: w, today_spend: spend, student_name } = await res.json();
+
       if (!w.is_active) {
         toast.error('Wallet ถูกระงับการใช้งาน', { id: loadingToast });
         return;
@@ -145,15 +156,7 @@ export default function POSShopPage() {
 
       setWalletAccount(w);
       setStudentId(w.student_id);
-
-      try {
-        const { createClient } = await import('@/lib/supabase/client');
-        const supabase = createClient();
-        const { data } = await supabase.from('students').select('name').eq('id', w.student_id).single();
-        setWalletStudentName(data?.name || 'ไม่พบชื่อ');
-      } catch { setWalletStudentName('ไม่พบชื่อ'); }
-
-      const spend = await getTodaySpend(w.student_id);
+      setWalletStudentName(student_name);
       setWalletTodaySpend(spend);
 
       const cartTotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
@@ -176,7 +179,18 @@ export default function POSShopPage() {
     setIsCheckingOut(true);
     const loadingToast = toast.loading('กำลังชำระเงิน...');
     try {
-      const tx = await createShopTransaction(cart, paymentMethod, studentId || null);
+      const res = await fetch('/api/pos/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cart, paymentMethod, studentId: studentId || null })
+      });
+      
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Checkout failed');
+      }
+      
+      const tx = await res.json();
       setSuccessSlip(tx);
       setCart([]);
       setShowCheckout(false);

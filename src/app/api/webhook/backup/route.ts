@@ -5,10 +5,15 @@ import { GoogleBackupPayload } from '@/types';
 export async function POST(request: Request) {
   const webhookSecret = process.env.SUPABASE_WEBHOOK_SECRET;
   
+  if (!webhookSecret) {
+    console.error('SUPABASE_WEBHOOK_SECRET is not set');
+    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+  }
+
   // Try to get auth header from standard Authorization or custom x-webhook-secret
   const authHeader = request.headers.get('authorization') || request.headers.get('x-webhook-secret');
   
-  if (webhookSecret && authHeader !== webhookSecret && authHeader !== `Bearer ${webhookSecret}`) {
+  if (authHeader !== webhookSecret && authHeader !== `Bearer ${webhookSecret}`) {
      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

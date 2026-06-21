@@ -2,12 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { WalletAccount } from '@/types';
-import {
-  getWalletByStudentId,
-  getWalletByCardUID,
-  topupWallet,
-  getTodaySpend,
-} from '@/lib/supabase/wallet';
+
 import type { WalletTransaction } from '@/types';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -83,9 +78,10 @@ export default function TopupPage() {
     setSearching(true);
     const loadingToast = toast.loading('กำลังตรวจสอบข้อมูลบัตร...');
     try {
-      const w = await getWalletByCardUID(uid);
-      if (w) {
-        await loadStudentInfo(w, loadingToast);
+      const res = await fetch(`/api/pos/wallet?card_uid=${encodeURIComponent(uid)}`);
+      if (res.ok) {
+        const { wallet, today_spend, student_name } = await res.json();
+        await loadStudentInfo(wallet, student_name, today_spend, loadingToast);
       } else {
         toast.error('ไม่พบบัตรในระบบ', { id: loadingToast, description: 'กรุณาลองกรอกรหัสนักเรียนด้วยตนเอง' });
       }
@@ -96,29 +92,11 @@ export default function TopupPage() {
     }
   }, []);
 
-  async function loadStudentInfo(w: WalletAccount, toastId?: string | number) {
+  async function loadStudentInfo(w: WalletAccount, name: string, spend: number, toastId?: string | number) {
     setWallet(w);
-    // Fetch student name
-    let name = 'ไม่พบชื่อ';
-    try {
-      const { createClient } = await import('@/lib/supabase/client');
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('students')
-        .select('name')
-        .eq('id', w.student_id)
-        .single();
-      if (data?.name) name = data.name;
-      setStudentName(name);
-
-      const spend = await getTodaySpend(w.student_id);
-      setTodaySpend(spend);
-      
-      if (toastId) toast.success(`พบข้อมูลนักเรียน: ${name}`, { id: toastId });
-    } catch {
-      setStudentName(name);
-      if (toastId) toast.success(`พบข้อมูลนักเรียน: ${name}`, { id: toastId });
-    }
+    setStudentName(name);
+    setTodaySpend(spend);
+    if (toastId) toast.success(`พบข้อมูลนักเรียน: ${name}`, { id: toastId });
     setStep('amount');
   }
 
@@ -127,27 +105,23 @@ export default function TopupPage() {
     setSearching(true);
     const loadingToast = toast.loading('กำลังค้นหาข้อมูล...');
     try {
-      // Check if it's a card UID (hex) or student ID (numeric)
       const isStudentId = /^\d{4,5}$/.test(inputValue.trim());
+      const queryParam = isStudentId ? `student_id=${encodeURIComponent(inputValue.trim())}` : `card_uid=${encodeURIComponent(inputValue.trim())}`;
+      const res = await fetch(`/api/pos/wallet?${queryParam}`);
 
-      let w: WalletAccount | null = null;
-      if (isStudentId) {
-        w = await getWalletByStudentId(inputValue.trim());
-      } else {
-        w = await getWalletByCardUID(inputValue.trim());
-      }
-
-      if (!w) {
+      if (!res.ok) {
         toast.error(isStudentId ? `ไม่พบนักเรียนรหัส ${inputValue}` : `ไม่พบบัตร UID ${inputValue}`, { id: loadingToast });
         return;
       }
 
-      if (!w.is_active) {
+      const { wallet, today_spend, student_name } = await res.json();
+
+      if (!wallet.is_active) {
         toast.error('Wallet ถูกระงับการใช้งาน', { id: loadingToast });
         return;
       }
 
-      await loadStudentInfo(w, loadingToast);
+      await loadStudentInfo(wallet, student_name, today_spend, loadingToast);
     } catch {
       toast.error('เกิดข้อผิดพลาดในการค้นหา', { id: loadingToast });
     } finally {
@@ -166,7 +140,18 @@ export default function TopupPage() {
     setProcessing(true);
     const loadingToast = toast.loading('กำลังประมวลผลการเติมเงิน...');
     try {
-      const tx = await topupWallet(wallet.student_id, topupAmount, 'counter');
+      const res = await fetch('/api/pos/wallet/topup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId: wallet.student_id, amount: topupAmount, topupMethod: 'counter' })
+      });
+      
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Topup failed');
+      }
+      
+      const tx = await res.json();
       setTransaction(tx);
       setStep('success');
       setCountdown(5);

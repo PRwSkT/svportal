@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getDailySummary, getAuditLogs } from '@/lib/supabase/reports';
+// removed direct import
 import { exportToCSV } from '@/lib/export';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -26,10 +26,11 @@ export default function ReportsPage() {
     const loadData = async () => {
       setIsLoading(true);
       try {
-        const sum = await getDailySummary(dateStr);
-        const logs = await getAuditLogs(50); // Get recent 50 logs
-        setSummary(sum);
-        setAuditLogs(logs);
+        const res = await fetch(`/api/admin/reports?date=${dateStr}&limit=50`);
+        if (!res.ok) throw new Error('Failed to fetch reports');
+        const data = await res.json();
+        setSummary(data.summary);
+        setAuditLogs(data.auditLogs);
       } catch (err: any) {
         toast.error('ไม่สามารถโหลดข้อมูลรายงานได้', { description: err.message });
       } finally {

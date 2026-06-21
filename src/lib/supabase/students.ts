@@ -98,7 +98,7 @@ export async function importStudentsFromCSV(
         id: item.id,
         name: item.name,
         grade: item.grade,
-        status: item.status || 'active'
+        status: item.status || 'กำลังศึกษาอยู่'
       }], { onConflict: 'id', ignoreDuplicates: false });
 
     if (error) {

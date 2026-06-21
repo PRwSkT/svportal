@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { searchStudentsWithFees, createTuitionPayment, syncPaymentToSVPortal, StudentWithFees } from '@/lib/supabase/fees';
+import { syncPaymentToSVPortal, StudentWithFees } from '@/lib/supabase/fees';
+import { getCurrentAcademicYear } from '@/lib/utils';
 import { FeeItem } from '@/types';
 import { ReceiptPrint } from '@/components/ReceiptPrint';
 import html2canvas from 'html2canvas';
@@ -40,7 +41,11 @@ export default function FeeCollectionPage() {
 
     setIsSearching(true);
     try {
-      const results = await searchStudentsWithFees(searchQuery);
+      const res = await fetch(`/api/pos/fees?q=${encodeURIComponent(searchQuery)}`);
+      if (!res.ok) {
+        throw new Error('Failed to fetch students');
+      }
+      const results = await res.json();
       setSearchResults(results);
       if (results.length === 0) {
         toast.error('ไม่พบนักเรียน กรุณาตรวจสอบรหัสนักเรียนหรือชื่ออีกครั้ง');
@@ -91,14 +96,24 @@ export default function FeeCollectionPage() {
     
     try {
       // Create payment in DB (atomic receipt generation)
-      // Assuming academic_year is 2568 for this session based on prompt
-      const result = await createTuitionPayment(
-        selectedStudent.id,
-        Array.from(selectedFeeIds),
-        paymentMethod,
-        totalAmount,
-        '2568'
-      );
+      const res = await fetch('/api/pos/fees/pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: selectedStudent.id,
+          feeItemIds: Array.from(selectedFeeIds),
+          paymentMethod,
+          totalAmount,
+          academicYear: getCurrentAcademicYear()
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to process payment');
+      }
+
+      const result = await res.json();
       
       setReceiptData({
         id: result.payment_id,

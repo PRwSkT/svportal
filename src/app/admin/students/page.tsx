@@ -12,22 +12,32 @@ export default function StudentRecordsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  
   // Search and Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchStudents = async () => {
+  const fetchStudents = async (currentPage: number = page) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/admin/students?q=${encodeURIComponent(searchQuery)}&status=${encodeURIComponent(statusFilter)}`);
+      const res = await fetch(`/api/admin/students?q=${encodeURIComponent(searchQuery)}&status=${encodeURIComponent(statusFilter)}&page=${currentPage}&limit=20`);
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || `HTTP error! status: ${res.status}`);
       }
       const data = await res.json();
-      setStudents(data || []);
+      if (Array.isArray(data)) {
+        setStudents(data);
+        setTotalPages(1);
+      } else {
+        setStudents(data.data || []);
+        setTotalPages(data.totalPages || 1);
+      }
     } catch (err: any) {
       console.error('Fetch error:', err);
       toast.error('ไม่สามารถโหลดข้อมูลนักเรียนได้', { description: err.message });
@@ -37,7 +47,11 @@ export default function StudentRecordsPage() {
   };
 
   useEffect(() => {
-    fetchStudents();
+    const timer = setTimeout(() => {
+      setPage(1);
+      fetchStudents(1);
+    }, 300);
+    return () => clearTimeout(timer);
   }, [searchQuery, statusFilter]);
 
   const handleCsvImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -70,7 +84,7 @@ export default function StudentRecordsPage() {
             id: cols[idIdx],
             name: cols[nameIdx],
             grade: cols[gradeIdx],
-            status: 'active'
+            status: 'กำลังศึกษาอยู่'
           });
         }
 
@@ -171,6 +185,7 @@ export default function StudentRecordsPage() {
             <p className="text-xl font-medium">ไม่พบข้อมูลนักเรียน</p>
           </div>
         ) : (
+          <>
           <table className="w-full text-left">
             <thead className="bg-foreground/[0.02] border-b border-foreground/5">
               <tr>
@@ -216,6 +231,35 @@ export default function StudentRecordsPage() {
               </AnimatePresence>
             </tbody>
           </table>
+          
+          {totalPages > 1 && (
+            <div className="flex justify-between items-center p-4 bg-foreground/[0.02] border-t border-foreground/5">
+              <button 
+                onClick={() => {
+                  const newPage = Math.max(1, page - 1);
+                  setPage(newPage);
+                  fetchStudents(newPage);
+                }}
+                disabled={page === 1}
+                className="px-4 py-2 border border-foreground/10 rounded-lg disabled:opacity-50 text-sm font-bold bg-surface hover:bg-foreground/5 transition-colors"
+              >
+                ก่อนหน้า
+              </button>
+              <span className="text-sm font-bold text-foreground/50">หน้า {page} จาก {totalPages}</span>
+              <button 
+                onClick={() => {
+                  const newPage = Math.min(totalPages, page + 1);
+                  setPage(newPage);
+                  fetchStudents(newPage);
+                }}
+                disabled={page >= totalPages}
+                className="px-4 py-2 border border-foreground/10 rounded-lg disabled:opacity-50 text-sm font-bold bg-surface hover:bg-foreground/5 transition-colors"
+              >
+                ถัดไป
+              </button>
+            </div>
+          )}
+        </>
         )}
       </div>
     </motion.div>

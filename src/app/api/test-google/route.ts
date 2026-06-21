@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
+import { requireAuth } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic'; // Prevent caching
 
 export async function GET() {
   try {
+    const authSession = await requireAuth('admin');
+    if (authSession.error) {
+      return NextResponse.json({ error: authSession.error }, { status: authSession.status });
+    }
+
     const keyString = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
     if (!keyString) {
       return NextResponse.json({ error: 'Missing GOOGLE_SERVICE_ACCOUNT_KEY in Environment Variables' });
@@ -15,8 +21,7 @@ export async function GET() {
       creds = JSON.parse(keyString);
     } catch(e: any) {
       return NextResponse.json({ 
-        error: 'Invalid JSON format in GOOGLE_SERVICE_ACCOUNT_KEY', 
-        details: e.message 
+        error: 'Invalid JSON format in GOOGLE_SERVICE_ACCOUNT_KEY'
       });
     }
 
@@ -26,7 +31,7 @@ export async function GET() {
     });
     
     const results: any = {
-      service_account_email: creds.client_email,
+      service_account_status: 'configured',
       drive_status: 'pending',
       sheets_status: 'pending'
     };
@@ -39,10 +44,10 @@ export async function GET() {
          results.drive_status = 'Missing GOOGLE_DRIVE_BACKUP_FOLDER_ID';
       } else {
          const dRes = await drive.files.get({ fileId: folderId, fields: 'id, name' });
-         results.drive_status = `Success! Found folder: ${dRes.data.name}`;
+         results.drive_status = `Success! Found folder.`;
       }
     } catch (dErr: any) {
-      results.drive_status = `Error: ${dErr.message}`;
+      results.drive_status = `Error testing drive`;
     }
     
     // Test Sheets
@@ -53,15 +58,15 @@ export async function GET() {
          results.sheets_status = 'Missing GOOGLE_SHEETS_SPREADSHEET_ID';
       } else {
          const sRes = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
-         results.sheets_status = `Success! Found sheet: ${sRes.data.properties?.title}`;
+         results.sheets_status = `Success! Found sheet.`;
       }
     } catch (sErr: any) {
-      results.sheets_status = `Error: ${sErr.message}`;
+      results.sheets_status = `Error testing sheets`;
     }
 
     return NextResponse.json(results);
 
   } catch (err: any) {
-    return NextResponse.json({ error: err.message, stack: err.stack });
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

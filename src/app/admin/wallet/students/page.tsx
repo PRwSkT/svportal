@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { WalletAccount } from '@/types';
-import { getAllWalletAccounts, linkCardToStudent, updateDailyLimit, adjustBalance, getWalletHistory } from '@/lib/supabase/wallet';
 import type { WalletTransaction } from '@/types';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -47,10 +46,14 @@ export default function AdminWalletStudentsPage() {
   async function fetchAccounts() {
     setLoading(true);
     try {
-      const data = await getAllWalletAccounts();
+      const res = await fetch('/api/admin/wallet');
+      if (!res.ok) throw new Error('Failed to fetch accounts');
+      const data = await res.json();
       setAccounts(data);
+      return data;
     } catch (err: any) {
       toast.error('ไม่สามารถโหลดข้อมูลได้', { description: err.message });
+      return null;
     } finally {
       setLoading(false);
     }
@@ -76,7 +79,9 @@ export default function AdminWalletStudentsPage() {
     setLinkingCard(false);
     setShowAdjustment(false);
     try {
-      const history = await getWalletHistory(account.student_id, 30);
+      const res = await fetch(`/api/admin/wallet/history?student_id=${account.student_id}&limit=30`);
+      if (!res.ok) throw new Error('Failed to load history');
+      const history = await res.json();
       setPanelHistory(history);
     } catch (err: any) {
       toast.error('ไม่สามารถโหลดประวัติได้', { description: err.message });
@@ -94,11 +99,16 @@ export default function AdminWalletStudentsPage() {
     if (!selectedAccount || !cardUIDInput.trim()) return;
     const loadingToast = toast.loading('กำลังผูกบัตร...');
     try {
-      await linkCardToStudent(selectedAccount.student_id, cardUIDInput.trim());
+      const res = await fetch('/api/admin/wallet', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'link_card', student_id: selectedAccount.student_id, card_uid: cardUIDInput.trim() })
+      });
+      if (!res.ok) throw new Error('Failed to link card');
       setLinkingCard(false);
       setCardUIDInput('');
-      await fetchAccounts();
-      const updated = accounts.find(a => a.student_id === selectedAccount.student_id);
+      const newData = await fetchAccounts();
+      const updated = newData?.find((a: any) => a.student_id === selectedAccount.student_id);
       if (updated) setSelectedAccount({ ...updated, card_uid: cardUIDInput.trim().toUpperCase() });
       toast.success('ผูกบัตรสำเร็จ', { id: loadingToast });
     } catch (err: any) {
@@ -115,7 +125,12 @@ export default function AdminWalletStudentsPage() {
     }
     const loadingToast = toast.loading('กำลังอัปเดตวงเงิน...');
     try {
-      await updateDailyLimit(selectedAccount.student_id, newLimit);
+      const res = await fetch('/api/admin/wallet', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_limit', student_id: selectedAccount.student_id, daily_limit: newLimit })
+      });
+      if (!res.ok) throw new Error('Failed to update limit');
       setEditingLimit(false);
       await fetchAccounts();
       setSelectedAccount(prev => prev ? { ...prev, daily_limit: newLimit } : null);
@@ -131,14 +146,22 @@ export default function AdminWalletStudentsPage() {
     const loadingToast = toast.loading('กำลังปรับยอด...');
     try {
       const amount = parseFloat(adjAmount);
-      await adjustBalance(selectedAccount.student_id, amount, adjNote);
+      const res = await fetch('/api/admin/wallet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student_id: selectedAccount.student_id, amount, note: adjNote })
+      });
+      if (!res.ok) throw new Error('Failed to adjust balance');
+      
       setShowAdjustment(false);
       setAdjAmount('');
       setAdjNote('');
-      await fetchAccounts();
-      const history = await getWalletHistory(selectedAccount.student_id, 30);
-      setPanelHistory(history);
-      const updated = accounts.find(a => a.student_id === selectedAccount.student_id);
+      const newData = await fetchAccounts();
+      
+      const historyRes = await fetch(`/api/admin/wallet/history?student_id=${selectedAccount.student_id}&limit=30`);
+      if (historyRes.ok) setPanelHistory(await historyRes.json());
+      
+      const updated = newData?.find((a: any) => a.student_id === selectedAccount.student_id);
       if (updated) setSelectedAccount(updated);
       toast.success('ปรับยอดสำเร็จ', { id: loadingToast });
     } catch (err: any) {

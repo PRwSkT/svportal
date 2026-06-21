@@ -2,9 +2,14 @@ import { NextResponse } from 'next/server';
 import { uploadReceiptPDF, appendTransactionRow } from '@/lib/google/backup';
 import { createClient } from '@/lib/supabase/server';
 import { GoogleBackupPayload } from '@/types';
+import { requireAuth } from '@/lib/auth';
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireAuth();
+    if (auth.error) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
     const { payment_id, receipt_number, student_id, total_amount, base64Image } = await request.json();
 
     if (!payment_id || !base64Image) {

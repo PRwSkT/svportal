@@ -126,6 +126,17 @@ export async function getFeeTypes(): Promise<FeeType[]> {
  * Will POST payment confirmation to SVPortal and update svportal_sync_at
  */
 export async function syncPaymentToSVPortal(paymentId: string): Promise<void> {
-  console.warn(`syncPaymentToSVPortal: SVPortal API not yet configured (payment_id: ${paymentId})`);
-  // Future implementation here
+  const supabase = createClient();
+  const { error } = await supabase.from('sync_queue').insert({
+    entity_type: 'tuition_payment',
+    entity_id: paymentId,
+    action: 'create',
+    payload: { payment_id: paymentId }
+  });
+
+  if (error) {
+    console.error(`Failed to enqueue payment sync: ${error.message}`);
+  } else {
+    console.log(`Enqueued payment ${paymentId} for SVPortal sync`);
+  }
 }

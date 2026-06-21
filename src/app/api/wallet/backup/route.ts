@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server';
 import { appendTransactionRow } from '@/lib/google/backup';
 import { GoogleBackupPayload } from '@/types';
+import { requireAuth } from '@/lib/auth';
 
 export async function POST(request: Request) {
   try {
+    // Only admin or cashier can trigger backups
+    const auth = await requireAuth();
+    if (auth.error) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
     const payload: GoogleBackupPayload = await request.json();
 
     if (!payload.transaction_id) {

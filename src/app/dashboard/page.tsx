@@ -1,15 +1,12 @@
-import { getDailySummary } from '@/lib/supabase/reports';
 import DashboardView from './DashboardView';
+import { headers } from 'next/headers';
 
 export default async function DashboardPage() {
   // Get today's summary in YYYY-MM-DD
   const today = new Date();
-  // Adjust for local timezone to get local date string
   const offset = today.getTimezoneOffset() * 60000;
   const localISOTime = (new Date(today.getTime() - offset)).toISOString().split('T')[0];
   
-  const summary = await getDailySummary(localISOTime);
-
   // Format date to Thai format
   const thaiDate = new Intl.DateTimeFormat('th-TH', { 
     year: 'numeric', 
@@ -17,7 +14,19 @@ export default async function DashboardPage() {
     day: 'numeric' 
   }).format(today);
 
-  const lastUpdated = new Date().toLocaleTimeString('th-TH');
+  // We fetch initial data on server to keep SSR
+  let initialData = { summary: null, sync_stats: null };
+  try {
+    const headersList = await headers();
+    const host = headersList.get('host') || 'localhost:3000';
+    const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
+    const res = await fetch(`${protocol}://${host}/api/admin/dashboard?date=${localISOTime}`, { cache: 'no-store' });
+    if (res.ok) {
+      initialData = await res.json();
+    }
+  } catch (e) {
+    console.error('Failed to fetch initial dashboard data', e);
+  }
 
-  return <DashboardView summary={summary} thaiDate={thaiDate} lastUpdated={lastUpdated} />;
+  return <DashboardView initialData={initialData} thaiDate={thaiDate} localISOTime={localISOTime} />;
 }
