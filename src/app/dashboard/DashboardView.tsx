@@ -57,7 +57,7 @@ export default function DashboardView({ initialData, thaiDate, localISOTime }: {
       animate={{ opacity: 1, y: 0 }}
       className="p-8 max-w-7xl mx-auto space-y-8 font-sans"
     >
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-surface/80 backdrop-blur-xl p-6 rounded-3xl shadow-lg border border-white/20">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-surface backdrop-blur-xl p-6 rounded-3xl shadow-lg border border-white/60">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
             <LayoutDashboard className="w-8 h-8" />
@@ -108,7 +108,7 @@ export default function DashboardView({ initialData, thaiDate, localISOTime }: {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-surface/80 backdrop-blur-xl rounded-3xl shadow-lg border border-white/20 p-8 hover:shadow-xl hover:border-primary/20 transition-all group"
+          className="bg-surface backdrop-blur-xl rounded-3xl shadow-lg border border-white/60 p-8 hover:shadow-xl hover:border-primary/20 transition-all group"
         >
           <div className="w-12 h-12 rounded-2xl bg-secondary/10 flex items-center justify-center text-secondary mb-6 group-hover:scale-110 transition-transform">
             <GraduationCap className="w-6 h-6" />
@@ -125,7 +125,7 @@ export default function DashboardView({ initialData, thaiDate, localISOTime }: {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-surface/80 backdrop-blur-xl rounded-3xl shadow-lg border border-white/20 p-8 hover:shadow-xl hover:border-primary/20 transition-all group"
+          className="bg-surface backdrop-blur-xl rounded-3xl shadow-lg border border-white/60 p-8 hover:shadow-xl hover:border-primary/20 transition-all group"
         >
           <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 mb-6 group-hover:scale-110 transition-transform">
             <ShoppingBag className="w-6 h-6" />
@@ -142,7 +142,7 @@ export default function DashboardView({ initialData, thaiDate, localISOTime }: {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="bg-surface/80 backdrop-blur-xl rounded-3xl shadow-lg border border-white/20 p-8 hover:shadow-xl hover:border-primary/20 transition-all group"
+          className="bg-surface backdrop-blur-xl rounded-3xl shadow-lg border border-white/60 p-8 hover:shadow-xl hover:border-primary/20 transition-all group"
         >
           <div className="w-12 h-12 rounded-2xl bg-green-500/10 flex items-center justify-center text-green-500 mb-6 group-hover:scale-110 transition-transform">
             <Wallet className="w-6 h-6" />
@@ -160,7 +160,7 @@ export default function DashboardView({ initialData, thaiDate, localISOTime }: {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
-        className="bg-surface/80 backdrop-blur-xl rounded-3xl shadow-lg border border-white/20 p-8"
+        className="bg-surface backdrop-blur-xl rounded-3xl shadow-lg border border-white/60 p-8"
       >
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">

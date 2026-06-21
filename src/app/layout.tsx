@@ -22,9 +22,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-background text-foreground relative overflow-x-hidden">
         {/* Global Watermark Logos */}
-        <div className="fixed bottom-4 md:bottom-8 right-4 md:right-8 opacity-10 pointer-events-none flex flex-col md:flex-row items-end md:items-center gap-4 md:gap-6 z-0 mix-blend-multiply transition-all duration-500 print:opacity-30">
-          <Image src="/logo.png" alt="School Logo" width={80} height={80} className="w-16 h-16 md:w-24 md:h-24 grayscale drop-shadow-md" />
-          <Image src="/SV-Portal.png" alt="SVPortal" width={200} height={50} className="w-32 md:w-48 h-auto grayscale drop-shadow-md" />
+        <div className="fixed bottom-4 md:bottom-8 right-4 md:right-8 opacity-25 pointer-events-none flex flex-col md:flex-row items-end md:items-center gap-4 md:gap-6 z-0 transition-all duration-500 print:opacity-100">
+          <Image src="/logo.png" alt="School Logo" width={100} height={100} className="w-20 h-20 md:w-32 md:h-32 drop-shadow-lg" />
+          <Image src="/SV-Portal.png" alt="SVPortal" width={240} height={60} className="w-40 md:w-56 h-auto drop-shadow-lg" />
         </div>
 
         <Toaster position="top-right" richColors />
