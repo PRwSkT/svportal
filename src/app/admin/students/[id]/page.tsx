@@ -27,11 +27,18 @@ export default function StudentDetailPage() {
   const [activeTab, setActiveTab] = useState<'general' | 'address' | 'parents'>('general');
 
   useEffect(() => {
+    // Fail-safe to remove skeleton if something hangs indefinitely
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 3000);
+
     if (resolvedId && !isNew) {
       fetchStudent();
     } else if (isNew) {
       setIsLoading(false);
     }
+
+    return () => clearTimeout(timer);
   }, [isNew, resolvedId]);
 
   const fetchStudent = async () => {
@@ -54,10 +61,12 @@ export default function StudentDetailPage() {
             { student_id: data.id, relationship: 'มารดา' }
           ]);
         }
+      } else {
+        toast.error('ไม่พบข้อมูลนักเรียน', { description: `รหัส: ${resolvedId}` });
       }
     } catch (err: any) {
       console.error(err);
-      toast.error('ไม่สามารถโหลดข้อมูลนักเรียนได้', { description: err.message });
+      toast.error('ไม่สามารถโหลดข้อมูลนักเรียนได้', { description: err?.message || 'Unknown error' });
     } finally {
       setIsLoading(false);
     }
