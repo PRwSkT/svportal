@@ -11,8 +11,17 @@ import { ArrowLeft, Save, User, MapPin, Users, PlusCircle, CheckCircle2 } from '
 
 export default function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
-  const resolvedParams = use(params);
-  const isNew = resolvedParams.id === 'new';
+  const [resolvedId, setResolvedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (params instanceof Promise) {
+      params.then(p => setResolvedId(p.id)).catch(console.error);
+    } else {
+      setResolvedId((params as any).id);
+    }
+  }, [params]);
+
+  const isNew = resolvedId === 'new';
 
   const [student, setStudent] = useState<Partial<Student>>({
     id: '', name: '', grade: '', status: 'กำลังศึกษาอยู่'
@@ -20,19 +29,22 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [addresses, setAddresses] = useState<Partial<StudentAddress>[]>([]);
   const [parents, setParents] = useState<Partial<StudentParent>[]>([]);
 
-  const [isLoading, setIsLoading] = useState(!isNew);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'address' | 'parents'>('general');
 
   useEffect(() => {
-    if (!isNew) {
+    if (resolvedId && !isNew) {
       fetchStudent();
+    } else if (isNew) {
+      setIsLoading(false);
     }
-  }, [isNew, resolvedParams.id]);
+  }, [isNew, resolvedId]);
 
   const fetchStudent = async () => {
     try {
-      const data = await getStudentById(resolvedParams.id);
+      if (!resolvedId) return;
+      const data = await getStudentById(resolvedId);
       if (data) {
         setStudent(data);
         if (data.student_addresses && data.student_addresses.length > 0) {
