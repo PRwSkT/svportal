@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { searchAddressBySubDistrict, searchAddressByDistrict, searchAddressByProvince, searchAddressByPostalCode } from 'thai-address-universal';
 
 interface AddressData {
   sub_district?: string;
   district?: string;
   province?: string;
-  postal_code?: string;
   zip_code?: string;
 }
 
@@ -18,135 +17,194 @@ interface Props {
 }
 
 export default function ThaiAddressRow({ address, onChange, onAddressSelect }: Props) {
-  const [suggestions, setSuggestions] = useState<AddressData[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [subDistricts, setSubDistricts] = useState<string[]>([]);
+  const [districts, setDistricts] = useState<string[]>([]);
+  const [provinces, setProvinces] = useState<string[]>([]);
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
-        setShowSuggestions(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  // Generate unique ID for datalists so multiple rows don't clash
+  const uniqueId = React.useId();
 
-  const handleSearch = async (query: string, field: 'sub_district' | 'district' | 'province' | 'zip_code') => {
-    onChange(field, query);
-    if (!query || query.length < 2) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
+  const handleZipCodeChange = async (val: string) => {
+    onChange('zip_code', val);
+    if (val.length === 5) {
+      try {
+        const results = await searchAddressByPostalCode(val);
+        if (results.length > 0) {
+          const uProvs = [...new Set(results.map(r => r.province))];
+          const uDists = [...new Set(results.map(r => r.district))];
+          const uSubs = [...new Set(results.map(r => r.sub_district))];
 
-    try {
-      let results: AddressData[] = [];
-      if (field === 'sub_district') {
-        results = await searchAddressBySubDistrict(query);
-      } else if (field === 'district') {
-        results = await searchAddressByDistrict(query);
-      } else if (field === 'province') {
-        results = await searchAddressByProvince(query);
-      } else if (field === 'zip_code') {
-        results = await searchAddressByPostalCode(query);
-      }
-      
-      // De-duplicate results
-      const uniqueResults = [];
-      const seen = new Set();
-      for (const item of results) {
-        const key = `${item.sub_district}-${item.district}-${item.province}-${item.postal_code}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          uniqueResults.push(item);
+          const updates: any = {};
+          if (uProvs.length === 1) updates.province = uProvs[0];
+          if (uDists.length === 1) updates.district = uDists[0];
+          if (uSubs.length === 1) updates.sub_district = uSubs[0];
+
+          if (Object.keys(updates).length > 0) {
+            onAddressSelect(updates);
+          }
+
+          setSubDistricts(uSubs as string[]);
+          setDistricts(uDists as string[]);
+          setProvinces(uProvs as string[]);
         }
+      } catch (e) {
+        console.error(e);
       }
-
-      setSuggestions(uniqueResults.slice(0, 5));
-      setShowSuggestions(uniqueResults.length > 0);
-    } catch (error) {
-      console.error('Failed to search address', error);
+    } else {
+      // Clear options if zip code is not complete
+      setSubDistricts([]);
+      setDistricts([]);
+      setProvinces([]);
     }
   };
 
-  const handleSelect = (suggestion: AddressData) => {
-    onAddressSelect({
-      sub_district: suggestion.sub_district || '',
-      district: suggestion.district || '',
-      province: suggestion.province || '',
-      zip_code: suggestion.postal_code || '' // Map back to zip_code
-    });
-    setSuggestions([]);
-    setShowSuggestions(false);
+  const handleSubDistrictChange = async (val: string) => {
+    onChange('sub_district', val);
+    if (val.length >= 2 && address.zip_code?.length !== 5) {
+      const results = await searchAddressBySubDistrict(val);
+      const exactMatches = results.filter(r => r.sub_district === val);
+      
+      if (exactMatches.length === 1) {
+        const match = exactMatches[0];
+        onAddressSelect({
+          district: match.district,
+          province: match.province,
+          zip_code: match.postal_code,
+        });
+      } else if (exactMatches.length > 1) {
+        setDistricts([...new Set(exactMatches.map(r => r.district))] as string[]);
+      } else {
+        setSubDistricts([...new Set(results.map(r => r.sub_district))] as string[]);
+      }
+    }
+  };
+
+  const handleDistrictChange = async (val: string) => {
+    onChange('district', val);
+    if (val.length >= 2 && address.zip_code?.length !== 5) {
+      const results = await searchAddressByDistrict(val);
+      const exactMatches = results.filter(r => r.district === val);
+      
+      if (exactMatches.length === 1) {
+        const match = exactMatches[0];
+        onAddressSelect({
+          province: match.province,
+          zip_code: match.postal_code,
+        });
+      } else {
+        setDistricts([...new Set(results.map(r => r.district))] as string[]);
+      }
+    }
+  };
+
+  const handleProvinceChange = async (val: string) => {
+    onChange('province', val);
+    if (val.length >= 2 && address.zip_code?.length !== 5) {
+      const results = await searchAddressByProvince(val);
+      setProvinces([...new Set(results.map(r => r.province))] as string[]);
+    }
   };
 
   return (
-    <div className="grid grid-cols-2 gap-6 relative" ref={wrapperRef}>
+    <div className="grid grid-cols-2 gap-6">
       <div className="col-span-2 md:col-span-1">
         <label className="block text-sm font-semibold text-foreground/70 mb-2">รหัสไปรษณีย์</label>
         <input 
           type="text" 
           value={address.zip_code || ''} 
-          onChange={e => handleSearch(e.target.value, 'zip_code')}
-          onFocus={() => { if(suggestions.length > 0) setShowSuggestions(true) }}
-          placeholder="กรอกรหัสไปรษณีย์..."
+          onChange={e => handleZipCodeChange(e.target.value)}
+          placeholder="กรอกรหัสไปรษณีย์ 5 หลัก"
+          maxLength={5}
           className="w-full px-4 py-3 bg-surface border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-primary font-bold transition-all" 
         />
       </div>
+
       <div className="col-span-2 md:col-span-1">
         <label className="block text-sm font-semibold text-foreground/70 mb-2">ตำบล / แขวง</label>
-        <input 
-          type="text" 
-          value={address.sub_district || ''} 
-          onChange={e => handleSearch(e.target.value, 'sub_district')}
-          onFocus={() => { if(suggestions.length > 0) setShowSuggestions(true) }}
-          className="w-full px-4 py-3 bg-surface border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all" 
-        />
-      </div>
-      <div className="col-span-2 md:col-span-1">
-        <label className="block text-sm font-semibold text-foreground/70 mb-2">อำเภอ / เขต</label>
-        <input 
-          type="text" 
-          value={address.district || ''} 
-          onChange={e => handleSearch(e.target.value, 'district')}
-          onFocus={() => { if(suggestions.length > 0) setShowSuggestions(true) }}
-          className="w-full px-4 py-3 bg-surface border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all" 
-        />
-      </div>
-      <div className="col-span-2 md:col-span-1">
-        <label className="block text-sm font-semibold text-foreground/70 mb-2">จังหวัด</label>
-        <input 
-          type="text" 
-          value={address.province || ''} 
-          onChange={e => handleSearch(e.target.value, 'province')}
-          onFocus={() => { if(suggestions.length > 0) setShowSuggestions(true) }}
-          className="w-full px-4 py-3 bg-surface border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all" 
-        />
+        {subDistricts.length > 1 && address.zip_code?.length === 5 ? (
+          <select
+            value={address.sub_district || ''}
+            onChange={e => handleSubDistrictChange(e.target.value)}
+            className="w-full px-4 py-3 bg-surface border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all appearance-none cursor-pointer"
+          >
+            <option value="">-- เลือกตำบล/แขวง --</option>
+            {subDistricts.map(sd => (
+              <option key={sd} value={sd}>{sd}</option>
+            ))}
+          </select>
+        ) : (
+          <>
+            <input 
+              type="text" 
+              list={`sub_district-${uniqueId}`}
+              value={address.sub_district || ''} 
+              onChange={e => handleSubDistrictChange(e.target.value)}
+              className="w-full px-4 py-3 bg-surface border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all" 
+            />
+            <datalist id={`sub_district-${uniqueId}`}>
+              {subDistricts.map(sd => <option key={sd} value={sd} />)}
+            </datalist>
+          </>
+        )}
       </div>
 
-      {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute top-full left-0 right-0 z-[100] mt-2 bg-surface border border-foreground/10 shadow-2xl rounded-2xl overflow-hidden backdrop-blur-xl">
-          {suggestions.map((s, i) => (
-            <button
-              type="button"
-              key={i}
-              onClick={() => handleSelect(s)}
-              className="w-full text-left px-6 py-4 hover:bg-primary/5 hover:text-primary transition-all border-b border-foreground/5 last:border-0 flex items-center justify-between"
-            >
-              <div>
-                <span className="font-medium text-primary">{s.postal_code}</span>
-                <span className="text-foreground/50 text-sm mx-3">|</span>
-                <span className="font-medium">{s.sub_district}</span>
-                <span className="text-foreground/50 text-sm mx-2">»</span>
-                <span className="text-foreground/80">{s.district}</span>
-                <span className="text-foreground/50 text-sm mx-2">»</span>
-                <span className="text-foreground/80">{s.province}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="col-span-2 md:col-span-1">
+        <label className="block text-sm font-semibold text-foreground/70 mb-2">อำเภอ / เขต</label>
+        {districts.length > 1 && address.zip_code?.length === 5 ? (
+          <select
+            value={address.district || ''}
+            onChange={e => handleDistrictChange(e.target.value)}
+            className="w-full px-4 py-3 bg-surface border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all appearance-none cursor-pointer"
+          >
+            <option value="">-- เลือกอำเภอ/เขต --</option>
+            {districts.map(d => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+        ) : (
+          <>
+            <input 
+              type="text" 
+              list={`district-${uniqueId}`}
+              value={address.district || ''} 
+              onChange={e => handleDistrictChange(e.target.value)}
+              className="w-full px-4 py-3 bg-surface border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all" 
+            />
+            <datalist id={`district-${uniqueId}`}>
+              {districts.map(d => <option key={d} value={d} />)}
+            </datalist>
+          </>
+        )}
+      </div>
+
+      <div className="col-span-2 md:col-span-1">
+        <label className="block text-sm font-semibold text-foreground/70 mb-2">จังหวัด</label>
+        {provinces.length > 1 && address.zip_code?.length === 5 ? (
+          <select
+            value={address.province || ''}
+            onChange={e => handleProvinceChange(e.target.value)}
+            className="w-full px-4 py-3 bg-surface border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all appearance-none cursor-pointer"
+          >
+            <option value="">-- เลือกจังหวัด --</option>
+            {provinces.map(p => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+        ) : (
+          <>
+            <input 
+              type="text" 
+              list={`province-${uniqueId}`}
+              value={address.province || ''} 
+              onChange={e => handleProvinceChange(e.target.value)}
+              className="w-full px-4 py-3 bg-surface border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all" 
+            />
+            <datalist id={`province-${uniqueId}`}>
+              {provinces.map(p => <option key={p} value={p} />)}
+            </datalist>
+          </>
+        )}
+      </div>
     </div>
   );
 }
