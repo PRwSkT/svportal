@@ -7,7 +7,7 @@ import { getStudentById, updateStudent, createStudent, upsertStudentAddress, ups
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Save, User, MapPin, Users, PlusCircle, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Save, User, MapPin, Users, PlusCircle, CheckCircle2, Trash2 } from 'lucide-react';
 import ThaiAddressRow from '@/components/admin/ThaiAddressRow';
 
 export default function StudentDetailPage() {
@@ -115,10 +115,17 @@ export default function StudentDetailPage() {
         ...studentData 
       } = student as any;
 
-      const constructedName = `${student.prefix || ''}${student.first_name || ''} ${student.last_name || ''}`.trim();
+      let finalName = studentData.name;
+      if (student.first_name || student.last_name) {
+        const prefix = (student.prefix || '').trim();
+        const fname = (student.first_name || '').trim();
+        const lname = (student.last_name || '').trim();
+        finalName = `${prefix}${fname}${lname ? ' ' + lname : ''}`.trim();
+      }
+
       const payloadStudentData = {
         ...studentData,
-        name: constructedName || studentData.name // Fallback to existing name if blank
+        name: finalName || studentData.name
       };
 
       const res = await fetch('/api/admin/students/save', {
@@ -341,7 +348,24 @@ export default function StudentDetailPage() {
               >
                 {addresses.map((addr, idx) => (
                   <div key={idx} className="grid grid-cols-2 gap-6 bg-foreground/[0.02] p-6 rounded-2xl border border-foreground/5 relative group">
-                    <div className="absolute top-4 right-4 text-foreground/20 font-mono text-4xl font-extrabold select-none">#{(idx+1).toString().padStart(2, '0')}</div>
+                    <div className="col-span-2 flex justify-between items-center mb-2">
+                      <div className="text-foreground/30 font-mono text-2xl font-extrabold select-none">#{ (idx+1).toString().padStart(2, '0') }</div>
+                      {addresses.length > 1 && (
+                        <button 
+                          onClick={() => {
+                            if (confirm('คุณต้องการลบที่อยู่นี้ใช่หรือไม่?')) {
+                              const newAddrs = [...addresses];
+                              newAddrs.splice(idx, 1);
+                              setAddresses(newAddrs);
+                            }
+                          }}
+                          className="p-2 text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+                          title="ลบที่อยู่"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      )}
+                    </div>
                     <div>
                       <label className="block text-sm font-semibold text-foreground/70 mb-2">บ้านเลขที่</label>
                       <input type="text" value={addr.house_number || ''} onChange={e => {
@@ -383,6 +407,12 @@ export default function StudentDetailPage() {
                     </div>
                   </div>
                 ))}
+                <button 
+                  onClick={() => setAddresses([...addresses, { student_id: student.id }])}
+                  className="w-full py-4 border-2 border-dashed border-foreground/20 rounded-2xl text-foreground/50 font-bold hover:border-primary hover:bg-primary/5 hover:text-primary transition-all flex items-center justify-center gap-2"
+                >
+                  <PlusCircle className="w-5 h-5" /> เพิ่มที่อยู่ใหม่
+                </button>
               </motion.div>
             )}
 
@@ -398,8 +428,21 @@ export default function StudentDetailPage() {
                   <div key={idx} className="grid grid-cols-2 gap-6 bg-foreground/[0.02] p-6 rounded-2xl border border-foreground/5 relative group">
                     <div className="col-span-2 flex justify-between items-center border-b border-foreground/10 pb-3 mb-2">
                       <h3 className="font-extrabold text-lg text-primary flex items-center gap-2">
-                        <Users className="w-5 h-5 opacity-50" /> {parent.relationship}
+                        <Users className="w-5 h-5 opacity-50" /> {parent.relationship || 'ผู้ปกครอง'}
                       </h3>
+                      <button 
+                        onClick={() => {
+                          if (confirm('คุณต้องการลบผู้ปกครองคนนี้ใช่หรือไม่?')) {
+                            const newParents = [...parents];
+                            newParents.splice(idx, 1);
+                            setParents(newParents);
+                          }
+                        }}
+                        className="p-2 text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+                        title="ลบผู้ปกครอง"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-foreground/70 mb-2">คำนำหน้าชื่อ</label>

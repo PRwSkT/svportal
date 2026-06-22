@@ -43,30 +43,52 @@ export async function POST(request: Request) {
 
     // Save Addresses
     if (Array.isArray(addresses)) {
+      // 1. Delete removed addresses
+      const currentAddressIds = addresses.map(a => a.id).filter(id => id);
+      if (currentAddressIds.length > 0) {
+        await supabase
+          .from('student_addresses')
+          .delete()
+          .eq('student_id', savedId)
+          .not('id', 'in', `(${currentAddressIds.join(',')})`);
+      } else {
+        await supabase.from('student_addresses').delete().eq('student_id', savedId);
+      }
+
+      // 2. Upsert
       for (const addr of addresses) {
-        if (addr.house_number || addr.province) {
+        if (addr.house_number || addr.province || addr.zip_code) {
           const { error: addrError } = await supabase
             .from('student_addresses')
             .upsert({ ...addr, student_id: savedId });
             
-          if (addrError) {
-            console.error('Address upsert error:', addrError);
-          }
+          if (addrError) console.error('Address upsert error:', addrError);
         }
       }
     }
 
     // Save Parents
     if (Array.isArray(parents)) {
+      // 1. Delete removed parents
+      const currentParentIds = parents.map(p => p.id).filter(id => id);
+      if (currentParentIds.length > 0) {
+        await supabase
+          .from('student_parents')
+          .delete()
+          .eq('student_id', savedId)
+          .not('id', 'in', `(${currentParentIds.join(',')})`);
+      } else {
+        await supabase.from('student_parents').delete().eq('student_id', savedId);
+      }
+
+      // 2. Upsert
       for (const p of parents) {
         if (p.first_name || p.last_name || p.citizen_id) {
           const { error: parentError } = await supabase
             .from('student_parents')
             .upsert({ ...p, student_id: savedId });
             
-          if (parentError) {
-            console.error('Parent upsert error:', parentError);
-          }
+          if (parentError) console.error('Parent upsert error:', parentError);
         }
       }
     }
