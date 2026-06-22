@@ -204,11 +204,11 @@ export default function StudentRecordsPage() {
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
           >
-            <option value="all">ทุกสถานะ</option>
-            <option value="กำลังศึกษาอยู่">กำลังศึกษาอยู่</option>
+            <option value="all">สถานะทั้งหมด</option>
+            <option value="กำลังศึกษาอยู่">กำลังศึกษาอยู่ / เข้าใหม่</option>
+            <option value="นักเรียนเข้าใหม่">นักเรียนเข้าใหม่</option>
             <option value="สำเร็จการศึกษา">สำเร็จการศึกษา</option>
-            <option value="ลาออก">ลาออก</option>
-            <option value="active">Active (Legacy)</option>
+            <option value="จำหน่ายออก">จำหน่ายออก</option>
           </select>
         </div>
       </div>

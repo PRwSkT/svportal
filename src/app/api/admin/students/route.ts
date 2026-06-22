@@ -31,7 +31,11 @@ export async function GET(request: Request) {
       query = query.or(`id.ilike.%${sanitized}%,name.ilike.%${sanitized}%`);
     }
     if (statusFilter && statusFilter !== 'all') {
-      query = query.eq('status', statusFilter);
+      if (statusFilter === 'กำลังศึกษาอยู่') {
+        query = query.in('status', ['กำลังศึกษาอยู่', 'นักเรียนเข้าใหม่']);
+      } else {
+        query = query.eq('status', statusFilter);
+      }
     }
     if (gradeFilter && gradeFilter !== 'all') {
       const grades = gradeFilter.split(',').map(g => g.trim());

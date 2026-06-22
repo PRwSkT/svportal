@@ -17,7 +17,7 @@ export default function StudentDetailPage() {
   const isNew = resolvedId === 'new';
 
   const [student, setStudent] = useState<Partial<Student>>({
-    id: '', name: '', grade: '', status: 'กำลังศึกษาอยู่'
+    id: '', name: '', grade: '', status: 'นักเรียนเข้าใหม่'
   });
   const [addresses, setAddresses] = useState<Partial<StudentAddress>[]>([]);
   const [parents, setParents] = useState<Partial<StudentParent>[]>([]);
@@ -255,7 +255,8 @@ export default function StudentDetailPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-foreground/70 mb-2">สถานะ</label>
-                    <select value={student.status || 'กำลังศึกษาอยู่'} onChange={e => setStudent({...student, status: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all">
+                    <select value={student.status || 'นักเรียนเข้าใหม่'} onChange={e => setStudent({...student, status: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all">
+                      <option value="นักเรียนเข้าใหม่">นักเรียนเข้าใหม่</option>
                       <option value="กำลังศึกษาอยู่">กำลังศึกษาอยู่</option>
                       <option value="สำเร็จการศึกษา">สำเร็จการศึกษา</option>
                       <option value="ลาออก">ลาออก</option>

@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     const { data: students, error: fetchErr } = await supabase
       .from('students')
       .select('id, grade')
-      .eq('status', 'กำลังศึกษาอยู่');
+      .in('status', ['กำลังศึกษาอยู่', 'นักเรียนเข้าใหม่']);
 
     if (fetchErr) throw fetchErr;
     if (!students || students.length === 0) {
