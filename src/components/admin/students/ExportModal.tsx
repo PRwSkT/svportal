@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Download, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 type ExportModalProps = {
   isOpen: boolean;
   onClose: () => void;
+  availableGrades: string[];
 };
 
 const personalFields = [
@@ -47,16 +48,17 @@ const parentFields = [
   { id: 'salary', label: 'เงินเดือน' },
 ];
 
-const gradeOptions = [
-  'อ.1/1', 'อ.1/2', 'อ.2/1', 'อ.2/2', 'อ.3/1', 'อ.3/2',
-  'ป.1/1', 'ป.1/2', 'ป.2/1', 'ป.2/2', 'ป.3/1', 'ป.3/2',
-  'ป.4/1', 'ป.4/2', 'ป.5/1', 'ป.5/2', 'ป.6/1', 'ป.6/2'
-];
-
-export default function ExportModal({ isOpen, onClose }: ExportModalProps) {
-  const [selectedGrades, setSelectedGrades] = useState<string[]>(gradeOptions);
+export default function ExportModal({ isOpen, onClose, availableGrades }: ExportModalProps) {
+  const [selectedGrades, setSelectedGrades] = useState<string[]>(availableGrades);
   const [isExporting, setIsExporting] = useState(false);
   const [expandedSections, setExpandedSections] = useState<string[]>(['personal']);
+
+  // Reset selected grades when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedGrades(availableGrades);
+    }
+  }, [isOpen, availableGrades]);
 
   // Selected fields state
   const [selectedPersonal, setSelectedPersonal] = useState<string[]>(personalFields.map(f => f.id));
@@ -96,7 +98,7 @@ export default function ExportModal({ isOpen, onClose }: ExportModalProps) {
     const toastId = toast.loading('กำลังรวบรวมข้อมูลเพื่อส่งออก...');
     try {
       // 1. Fetch data
-      const gradeQuery = selectedGrades.length === gradeOptions.length ? 'all' : selectedGrades.join(',');
+      const gradeQuery = selectedGrades.length === availableGrades.length ? 'all' : selectedGrades.join(',');
       const res = await fetch(`/api/admin/students?limit=10000&grade=${encodeURIComponent(gradeQuery)}`);
       if (!res.ok) throw new Error('ไม่สามารถดึงข้อมูลได้');
       const json = await res.json();
@@ -176,7 +178,7 @@ export default function ExportModal({ isOpen, onClose }: ExportModalProps) {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', url);
-      const isAllGrades = selectedGrades.length === gradeOptions.length;
+      const isAllGrades = selectedGrades.length === availableGrades.length;
       link.setAttribute('download', `students_export_${isAllGrades ? 'all' : selectedGrades.join('_')}_${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
@@ -287,7 +289,7 @@ export default function ExportModal({ isOpen, onClose }: ExportModalProps) {
                 {renderFieldGroup(
                   'เลือกชั้นเรียนที่ต้องการ', 
                   'grades', 
-                  gradeOptions.map(g => ({ id: g, label: g })), 
+                  availableGrades.map(g => ({ id: g, label: g })), 
                   selectedGrades, 
                   setSelectedGrades
                 )}
