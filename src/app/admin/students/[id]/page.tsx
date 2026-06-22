@@ -35,6 +35,11 @@ export default function StudentDetailPage() {
     if (resolvedId && !isNew) {
       fetchStudent();
     } else if (isNew) {
+      setAddresses([{}]);
+      setParents([
+        { relationship: 'บิดา' },
+        { relationship: 'มารดา' }
+      ]);
       setIsLoading(false);
     }
 
