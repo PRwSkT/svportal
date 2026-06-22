@@ -25,6 +25,20 @@ export default function StudentDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'address' | 'parents'>('general');
+  const [studentType, setStudentType] = useState<'normal' | 'e'>('normal');
+
+  useEffect(() => {
+    if (isNew) {
+      fetch(`/api/admin/students/next-id?type=${studentType}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.nextId) {
+            setStudent(s => ({ ...s, id: data.nextId }));
+          }
+        })
+        .catch(err => console.error('Failed to fetch next ID:', err));
+    }
+  }, [isNew, studentType]);
 
   useEffect(() => {
     // Fail-safe to remove skeleton if something hangs indefinitely
@@ -221,6 +235,35 @@ export default function StudentDetailPage() {
                 className="space-y-6"
               >
                 <div className="grid grid-cols-2 gap-6">
+                  {isNew && (
+                    <div className="col-span-2 mb-2 p-5 bg-primary/5 border border-primary/20 rounded-2xl">
+                      <label className="block text-sm font-bold text-primary mb-3">ประเภทนักเรียน (รันรหัสอัตโนมัติ)</label>
+                      <div className="flex items-center gap-6">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input 
+                            type="radio" 
+                            name="studentType" 
+                            value="normal" 
+                            checked={studentType === 'normal'} 
+                            onChange={() => setStudentType('normal')}
+                            className="w-5 h-5 text-primary focus:ring-primary/20"
+                          />
+                          <span className="text-sm font-medium text-foreground/80">นักเรียนในระบบ (รหัสปกติ)</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input 
+                            type="radio" 
+                            name="studentType" 
+                            value="e" 
+                            checked={studentType === 'e'} 
+                            onChange={() => setStudentType('e')}
+                            className="w-5 h-5 text-primary focus:ring-primary/20"
+                          />
+                          <span className="text-sm font-medium text-foreground/80">นักเรียนนอกระบบ (รหัส E)</span>
+                        </label>
+                      </div>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-semibold text-foreground/70 mb-2">รหัสนักเรียน (id)</label>
                     <input type="text" disabled={!isNew} value={student.id || ''} onChange={e => setStudent({...student, id: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50 text-foreground transition-all" />
