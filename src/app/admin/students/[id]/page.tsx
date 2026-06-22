@@ -214,6 +214,10 @@ export default function StudentDetailPage() {
                     <input type="text" disabled={!isNew} value={student.id || ''} onChange={e => setStudent({...student, id: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50 text-foreground transition-all" />
                   </div>
                   <div>
+                    <label className="block text-sm font-semibold text-foreground/70 mb-2">เลขประจำตัวประชาชน</label>
+                    <input type="text" value={student.citizen_id || ''} onChange={e => setStudent({...student, citizen_id: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all" />
+                  </div>
+                  <div>
                     <label className="block text-sm font-semibold text-foreground/70 mb-2">ชื่อ-สกุลเต็ม</label>
                     <input type="text" value={student.name || ''} onChange={e => setStudent({...student, name: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all" />
                   </div>

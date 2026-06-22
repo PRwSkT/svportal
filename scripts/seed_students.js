@@ -60,6 +60,16 @@ function extractPrefixAndName(fullName) {
     return { prefix, first_name, last_name };
 }
 
+// แปลงเลขไทยเป็นเลขอารบิก
+function thaiToArabic(str) {
+    if (!str) return str;
+    const thaiNums = ['๐','๑','๒','๓','๔','๕','๖','๗','๘','๙'];
+    return str.toString().split('').map(char => {
+        const idx = thaiNums.indexOf(char);
+        return idx !== -1 ? idx.toString() : char;
+    }).join('');
+}
+
 function parseFloatSafe(val) {
     if (!val) return null;
     const num = parseFloat(val);
@@ -84,6 +94,7 @@ async function seed() {
       id: studentCode, // ให้ id คือเลขประจำตัวเลย จะได้เชื่อมโยงง่าย
       name: item['ชื่อ - นามสกุล'] || '', // Legacy support
       grade: item['ชั้นเรียน'] || '', // Legacy support
+      citizen_id: thaiToArabic(item['เลขประจำตัวประชาชนนักเรียน'] || item['เลขประจำตัวประชาชน'] || null),
       prefix,
       first_name,
       last_name,
@@ -124,7 +135,7 @@ async function seed() {
             let pPrefix = item[`[${f.type}] คำนำหน้าชื่อ`] || null;
             let pFirst = item[`[${f.type}] ชื่อ`] || null;
             let pLast = item[`[${f.type}] นามสกุล`] || null;
-            let pCitizenId = item[`[${f.type}] เลขประจำตัวประชาชน`] || null;
+            let pCitizenId = thaiToArabic(item[`[${f.type}] เลขประจำตัวประชาชน`] || null);
             let pOccup = item[`[${f.type}] อาชีพของ${f.type}`] || item[`[${f.type}] อาชีพของผู้ปกครอง`] || null;
             let pSalary = item[`[${f.type}] เงินเดือน(ต่อเดือน)`] || null;
             let pPhone = item[`[${f.type}] เบอร์โทรศัพท์`] || null;

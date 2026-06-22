@@ -13,6 +13,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const searchQuery = searchParams.get('q') || '';
     const statusFilter = searchParams.get('status') || 'all';
+    const gradeFilter = searchParams.get('grade') || 'all';
 
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
@@ -23,8 +24,15 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from('students')
-      .select('*, student_addresses(*), student_parents(*)', { count: 'exact' })
-      .order('id', { ascending: true });
+      .select('*, student_addresses(*), student_parents(*)', { count: 'exact' });
+
+    // Custom sorting: If viewing all grades, sort by grade first, then id. 
+    // Otherwise, just sort by id.
+    if (gradeFilter === 'all') {
+      query = query.order('grade', { ascending: true, nullsFirst: false }).order('id', { ascending: true });
+    } else {
+      query = query.order('id', { ascending: true });
+    }
 
     if (searchQuery) {
       const sanitized = searchQuery.replace(/[,()"]/g, '');
@@ -32,6 +40,9 @@ export async function GET(request: Request) {
     }
     if (statusFilter && statusFilter !== 'all') {
       query = query.eq('status', statusFilter);
+    }
+    if (gradeFilter && gradeFilter !== 'all') {
+      query = query.eq('grade', gradeFilter);
     }
 
     query = query.range(from, to);

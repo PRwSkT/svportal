@@ -6,26 +6,46 @@ import { importStudentsFromCSV } from '@/lib/supabase/students';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Filter, Upload, Plus, UserX, UserSquare2, ChevronRight } from 'lucide-react';
+import { Search, Filter, Upload, Plus, UserX, UserSquare2, ChevronRight, Download } from 'lucide-react';
+import ExportModal from '@/components/admin/students/ExportModal';
 
 export default function StudentRecordsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   
   // Pagination
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   
-  // Search and Filters
+  // Search, Filters, Tabs
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedGradeTab, setSelectedGradeTab] = useState('all');
+  const [gradeStats, setGradeStats] = useState<{counts: Record<string, number>, total: number}>({counts: {}, total: 0});
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchStats = async () => {
+    try {
+      const res = await fetch('/api/admin/students/stats');
+      if (res.ok) {
+        const data = await res.json();
+        setGradeStats(data);
+      }
+    } catch (err) {
+      console.error('Fetch stats error:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
 
   const fetchStudents = async (currentPage: number = page) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/admin/students?q=${encodeURIComponent(searchQuery)}&status=${encodeURIComponent(statusFilter)}&page=${currentPage}&limit=20`);
+      const res = await fetch(`/api/admin/students?q=${encodeURIComponent(searchQuery)}&status=${encodeURIComponent(statusFilter)}&grade=${encodeURIComponent(selectedGradeTab)}&page=${currentPage}&limit=20`);
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || `HTTP error! status: ${res.status}`);
@@ -52,7 +72,7 @@ export default function StudentRecordsPage() {
       fetchStudents(1);
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, statusFilter]);
+  }, [searchQuery, statusFilter, selectedGradeTab]);
 
   const handleCsvImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -66,14 +86,25 @@ export default function StudentRecordsPage() {
         const rows = text.split('\n').filter(r => r.trim());
         const headers = rows[0].split(',').map(h => h.trim().toLowerCase());
         
-        const idIdx = headers.indexOf('id');
-        const nameIdx = headers.indexOf('name');
-        const gradeIdx = headers.indexOf('grade');
+        const idIdx = headers.findIndex(h => h === 'id' || h === 'เลขประจำตัวนักเรียน');
+        const nameIdx = headers.findIndex(h => h === 'name' || h === 'ชื่อ - นามสกุล');
+        const gradeIdx = headers.findIndex(h => h === 'grade' || h === 'ชั้นเรียน');
+        const citizenIdIdx = headers.findIndex(h => h === 'citizen_id' || h === 'เลขประจำตัวประชาชน' || h === 'เลขประจำตัวประชาชนนักเรียน');
         
         if (idIdx === -1 || nameIdx === -1 || gradeIdx === -1) {
-          toast.error('ไฟล์ CSV ไม่ถูกต้อง', { id: toastId, description: 'ต้องมีคอลัมน์ id, name, grade เป็นอย่างน้อย' });
+          toast.error('ไฟล์ CSV ไม่ถูกต้อง', { id: toastId, description: 'ต้องมีคอลัมน์ เลขประจำตัวนักเรียน, ชื่อ - นามสกุล, ชั้นเรียน เป็นอย่างน้อย' });
           return;
         }
+
+        // แปลงเลขไทยเป็นอารบิก
+        const thaiToArabic = (str: string | undefined) => {
+          if (!str) return undefined;
+          const thaiNums = ['๐','๑','๒','๓','๔','๕','๖','๗','๘','๙'];
+          return str.toString().split('').map(char => {
+              const idx = thaiNums.indexOf(char);
+              return idx !== -1 ? idx.toString() : char;
+          }).join('');
+        };
 
         const toImport = [];
         for (let i = 1; i < rows.length; i++) {
@@ -84,6 +115,7 @@ export default function StudentRecordsPage() {
             id: cols[idIdx],
             name: cols[nameIdx],
             grade: cols[gradeIdx],
+            citizen_id: citizenIdIdx !== -1 ? thaiToArabic(cols[citizenIdIdx]) : undefined,
             status: 'กำลังศึกษาอยู่'
           });
         }
@@ -93,6 +125,7 @@ export default function StudentRecordsPage() {
           id: toastId,
           description: `สำเร็จ ${result.success} รายการ, ล้มเหลว ${result.failed} รายการ`
         });
+        fetchStats();
         fetchStudents();
       } catch (err) {
         toast.error('เกิดข้อผิดพลาดในการอ่านไฟล์ CSV', { id: toastId });
@@ -120,6 +153,12 @@ export default function StudentRecordsPage() {
         </div>
         <div className="flex gap-4">
           <button 
+            onClick={() => setIsExportModalOpen(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-surface border-2 border-foreground/10 text-foreground/70 font-bold rounded-xl hover:border-primary hover:text-primary transition-all active:scale-95"
+          >
+            <Download className="w-5 h-5" /> Export CSV
+          </button>
+          <button 
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center gap-2 px-6 py-3 bg-surface border-2 border-foreground/10 text-foreground/70 font-bold rounded-xl hover:border-primary hover:text-primary transition-all active:scale-95"
           >
@@ -145,7 +184,7 @@ export default function StudentRecordsPage() {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
           <input 
             type="text" 
-            placeholder="ค้นหารหัส หรือ ชื่อ..." 
+            placeholder="ค้นหารหัส หรือ ชื่อนักเรียน จากทุกห้องเรียน..." 
             className="w-full pl-12 pr-4 py-3 bg-background border border-foreground/10 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-foreground transition-all"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
@@ -165,6 +204,42 @@ export default function StudentRecordsPage() {
             <option value="active">Active (Legacy)</option>
           </select>
         </div>
+      </div>
+
+      {/* Grade Tabs Navigation */}
+      <div className="flex overflow-x-auto pb-2 gap-2 snap-x scrollbar-hide">
+        <button
+          onClick={() => setSelectedGradeTab('all')}
+          className={`snap-start whitespace-nowrap px-5 py-2.5 rounded-full font-bold text-sm transition-all shadow-sm border ${
+            selectedGradeTab === 'all' 
+              ? 'bg-primary text-white border-primary shadow-primary/20' 
+              : 'bg-surface text-foreground/60 border-foreground/10 hover:bg-foreground/5 hover:text-foreground'
+          }`}
+        >
+          ทั้งหมด <span className="ml-1 opacity-70 text-xs font-mono">({gradeStats.total})</span>
+        </button>
+        
+        {Object.keys(gradeStats.counts)
+          .sort((a, b) => {
+            const isAnubanA = a.startsWith('อ.');
+            const isAnubanB = b.startsWith('อ.');
+            if (isAnubanA && !isAnubanB) return -1;
+            if (!isAnubanA && isAnubanB) return 1;
+            return a.localeCompare(b);
+          })
+          .map(grade => (
+          <button
+            key={grade}
+            onClick={() => setSelectedGradeTab(grade)}
+            className={`snap-start whitespace-nowrap px-5 py-2.5 rounded-full font-bold text-sm transition-all shadow-sm border ${
+              selectedGradeTab === grade 
+                ? 'bg-primary text-white border-primary shadow-primary/20' 
+                : 'bg-surface text-foreground/60 border-foreground/10 hover:bg-foreground/5 hover:text-foreground'
+            }`}
+          >
+            {grade} <span className="ml-1 opacity-70 text-xs font-mono">({gradeStats.counts[grade]})</span>
+          </button>
+        ))}
       </div>
 
       <div className="bg-surface/80 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 overflow-hidden min-h-[400px]">
@@ -191,7 +266,9 @@ export default function StudentRecordsPage() {
               <tr>
                 <th className="p-5 font-bold text-foreground/50 text-sm uppercase tracking-wider">รหัส</th>
                 <th className="p-5 font-bold text-foreground/50 text-sm uppercase tracking-wider">ชื่อ-สกุล</th>
-                <th className="p-5 font-bold text-foreground/50 text-sm uppercase tracking-wider">ชั้นเรียน</th>
+                {selectedGradeTab === 'all' && (
+                  <th className="p-5 font-bold text-foreground/50 text-sm uppercase tracking-wider">ชั้นเรียน</th>
+                )}
                 <th className="p-5 font-bold text-foreground/50 text-sm uppercase tracking-wider">สถานะ</th>
                 <th className="p-5 font-bold text-foreground/50 text-sm uppercase tracking-wider text-right">Wallet</th>
                 <th className="p-5 font-bold text-foreground/50 text-sm uppercase tracking-wider text-center">จัดการ</th>
@@ -211,7 +288,9 @@ export default function StudentRecordsPage() {
                   >
                     <td className="p-5 font-mono font-medium text-foreground/70">{s.id}</td>
                     <td className="p-5 font-bold text-primary">{s.name}</td>
-                    <td className="p-5 font-medium text-foreground/80">{s.grade || '-'}</td>
+                    {selectedGradeTab === 'all' && (
+                      <td className="p-5 font-medium text-foreground/80">{s.grade || '-'}</td>
+                    )}
                     <td className="p-5">
                       <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${
                         s.status?.includes('กำลังศึกษา') || s.status === 'active' ? 'bg-secondary/10 text-secondary' : 
@@ -262,6 +341,11 @@ export default function StudentRecordsPage() {
         </>
         )}
       </div>
+
+      <ExportModal 
+        isOpen={isExportModalOpen} 
+        onClose={() => setIsExportModalOpen(false)} 
+      />
     </motion.div>
   );
 }

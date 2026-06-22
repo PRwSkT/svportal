@@ -2,6 +2,7 @@ export type Student = {
   id: string; // student code
   name: string; // Full name (legacy support)
   grade: string; // Class level (legacy support)
+  citizen_id?: string | null;
   prefix?: string | null;
   first_name?: string | null;
   last_name?: string | null;

@@ -84,7 +84,7 @@ export async function deleteStudent(id: string): Promise<boolean> {
 }
 
 export async function importStudentsFromCSV(
-  fileData: { id: string; name: string; grade: string; status?: string; }[]
+  fileData: { id: string; name: string; grade: string; citizen_id?: string; status?: string; }[]
 ): Promise<{ success: number; failed: number; errors: any[] }> {
   const supabase = createClient();
   let success = 0;
@@ -98,6 +98,7 @@ export async function importStudentsFromCSV(
         id: item.id,
         name: item.name,
         grade: item.grade,
+        citizen_id: item.citizen_id,
         status: item.status || 'กำลังศึกษาอยู่'
       }], { onConflict: 'id', ignoreDuplicates: false });
 
