@@ -24,15 +24,7 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from('students')
-      .select('*, student_addresses(*), student_parents(*)', { count: 'exact' });
-
-    // Custom sorting: If viewing all grades, sort by grade first, then id. 
-    // Otherwise, just sort by id.
-    if (gradeFilter === 'all') {
-      query = query.order('grade', { ascending: true, nullsFirst: false }).order('id', { ascending: true });
-    } else {
-      query = query.order('id', { ascending: true });
-    }
+      .select('*, student_addresses(*), student_parents(*)');
 
     if (searchQuery) {
       const sanitized = searchQuery.replace(/[,()"]/g, '');
@@ -45,13 +37,46 @@ export async function GET(request: Request) {
       query = query.eq('grade', gradeFilter);
     }
 
-    query = query.range(from, to);
-
-    const { data, error, count } = await query;
+    // Fetch all matching records to sort them properly in memory
+    const { data: allStudents, error } = await query;
+    
     if (error) throw error;
+    
+    let sortedData = [...(allStudents || [])];
+    
+    // Sort logic
+    sortedData.sort((a, b) => {
+      if (gradeFilter === 'all') {
+        // Sort by Grade Level (อ comes before ป)
+        const gradeA = a.grade || '';
+        const gradeB = b.grade || '';
+        const isAnubanA = gradeA.startsWith('อ.');
+        const isAnubanB = gradeB.startsWith('อ.');
+        
+        if (isAnubanA && !isAnubanB) return -1;
+        if (!isAnubanA && isAnubanB) return 1;
+        
+        if (gradeA !== gradeB) {
+          return gradeA.localeCompare(gradeB);
+        }
+      }
+      
+      // Sort by Numeric ID
+      const numA = parseInt(a.id, 10);
+      const numB = parseInt(b.id, 10);
+      
+      if (!isNaN(numA) && !isNaN(numB)) {
+        return numA - numB;
+      }
+      // Fallback to string sort if IDs are not purely numeric
+      return (a.id || '').localeCompare(b.id || '');
+    });
+
+    const count = sortedData.length;
+    const paginatedData = sortedData.slice(from, to + 1);
 
     return NextResponse.json({
-      data,
+      data: paginatedData,
       count,
       page,
       limit,
