@@ -8,6 +8,7 @@ interface AddressData {
   district?: string;
   province?: string;
   postal_code?: string;
+  zip_code?: string;
 }
 
 interface Props {
