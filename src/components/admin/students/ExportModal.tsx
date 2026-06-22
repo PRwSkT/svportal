@@ -54,7 +54,7 @@ const gradeOptions = [
 ];
 
 export default function ExportModal({ isOpen, onClose }: ExportModalProps) {
-  const [selectedGrade, setSelectedGrade] = useState('all');
+  const [selectedGrades, setSelectedGrades] = useState<string[]>(gradeOptions);
   const [isExporting, setIsExporting] = useState(false);
   const [expandedSections, setExpandedSections] = useState<string[]>(['personal']);
 
@@ -96,7 +96,8 @@ export default function ExportModal({ isOpen, onClose }: ExportModalProps) {
     const toastId = toast.loading('กำลังรวบรวมข้อมูลเพื่อส่งออก...');
     try {
       // 1. Fetch data
-      const res = await fetch(`/api/admin/students?limit=10000&grade=${encodeURIComponent(selectedGrade)}`);
+      const gradeQuery = selectedGrades.length === gradeOptions.length ? 'all' : selectedGrades.join(',');
+      const res = await fetch(`/api/admin/students?limit=10000&grade=${encodeURIComponent(gradeQuery)}`);
       if (!res.ok) throw new Error('ไม่สามารถดึงข้อมูลได้');
       const json = await res.json();
       const students = Array.isArray(json) ? json : (json.data || []);
@@ -175,7 +176,8 @@ export default function ExportModal({ isOpen, onClose }: ExportModalProps) {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', url);
-      link.setAttribute('download', `students_export_${selectedGrade === 'all' ? 'all' : selectedGrade}_${new Date().toISOString().split('T')[0]}.csv`);
+      const isAllGrades = selectedGrades.length === gradeOptions.length;
+      link.setAttribute('download', `students_export_${isAllGrades ? 'all' : selectedGrades.join('_')}_${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -281,15 +283,14 @@ export default function ExportModal({ isOpen, onClose }: ExportModalProps) {
             <div className="p-6 overflow-y-auto flex-1 space-y-6">
               
               <div>
-                <label className="block text-sm font-bold text-foreground/70 mb-2">ตัวกรองชั้นเรียน</label>
-                <select 
-                  value={selectedGrade}
-                  onChange={(e) => setSelectedGrade(e.target.value)}
-                  className="w-full md:w-1/2 p-3 bg-background border border-foreground/10 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-foreground font-medium"
-                >
-                  <option value="all">ทั้งหมด (ทุกชั้นเรียน)</option>
-                  {gradeOptions.map(g => <option key={g} value={g}>{g}</option>)}
-                </select>
+                <label className="block text-sm font-bold text-foreground/70 mb-3">ตัวกรองชั้นเรียน</label>
+                {renderFieldGroup(
+                  'เลือกชั้นเรียนที่ต้องการ', 
+                  'grades', 
+                  gradeOptions.map(g => ({ id: g, label: g })), 
+                  selectedGrades, 
+                  setSelectedGrades
+                )}
               </div>
 
               <div>

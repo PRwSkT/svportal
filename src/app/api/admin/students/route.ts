@@ -34,7 +34,8 @@ export async function GET(request: Request) {
       query = query.eq('status', statusFilter);
     }
     if (gradeFilter && gradeFilter !== 'all') {
-      query = query.eq('grade', gradeFilter);
+      const grades = gradeFilter.split(',').map(g => g.trim());
+      query = query.in('grade', grades);
     }
 
     // Fetch all matching records to sort them properly in memory
