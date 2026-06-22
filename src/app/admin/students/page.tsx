@@ -287,7 +287,11 @@ export default function StudentRecordsPage() {
                     onClick={() => document.getElementById(`link-${s.id}`)?.click()}
                   >
                     <td className="p-5 font-mono font-medium text-foreground/70">{s.id}</td>
-                    <td className="p-5 font-bold text-primary">{s.name}</td>
+                    <td className="p-5 font-bold text-primary">
+                      {s.first_name && s.last_name 
+                        ? `${s.prefix || ''}${s.first_name} ${s.last_name}`.trim()
+                        : s.name}
+                    </td>
                     {selectedGradeTab === 'all' && (
                       <td className="p-5 font-medium text-foreground/80">{s.grade || '-'}</td>
                     )}
