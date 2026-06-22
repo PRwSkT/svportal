@@ -53,7 +53,8 @@ export default function StudentDetailPage() {
       setAddresses([{}]);
       setParents([
         { relationship: 'บิดา' },
-        { relationship: 'มารดา' }
+        { relationship: 'มารดา' },
+        { relationship: 'ผู้ปกครอง' }
       ]);
       setIsLoading(false);
     }
@@ -79,11 +80,27 @@ export default function StudentDetailPage() {
         }
 
         if (data.student_parents && data.student_parents.length > 0) {
-          setParents(data.student_parents);
+          const roles = ['บิดา', 'มารดา', 'ผู้ปกครอง'];
+          const newParents = [...data.student_parents];
+          roles.forEach(role => {
+            if (!newParents.find((p: any) => p.relationship === role)) {
+              newParents.push({ student_id: data.id, relationship: role });
+            }
+          });
+          newParents.sort((a, b) => {
+            const idxA = roles.indexOf(a.relationship);
+            const idxB = roles.indexOf(b.relationship);
+            if (idxA === -1 && idxB === -1) return 0;
+            if (idxA === -1) return 1;
+            if (idxB === -1) return -1;
+            return idxA - idxB;
+          });
+          setParents(newParents);
         } else {
           setParents([
             { student_id: data.id, relationship: 'บิดา' },
-            { student_id: data.id, relationship: 'มารดา' }
+            { student_id: data.id, relationship: 'มารดา' },
+            { student_id: data.id, relationship: 'ผู้ปกครอง' }
           ]);
         }
       } else {
@@ -427,22 +444,60 @@ export default function StudentDetailPage() {
                 {parents.map((parent, idx) => (
                   <div key={idx} className="grid grid-cols-2 gap-6 bg-foreground/[0.02] p-6 rounded-2xl border border-foreground/5 relative group">
                     <div className="col-span-2 flex justify-between items-center border-b border-foreground/10 pb-3 mb-2">
-                      <h3 className="font-extrabold text-lg text-primary flex items-center gap-2">
-                        <Users className="w-5 h-5 opacity-50" /> {parent.relationship || 'ผู้ปกครอง'}
-                      </h3>
-                      <button 
-                        onClick={() => {
-                          if (confirm('คุณต้องการลบผู้ปกครองคนนี้ใช่หรือไม่?')) {
-                            const newParents = [...parents];
-                            newParents.splice(idx, 1);
-                            setParents(newParents);
-                          }
-                        }}
-                        className="p-2 text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
-                        title="ลบผู้ปกครอง"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                      <div className="flex items-center gap-4">
+                        <h3 className="font-extrabold text-lg text-primary flex items-center gap-2">
+                          <Users className="w-5 h-5 opacity-50" /> {parent.relationship || 'ผู้ปกครอง'}
+                        </h3>
+                        {parent.relationship === 'ผู้ปกครอง' && (
+                          <select
+                            className="px-3 py-1.5 bg-surface border border-primary/20 rounded-lg text-sm font-medium text-primary cursor-pointer hover:bg-primary/5 transition-colors outline-none"
+                            onChange={(e) => {
+                              if (e.target.value === 'บิดา' || e.target.value === 'มารดา') {
+                                const source = parents.find(p => p.relationship === e.target.value);
+                                if (source) {
+                                  const newParents = [...parents];
+                                  newParents[idx] = { 
+                                    ...source, 
+                                    id: parent.id, // Preserve existing ID
+                                    relationship: 'ผู้ปกครอง' 
+                                  };
+                                  setParents(newParents);
+                                }
+                              } else {
+                                const newParents = [...parents];
+                                newParents[idx] = { 
+                                  student_id: student.id,
+                                  id: parent.id,
+                                  relationship: 'ผู้ปกครอง' 
+                                };
+                                setParents(newParents);
+                              }
+                              // Reset select value so it acts like a button
+                              e.target.value = '';
+                            }}
+                          >
+                            <option value="" disabled selected>-- เลือกคัดลอกข้อมูล --</option>
+                            <option value="new">เคลียร์ค่า (กรอกใหม่)</option>
+                            <option value="บิดา">คัดลอกข้อมูลบิดา</option>
+                            <option value="มารดา">คัดลอกข้อมูลมารดา</option>
+                          </select>
+                        )}
+                      </div>
+                      {!['บิดา', 'มารดา', 'ผู้ปกครอง'].includes(parent.relationship || '') && (
+                        <button 
+                          onClick={() => {
+                            if (confirm('คุณต้องการลบผู้ปกครองคนนี้ใช่หรือไม่?')) {
+                              const newParents = [...parents];
+                              newParents.splice(idx, 1);
+                              setParents(newParents);
+                            }
+                          }}
+                          className="p-2 text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+                          title="ลบผู้ปกครอง"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-foreground/70 mb-2">คำนำหน้าชื่อ</label>
