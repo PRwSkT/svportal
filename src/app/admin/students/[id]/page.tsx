@@ -90,8 +90,6 @@ export default function StudentDetailPage() {
 
     setIsSaving(true);
     try {
-      let savedId = student.id!;
-      
       // Remove relationships and read-only fields before saving to students table
       const { 
         student_addresses, 
@@ -102,25 +100,22 @@ export default function StudentDetailPage() {
         ...studentData 
       } = student as any;
 
-      if (isNew) {
-        const newSt = await createStudent(studentData);
-        savedId = newSt.id;
-      } else {
-        await updateStudent(student.id!, studentData);
-      }
+      const res = await fetch('/api/admin/students/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          studentData,
+          isNew,
+          addresses,
+          parents
+        }),
+      });
 
-      // Save Address
-      for (const addr of addresses) {
-        if (addr.house_number || addr.province) {
-          await upsertStudentAddress({ ...addr, student_id: savedId });
-        }
-      }
-
-      // Save Parents
-      for (const p of parents) {
-        if (p.first_name || p.last_name || p.citizen_id) {
-          await upsertStudentParent({ ...p, student_id: savedId });
-        }
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Failed to save student data');
       }
 
       toast.success('บันทึกข้อมูลสำเร็จ', {
@@ -128,6 +123,7 @@ export default function StudentDetailPage() {
       });
       router.push('/admin/students');
     } catch (err: any) {
+      console.error('Save error:', err);
       toast.error('เกิดข้อผิดพลาดในการบันทึก', { description: err.message });
     } finally {
       setIsSaving(false);
