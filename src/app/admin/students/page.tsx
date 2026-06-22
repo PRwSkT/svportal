@@ -8,19 +8,20 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Filter, Upload, Plus, UserX, UserSquare2, ChevronRight, Download } from 'lucide-react';
 import ExportModal from '@/components/admin/students/ExportModal';
+import PromotionModal from '@/components/admin/students/PromotionModal';
 
 export default function StudentRecordsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isPromotionModalOpen, setIsPromotionModalOpen] = useState(false);
   
   // Pagination
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   
-  // Search, Filters, Tabs
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('กำลังศึกษาอยู่');
   const [selectedGradeTab, setSelectedGradeTab] = useState('all');
   const [gradeStats, setGradeStats] = useState<{counts: Record<string, number>, total: number}>({counts: {}, total: 0});
   
@@ -171,6 +172,12 @@ export default function StudentRecordsPage() {
             className="hidden" 
             onChange={handleCsvImport}
           />
+          <button 
+            onClick={() => setIsPromotionModalOpen(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-secondary/10 border-2 border-secondary/20 text-secondary font-bold rounded-xl hover:bg-secondary hover:text-white transition-all active:scale-95 shadow-sm"
+          >
+            <Upload className="w-5 h-5 rotate-180" /> เลื่อนชั้นประจำปี
+          </button>
           <Link href="/admin/students/new">
             <button className="flex items-center gap-2 px-6 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 active:scale-95">
               <Plus className="w-5 h-5" /> เพิ่มนักเรียน
@@ -348,7 +355,24 @@ export default function StudentRecordsPage() {
 
       <ExportModal 
         isOpen={isExportModalOpen} 
-        onClose={() => setIsExportModalOpen(false)} 
+        onClose={() => setIsExportModalOpen(false)}
+        availableGrades={Object.keys(gradeStats.counts).sort((a, b) => {
+          const isAnubanA = a.startsWith('อ.');
+          const isAnubanB = b.startsWith('อ.');
+          if (isAnubanA && !isAnubanB) return -1;
+          if (!isAnubanA && isAnubanB) return 1;
+          return a.localeCompare(b);
+        })}
+      />
+
+      <PromotionModal 
+        isOpen={isPromotionModalOpen}
+        onClose={() => setIsPromotionModalOpen(false)}
+        onSuccess={() => {
+          setIsPromotionModalOpen(false);
+          fetchStudents(1);
+          fetchStats();
+        }}
       />
     </motion.div>
   );
