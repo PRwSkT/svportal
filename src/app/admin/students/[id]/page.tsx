@@ -91,11 +91,22 @@ export default function StudentDetailPage() {
     setIsSaving(true);
     try {
       let savedId = student.id!;
+      
+      // Remove relationships and read-only fields before saving to students table
+      const { 
+        student_addresses, 
+        student_parents, 
+        wallet_balance, 
+        created_at, 
+        updated_at, 
+        ...studentData 
+      } = student as any;
+
       if (isNew) {
-        const newSt = await createStudent(student as Omit<Student, 'wallet_balance' | 'created_at' | 'updated_at' | 'student_addresses' | 'student_parents'>);
+        const newSt = await createStudent(studentData);
         savedId = newSt.id;
       } else {
-        await updateStudent(student.id!, student);
+        await updateStudent(student.id!, studentData);
       }
 
       // Save Address
