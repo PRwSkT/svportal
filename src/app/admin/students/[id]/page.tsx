@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Save, User, MapPin, Users, PlusCircle, CheckCircle2 } from 'lucide-react';
+import ThaiAddressRow from '@/components/admin/ThaiAddressRow';
 
 export default function StudentDetailPage() {
   const router = useRouter();
@@ -97,8 +98,8 @@ export default function StudentDetailPage() {
   };
 
   const handleSave = async () => {
-    if (!student.id || !student.name || !student.grade) {
-      toast.error('กรุณากรอกข้อมูลที่จำเป็น', { description: 'รหัสนักเรียน, ชื่อ-สกุลเต็ม, และระดับชั้น' });
+    if (!student.id || !student.grade) {
+      toast.error('กรุณากรอกข้อมูลที่จำเป็น', { description: 'รหัสนักเรียน และระดับชั้น' });
       return;
     }
 
@@ -114,13 +115,19 @@ export default function StudentDetailPage() {
         ...studentData 
       } = student as any;
 
+      const constructedName = `${student.prefix || ''}${student.first_name || ''} ${student.last_name || ''}`.trim();
+      const payloadStudentData = {
+        ...studentData,
+        name: constructedName || studentData.name // Fallback to existing name if blank
+      };
+
       const res = await fetch('/api/admin/students/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          studentData,
+          studentData: payloadStudentData,
           isNew,
           addresses,
           parents
@@ -273,12 +280,15 @@ export default function StudentDetailPage() {
                     <input type="text" value={student.citizen_id || ''} onChange={e => setStudent({...student, citizen_id: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all" />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-foreground/70 mb-2">ชื่อ-สกุลเต็ม</label>
-                    <input type="text" value={student.name || ''} onChange={e => setStudent({...student, name: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all" />
-                  </div>
-                  <div>
                     <label className="block text-sm font-semibold text-foreground/70 mb-2">คำนำหน้าชื่อ</label>
-                    <input type="text" value={student.prefix || ''} onChange={e => setStudent({...student, prefix: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all" />
+                    <input type="text" list="prefix-list" value={student.prefix || ''} onChange={e => setStudent({...student, prefix: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all" />
+                    <datalist id="prefix-list">
+                      <option value="เด็กชาย" />
+                      <option value="เด็กหญิง" />
+                      <option value="นาย" />
+                      <option value="นาง" />
+                      <option value="นางสาว" />
+                    </datalist>
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-foreground/70 mb-2">ชื่อ (First Name)</label>
@@ -290,7 +300,18 @@ export default function StudentDetailPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-foreground/70 mb-2">ระดับชั้น</label>
-                    <input type="text" value={student.grade || ''} onChange={e => setStudent({...student, grade: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all" />
+                    <input type="text" list="grade-list" value={student.grade || ''} onChange={e => setStudent({...student, grade: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all" />
+                    <datalist id="grade-list">
+                      <option value="อ.1" />
+                      <option value="อ.2" />
+                      <option value="อ.3" />
+                      <option value="ป.1" />
+                      <option value="ป.2" />
+                      <option value="ป.3" />
+                      <option value="ป.4" />
+                      <option value="ป.5" />
+                      <option value="ป.6" />
+                    </datalist>
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-foreground/70 mb-2">วันเกิด</label>
@@ -345,29 +366,20 @@ export default function StudentDetailPage() {
                         setAddresses(newAddrs);
                       }} className="w-full px-4 py-3 bg-surface border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all" />
                     </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-foreground/70 mb-2">ตำบล</label>
-                      <input type="text" value={addr.sub_district || ''} onChange={e => {
-                        const newAddrs = [...addresses];
-                        newAddrs[idx].sub_district = e.target.value;
-                        setAddresses(newAddrs);
-                      }} className="w-full px-4 py-3 bg-surface border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-foreground/70 mb-2">อำเภอ</label>
-                      <input type="text" value={addr.district || ''} onChange={e => {
-                        const newAddrs = [...addresses];
-                        newAddrs[idx].district = e.target.value;
-                        setAddresses(newAddrs);
-                      }} className="w-full px-4 py-3 bg-surface border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-foreground/70 mb-2">จังหวัด</label>
-                      <input type="text" value={addr.province || ''} onChange={e => {
-                        const newAddrs = [...addresses];
-                        newAddrs[idx].province = e.target.value;
-                        setAddresses(newAddrs);
-                      }} className="w-full px-4 py-3 bg-surface border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all" />
+                    <div className="col-span-2">
+                      <ThaiAddressRow 
+                        address={addr} 
+                        onChange={(field, value) => {
+                          const newAddrs = [...addresses];
+                          (newAddrs[idx] as any)[field] = value;
+                          setAddresses(newAddrs);
+                        }} 
+                        onAddressSelect={(data) => {
+                          const newAddrs = [...addresses];
+                          newAddrs[idx] = { ...newAddrs[idx], ...data };
+                          setAddresses(newAddrs);
+                        }} 
+                      />
                     </div>
                   </div>
                 ))}
@@ -391,7 +403,7 @@ export default function StudentDetailPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-foreground/70 mb-2">คำนำหน้าชื่อ</label>
-                      <input type="text" value={parent.prefix || ''} onChange={e => {
+                      <input type="text" list="prefix-list" value={parent.prefix || ''} onChange={e => {
                         const newParents = [...parents];
                         newParents[idx].prefix = e.target.value;
                         setParents(newParents);
