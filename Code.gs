@@ -5,7 +5,7 @@
 
 function doPost(e) {
   try {
-    var params = params;
+    var params = e.parameter || {};
     if (e.postData && e.postData.contents) {
       try {
         var parsed = JSON.parse(e.postData.contents);
@@ -14,16 +14,16 @@ function doPost(e) {
     }
     var action = params.action;
     if (action === 'publishToSocial') {
-      return handlePublishToSocial(e);
+      return handlePublishToSocial(params);
     }
     if (action === 'translateCaption') {
-      return handleTranslateCaption(e);
+      return handleTranslateCaption(params);
     }
     // === Video Multi-Step Endpoints ===
-    if (action === 'videoStepFB')    return handleVideoStepFB(e);
-    if (action === 'videoStepIG')    return handleVideoStepIG(e);
-    if (action === 'videoCheckIG')   return handleVideoCheckIG(e);
-    if (action === 'videoPublishIG') return handleVideoPublishIG(e);
+    if (action === 'videoStepFB')    return handleVideoStepFB(params);
+    if (action === 'videoStepIG')    return handleVideoStepIG(params);
+    if (action === 'videoCheckIG')   return handleVideoCheckIG(params);
+    if (action === 'videoPublishIG') return handleVideoPublishIG(params);
 
     var imagesDataJson = params.images;
     var mimeType       = params.mimeType || "image/jpeg";
