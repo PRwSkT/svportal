@@ -390,8 +390,25 @@ function callGeminiAPI(base64ImagesArray, mimeType, prompt) {
     "muteHttpExceptions": true // ดัก Error จาก Google
   };
 
-  var response = UrlFetchApp.fetch(url, options);
-  var responseText = response.getContentText();
+  var maxRetries = 3;
+  var attempt = 0;
+  var responseText = "";
+
+  while (attempt < maxRetries) {
+    var response = UrlFetchApp.fetch(url, options);
+    responseText = response.getContentText();
+    var responseCode = response.getResponseCode();
+    
+    // ถ้าเจอคนใช้เยอะ (503) หรือ Rate Limit (429) ให้รอแล้วลองใหม่
+    if (responseCode === 503 || responseCode === 429) {
+      attempt++;
+      if (attempt < maxRetries) {
+        Utilities.sleep(2000 * Math.pow(2, attempt - 1)); // รอ 2วิ, 4วิ ตามลำดับ
+        continue;
+      }
+    }
+    break;
+  }
   
   try {
     return JSON.parse(responseText);
@@ -443,8 +460,24 @@ function handleTranslateCaption(params) {
     "muteHttpExceptions": true
   };
 
-  var response = UrlFetchApp.fetch(url, options);
-  var responseText = response.getContentText();
+  var maxRetries = 3;
+  var attempt = 0;
+  var responseText = "";
+
+  while (attempt < maxRetries) {
+    var response = UrlFetchApp.fetch(url, options);
+    responseText = response.getContentText();
+    var responseCode = response.getResponseCode();
+    
+    if (responseCode === 503 || responseCode === 429) {
+      attempt++;
+      if (attempt < maxRetries) {
+        Utilities.sleep(2000 * Math.pow(2, attempt - 1));
+        continue;
+      }
+    }
+    break;
+  }
   
   try {
     var data = JSON.parse(responseText);
