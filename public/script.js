@@ -600,7 +600,7 @@ async function translateFromThai() {
         const response = await fetch(WEB_APP_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: new URLSearchParams({
+            body: JSON.stringify({
                 'action': 'translateCaption',
                 'thaiCaption': thaiTextOnly  // ส่งเฉพาะ text ไม่มี contact
             })
