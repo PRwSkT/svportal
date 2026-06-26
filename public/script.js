@@ -289,8 +289,8 @@ async function processPost() {
 
         const response = await fetch(WEB_APP_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
                 'images': JSON.stringify(imagesDataForAI),
                 'mimeType': 'image/jpeg',
                 'activityInfo': activityContext,
@@ -599,7 +599,7 @@ async function translateFromThai() {
     try {
         const response = await fetch(WEB_APP_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: new URLSearchParams({
                 'action': 'translateCaption',
                 'thaiCaption': thaiTextOnly  // ส่งเฉพาะ text ไม่มี contact
@@ -871,7 +871,7 @@ async function confirmPublish() {
                     templates: { fbCover: templateFBCover, igCover: templateIGCover, fbSub: templateFBSub, igSub: templateIGSub }
                 });
             }
-            requestBody = new URLSearchParams({
+            requestBody = JSON.stringify({
                 'action': 'publishToSocial',
                 'mediaMode': 'photo',
                 'fbImages': JSON.stringify(processedImages.fbImages),
@@ -905,8 +905,8 @@ async function confirmPublish() {
             async function callStep(params) {
                 const res = await fetch(WEB_APP_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: new URLSearchParams(params)
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(params)
                 });
                 const text = await res.text();
                 let data;
@@ -998,7 +998,7 @@ async function confirmPublish() {
         // Backend call (for Photo mode only)
         const response = await fetch(WEB_APP_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: requestBody
         });
 

@@ -5,7 +5,14 @@
 
 function doPost(e) {
   try {
-    var action = e.parameter.action;
+    var params = params;
+    if (e.postData && e.postData.contents) {
+      try {
+        var parsed = JSON.parse(e.postData.contents);
+        params = Object.assign({}, params, parsed);
+      } catch(err) {}
+    }
+    var action = params.action;
     if (action === 'publishToSocial') {
       return handlePublishToSocial(e);
     }
@@ -18,12 +25,12 @@ function doPost(e) {
     if (action === 'videoCheckIG')   return handleVideoCheckIG(e);
     if (action === 'videoPublishIG') return handleVideoPublishIG(e);
 
-    var imagesDataJson = e.parameter.images;
-    var mimeType       = e.parameter.mimeType || "image/jpeg";
-    var activityInfo   = e.parameter.activityInfo || "";
+    var imagesDataJson = params.images;
+    var mimeType       = params.mimeType || "image/jpeg";
+    var activityInfo   = params.activityInfo || "";
 
     var base64ImagesArray = JSON.parse(imagesDataJson || "[]");
-    var mediaMode = e.parameter.mediaMode || 'photo';
+    var mediaMode = params.mediaMode || 'photo';
 
     var prompt = `
 คุณคือผู้เชี่ยวชาญโซเชียลมีเดียและการตลาดของ "โรงเรียนสมคิดวิทยา" (Somkidvittaya School)
@@ -167,10 +174,10 @@ ${activityInfo}
 // ==========================================
 // Publish to Social Media (Meta Graph API Framework)
 // ==========================================
-function handlePublishToSocial(e) {
-  var mediaMode = e.parameter.mediaMode || "photo";
-  var fbCaption = e.parameter.fbCaption || "";
-  var igCaption = e.parameter.igCaption || "";
+function handlePublishToSocial(params) {
+  var mediaMode = params.mediaMode || "photo";
+  var fbCaption = params.fbCaption || "";
+  var igCaption = params.igCaption || "";
   
   // ข้อมูล Meta Graph API ของคุณ
   var PAGE_ACCESS_TOKEN = "EAAYA0g05EhoBRkw8us77ykfLJI1V5p0c6RCS1BUKvDv5Uzj0uHysQALJm9iATqlNjFNSCzakf3EfCM5ktVahwnheASgGjNNm2RSg3DeQJZCic0rK43W8fdmbzxPJZBfdk8HZCa5serZBMk2OUosKJj2EZBvwPmFzDbs4uJoffPMHRZAzTT8dJTtss3Qm3KenEpidsZD";
@@ -186,8 +193,8 @@ function handlePublishToSocial(e) {
       // ==========================================
       // PHOTO POSTING LOGIC
       // ==========================================
-      var fbImages = JSON.parse(e.parameter.fbImages || "[]");
-      var igImages = JSON.parse(e.parameter.igImages || "[]");
+      var fbImages = JSON.parse(params.fbImages || "[]");
+      var igImages = JSON.parse(params.igImages || "[]");
 
       // 1. FACEBOOK POSTING
       var fbMediaIds = [];
@@ -396,8 +403,8 @@ function callGeminiAPI(base64ImagesArray, mimeType, prompt) {
 // ==========================================
 // แปลภาษาแคปชั่นอัตโนมัติจากภาษาไทย
 // ==========================================
-function handleTranslateCaption(e) {
-  var thaiCaption = e.parameter.thaiCaption || "";
+function handleTranslateCaption(params) {
+  var thaiCaption = params.thaiCaption || "";
   if (!thaiCaption) {
     return ContentService.createTextOutput(JSON.stringify({error: "No Thai caption provided"})).setMimeType(ContentService.MimeType.JSON);
   }
@@ -471,14 +478,14 @@ function getMetaConfig_() {
 // step=transfer: รับ chunkBase64 แล้วส่งไป FB
 // step=finish: จบ session
 // ==========================================
-function handleVideoStepFB(e) {
+function handleVideoStepFB(params) {
   var c = getMetaConfig_();
-  var step = e.parameter.step || "start";
+  var step = params.step || "start";
   try {
     if (step === "start") {
       var res = UrlFetchApp.fetch("https://graph-video.facebook.com/v20.0/" + c.pageId + "/videos", {
         method: "post",
-        payload: { "access_token": c.token, "upload_phase": "start", "file_size": e.parameter.fileSize },
+        payload: { "access_token": c.token, "upload_phase": "start", "file_size": params.fileSize },
         muteHttpExceptions: true
       });
       var d = JSON.parse(res.getContentText());
@@ -488,8 +495,8 @@ function handleVideoStepFB(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
     if (step === "transfer") {
-      var off = e.parameter.startOffset;
-      var base64Data = e.parameter.chunkBase64;
+      var off = params.startOffset;
+      var base64Data = params.chunkBase64;
       var bytes = Utilities.base64Decode(base64Data);
       var chunkBlob = Utilities.newBlob(bytes, "video/mp4", "chunk.mp4");
 
@@ -497,7 +504,7 @@ function handleVideoStepFB(e) {
         method: "post",
         payload: {
           "access_token": c.token, "upload_phase": "transfer",
-          "upload_session_id": e.parameter.sessionId,
+          "upload_session_id": params.sessionId,
           "start_offset": off, "video_file_chunk": chunkBlob
         },
         muteHttpExceptions: true
@@ -513,7 +520,7 @@ function handleVideoStepFB(e) {
         method: "post",
         payload: {
           "access_token": c.token, "upload_phase": "finish",
-          "upload_session_id": e.parameter.sessionId, "description": e.parameter.fbCaption || ""
+          "upload_session_id": params.sessionId, "description": params.fbCaption || ""
         },
         muteHttpExceptions: true
       });
@@ -531,14 +538,14 @@ function handleVideoStepFB(e) {
 // step=create: สร้าง container รับ uploadUri
 // step=transfer: รับ chunkBase64 แล้วส่งไป uploadUri
 // ==========================================
-function handleVideoStepIG(e) {
+function handleVideoStepIG(params) {
   var c = getMetaConfig_();
-  var step = e.parameter.step || "create";
+  var step = params.step || "create";
   try {
     if (step === "create") {
       var res = UrlFetchApp.fetch("https://graph.facebook.com/v20.0/" + c.igId + "/media", {
         method: "post",
-        payload: { "access_token": c.token, "media_type": "REELS", "upload_type": "resumable", "caption": e.parameter.igCaption || "" },
+        payload: { "access_token": c.token, "media_type": "REELS", "upload_type": "resumable", "caption": params.igCaption || "" },
         muteHttpExceptions: true
       });
       var d = JSON.parse(res.getContentText());
@@ -546,14 +553,14 @@ function handleVideoStepIG(e) {
       return ContentService.createTextOutput(JSON.stringify({containerId: d.id, uploadUri: d.uri})).setMimeType(ContentService.MimeType.JSON);
     }
     if (step === "transfer") {
-      var offset = e.parameter.offset;
-      var fileSize = e.parameter.fileSize;
+      var offset = params.offset;
+      var fileSize = params.fileSize;
       
-      var base64Data = e.parameter.chunkBase64;
+      var base64Data = params.chunkBase64;
       var bytes = Utilities.base64Decode(base64Data);
       var chunkBlob = Utilities.newBlob(bytes, "application/octet-stream", "chunk.mp4");
 
-      UrlFetchApp.fetch(e.parameter.uploadUri, {
+      UrlFetchApp.fetch(params.uploadUri, {
         method: "post",
         headers: { "Authorization": "OAuth " + c.token, "offset": offset, "file_size": fileSize },
         contentType: "application/octet-stream", payload: chunkBlob, muteHttpExceptions: true
@@ -569,10 +576,10 @@ function handleVideoStepIG(e) {
 // ==========================================
 // VIDEO STEP: Check IG Reel Status
 // ==========================================
-function handleVideoCheckIG(e) {
+function handleVideoCheckIG(params) {
   var c = getMetaConfig_();
   try {
-    var res = UrlFetchApp.fetch("https://graph.facebook.com/v20.0/" + e.parameter.containerId + "?fields=status_code&access_token=" + c.token, {muteHttpExceptions:true});
+    var res = UrlFetchApp.fetch("https://graph.facebook.com/v20.0/" + params.containerId + "?fields=status_code&access_token=" + c.token, {muteHttpExceptions:true});
     var d = JSON.parse(res.getContentText());
     return ContentService.createTextOutput(JSON.stringify({status: d.status_code || "IN_PROGRESS"})).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
@@ -583,12 +590,12 @@ function handleVideoCheckIG(e) {
 // ==========================================
 // VIDEO STEP: Publish IG Reel
 // ==========================================
-function handleVideoPublishIG(e) {
+function handleVideoPublishIG(params) {
   var c = getMetaConfig_();
   try {
     var res = UrlFetchApp.fetch("https://graph.facebook.com/v20.0/" + c.igId + "/media_publish", {
       method: "post",
-      payload: { "access_token": c.token, "creation_id": e.parameter.containerId },
+      payload: { "access_token": c.token, "creation_id": params.containerId },
       muteHttpExceptions: true
     });
     var d = JSON.parse(res.getContentText());
