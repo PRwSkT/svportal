@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import HomeLaunchpad from '@/components/HomeLaunchpad';
 
 export default function Home() {
-  redirect('/dashboard');
+  return <HomeLaunchpad />;
 }

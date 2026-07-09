@@ -9,8 +9,8 @@ export async function proxy(request: NextRequest) {
   });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key',
     {
       cookies: {
         getAll() {
@@ -35,21 +35,35 @@ export async function proxy(request: NextRequest) {
   // Handle public route
   if (request.nextUrl.pathname.startsWith('/login')) {
     if (user) {
-      let { data: role } = await supabase.rpc('get_user_role');
-      if (user.email === 'admin@svportal.com') role = 'admin';
-      return NextResponse.redirect(new URL(role === 'admin' ? '/dashboard' : '/pos/shop', request.url));
+      // Allow logged-in users to access login page if their domain is wrong, so they can sign out or switch accounts.
+      if (user.email?.endsWith('@somkidvittaya.ac.th') || user.email === 'admin@svportal.com') {
+        let { data: role } = await supabase.rpc('get_user_role');
+        if (user.email === 'admin@svportal.com') role = 'admin';
+        return NextResponse.redirect(new URL(role === 'admin' ? '/dashboard' : '/pos/shop', request.url));
+      }
     }
     return response;
   }
 
-  // Bypass auth for post-assistant and any public html files
-  if (request.nextUrl.pathname.endsWith('.html') || request.nextUrl.pathname.includes('post-assistant')) {
+  // Bypass auth for post-assistant, auth callbacks, and any public html files
+  if (
+    request.nextUrl.pathname.startsWith('/auth') ||
+    request.nextUrl.pathname.endsWith('.html') ||
+    request.nextUrl.pathname.includes('post-assistant')
+  ) {
     return response;
   }
 
   // Handle protected routes
   if (!user) {
     return NextResponse.redirect(new URL('/login', request.url));
+  }
+
+  // Enforce Domain Restriction
+  if (!user.email?.endsWith('@somkidvittaya.ac.th') && user.email !== 'admin@svportal.com') {
+    // If they bypass Google's hosted domain prompt, middleware will catch them
+    // and send them back to login with an error query param
+    return NextResponse.redirect(new URL('/login?error=Invalid_Domain', request.url));
   }
 
   // Protect admin routes

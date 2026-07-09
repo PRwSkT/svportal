@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SV Portal - QR Generator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@200;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container portal-panel">
+        <header>
+            <div class="logo-container">
+                <img src="logo.png" alt="SV PORTAL" id="header-logo" onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='inline-block';">
+                <div id="logo-fallback" class="logo" style="display: none;">
+                    <span class="logo-sv">SV</span><span class="logo-portal">PORTAL</span>
+                </div>
+            </div>
+            <h2>QR Code Generator Tool</h2>
+            <p>Customize and generate standard QR codes for your applications.</p>
+        </header>
+
+        <div class="app-layout">
+            <div class="settings-panel">
+                
+                <div class="settings-section">
+                    <h3>1. Enter Content</h3>
+                    <div class="input-group">
+                        <textarea id="qr-data" placeholder="Enter URL or text here..." rows="2" style="font-size: 1.1rem; padding: 16px; border-radius: var(--radius-md); font-family: 'Montserrat', sans-serif;">https://svportal.example.com</textarea>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3>2. Choose Preset</h3>
+                    <div class="preset-cards">
+                        <div class="preset-card active" data-preset="ruby">
+                            <div class="preset-color-preview" style="background: #6E0D22;"></div>
+                            <span>Ruby Red</span>
+                        </div>
+                        <div class="preset-card" data-preset="sapphire">
+                            <div class="preset-color-preview" style="background: #173D66;"></div>
+                            <span>Sapphire</span>
+                        </div>
+                        <div class="preset-card" data-preset="luxury_navy">
+                            <div class="preset-color-preview" style="background: #173D66; border-color: #E6E6D7;"></div>
+                            <span>Luxury Navy</span>
+                        </div>
+                        <div class="preset-card" data-preset="crimson_night">
+                            <div class="preset-color-preview" style="background: #6E0D22; border-color: #E6E6D7;"></div>
+                            <span>Crimson Night</span>
+                        </div>
+                        <div class="preset-card" data-preset="minimal">
+                            <div class="preset-color-preview" style="background: #111111; border-color: #ffffff;"></div>
+                            <span>Minimalist</span>
+                        </div>
+                        <div class="preset-card" data-preset="royal_gold">
+                            <div class="preset-color-preview" style="background: #b6a555; border-color: #ffffff;"></div>
+                            <span>Royal Gold</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3>3. Logo Settings</h3>
+                    
+                    <div class="input-group">
+                        <label for="predefined-logo">Select Logo</label>
+                        <select id="predefined-logo">
+                            <option value="logo/sv-logo-social.png">Main Logo</option>
+                            <option value="logo/IMG_1484.PNG">SIRITHAM</option>
+                            <option value="logo.png">SV Portal</option>
+                            <option value="logo/svsc.png">SV SC</option>
+                            <option value="logo/svaquatics-centre.png">SV Aquatics</option>
+                            <option value="logo/SV-lion.png">SV Lion</option>
+                            <option value="custom">-- Upload Custom --</option>
+                            <option value="">-- None --</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group" id="custom-logo-group" style="display: none; margin-top: 0.5rem;">
+                        <label for="logo-upload" class="file-upload-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                            Upload Custom Image
+                        </label>
+                        <input type="file" id="logo-upload" accept="image/png, image/jpeg, image/svg+xml" hidden>
+                        <span id="file-name-display" class="file-name">No file selected</span>
+                        <button id="clear-logo" class="btn btn-small btn-outline hidden">Clear Custom</button>
+                    </div>
+                    
+                    <div class="settings-grid">
+                        <div class="input-group">
+                            <label for="logo-size">Size</label>
+                            <input type="range" id="logo-size" min="0.1" max="0.6" step="0.05" value="0.4">
+                        </div>
+                        <div class="input-group">
+                            <label for="logo-margin">Margin</label>
+                            <input type="range" id="logo-margin" min="0" max="20" step="1" value="10">
+                        </div>
+                    </div>
+                </div>
+
+                <details class="settings-section advanced-options" style="cursor: pointer;">
+                    <summary><h3 style="display: inline-block; margin-bottom: 0;">4. Advanced Customization</h3></summary>
+                    <div class="advanced-content" style="padding-top: 1.5rem; cursor: default;">
+                        
+                        <div class="settings-grid">
+                            <div class="input-group">
+                                <label for="qr-dots">Dots Style</label>
+                                <select id="qr-dots">
+                                    <option value="square">Square</option>
+                                    <option value="dots">Dots</option>
+                                    <option value="rounded" selected>Rounded</option>
+                                    <option value="extra-rounded">Extra Rounded</option>
+                                    <option value="classy">Classy</option>
+                                    <option value="classy-rounded">Classy Rounded</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="qr-color">Dots Color</label>
+                                <div class="color-picker-wrapper">
+                                    <input type="color" id="qr-color" value="#6E0D22">
+                                    <span id="color-hex" class="color-hex">#6E0D22</span>
+                                </div>
+                            </div>
+                            
+                            <div class="input-group">
+                                <label for="bg-color">Background Color</label>
+                                <div class="color-picker-wrapper">
+                                    <input type="color" id="bg-color" value="#ffffff">
+                                    <span id="bg-color-hex" class="color-hex">#FFFFFF</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 1.5rem 0;">
+
+                        <div class="settings-grid">
+                            <div class="input-group">
+                                <label for="corner-square-style">Outer Square</label>
+                                <select id="corner-square-style">
+                                    <option value="dot">Dot</option>
+                                    <option value="square">Square</option>
+                                    <option value="extra-rounded" selected>Extra Rounded</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="corner-square-color">Outer Color</label>
+                                <div class="color-picker-wrapper">
+                                    <input type="color" id="corner-square-color" value="#6E0D22">
+                                </div>
+                            </div>
+
+                            <div class="input-group">
+                                <label for="corner-dot-style">Inner Dot</label>
+                                <select id="corner-dot-style">
+                                    <option value="dot" selected>Dot</option>
+                                    <option value="square">Square</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="corner-dot-color">Inner Color</label>
+                                <div class="color-picker-wrapper">
+                                    <input type="color" id="corner-dot-color" value="#6E0D22">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+
+            </div>
+
+            <div class="preview-panel">
+                <div class="qr-wrapper">
+                    <div id="qr-code-canvas"></div>
+                </div>
+                <div class="actions">
+                    <button id="btn-download" class="btn btn-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        Download PNG
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Code Styling Library -->
+    <script src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
