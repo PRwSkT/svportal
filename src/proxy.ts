@@ -39,7 +39,7 @@ export async function proxy(request: NextRequest) {
       if (user.email?.endsWith('@somkidvittaya.ac.th') || user.email === 'admin@svportal.com') {
         let { data: role } = await supabase.rpc('get_user_role');
         if (user.email === 'admin@svportal.com') role = 'admin';
-        return NextResponse.redirect(new URL(role === 'admin' ? '/dashboard' : '/pos/shop', request.url));
+        return NextResponse.redirect(new URL('/', request.url));
       }
     }
     return response;
