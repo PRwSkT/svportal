@@ -179,9 +179,10 @@ Invite parents. (e.g. Come experience learning beyond the classroom. / Admission
 ------------------------------------------
 9 DIVIDER LINES (เส้นคั่น)
 • Separate each language block (English, Chinese, Thai) with a 15-dash line: _______________
-• Do NOT add a blank line before the divider (put it immediately below the last line of the language block).
-• Add exactly ONE blank line after the divider before starting the next language.
-• After the Thai block, put the divider, then one blank line, then the Hashtags.
+• The divider must be placed on its own new line.
+• Do NOT put any empty blank lines before the divider. The divider must be exactly on the very next line below the contact info.
+• Add exactly ONE empty blank line AFTER the divider before starting the next language.
+• After the Thai block, put the divider, then one empty blank line, then the Hashtags.
 
 ------------------------------------------
 10 HASHTAGS
