@@ -311,8 +311,23 @@ async function processPost() {
         if (mediaMode === 'photo' && !parsedData.kept_image_indices) throw new Error("ไม่ได้รับข้อมูลการคัดภาพจาก AI");
 
         currentAIResult = parsedData;
-        currentCaptionFB = parsedData.post_caption;
-        currentCaptionIG = parseIGCaption(parsedData.post_caption);
+
+        // แยกแคปชั่น FB และ IG จาก JSON Structure ใหม่
+        if (parsedData.post_caption && parsedData.post_caption.facebook && parsedData.post_caption.instagram) {
+            let fbObj = parsedData.post_caption.facebook;
+            let igObj = parsedData.post_caption.instagram;
+            currentCaptionFB = fbObj.english + "\n\n" + fbObj.chinese + "\n\n" + fbObj.thai;
+            currentCaptionIG = parseIGCaption(igObj.english + "\n\n" + igObj.chinese + "\n\n" + igObj.thai);
+        } else {
+            // เผื่อ fallback กรณี AI ไม่ส่งตามโครงสร้าง
+            currentCaptionFB = JSON.stringify(parsedData.post_caption);
+            currentCaptionIG = currentCaptionFB;
+        }
+
+        // Log AI Intelligence Data 
+        if (parsedData.hero_quote) console.log("🌟 Hero Quote:", parsedData.hero_quote);
+        if (parsedData.cover_design) console.log("🎨 Cover Design Direction:", parsedData.cover_design);
+        if (parsedData.quality) console.log("📊 AI Content Quality:", parsedData.quality);
         
         document.getElementById('final-caption-fb').innerText = currentCaptionFB;
         document.getElementById('final-caption-ig').innerText = currentCaptionIG;
