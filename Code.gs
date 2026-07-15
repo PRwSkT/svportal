@@ -240,10 +240,19 @@ Return in the quality object.
       throw new Error("โครงสร้าง API ตอบกลับผิดปกติ: " + JSON.stringify(rawResponse));
     }
 
-    var textResult = rawResponse.candidates[0].content.parts[0].text.trim();
+    var candidate = rawResponse.candidates[0];
+    var textResult = candidate.content.parts[0].text.trim();
+    var finishReason = candidate.finishReason || "UNKNOWN";
     
-    // ลบ markdown fences ออกเพื่อความชัวร์ แม้จะบังคับ responseMimeType แล้วก็ตาม
+    // ลบ markdown fences ออกเพื่อความชัวร์
     textResult = textResult.replace(/```json/gi, "").replace(/```/g, "").trim();
+
+    // เช็ค Parse ฝั่งเซิร์ฟเวอร์ก่อนส่งกลับ เพื่อป้องกัน frontend พัง
+    try {
+      JSON.parse(textResult);
+    } catch(e) {
+      throw new Error("Gemini สร้าง JSON ไม่สมบูรณ์ (FinishReason: " + finishReason + ")\nสาเหตุ: " + e.message + "\n\nข้อมูลดิบ:\n" + textResult);
+    }
 
     return ContentService
       .createTextOutput(textResult)
@@ -526,7 +535,7 @@ Never expose your reasoning.`
       "temperature": 0.85,
       "topP": 0.95,
       "topK": 40,
-      "maxOutputTokens": 4096
+      "maxOutputTokens": 8192
     }
   };
 
