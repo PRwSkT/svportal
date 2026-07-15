@@ -485,24 +485,8 @@ function callGeminiAPI(base64ImagesArray, mimeType, prompt) {
       "post_caption": {
         "type": "OBJECT",
         "properties": {
-          "facebook": {
-            "type": "OBJECT",
-            "properties": {
-              "english": { "type": "STRING" },
-              "chinese": { "type": "STRING" },
-              "thai": { "type": "STRING" }
-            },
-            "required": ["english", "chinese", "thai"]
-          },
-          "instagram": {
-            "type": "OBJECT",
-            "properties": {
-              "english": { "type": "STRING" },
-              "chinese": { "type": "STRING" },
-              "thai": { "type": "STRING" }
-            },
-            "required": ["english", "chinese", "thai"]
-          }
+          "facebook": { "type": "STRING" },
+          "instagram": { "type": "STRING" }
         },
         "required": ["facebook", "instagram"]
       }

@@ -313,11 +313,9 @@ async function processPost() {
         currentAIResult = parsedData;
 
         // แยกแคปชั่น FB และ IG จาก JSON Structure ใหม่
-        if (parsedData.post_caption && parsedData.post_caption.facebook && parsedData.post_caption.instagram) {
-            let fbObj = parsedData.post_caption.facebook;
-            let igObj = parsedData.post_caption.instagram;
-            currentCaptionFB = fbObj.english + "\n\n" + fbObj.chinese + "\n\n" + fbObj.thai;
-            currentCaptionIG = parseIGCaption(igObj.english + "\n\n" + igObj.chinese + "\n\n" + igObj.thai);
+        if (parsedData.post_caption && typeof parsedData.post_caption.facebook === 'string') {
+            currentCaptionFB = parsedData.post_caption.facebook;
+            currentCaptionIG = parseIGCaption(parsedData.post_caption.instagram || parsedData.post_caption.facebook);
         } else {
             // เผื่อ fallback กรณี AI ไม่ส่งตามโครงสร้าง
             currentCaptionFB = JSON.stringify(parsedData.post_caption);
