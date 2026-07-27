@@ -532,6 +532,40 @@ function switchCaptionTab(tab) {
     document.getElementById('final-caption-ig').style.display = tab === 'ig' ? 'block' : 'none';
 }
 
+// ── Helper: Normalize Line Breaks และแก้บัค innerText เมื่อ display: none บน Windows/IG ──
+function normalizeLineBreaks(text) {
+    if (!text) return "";
+    return text
+        .replace(/\r\n|\r|\n/g, '\n') // Standardize เป็น \n ก่อน
+        .split('\n')
+        .map(line => line.trimEnd())   // สำคัญมาก! ลบ whitespace ท้ายบรรทัดที่ทำให้อัลกอริทึม IG กลืนเคาะบรรทัด
+        .join('\n');
+}
+
+function getCaptionText(elementId) {
+    const el = document.getElementById(elementId);
+    if (!el) return "";
+    
+    // บัค Windows Chrome: การอ่าน .innerText จาก element ที่ display: none จะลบ \n ทิ้งทั้งหมดเพราะไม่มี layout calculation!
+    // วิธีแก้: ถ้าถูกซ่อนอยู่ ให้เปิดแสดงชั่วครู่อย่างลับๆ (visibility: hidden, position: absolute) เพื่อให้อ่านบรรทัดได้ถูกต้อง 100%
+    const originalDisplay = el.style.display;
+    if (originalDisplay === 'none') {
+        el.style.visibility = 'hidden';
+        el.style.position = 'absolute';
+        el.style.display = 'block';
+    }
+    
+    let text = el.innerText || el.textContent || "";
+    
+    if (originalDisplay === 'none') {
+        el.style.display = 'none';
+        el.style.visibility = '';
+        el.style.position = '';
+    }
+    
+    return normalizeLineBreaks(text);
+}
+
 function parseIGCaption(fullCaption) {
     if (typeof fullCaption !== 'string') {
         try {
@@ -568,7 +602,7 @@ function parseIGCaption(fullCaption) {
     }
 
     // IG format: content → เส้น → contact → เส้น → hashtag
-    return `${enContentOnly}\n_______________\n\n${enContact}\n_______________\n\n${hashtags}`;
+    return normalizeLineBreaks(`${enContentOnly}\n_______________\n\n${enContact}\n_______________\n\n${hashtags}`);
 }
 
 let isEditing = false;
@@ -588,7 +622,7 @@ function toggleEdit() {
 
 async function translateFromThai() {
     const fbBox = document.getElementById('final-caption-fb');
-    const fullText = fbBox.innerText;
+    const fullText = getCaptionText('final-caption-fb');
     
     const blocks = fullText.split('_______________').map(s => s.trim());
     if (blocks.length < 4) {
@@ -654,7 +688,7 @@ async function translateFromThai() {
 
 function copyCaption() {
     const boxId = activeTab === 'fb' ? 'final-caption-fb' : 'final-caption-ig';
-    const text = document.getElementById(boxId).innerText;
+    const text = getCaptionText(boxId);
     navigator.clipboard.writeText(text)
         .then(() => showToast("คัดลอกแคปชั่นเรียบร้อยแล้วครับ!"))
         .catch(() => { document.execCommand('copy'); showToast("คัดลอกแคปชั่นเรียบร้อยแล้วครับ!"); });
@@ -672,8 +706,8 @@ async function generateAndDownloadZip() {
         const activeFiles = uploadedFiles.filter((_, i) => !excludedIndices.has(i));
         const maxPhotos = Math.min(activeFiles.length, 40);
         const hl = getHeadlineFromEditor();
-        const captionFB = document.getElementById('final-caption-fb').innerText;
-        const captionIG = document.getElementById('final-caption-ig').innerText;
+        const captionFB = getCaptionText('final-caption-fb');
+        const captionIG = getCaptionText('final-caption-ig');
 
         const zipBlob = await runWorkerTask('generateZip', {
             files: activeFiles.slice(0, maxPhotos),
@@ -751,8 +785,8 @@ async function openPublishModal() {
     }
 
     try {
-        const fbCaption = document.getElementById('final-caption-fb').innerText;
-        const igCaption = document.getElementById('final-caption-ig').innerText;
+        const fbCaption = getCaptionText('final-caption-fb');
+        const igCaption = getCaptionText('final-caption-ig');
         
         document.getElementById('modal-fb-caption').innerText = fbCaption;
         document.getElementById('modal-ig-caption').innerText = igCaption;
@@ -868,8 +902,8 @@ async function confirmPublish() {
     
     try {
         const activeFiles = getActiveFiles();
-        const fbCaption = document.getElementById('final-caption-fb').innerText;
-        const igCaption = document.getElementById('final-caption-ig').innerText;
+        const fbCaption = getCaptionText('final-caption-fb');
+        const igCaption = getCaptionText('final-caption-ig');
         const hl = getHeadlineFromEditor();
 
         let requestBody;

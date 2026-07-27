@@ -109,11 +109,18 @@ The first sentence must stop users from scrolling.
 
     prompt += `
 ==================================================
-CAPTION FRAMEWORK
+CAPTION FRAMEWORK & LENGTH POLICY
 ==================================================
 Generate captions in English, Chinese, and Thai.
-Generate facebook_caption and instagram_caption.
-Instagram version must be approximately 40-60% shorter than Facebook version. Do NOT simply cut text. Rewrite naturally.
+You MUST generate separate content for Facebook and Instagram inside post_caption.
+
+[CAPTION LENGTH POLICY]
+• Facebook (English & Thai): 80–120 words. Maximum 2 short paragraphs. Maximum 700 characters per language. Never exceed these limits.
+• Facebook (Chinese): 120–180 Chinese characters. Maximum 2 short paragraphs.
+• Instagram (English & Thai): 40–60 words. Maximum 1 short paragraph. Maximum 350 characters per language. Never exceed these limits.
+• Instagram (Chinese): 60–100 Chinese characters. Maximum 1 short paragraph.
+• Instagram version must be punchy and highly engaging. Do NOT simply cut text. Rewrite naturally for instant impact.
+
 Every language and platform must follow this exact structure.
 
 ------------------------------------------
@@ -197,7 +204,15 @@ WRITING STYLE & NEGATIVE PROMPTS
 ==================================================
 Tone: Premium, Warm, Confident, International, Professional, Optimistic
 Avoid these words: จัดกิจกรรม, เพื่อส่งเสริม, เปิดโอกาส, ได้เรียนรู้, ได้มีโอกาส, บรรยากาศเต็มไปด้วย, นักเรียนได้ร่วม
-Instead: Paint vivid scenes. Use sensory language. Focus on student transformation. Show instead of tell.
+Instead: Write as a premium international school copywriter. Be concise. Every sentence must add new information. Avoid unnecessary storytelling. Use elegant but efficient language. Maximum impact with minimum words. Focus on student transformation.
+
+[ANTI-REPETITION RULES]
+• Avoid repetition. Do not restate the same idea.
+• Each sentence must contribute new information.
+• Do not repeat CTA or contact details in the story.
+• Do not repeat learning outcomes.
+• Do not paraphrase previous sentences.
+
 Preferred Vocabulary: Experience, Discover, Explore, Create, Grow, Future Ready, Hands-on Learning, Meaningful Learning, Confidence, Leadership, Innovation, Creativity, Collaboration, Curiosity, Character
 Avoid repeating phrases used in previous sections. Every paragraph should introduce new information.
 
@@ -218,6 +233,20 @@ HERO QUOTE
 ==================================================
 Generate one inspirational quote. Maximum 12 words. No punctuation at end.
 Never reuse common education quotes. Generate an original quote every time. Suitable for cover artwork. Return hero_quote inside JSON.
+
+==================================================
+TOKEN BUDGET & GRACEFUL COMPRESSION POLICY
+==================================================
+You operate under a strict total output token budget (approx. 8,000 tokens total).
+Output MUST be valid JSON. Never stop generating before closing every object. Never truncate strings. Never omit closing brackets.
+If your generated content approaches the token limit, automatically compress and shorten captions instead of truncating JSON.
+
+Priority Order:
+1. Keep JSON valid
+2. Keep all required fields (kept_image_indices, cover_headline, cover_design, hero_quote, quality, post_caption)
+3. Shorten captions if necessary to fit within budget
+4. Never remove languages (English, Chinese, and Thai must all exist)
+5. Never truncate JSON string
 
 ==================================================
 AI REFLECTION & SELF QUALITY CHECK
@@ -438,7 +467,7 @@ function handlePublishToSocial(params) {
 // ==========================================
 function callGeminiAPI(base64ImagesArray, mimeType, prompt) {
    var apiKey = "YOUR_GEMINI_API_KEY"; // ใส่คีย์ของคุณระหว่างเครื่องหมาย " "
-   var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=" + apiKey;
+   var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=" + apiKey;
 
   var jsonSchema = {
     "type": "OBJECT",
@@ -567,7 +596,7 @@ function handleTranslateCaption(params) {
   }
 
   var apiKey = "YOUR_GEMINI_API_KEY"; // ใส่คีย์ของคุณระหว่างเครื่องหมาย " "
-  var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=" + apiKey;
+  var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=" + apiKey;
 
   var jsonSchema = {
     "type": "OBJECT",
