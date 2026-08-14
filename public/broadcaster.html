@@ -165,7 +165,7 @@
   <!-- Hidden HTML5 Audio for TTS and Bells -->
   <audio id="main-player" class="hidden"></audio>
   <audio id="bell-player" class="hidden" src="https://assets.mixkit.co/active_storage/sfx/2042/2042-preview.mp3"></audio>
-  <audio id="sos-player" class="hidden" src="./sounds/SOS%20Alarm.mp3" loop></audio>
+  <audio id="sos-player" class="hidden" src="./sounds/SOS_Alarm.mp3" loop></audio>
 
   <script>
     // ==========================================
@@ -606,19 +606,23 @@
               }
               const sosPlayer = document.getElementById('sos-player');
               if (sosPlayer) {
-                // Cut music entirely
-                if (typeof ytPlayer !== 'undefined' && ytPlayer && ytPlayer.stopVideo) {
-                  ytPlayer.stopVideo();
-                  currentMusicIndex = musicQueue.length;
-                  renderMusicQueue();
-                }
+                // Cut music entirely safely
+                try {
+                  if (typeof ytPlayer !== 'undefined' && ytPlayer && ytPlayer.stopVideo) {
+                    ytPlayer.stopVideo();
+                    currentMusicIndex = musicQueue.length;
+                    renderMusicQueue();
+                  }
+                } catch(e) { console.warn('SOS YT Stop error:', e); }
                 
-                // Stop any current announcement/bell
-                if (typeof player !== 'undefined' && player) {
-                  player.pause();
-                }
+                // Stop any current announcement/bell safely
+                try {
+                  if (typeof player !== 'undefined' && player) {
+                    player.pause();
+                  }
+                } catch(e) { console.warn('SOS Player pause error:', e); }
                 
-                sosPlayer.play().catch(e => console.warn(e));
+                sosPlayer.play().catch(e => console.warn('SOS Play error:', e));
               }
               
               audioQueue = []; // Clear current queue to prioritize SOS
