@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Remote Control Panel - School Broadcasting Hub</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  
+  <script src="https://accounts.google.com/gsi/client?onload=onGoogleLibraryLoad" async defer></script>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <style> 
+    @font-face { font-family: 'MySukhumvit'; src: url('sukhumvit.ttf') format('truetype'); }
+    body { background-color: #f4f6f8; padding: 20px; font-family: 'MySukhumvit', 'Kanit', sans-serif; min-height: 100vh; }
+    .box { border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+    .school-logo { max-width: 140px; height: auto; display: block; margin: 0 auto 15px auto; }
+  </style>
+</head>
+<body>
+  <div class="container" style="max-width: 600px;">
+    
+    <div class="box has-text-centered" id="login-section">
+      <img src="logo2.png" alt="โลโก้โรงเรียน" class="school-logo">
+      <h1 class="title is-4" style="color: #2c3e50;">ระบบควบคุมเสียงประกาศ (Admin)</h1>
+      <p class="mb-4 has-text-grey is-size-6">กรุณาเข้าสู่ระบบด้วยอีเมลโรงเรียน<br><b>@somkidvittaya.ac.th</b></p>
+      <div id="google-btn-container" style="display: flex; justify-content: center; min-height: 44px;"></div>
+      <div id="login-error" class="has-text-danger mt-3 is-hidden">กรุณาใช้บัญชีของโรงเรียนเท่านั้น</div>
+    </div>
+
+    <div id="app-section" class="is-hidden">
+      <div class="box" style="background: #173d66; color: white; text-align: center;">
+        <h1 class="title is-4 has-text-white mb-2">แผงควบคุมระยะไกล</h1>
+        <p class="is-size-6">ผู้ใช้งาน: <span id="user-display" class="has-text-warning"></span></p>
+      </div>
+
+      <!-- Music Remote -->
+      <div class="box">
+        <h2 class="title is-5"><i class="fas fa-music has-text-danger"></i> สั่งเปิดเพลง (YouTube)</h2>
+        <div class="field">
+          <label class="label">ลิงก์วิดีโอ YouTube</label>
+          <div class="control">
+            <input class="input" type="text" id="yt-url" placeholder="เช่น https://youtu.be/xxxxxxx">
+          </div>
+        </div>
+        <button class="button is-danger is-fullwidth" id="btn-add-music" onclick="addMusic()">
+          <i class="fas fa-play mr-2"></i> เพิ่มเข้าคิวเพลง
+        </button>
+      </div>
+
+      <!-- Announcement Remote -->
+      <div class="box">
+        <h2 class="title is-5"><i class="fas fa-bullhorn has-text-link"></i> พิมพ์ข้อความประกาศ</h2>
+        <div class="field">
+          <label class="label">ข้อความภาษาไทย (ระบบจะแปลอิ้งให้เอง)</label>
+          <div class="control">
+            <textarea class="textarea" id="announce-text" placeholder="พิมพ์ข้อความที่ต้องการให้คอมพิวเตอร์กลางประกาศออกลำโพง..."></textarea>
+          </div>
+        </div>
+        <button class="button is-link is-fullwidth" id="btn-add-announce" onclick="addAnnouncement()">
+          <i class="fas fa-paper-plane mr-2"></i> ส่งข้อความประกาศ
+        </button>
+      </div>
+
+      <button class="button is-text is-fullwidth mt-5" onclick="logout()">ออกจากระบบ</button>
+    </div>
+
+  </div>
+
+  <script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbyDmhCMyqQdnF3LdDSR_sFzCW3dj5C5Oh7D-ToR529Ij01nQLCjZM7Iqec6E_VqDlSGtg/exec"; 
+
+    // ==========================================
+    // 🔐 Auth System
+    // ==========================================
+    window.onGoogleLibraryLoad = function() {
+      if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+        google.accounts.id.initialize({
+          client_id: "299916053656-tlt1jbq5pol3nq8kpka89bk9tp1kqgo9.apps.googleusercontent.com",
+          callback: handleCredentialResponse
+        });
+        google.accounts.id.renderButton(
+          document.getElementById("google-btn-container"),
+          { theme: "outline", size: "large", type: "standard", shape: "rectangular", text: "signin_with", logo_alignment: "left" }
+        );
+      }
+    };
+
+    window.addEventListener('load', function() {
+      const savedEmail = localStorage.getItem('sv_staff_email');
+      if (savedEmail) {
+        showApp(savedEmail);
+      } else {
+        if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+          window.onGoogleLibraryLoad();
+        }
+      }
+    });
+
+    function showApp(email) {
+      document.getElementById('login-section').classList.add('is-hidden');
+      document.getElementById('app-section').classList.remove('is-hidden');
+      document.getElementById('user-display').innerText = email;
+    }
+
+    function logout() {
+      localStorage.removeItem('sv_staff_email');
+      location.reload();
+    }
+
+    function handleCredentialResponse(response) {
+      try {
+        let base64Url = response.credential.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        while (base64Url.length % 4) { base64Url += '='; }
+        const payload = JSON.parse(decodeURIComponent(window.atob(base64Url).split('').map(function(c) { return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2); }).join('')));
+        
+        if (payload.email && payload.email.endsWith("@somkidvittaya.ac.th")) {
+          localStorage.setItem('sv_staff_email', payload.email);
+          showApp(payload.email);
+        } else { 
+          document.getElementById('login-error').classList.remove('is-hidden'); 
+        }
+      } catch (e) {
+        document.getElementById('login-error').classList.remove('is-hidden');
+      }
+    }
+
+    // ==========================================
+    // 🎵 Remote Control Actions
+    // ==========================================
+    function extractVideoID(url) {
+      let match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/);
+      return (match && match[1]) ? match[1] : null;
+    }
+
+    function addMusic() {
+      const input = document.getElementById('yt-url');
+      const btn = document.getElementById('btn-add-music');
+      const vid = extractVideoID(input.value);
+      
+      if (!vid) {
+        alert('ลิงก์ YouTube ไม่ถูกต้อง');
+        return;
+      }
+
+      btn.classList.add('is-loading');
+      fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'add_music', videoId: vid })
+      })
+      .then(r => r.json())
+      .then(res => {
+        btn.classList.remove('is-loading');
+        if (res.success) {
+          input.value = '';
+          alert('✅ ส่งเข้าคิวเพลงเรียบร้อย');
+        } else {
+          alert('❌ เกิดข้อผิดพลาด: ' + res.message);
+        }
+      })
+      .catch(err => {
+        btn.classList.remove('is-loading');
+        alert('❌ ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+      });
+    }
+
+    function addAnnouncement() {
+      const input = document.getElementById('announce-text');
+      const btn = document.getElementById('btn-add-announce');
+      const text = input.value.trim();
+
+      if (!text) {
+        alert('กรุณาพิมพ์ข้อความ');
+        return;
+      }
+
+      btn.classList.add('is-loading');
+      fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'add_announcement', text: text })
+      })
+      .then(r => r.json())
+      .then(res => {
+        btn.classList.remove('is-loading');
+        if (res.success) {
+          input.value = '';
+          alert('✅ ส่งประกาศไปยังลำโพงเรียบร้อย');
+        } else {
+          alert('❌ เกิดข้อผิดพลาด: ' + res.message);
+        }
+      })
+      .catch(err => {
+        btn.classList.remove('is-loading');
+        alert('❌ ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>School Broadcasting Hub</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#173d66">
+  
+  <!-- โหลด YouTube IFrame API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+
+  <style>
+    @font-face {
+      font-family: 'MySukhumvit';
+      src: url('sukhumvit.ttf') format('truetype');
+      font-display: swap;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #e6e6d7;
+      padding: 10px;
+      font-family: 'MySukhumvit', 'Kanit', sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+
+    /* Common Panels */
+    .panel {
+      background: white;
+      border-radius: 12px;
+      padding: 15px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .panel-header {
+      background-color: #173d66;
+      color: white;
+      padding: 12px 15px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      font-size: 1.3rem;
+      font-weight: 600;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    /* Left Pane: Pickup Queue */
+    .left-pane { height: calc(100vh - 20px); }
+    .pickup-list { overflow-y: auto; flex-grow: 1; padding-right: 5px; }
+    
+    .student-card {
+      background: white;
+      border-left: 8px solid #3298dc;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      animation: slideIn 0.3s ease-out;
+    }
+    .student-name { font-size: 1.8rem; font-weight: 600; }
+    .gate-label { font-size: 1.2rem; color: #3298dc; }
+    .time-badge {
+      background-color: #173d66; color: white;
+      padding: 5px 15px; border-radius: 20px; font-size: 1.2rem;
+    }
+
+    /* Right Pane */
+    .right-pane {
+      display: grid;
+      grid-template-rows: 40% 30% 1fr;
+      gap: 15px;
+      height: calc(100vh - 20px);
+    }
+
+    /* Music Player */
+    .music-controls { display: flex; gap: 8px; margin-bottom: 10px; }
+    .music-controls input {
+      flex-grow: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc;
+      font-family: inherit; font-size: 1rem;
+    }
+    .music-controls button {
+      padding: 8px 15px; background: #e74c3c; color: white; border: none;
+      border-radius: 6px; cursor: pointer; font-family: inherit; font-weight: 600;
+    }
+    .override-box {
+      margin-top: 5px; font-size: 0.9rem; color: #555;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .queue-list { overflow-y: auto; flex-grow: 1; font-size: 0.9rem; }
+    .queue-item {
+      padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;
+    }
+    .queue-item.playing { background: #fff3cd; font-weight: bold; border-left: 4px solid #ffc107; }
+
+    /* Bell Schedule */
+    .bell-list { overflow-y: auto; flex-grow: 1; }
+    .bell-item {
+      display: flex; justify-content: space-between; padding: 8px;
+      border-bottom: 1px solid #eee; font-size: 1.1rem;
+    }
+    .bell-add { display: flex; gap: 5px; margin-top: 10px; }
+    .bell-add input { padding: 5px; border: 1px solid #ccc; font-family: inherit; }
+    .bell-add button { background: #2ecc71; color: white; border: none; padding: 5px 10px; cursor: pointer; }
+
+    /* Announcements */
+    .announce-list { overflow-y: auto; flex-grow: 1; font-size: 1rem; }
+    .announce-item {
+      padding: 10px; border-bottom: 1px dashed #ccc;
+    }
+    .announce-en { color: #888; font-size: 0.9rem; font-style: italic; }
+
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+
+    /* Audio Gate Overlay (Removed - using inline DOM audio unlock) */
+    .status-msg { text-align: center; color: #888; margin-top: 20px; font-size: 1.2rem; }
+  </style>
+</head>
+<body>
+
+  <!-- LEFT PANE: Pickups -->
+  <div class="panel left-pane">
+    <div class="panel-header">รายชื่อนักเรียนรับกลับบ้าน</div>
+    <div id="pickup-list" class="pickup-list">
+      <div class="status-msg">กำลังเชื่อมต่อข้อมูล...</div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANE -->
+  <div class="right-pane">
+    
+    <!-- Music Player -->
+    <div class="panel">
+      <div class="panel-header" style="background:#e74c3c;">🎵 ระบบเปิดเพลง (YouTube Bot)</div>
+      <div class="music-controls">
+        <input type="text" id="yt-url" placeholder="วางลิงก์ YouTube ที่นี่...">
+        <button onclick="addMusicToQueue()">เพิ่มคิวเพลง</button>
+        <button onclick="skipMusic()" style="background:#f39c12;">ข้าม (Skip)</button>
+      </div>
+      <div class="override-box">
+        <input type="checkbox" id="override-bells"> <label for="override-bells">ปลดล็อกระบบตัดเพลง (อนุญาตให้เพลงเฟดดับเองตอนออดดัง)</label>
+      </div>
+      <div id="music-queue" class="queue-list"></div>
+      <!-- Hidden YT Player -->
+      <div id="yt-player-container" style="position:absolute; width:0; height:0; overflow:hidden; left:-9999px;">
+        <div id="yt-player"></div>
+      </div>
+    </div>
+
+    <!-- Bell Schedule -->
+    <div class="panel">
+      <div class="panel-header" style="background:#2ecc71;">🔔 ตารางเวลาออดโรงเรียน</div>
+      <div id="bell-list" class="bell-list"></div>
+      <div class="bell-add">
+        <input type="time" id="bell-time">
+        <input type="text" id="bell-desc" placeholder="เช่น เข้าแถวเช้า" style="flex-grow:1;">
+        <button id="bell-add-btn" onclick="addBell()">เพิ่ม</button>
+      </div>
+    </div>
+
+    <!-- Announcements -->
+    <div class="panel">
+      <div class="panel-header" style="background:#9b59b6;">📢 ประวัติประกาศจากคุณครู (LINE)</div>
+      <div id="announce-list" class="announce-list"></div>
+    </div>
+
+  </div>
+
+  <!-- Hidden HTML5 Audio for TTS and Bells -->
+  <audio id="main-player" style="display:none;"></audio>
+  <audio id="bell-player" style="display:none;" src="https://assets.mixkit.co/active_storage/sfx/2042/2042-preview.mp3"></audio> <!-- ตัวอย่างเสียงออด -->
+
+  <script>
+    // ==========================================
+    // ⚙️ Configurations & Global State
+    // ==========================================
+    // ⚠️ IMPORTANT: Update this URL to the NEW deployment URL after deploying code.gs
+    const API_URL = "https://script.google.com/macros/s/AKfycbyDmhCMyqQdnF3LdDSR_sFzCW3dj5C5Oh7D-ToR529Ij01nQLCjZM7Iqec6E_VqDlSGtg/exec"; 
+    
+    // Pickups
+    let lastPickupString = "";
+    let announcedNames = new Set(JSON.parse(sessionStorage.getItem('sv_announcedNames') || '[]'));
+    let pendingAnnouncements = [];
+    
+    // Announcements
+    let announcedIds = new Set(JSON.parse(sessionStorage.getItem('sv_announcedMsgs') || '[]'));
+
+    // Audio / TTS
+    const ttsCache = {};
+    let audioQueue = [];
+    let isPlayingTTS = false;
+    let isPreparingAudio = false;
+    const player = document.getElementById('main-player');
+
+    // ==========================================
+    // 1. YouTube Music Bot Logic
+    // ==========================================
+    let ytPlayer;
+    let musicQueue = [];
+    let currentMusicIndex = -1;
+    let fadeInterval = null;
+
+    function onYouTubeIframeAPIReady() {
+      ytPlayer = new YT.Player('yt-player', {
+        height: '100', width: '100',
+        videoId: '', 
+        playerVars: { 'autoplay': 1, 'controls': 0, 'disablekb': 1, 'rel': 0 },
+        events: {
+          'onStateChange': onPlayerStateChange
+        }
+      });
+    }
+
+    function onPlayerStateChange(event) {
+      if (event.data === YT.PlayerState.ENDED) {
+        playNextMusic();
+      }
+    }
+
+    function extractVideoID(url) {
+      let match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/);
+      return (match && match[1]) ? match[1] : null;
+    }
+
+    async function addMusicToQueue() {
+      const urlInput = document.getElementById('yt-url');
+      const vid = extractVideoID(urlInput.value);
+      if (!vid) return alert('ลิงก์ YouTube ไม่ถูกต้อง');
+      urlInput.value = '';
+
+      musicQueue.push({ id: vid, url: 'https://youtu.be/'+vid });
+      renderMusicQueue();
+      if (currentMusicIndex === -1 || ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
+        playNextMusic();
+      }
+    }
+
+    function playNextMusic() {
+      if (currentMusicIndex + 1 < musicQueue.length) {
+        currentMusicIndex++;
+        ytPlayer.loadVideoById(musicQueue[currentMusicIndex].id);
+        renderMusicQueue();
+      } else {
+        currentMusicIndex = -1; // Finished queue
+        renderMusicQueue();
+      }
+    }
+
+    function skipMusic() {
+      playNextMusic();
+    }
+
+    function renderMusicQueue() {
+      const qBox = document.getElementById('music-queue');
+      qBox.innerHTML = musicQueue.map((item, idx) => `
+        <div class="queue-item ${idx === currentMusicIndex ? 'playing' : ''}">
+          <span>${idx === currentMusicIndex ? '▶️ ' : ''} วิดีโอ ${item.id}</span>
+        </div>
+      `).join('');
+    }
+
+    // --- Audio Ducking (หรี่เพลงตอนพูด) ---
+    function duckMusicVolume(isDucking) {
+      if (!ytPlayer || !ytPlayer.setVolume) return;
+      clearInterval(fadeInterval);
+      let vol = ytPlayer.getVolume();
+      let target = isDucking ? 15 : 100; // หรี่เหลือ 15%, คืนกลับ 100%
+      let step = isDucking ? -5 : 5;
+      
+      fadeInterval = setInterval(() => {
+        vol += step;
+        if ((isDucking && vol <= target) || (!isDucking && vol >= target)) {
+          ytPlayer.setVolume(target);
+          clearInterval(fadeInterval);
+        } else {
+          ytPlayer.setVolume(vol);
+        }
+      }, 50);
+    }
+
+    function stopMusicForBell() {
+      if (ytPlayer && ytPlayer.stopVideo) {
+        duckMusicVolume(true); // Fade out quickly
+        setTimeout(() => ytPlayer.stopVideo(), 1000);
+        currentMusicIndex = -1;
+        musicQueue = [];
+        renderMusicQueue();
+      }
+    }
+
+
+    // ==========================================
+    // 2. Bell Schedule System
+    // ==========================================
+    let bells = JSON.parse(localStorage.getItem('sv_bells') || '[]');
+    let lastRungBell = null;
+    let editBellIndex = -1;
+
+    function renderBells() {
+      bells.sort((a,b) => a.time.localeCompare(b.time));
+      document.getElementById('bell-list').innerHTML = bells.map((b, idx) => `
+        <div class="bell-item">
+          <span><b>${b.time}</b> - ${b.desc}</span>
+          <div>
+            <button onclick="editBell(${idx})" style="background:none; border:none; color:#f39c12; cursor:pointer; margin-right:5px;">✏️</button>
+            <button onclick="removeBell(${idx})" style="background:none; border:none; color:#e74c3c; cursor:pointer;">❌</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function addBell() {
+      const time = document.getElementById('bell-time').value;
+      const desc = document.getElementById('bell-desc').value;
+      if(time && desc) {
+        if (editBellIndex > -1) {
+          bells[editBellIndex] = {time, desc};
+          editBellIndex = -1;
+          document.getElementById('bell-add-btn').innerText = 'เพิ่ม';
+        } else {
+          bells.push({time, desc});
+        }
+        localStorage.setItem('sv_bells', JSON.stringify(bells));
+        document.getElementById('bell-time').value = '';
+        document.getElementById('bell-desc').value = '';
+        renderBells();
+      }
+    }
+    
+    function editBell(idx) {
+      editBellIndex = idx;
+      document.getElementById('bell-time').value = bells[idx].time;
+      document.getElementById('bell-desc').value = bells[idx].desc;
+      document.getElementById('bell-add-btn').innerText = 'บันทึก';
+    }
+
+    function removeBell(idx) {
+      bells.splice(idx, 1);
+      localStorage.setItem('sv_bells', JSON.stringify(bells));
+      renderBells();
+    }
+
+    function checkBells() {
+      const now = new Date();
+      const timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+      
+      // ถ้าเวลาตรงกับในตาราง และยังไม่ได้กดกริ่งในนาทีนี้
+      const bell = bells.find(b => b.time === timeStr);
+      if (bell && lastRungBell !== timeStr) {
+        lastRungBell = timeStr;
+        triggerBellSequence(bell.desc);
+      }
+    }
+
+    async function triggerBellSequence(desc) {
+      const override = document.getElementById('override-bells').checked;
+      if (!override) {
+        stopMusicForBell(); // ตัดเพลงออก (fade out 1วิ แล้วหยุด)
+      }
+
+      // เล่นเสียงออด (กริ่ง)
+      const bellSfx = document.getElementById('bell-player');
+      await new Promise(r => { bellSfx.onended = r; bellSfx.play(); });
+
+      // เอา AI ประกาศตาม
+      const txt = "ขณะนี้เวลา " + lastRungBell.replace(':', ' นาฬิกา ') + " นาที, " + desc;
+      const audioUrl = await fetchAudioData(txt, "th-TH");
+      if(audioUrl) { audioQueue.push(audioUrl); processAudioQueue(); }
+    }
+
+    // ==========================================
+    // 3. Audio & TTS System (Pickups & Announce)
+    // ==========================================
+    async function fetchAudioData(text, lang) {
+      const cleanText = String(text || '').trim();
+      if (!cleanText) return null;
+      const cacheKey = lang + ':' + cleanText;
+      if (ttsCache[cacheKey]) return ttsCache[cacheKey];
+
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'tts_speak', text: cleanText, lang: lang })
+        });
+        const data = await response.json();
+        if (data.success && data.audioContent) {
+          const audioDataUri = 'data:audio/mp3;base64,' + data.audioContent;
+          ttsCache[cacheKey] = audioDataUri;
+          return audioDataUri;
+        }
+      } catch (e) { console.error('TTS Error:', e); }
+      return null;
+    }
+
+    async function processAudioQueue() {
+      if (isPlayingTTS) return;
+      isPlayingTTS = true;
+      duckMusicVolume(true); // หรี่เพลงรอเลย
+
+      while (audioQueue.length > 0) {
+        const audioSrc = audioQueue.shift();
+        await new Promise(function(resolve) {
+          player.src = audioSrc;
+          player.onended = resolve;
+          player.onerror = resolve;
+          player.play().catch(function(e) {
+            console.warn("Audio blocked:", e);
+            if (e.name === 'NotAllowedError') {
+              audioQueue.unshift(audioSrc);
+              const unlock = () => { document.removeEventListener('click', unlock); resolve(); };
+              document.addEventListener('click', unlock);
+            } else resolve();
+          });
+        });
+      }
+
+      isPlayingTTS = false;
+      duckMusicVolume(false); // คืนเสียงเพลง
+    }
+
+    async function queueStudentPickup(student) {
+      const name = student.name;
+      const gateThai = student.gate || "จุดรับนักเรียน";
+      let gateEng = gateThai.includes("1") ? "Gate Number 1" : (gateThai.includes("3") ? "Gate Number 3" : "the pickup point");
+      let nameForEng = name.replace(/ด\.ช\.|ด\.ญ\.|ดช\.|ดญ\.|เด็กชาย|เด็กหญิง/g, "").trim();
+      let nameForThai = name.replace(/ด\.ช\.|ดช\./g, "เด็กชาย ").replace(/ด\.ญ\.|ดญ\./g, "เด็กหญิง ");
+
+      const audios = await Promise.all([
+        fetchAudioData("Attention please, student ", "en-GB"),
+        fetchAudioData(nameForEng, "th-TH"),
+        fetchAudioData(" please meet your parents at " + gateEng, "en-GB"),
+        fetchAudioData(`ประกาศ, นักเรียนชื่อ ${nameForThai}, ขณะนี้ผู้ปกครองมารอรับแล้วที่ ${gateThai} ค่ะ`, "th-TH")
+      ]);
+      audios.forEach(a => { if(a) audioQueue.push(a); });
+      processAudioQueue();
+    }
+
+    async function queueTeacherAnnouncement(item) {
+      // item = { row, th, en }
+      const audios = await Promise.all([
+        fetchAudioData("Attention please, ", "en-GB"),
+        fetchAudioData(item.en, "en-GB"),
+        fetchAudioData("ประกาศ, ", "th-TH"),
+        fetchAudioData(item.th, "th-TH")
+      ]);
+      audios.forEach(a => { if(a) audioQueue.push(a); });
+      processAudioQueue();
+    }
+
+    // ==========================================
+    // 4. Unified Polling Loop
+    // ==========================================
+    let isInitialLoad = true;
+
+    function renderPickups(pickups) {
+      if (!pickups || pickups.length === 0) {
+        document.getElementById('pickup-list').innerHTML = '<div class="status-msg">ไม่มีคิวรับกลับบ้าน...</div>';
+        lastPickupString = "";
+        return;
+      }
+      const html = pickups.map(item => `
+        <div class="student-card">
+          <div>
+            <div class="student-name">${item.name}</div>
+            <div class="gate-label">${item.gate || 'จุดรับนักเรียน'}</div>
+          </div>
+          <span class="time-badge">${item.time} น.</span>
+        </div>
+      `).join('');
+      
+      if (html !== lastPickupString) {
+        document.getElementById('pickup-list').innerHTML = html;
+        lastPickupString = html;
+        
+        pickups.forEach(item => {
+          const key = item.name + '_' + item.time;
+          if (!announcedNames.has(key)) {
+            announcedNames.add(key);
+            sessionStorage.setItem('sv_announcedNames', JSON.stringify([...announcedNames]));
+            if (!isInitialLoad) queueStudentPickup(item);
+          }
+        });
+      }
+    }
+
+    function renderAnnouncements(announces) {
+      if (!announces) return;
+      const listDiv = document.getElementById('announce-list');
+      announces.forEach(item => {
+        if (!announcedIds.has(item.row)) {
+          announcedIds.add(item.row);
+          sessionStorage.setItem('sv_announcedMsgs', JSON.stringify([...announcedIds]));
+          
+          const div = document.createElement('div');
+          div.className = 'announce-item';
+          div.innerHTML = `<div>${item.th}</div><div class="announce-en">${item.en}</div>`;
+          listDiv.prepend(div); // เพิ่มบนสุด
+          
+          if (!isInitialLoad) queueTeacherAnnouncement(item);
+        }
+      });
+    }
+
+    function pollServer() {
+      checkBells(); // เช็คเวลาทุกครั้งที่ loop วิ่ง (ทุก ~8 วิ ก็แม่นพอสำหรับระดับนาที)
+
+      fetch(API_URL + "?action=get_dashboard_data&t=" + new Date().getTime())
+        .then(r => r.json())
+        .then(res => {
+          if (res.success) {
+            renderPickups(res.pickups);
+            renderAnnouncements(res.announcements);
+            
+            // Handle Remote Music Queue
+            if (res.musicQueue && res.musicQueue.length > 0) {
+              res.musicQueue.forEach(item => {
+                if (!announcedIds.has('music_' + item.row)) {
+                  announcedIds.add('music_' + item.row);
+                  sessionStorage.setItem('sv_announcedMsgs', JSON.stringify([...announcedIds]));
+                  
+                  // Add to local queue
+                  musicQueue.push({ id: item.videoId, url: 'https://youtu.be/' + item.videoId });
+                  renderMusicQueue();
+                  if (currentMusicIndex === -1 || ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
+                    playNextMusic();
+                  }
+                }
+              });
+            }
+          }
+          isInitialLoad = false;
+        }).catch(err => console.error(err));
+    }
+
+    // Init
+    renderBells();
+    pollServer();
+    setInterval(pollServer, 8000); // 8 วินาทีต่อรอบ
+
+    // Register Service Worker for PWA (with Next.js bypass)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js')
+          .then(reg => console.log('Service Worker registered', reg))
+          .catch(err => console.error('Service Worker registration failed', err));
+      });
+    }
+
+  </script>
+</body>
+</html>

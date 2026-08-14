@@ -15,7 +15,8 @@ import {
   LineChart,
   ShoppingCart,
   CreditCard,
-  MessageSquare
+  MessageSquare,
+  Radio
 } from 'lucide-react';
 
 export default function HomeLaunchpad() {
@@ -68,7 +69,8 @@ export default function HomeLaunchpad() {
       icon: <Megaphone className="w-5 h-5 text-rose-500" />,
       color: "border-rose-500/20 bg-rose-500/5",
       tools: [
-        { name: "Post Assistance", href: "/post-assistant.html", icon: <MessageSquare className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" }
+        { name: "Post Assistance", href: "/post-assistant.html", icon: <MessageSquare className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
+        { name: "Audio Remote", href: "/audio-remote.html", icon: <Radio className="w-6 h-6" />, color: "bg-rose-500 text-white" }
       ]
     },
     {
