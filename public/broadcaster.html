@@ -68,6 +68,12 @@
 </head>
 <body class="h-screen overflow-hidden p-4 text-gray-800 flex gap-4">
 
+  <!-- SOS Flashing Overlay -->
+  <div id="sos-overlay" class="fixed inset-0 z-[9999] bg-red-600 hidden flex-col items-center justify-center animate-pulse">
+    <h1 class="text-white text-6xl md:text-9xl font-black tracking-widest text-center" style="text-shadow: 0 0 20px rgba(0,0,0,0.5);">EMERGENCY</h1>
+    <h2 id="sos-overlay-code" class="text-white text-4xl md:text-7xl font-bold mt-8 bg-black/30 px-12 py-6 rounded-3xl" style="text-shadow: 0 0 10px rgba(0,0,0,0.5);">CODE: -</h2>
+  </div>
+
   <!-- LEFT PANE: Pickups -->
   <div class="w-1/2 flex flex-col bg-white/80 backdrop-blur-md border border-white rounded-2xl shadow-lg p-4 h-full">
     <div class="bg-primary text-white text-xl font-semibold text-center py-3 px-4 rounded-xl shadow-sm mb-4 shrink-0 flex items-center justify-center gap-2">
@@ -559,6 +565,12 @@
             listDiv.prepend(div);
             
             if (!isInitialLoad) {
+              const overlay = document.getElementById('sos-overlay');
+              if (overlay) {
+                document.getElementById('sos-overlay-code').innerText = "CODE: " + sosCode;
+                overlay.classList.remove('hidden');
+                overlay.classList.add('flex');
+              }
               const sosPlayer = document.getElementById('sos-player');
               if (sosPlayer) {
                 duckMusicVolume(true);
@@ -583,6 +595,11 @@
             listDiv.prepend(div);
 
             if (!isInitialLoad) {
+              const overlay = document.getElementById('sos-overlay');
+              if (overlay) {
+                overlay.classList.add('hidden');
+                overlay.classList.remove('flex');
+              }
               const sosPlayer = document.getElementById('sos-player');
               if (sosPlayer) {
                 sosPlayer.pause();

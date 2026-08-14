@@ -127,7 +127,35 @@
         กลับสู่หน้าหลัก
       </button>
     </div>
+  </div>
 
+  <!-- SOS Keypad Modal -->
+  <div id="sos-modal" class="fixed inset-0 bg-gray-900/95 z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-3xl shadow-2xl p-6 w-[90%] max-w-sm border-2 border-red-500">
+      <h3 class="text-center text-xl font-bold text-red-600 mb-2">🚨 ระบุรหัสฉุกเฉิน (SOS Code)</h3>
+      <div class="text-center text-5xl font-mono font-bold tracking-widest text-red-600 h-16 bg-red-50 border border-red-200 rounded-xl flex items-center justify-center mb-6" id="sos-code-display">-</div>
+      
+      <div class="grid grid-cols-3 gap-3 mb-6">
+        <button onclick="sosPad('1')" class="h-16 text-2xl font-bold bg-gray-100 hover:bg-gray-200 rounded-2xl active:bg-gray-300 transition">1</button>
+        <button onclick="sosPad('2')" class="h-16 text-2xl font-bold bg-gray-100 hover:bg-gray-200 rounded-2xl active:bg-gray-300 transition">2</button>
+        <button onclick="sosPad('3')" class="h-16 text-2xl font-bold bg-gray-100 hover:bg-gray-200 rounded-2xl active:bg-gray-300 transition">3</button>
+        <button onclick="sosPad('4')" class="h-16 text-2xl font-bold bg-gray-100 hover:bg-gray-200 rounded-2xl active:bg-gray-300 transition">4</button>
+        <button onclick="sosPad('5')" class="h-16 text-2xl font-bold bg-gray-100 hover:bg-gray-200 rounded-2xl active:bg-gray-300 transition">5</button>
+        <button onclick="sosPad('6')" class="h-16 text-2xl font-bold bg-gray-100 hover:bg-gray-200 rounded-2xl active:bg-gray-300 transition">6</button>
+        <button onclick="sosPad('7')" class="h-16 text-2xl font-bold bg-gray-100 hover:bg-gray-200 rounded-2xl active:bg-gray-300 transition">7</button>
+        <button onclick="sosPad('8')" class="h-16 text-2xl font-bold bg-gray-100 hover:bg-gray-200 rounded-2xl active:bg-gray-300 transition">8</button>
+        <button onclick="sosPad('9')" class="h-16 text-2xl font-bold bg-gray-100 hover:bg-gray-200 rounded-2xl active:bg-gray-300 transition">9</button>
+        <button onclick="sosPad('CLEAR')" class="h-16 text-lg font-bold text-red-500 bg-red-50 hover:bg-red-100 rounded-2xl active:bg-red-200 transition">ลบ</button>
+        <button onclick="sosPad('0')" class="h-16 text-2xl font-bold bg-gray-100 hover:bg-gray-200 rounded-2xl active:bg-gray-300 transition">0</button>
+        <button onclick="hideSosModal()" class="h-16 text-lg font-bold text-gray-500 bg-gray-50 hover:bg-gray-100 rounded-2xl active:bg-gray-200 transition">ยกเลิก</button>
+      </div>
+
+      <button id="btn-confirm-sos" onclick="confirmSosSend()" 
+        class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-xl text-xl shadow-lg flex justify-center items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-7 h-7"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+        ส่งสัญญาณเตือนภัย
+      </button>
+    </div>
   </div>
 
   <script>
@@ -204,26 +232,48 @@
         btn.classList.remove('is-loading');
         alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
       });
-    }
+    let currentSosCode = "";
 
     function triggerSOS() {
-      const sosCode = prompt('ระบุรหัสฉุกเฉิน (SOS Code) เช่น Red, Black, Fire:');
-      
-      if (!sosCode) return; // ยกเลิก หรือไม่ระบุ
+      currentSosCode = "";
+      document.getElementById('sos-code-display').innerText = "-";
+      document.getElementById('sos-modal').classList.remove('hidden');
+    }
 
-      if (!confirm(`ยืนยันอีกครั้ง: คุณต้องการเปิดสัญญาณเตือนภัยฉุกเฉิน (SOS Code: ${sosCode}) ทั่วทั้งโรงเรียนจริงหรือไม่?`)) return;
+    function hideSosModal() {
+      document.getElementById('sos-modal').classList.add('hidden');
+    }
 
-      const btn = document.getElementById('btn-trigger-sos');
+    function sosPad(val) {
+      if (val === 'CLEAR') {
+        currentSosCode = "";
+      } else {
+        if (currentSosCode.length < 4) {
+          currentSosCode += val;
+        }
+      }
+      document.getElementById('sos-code-display').innerText = currentSosCode || "-";
+    }
+
+    function confirmSosSend() {
+      if (!currentSosCode) {
+        alert("กรุณาระบุรหัสฉุกเฉินบนปุ่มกด");
+        return;
+      }
+      if (!confirm(`ยืนยันการเปิดสัญญาณเตือนภัยฉุกเฉิน (SOS Code: ${currentSosCode}) ทั่วโรงเรียนใช่หรือไม่?`)) return;
+
+      const btn = document.getElementById('btn-confirm-sos');
       btn.classList.add('is-loading');
       fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'add_announcement', text: '#SOS#:' + sosCode })
+        body: JSON.stringify({ action: 'add_announcement', text: '#SOS#:' + currentSosCode })
       })
       .then(r => r.json())
       .then(res => {
         btn.classList.remove('is-loading');
         if (res.success) {
+          hideSosModal();
           alert('ส่งสัญญาณเตือนภัยฉุกเฉินไปยังลำโพงเรียบร้อยแล้ว');
         } else {
           alert('เกิดข้อผิดพลาด: ' + res.message);
