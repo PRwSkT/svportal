@@ -623,16 +623,19 @@
               
               audioQueue = []; // Clear current queue to prioritize SOS
               isPlayingTTS = false; // Reset TTS state
+              window.isSOSActive = true;
               
               fetchAudioData(`Emergency. SOS Code ${sosCode}.`, "en-GB").then(urlEn => {
+                if (!window.isSOSActive) return;
                 if (urlEn) audioQueue.push(urlEn);
                 return fetchAudioData(`ประกาศเตือนภัยฉุกเฉิน. เอส โอ เอส โค้ด ${sosCode}`, "th-TH");
               }).then(urlTh => {
+                if (!window.isSOSActive) return;
                 if (urlTh) audioQueue.push(urlTh);
                 processAudioQueue();
               }).catch(err => {
                 console.error("SOS TTS failed:", err);
-                processAudioQueue();
+                if (window.isSOSActive) processAudioQueue();
               });
             }
             return;
@@ -644,6 +647,8 @@
             listDiv.prepend(div);
 
             if (!isInitialLoad) {
+              window.isSOSActive = false;
+
               const overlay = document.getElementById('sos-overlay');
               if (overlay) {
                 overlay.classList.add('hidden');
@@ -654,6 +659,13 @@
                 sosPlayer.pause();
                 sosPlayer.currentTime = 0;
               }
+              
+              if (typeof player !== 'undefined' && player) {
+                player.pause();
+              }
+              audioQueue = [];
+              isPlayingTTS = false;
+              
               duckMusicVolume(false);
             }
             return;
