@@ -392,18 +392,18 @@
       if (!override) {
         stopMusicForBell();
       }
-      
-      let bellSoundUrl = "https://assets.mixkit.co/active_storage/sfx/2042/2042-preview.mp3";
-      if (bellObj.sound === 'start') bellSoundUrl = "./sounds/เข้าเรียน.mp3";
-      else if (bellObj.sound === 'end') bellSoundUrl = "./sounds/เลิกเรียน-เปลี่ยนคาบ.mp3";
 
-      const bellSfx = document.getElementById('bell-player');
-      bellSfx.src = bellSoundUrl;
-      await new Promise(r => { bellSfx.onended = r; bellSfx.play(); });
+      let bellSoundUrl = "https://assets.mixkit.co/active_storage/sfx/2042/2042-preview.mp3";
+      if (bellObj.sound === 'start') bellSoundUrl = encodeURI("./sounds/เข้าเรียน.mp3");
+      else if (bellObj.sound === 'end') bellSoundUrl = encodeURI("./sounds/เลิกเรียน-เปลี่ยนคาบ.mp3");
+
+      audioQueue.push(bellSoundUrl);
 
       const txt = "ขณะนี้เวลา " + lastRungBell.replace(':', ' นาฬิกา ') + " นาที, " + bellObj.desc;
       const audioUrl = await fetchAudioData(txt, "th-TH");
-      if(audioUrl) { audioQueue.push(audioUrl); processAudioQueue(); }
+      if(audioUrl) { audioQueue.push(audioUrl); }
+      
+      processAudioQueue();
     }
 
     // ==========================================
