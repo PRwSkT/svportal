@@ -70,8 +70,9 @@
 
   <!-- LEFT PANE: Pickups -->
   <div class="w-1/2 flex flex-col bg-white/80 backdrop-blur-md border border-white rounded-2xl shadow-lg p-4 h-full">
-    <div class="bg-primary text-white text-xl font-semibold text-center py-3 px-4 rounded-xl shadow-sm mb-4 shrink-0">
-      รายชื่อนักเรียนรับกลับบ้าน
+    <div class="bg-primary text-white text-xl font-semibold text-center py-3 px-4 rounded-xl shadow-sm mb-4 shrink-0 flex items-center justify-center gap-2">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
+      สถานะการรับนักเรียน
     </div>
     <div id="pickup-list" class="overflow-y-auto flex-grow pr-2 flex flex-col gap-3">
       <div class="text-center text-gray-400 mt-8 text-lg">กำลังเชื่อมต่อข้อมูล...</div>
@@ -83,17 +84,24 @@
     
     <!-- Music Player -->
     <div class="bg-white/80 backdrop-blur-md border border-white rounded-2xl shadow-lg p-4 flex flex-col" style="height: 40%;">
-      <div class="bg-red-600 text-white text-lg font-semibold text-center py-2 px-4 rounded-xl shadow-sm mb-3 shrink-0">
-        🎵 ระบบเปิดเพลง (YouTube Bot)
+      <div class="bg-red-600 text-white text-lg font-semibold text-center py-2 px-4 rounded-xl shadow-sm mb-3 shrink-0 flex items-center justify-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z" /></svg>
+        ระบบจัดการเสียงดนตรี
       </div>
       <div class="flex gap-2 mb-2">
         <input type="text" id="yt-url" placeholder="วางลิงก์ YouTube ที่นี่..." class="flex-grow px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
-        <button onclick="addMusicToQueue()" class="bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg transition">เพิ่มคิวเพลง</button>
-        <button onclick="skipMusic()" class="bg-orange-500 hover:bg-orange-600 text-white font-medium px-4 py-2 rounded-lg transition">ข้าม (Skip)</button>
+        <button onclick="addMusicToQueue()" class="bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg transition flex items-center gap-1">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+          เพิ่มรายการเพลง
+        </button>
+        <button onclick="skipMusic()" class="bg-orange-500 hover:bg-orange-600 text-white font-medium px-4 py-2 rounded-lg transition flex items-center gap-1">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8.688c0-.864.933-1.405 1.683-.977l7.108 4.062a1.125 1.125 0 010 1.953l-7.108 4.062A1.125 1.125 0 013 16.81V8.688zM12.75 8.688c0-.864.933-1.405 1.683-.977l7.108 4.062a1.125 1.125 0 010 1.953l-7.108 4.062a1.125 1.125 0 01-1.683-.977V8.688z" /></svg>
+          ข้าม (Skip)
+        </button>
       </div>
       <div class="flex items-center gap-2 mb-3 text-sm text-gray-600">
         <input type="checkbox" id="override-bells" class="rounded text-primary focus:ring-primary"> 
-        <label for="override-bells">ปลดล็อกระบบตัดเพลง (อนุญาตให้เพลงเฟดดับเองตอนออดดัง)</label>
+        <label for="override-bells">ปลดล็อกระบบตัดเพลง (อนุญาตให้เพลงค่อยๆ หรี่และดับลงเมื่อมีประกาศหรือเสียงออด)</label>
       </div>
       <div id="music-queue" class="overflow-y-auto flex-grow text-sm flex flex-col gap-2"></div>
       
@@ -105,21 +113,26 @@
 
     <!-- Bell Schedule -->
     <div class="bg-white/80 backdrop-blur-md border border-white rounded-2xl shadow-lg p-4 flex flex-col" style="height: 30%;">
-      <div class="bg-emerald-500 text-white text-lg font-semibold text-center py-2 px-4 rounded-xl shadow-sm mb-3 shrink-0">
-        🔔 ตารางเวลาออดโรงเรียน
+      <div class="bg-emerald-500 text-white text-lg font-semibold text-center py-2 px-4 rounded-xl shadow-sm mb-3 shrink-0 flex items-center justify-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" /></svg>
+        ตารางเวลาเสียงออด
       </div>
       <div id="bell-list" class="overflow-y-auto flex-grow flex flex-col gap-2"></div>
       <div class="flex gap-2 mt-3 shrink-0">
         <input type="time" id="bell-time" class="px-2 py-1 border border-gray-300 rounded-lg">
         <input type="text" id="bell-desc" placeholder="เช่น เข้าแถวเช้า" class="flex-grow px-3 py-1 border border-gray-300 rounded-lg">
-        <button id="bell-add-btn" onclick="addBell()" class="bg-emerald-500 hover:bg-emerald-600 text-white font-medium px-4 py-1 rounded-lg transition">เพิ่ม</button>
+        <button id="bell-add-btn" onclick="addBell()" class="bg-emerald-500 hover:bg-emerald-600 text-white font-medium px-4 py-1 rounded-lg transition flex items-center gap-1">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+          เพิ่ม
+        </button>
       </div>
     </div>
 
     <!-- Announcements -->
     <div class="bg-white/80 backdrop-blur-md border border-white rounded-2xl shadow-lg p-4 flex flex-col flex-grow">
-      <div class="bg-purple-600 text-white text-lg font-semibold text-center py-2 px-4 rounded-xl shadow-sm mb-3 shrink-0">
-        📢 ประวัติประกาศจากคุณครู (LINE)
+      <div class="bg-purple-600 text-white text-lg font-semibold text-center py-2 px-4 rounded-xl shadow-sm mb-3 shrink-0 flex items-center justify-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
+        ประวัติการประกาศข่าวสาร
       </div>
       <div id="announce-list" class="overflow-y-auto flex-grow flex flex-col gap-2"></div>
     </div>
@@ -245,9 +258,11 @@
           classes += "bg-white border border-gray-100 shadow-sm";
         }
 
+        const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 inline-block mr-1"><path fill-rule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clip-rule="evenodd" /></svg>`;
+
         return `
           <div class="${classes}">
-            <span class="truncate pr-2">${isPlaying ? '▶️ ' : ''}${item.title || ('วิดีโอ ' + item.id)}</span>
+            <span class="truncate pr-2 flex items-center">${isPlaying ? playIcon : ''}${item.title || ('วิดีโอ ' + item.id)}</span>
             <span class="text-xs shrink-0 ${isPlayed ? '' : 'text-gray-400'}">${isPlayed ? 'เล่นแล้ว' : ''}</span>
           </div>
         `;
@@ -297,8 +312,12 @@
         <div class="flex justify-between items-center px-3 py-2 bg-white rounded-lg border border-gray-100 shadow-sm">
           <span class="text-gray-700"><b>${b.time}</b> - ${b.desc}</span>
           <div class="flex gap-2">
-            <button onclick="editBell(${idx})" class="text-amber-500 hover:text-amber-600 transition">✏️</button>
-            <button onclick="removeBell(${idx})" class="text-red-500 hover:text-red-600 transition">❌</button>
+            <button onclick="editBell(${idx})" class="text-amber-500 hover:text-amber-600 transition" title="แก้ไข">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" /></svg>
+            </button>
+            <button onclick="removeBell(${idx})" class="text-red-500 hover:text-red-600 transition" title="ลบ">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+            </button>
           </div>
         </div>
       `).join('');
@@ -311,7 +330,7 @@
         if (editBellIndex > -1) {
           bells[editBellIndex] = {time, desc};
           editBellIndex = -1;
-          document.getElementById('bell-add-btn').innerText = 'เพิ่ม';
+          document.getElementById('bell-add-btn').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg> เพิ่ม';
         } else {
           bells.push({time, desc});
         }
@@ -445,7 +464,7 @@
 
     function renderPickups(pickups) {
       if (!pickups || pickups.length === 0) {
-        document.getElementById('pickup-list').innerHTML = '<div class="text-center text-gray-400 mt-8 text-lg">ไม่มีคิวรับกลับบ้าน...</div>';
+        document.getElementById('pickup-list').innerHTML = '<div class="text-center text-gray-400 mt-8 text-lg">ไม่มีรายการนักเรียนรอรับกลับ...</div>';
         lastPickupString = "";
         return;
       }
