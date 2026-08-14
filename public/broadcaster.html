@@ -573,11 +573,24 @@
               }
               const sosPlayer = document.getElementById('sos-player');
               if (sosPlayer) {
-                duckMusicVolume(true);
+                // Cut music entirely
+                if (typeof ytPlayer !== 'undefined' && ytPlayer && ytPlayer.stopVideo) {
+                  ytPlayer.stopVideo();
+                  currentMusicIndex = musicQueue.length;
+                  renderMusicQueue();
+                }
+                
+                // Stop any current announcement/bell
+                if (typeof player !== 'undefined' && player) {
+                  player.pause();
+                }
+                
                 sosPlayer.play().catch(e => console.warn(e));
               }
               
               audioQueue = []; // Clear current queue to prioritize SOS
+              isPlayingTTS = false; // Reset TTS state
+              
               fetchAudioData(`Emergency. SOS Code ${sosCode}.`, "en-GB").then(urlEn => {
                 if (urlEn) audioQueue.push(urlEn);
                 return fetchAudioData(`ประกาศเตือนภัยฉุกเฉิน. เอส โอ เอส โค้ด ${sosCode}`, "th-TH");
