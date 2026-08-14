@@ -4,59 +4,107 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Remote Control Panel - School Broadcasting Hub</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-  
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- โหลด Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#7B1C3E',
+            secondary: '#1B3A6B',
+            background: '#F5F4F2',
+          },
+          fontFamily: {
+            sans: ['Sukhumvit Set', 'Kanit', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
 
   <style> 
-    @font-face { font-family: 'MySukhumvit'; src: url('sukhumvit.ttf') format('truetype'); }
-    body { background-color: #f4f6f8; padding: 20px; font-family: 'MySukhumvit', 'Kanit', sans-serif; min-height: 100vh; }
-    .box { border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-    .school-logo { max-width: 140px; height: auto; display: block; margin: 0 auto 15px auto; }
+    @font-face { font-family: 'Sukhumvit Set'; src: url('sukhumvit.ttf') format('truetype'); font-display: swap; }
+    
+    body {
+      background-color: #F5F4F2;
+      background-image: radial-gradient(circle at 100% 0%, #F5E8ED 0%, transparent 40%),
+                        radial-gradient(circle at 0% 100%, #EEF2F8 0%, transparent 40%);
+      background-attachment: fixed;
+    }
+    
+    /* Loading spinner animation */
+    .is-loading {
+      position: relative;
+      color: transparent !important;
+      pointer-events: none;
+    }
+    .is-loading::after {
+      content: "";
+      position: absolute;
+      left: calc(50% - 0.5em);
+      top: calc(50% - 0.5em);
+      width: 1em;
+      height: 1em;
+      border: 2px solid white;
+      border-right-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
   </style>
 </head>
-<body>
-  <div class="container" style="max-width: 600px;">
+<body class="min-h-screen text-gray-800 p-4">
+  <div class="max-w-xl mx-auto flex flex-col gap-5">
     
-    <div id="app-section">
-      <div class="box" style="background: #173d66; color: white; text-align: center;">
-        <h1 class="title is-4 has-text-white mb-2">แผงควบคุมระยะไกล</h1>
-        <p class="is-size-6">ผู้ใช้งาน: <span id="user-display" class="has-text-warning"></span></p>
+    <div id="app-section" class="flex flex-col gap-5">
+      <!-- Header -->
+      <div class="bg-primary text-white text-center py-4 px-6 rounded-2xl shadow-lg border border-white/20">
+        <h1 class="text-xl font-semibold mb-1">แผงควบคุมระยะไกล</h1>
+        <p class="text-sm opacity-90">ผู้ใช้งาน: <span id="user-display" class="font-medium text-amber-300">Admin</span></p>
       </div>
 
       <!-- Music Remote -->
-      <div class="box">
-        <h2 class="title is-5"><i class="fas fa-music has-text-danger"></i> สั่งเปิดเพลง (YouTube)</h2>
-        <div class="field">
-          <label class="label">ลิงก์วิดีโอ YouTube</label>
-          <div class="control">
-            <input class="input" type="text" id="yt-url" placeholder="เช่น https://youtu.be/xxxxxxx">
-          </div>
+      <div class="bg-white/80 backdrop-blur-md border border-white rounded-2xl shadow-lg p-5">
+        <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
+          <i class="fas fa-music text-red-500"></i> สั่งเปิดเพลง (YouTube)
+        </h2>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">ลิงก์วิดีโอ YouTube</label>
+          <input type="text" id="yt-url" placeholder="เช่น https://youtu.be/xxxxxxx" 
+            class="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition">
         </div>
-        <button class="button is-danger is-fullwidth" id="btn-add-music" onclick="addMusic()">
-          <i class="fas fa-play mr-2"></i> เพิ่มเข้าคิวเพลง
+        <button id="btn-add-music" onclick="addMusic()" 
+          class="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 rounded-lg shadow-sm transition flex justify-center items-center gap-2">
+          <i class="fas fa-play"></i> เพิ่มเข้าคิวเพลง
         </button>
       </div>
 
       <!-- Announcement Remote -->
-      <div class="box">
-        <h2 class="title is-5"><i class="fas fa-bullhorn has-text-link"></i> พิมพ์ข้อความประกาศ</h2>
-        <div class="field">
-          <label class="label">ข้อความภาษาไทย (ระบบจะแปลอิ้งให้เอง)</label>
-          <div class="control">
-            <textarea class="textarea" id="announce-text" placeholder="พิมพ์ข้อความที่ต้องการให้คอมพิวเตอร์กลางประกาศออกลำโพง..."></textarea>
-          </div>
+      <div class="bg-white/80 backdrop-blur-md border border-white rounded-2xl shadow-lg p-5">
+        <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
+          <i class="fas fa-bullhorn text-secondary"></i> พิมพ์ข้อความประกาศ
+        </h2>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">ข้อความภาษาไทย (ระบบจะแปลอิ้งให้เอง)</label>
+          <textarea id="announce-text" placeholder="พิมพ์ข้อความที่ต้องการให้คอมพิวเตอร์กลางประกาศออกลำโพง..." 
+            class="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition h-28 resize-none"></textarea>
         </div>
-        <button class="button is-link is-fullwidth" id="btn-add-announce" onclick="addAnnouncement()">
-          <i class="fas fa-paper-plane mr-2"></i> ส่งข้อความประกาศ
+        <button id="btn-add-announce" onclick="addAnnouncement()" 
+          class="w-full bg-secondary hover:bg-[#12274b] text-white font-medium py-2.5 rounded-lg shadow-sm transition flex justify-center items-center gap-2">
+          <i class="fas fa-paper-plane"></i> ส่งข้อความประกาศ
         </button>
       </div>
 
-      <button class="button is-text is-fullwidth mt-5" onclick="window.history.back()">กลับสู่หน้าหลัก</button>
+      <button onclick="window.history.back()" 
+        class="w-full mt-2 text-gray-500 hover:text-gray-800 font-medium py-2 transition">
+        กลับสู่หน้าหลัก
+      </button>
     </div>
 
   </div>

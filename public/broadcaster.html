@@ -5,185 +5,135 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>School Broadcasting Hub</title>
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#173d66">
+  <meta name="theme-color" content="#7B1C3E">
   
   <!-- โหลด YouTube IFrame API -->
   <script src="https://www.youtube.com/iframe_api"></script>
+  <!-- โหลด Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#7B1C3E',
+            secondary: '#1B3A6B',
+            background: '#F5F4F2',
+          },
+          fontFamily: {
+            sans: ['Sukhumvit Set', 'Kanit', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
 
   <style>
     @font-face {
-      font-family: 'MySukhumvit';
+      font-family: 'Sukhumvit Set';
       src: url('sukhumvit.ttf') format('truetype');
       font-display: swap;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background-color: #e6e6d7;
-      padding: 10px;
-      font-family: 'MySukhumvit', 'Kanit', sans-serif;
-      height: 100vh;
-      overflow: hidden;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 15px;
+      background-color: #F5F4F2;
+      background-image: radial-gradient(circle at 100% 0%, #F5E8ED 0%, transparent 40%),
+                        radial-gradient(circle at 0% 100%, #EEF2F8 0%, transparent 40%);
+      background-attachment: fixed;
     }
 
-    /* Common Panels */
-    .panel {
-      background: white;
-      border-radius: 12px;
-      padding: 15px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
+    /* ซ่อน scrollbar แต่ยัง scroll ได้ */
+    ::-webkit-scrollbar {
+      width: 6px;
     }
-    .panel-header {
-      background-color: #173d66;
-      color: white;
-      padding: 12px 15px;
-      border-radius: 8px;
-      margin-bottom: 10px;
-      font-size: 1.3rem;
-      font-weight: 600;
-      text-align: center;
-      flex-shrink: 0;
+    ::-webkit-scrollbar-track {
+      background: transparent;
     }
-
-    /* Left Pane: Pickup Queue */
-    .left-pane { height: calc(100vh - 20px); }
-    .pickup-list { overflow-y: auto; flex-grow: 1; padding-right: 5px; }
-    
-    .student-card {
-      background: white;
-      border-left: 8px solid #3298dc;
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.1);
       border-radius: 10px;
-      padding: 15px;
-      margin-bottom: 10px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.08);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      animation: slideIn 0.3s ease-out;
     }
-    .student-name { font-size: 1.8rem; font-weight: 600; }
-    .gate-label { font-size: 1.2rem; color: #3298dc; }
-    .time-badge {
-      background-color: #173d66; color: white;
-      padding: 5px 15px; border-radius: 20px; font-size: 1.2rem;
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(0,0,0,0.2);
     }
 
-    /* Right Pane */
-    .right-pane {
-      display: grid;
-      grid-template-rows: 40% 30% 1fr;
-      gap: 15px;
-      height: calc(100vh - 20px);
+    @keyframes slideIn { 
+      from { opacity: 0; transform: translateX(-10px); } 
+      to { opacity: 1; transform: translateX(0); } 
     }
-
-    /* Music Player */
-    .music-controls { display: flex; gap: 8px; margin-bottom: 10px; }
-    .music-controls input {
-      flex-grow: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc;
-      font-family: inherit; font-size: 1rem;
+    .animate-slide-in {
+      animation: slideIn 0.3s ease-out forwards;
     }
-    .music-controls button {
-      padding: 8px 15px; background: #e74c3c; color: white; border: none;
-      border-radius: 6px; cursor: pointer; font-family: inherit; font-weight: 600;
-    }
-    .override-box {
-      margin-top: 5px; font-size: 0.9rem; color: #555;
-      display: flex; align-items: center; gap: 5px;
-    }
-    .queue-list { overflow-y: auto; flex-grow: 1; font-size: 0.9rem; }
-    .queue-item {
-      padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;
-    }
-    .queue-item.playing { background: #fff3cd; font-weight: bold; border-left: 4px solid #ffc107; }
-
-    /* Bell Schedule */
-    .bell-list { overflow-y: auto; flex-grow: 1; }
-    .bell-item {
-      display: flex; justify-content: space-between; padding: 8px;
-      border-bottom: 1px solid #eee; font-size: 1.1rem;
-    }
-    .bell-add { display: flex; gap: 5px; margin-top: 10px; }
-    .bell-add input { padding: 5px; border: 1px solid #ccc; font-family: inherit; }
-    .bell-add button { background: #2ecc71; color: white; border: none; padding: 5px 10px; cursor: pointer; }
-
-    /* Announcements */
-    .announce-list { overflow-y: auto; flex-grow: 1; font-size: 1rem; }
-    .announce-item {
-      padding: 10px; border-bottom: 1px dashed #ccc;
-    }
-    .announce-en { color: #888; font-size: 0.9rem; font-style: italic; }
-
-    @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
-
-    /* Audio Gate Overlay (Removed - using inline DOM audio unlock) */
-    .status-msg { text-align: center; color: #888; margin-top: 20px; font-size: 1.2rem; }
   </style>
 </head>
-<body>
+<body class="h-screen overflow-hidden p-4 text-gray-800 flex gap-4">
 
   <!-- LEFT PANE: Pickups -->
-  <div class="panel left-pane">
-    <div class="panel-header">รายชื่อนักเรียนรับกลับบ้าน</div>
-    <div id="pickup-list" class="pickup-list">
-      <div class="status-msg">กำลังเชื่อมต่อข้อมูล...</div>
+  <div class="w-1/2 flex flex-col bg-white/80 backdrop-blur-md border border-white rounded-2xl shadow-lg p-4 h-full">
+    <div class="bg-primary text-white text-xl font-semibold text-center py-3 px-4 rounded-xl shadow-sm mb-4 shrink-0">
+      รายชื่อนักเรียนรับกลับบ้าน
+    </div>
+    <div id="pickup-list" class="overflow-y-auto flex-grow pr-2 flex flex-col gap-3">
+      <div class="text-center text-gray-400 mt-8 text-lg">กำลังเชื่อมต่อข้อมูล...</div>
     </div>
   </div>
 
   <!-- RIGHT PANE -->
-  <div class="right-pane">
+  <div class="w-1/2 flex flex-col gap-4 h-full">
     
     <!-- Music Player -->
-    <div class="panel">
-      <div class="panel-header" style="background:#e74c3c;">🎵 ระบบเปิดเพลง (YouTube Bot)</div>
-      <div class="music-controls">
-        <input type="text" id="yt-url" placeholder="วางลิงก์ YouTube ที่นี่...">
-        <button onclick="addMusicToQueue()">เพิ่มคิวเพลง</button>
-        <button onclick="skipMusic()" style="background:#f39c12;">ข้าม (Skip)</button>
+    <div class="bg-white/80 backdrop-blur-md border border-white rounded-2xl shadow-lg p-4 flex flex-col" style="height: 40%;">
+      <div class="bg-red-600 text-white text-lg font-semibold text-center py-2 px-4 rounded-xl shadow-sm mb-3 shrink-0">
+        🎵 ระบบเปิดเพลง (YouTube Bot)
       </div>
-      <div class="override-box">
-        <input type="checkbox" id="override-bells"> <label for="override-bells">ปลดล็อกระบบตัดเพลง (อนุญาตให้เพลงเฟดดับเองตอนออดดัง)</label>
+      <div class="flex gap-2 mb-2">
+        <input type="text" id="yt-url" placeholder="วางลิงก์ YouTube ที่นี่..." class="flex-grow px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+        <button onclick="addMusicToQueue()" class="bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg transition">เพิ่มคิวเพลง</button>
+        <button onclick="skipMusic()" class="bg-orange-500 hover:bg-orange-600 text-white font-medium px-4 py-2 rounded-lg transition">ข้าม (Skip)</button>
       </div>
-      <div id="music-queue" class="queue-list"></div>
+      <div class="flex items-center gap-2 mb-3 text-sm text-gray-600">
+        <input type="checkbox" id="override-bells" class="rounded text-primary focus:ring-primary"> 
+        <label for="override-bells">ปลดล็อกระบบตัดเพลง (อนุญาตให้เพลงเฟดดับเองตอนออดดัง)</label>
+      </div>
+      <div id="music-queue" class="overflow-y-auto flex-grow text-sm flex flex-col gap-2"></div>
+      
       <!-- Hidden YT Player -->
-      <div id="yt-player-container" style="position:absolute; width:0; height:0; overflow:hidden; left:-9999px;">
+      <div id="yt-player-container" class="absolute w-0 h-0 overflow-hidden -left-[9999px]">
         <div id="yt-player"></div>
       </div>
     </div>
 
     <!-- Bell Schedule -->
-    <div class="panel">
-      <div class="panel-header" style="background:#2ecc71;">🔔 ตารางเวลาออดโรงเรียน</div>
-      <div id="bell-list" class="bell-list"></div>
-      <div class="bell-add">
-        <input type="time" id="bell-time">
-        <input type="text" id="bell-desc" placeholder="เช่น เข้าแถวเช้า" style="flex-grow:1;">
-        <button id="bell-add-btn" onclick="addBell()">เพิ่ม</button>
+    <div class="bg-white/80 backdrop-blur-md border border-white rounded-2xl shadow-lg p-4 flex flex-col" style="height: 30%;">
+      <div class="bg-emerald-500 text-white text-lg font-semibold text-center py-2 px-4 rounded-xl shadow-sm mb-3 shrink-0">
+        🔔 ตารางเวลาออดโรงเรียน
+      </div>
+      <div id="bell-list" class="overflow-y-auto flex-grow flex flex-col gap-2"></div>
+      <div class="flex gap-2 mt-3 shrink-0">
+        <input type="time" id="bell-time" class="px-2 py-1 border border-gray-300 rounded-lg">
+        <input type="text" id="bell-desc" placeholder="เช่น เข้าแถวเช้า" class="flex-grow px-3 py-1 border border-gray-300 rounded-lg">
+        <button id="bell-add-btn" onclick="addBell()" class="bg-emerald-500 hover:bg-emerald-600 text-white font-medium px-4 py-1 rounded-lg transition">เพิ่ม</button>
       </div>
     </div>
 
     <!-- Announcements -->
-    <div class="panel">
-      <div class="panel-header" style="background:#9b59b6;">📢 ประวัติประกาศจากคุณครู (LINE)</div>
-      <div id="announce-list" class="announce-list"></div>
+    <div class="bg-white/80 backdrop-blur-md border border-white rounded-2xl shadow-lg p-4 flex flex-col flex-grow">
+      <div class="bg-purple-600 text-white text-lg font-semibold text-center py-2 px-4 rounded-xl shadow-sm mb-3 shrink-0">
+        📢 ประวัติประกาศจากคุณครู (LINE)
+      </div>
+      <div id="announce-list" class="overflow-y-auto flex-grow flex flex-col gap-2"></div>
     </div>
 
   </div>
 
   <!-- Hidden HTML5 Audio for TTS and Bells -->
-  <audio id="main-player" style="display:none;"></audio>
-  <audio id="bell-player" style="display:none;" src="https://assets.mixkit.co/active_storage/sfx/2042/2042-preview.mp3"></audio> <!-- ตัวอย่างเสียงออด -->
+  <audio id="main-player" class="hidden"></audio>
+  <audio id="bell-player" class="hidden" src="https://assets.mixkit.co/active_storage/sfx/2042/2042-preview.mp3"></audio>
 
   <script>
     // ==========================================
     // ⚙️ Configurations & Global State
     // ==========================================
-    // ⚠️ IMPORTANT: Update this URL to the NEW deployment URL after deploying code.gs
     const API_URL = "https://script.google.com/macros/s/AKfycbyDmhCMyqQdnF3LdDSR_sFzCW3dj5C5Oh7D-ToR529Ij01nQLCjZM7Iqec6E_VqDlSGtg/exec"; 
     
     // Pickups
@@ -231,26 +181,47 @@
       return (match && match[1]) ? match[1] : null;
     }
 
+    async function fetchYouTubeTitle(vid) {
+      try {
+        const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${vid}`);
+        if (!res.ok) return `วิดีโอ ${vid}`;
+        const data = await res.json();
+        return data.title || `วิดีโอ ${vid}`;
+      } catch(e) {
+        return `วิดีโอ ${vid}`;
+      }
+    }
+
     async function addMusicToQueue() {
       const urlInput = document.getElementById('yt-url');
       const vid = extractVideoID(urlInput.value);
       if (!vid) return alert('ลิงก์ YouTube ไม่ถูกต้อง');
       urlInput.value = '';
 
-      musicQueue.push({ id: vid, url: 'https://youtu.be/'+vid });
+      const title = await fetchYouTubeTitle(vid);
+      musicQueue.push({ id: vid, url: 'https://youtu.be/'+vid, title: title });
       renderMusicQueue();
-      if (currentMusicIndex === -1 || ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
-        playNextMusic();
+      if (currentMusicIndex === -1 || currentMusicIndex >= musicQueue.length - 1 || ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
+        if (currentMusicIndex === -1 && musicQueue.length === 1) {
+          playNextMusic();
+        } else if (currentMusicIndex >= musicQueue.length - 1 && ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
+          playNextMusic();
+        }
       }
     }
 
     function playNextMusic() {
-      if (currentMusicIndex + 1 < musicQueue.length) {
+      if (currentMusicIndex === -1) {
+        currentMusicIndex = 0;
+      } else {
         currentMusicIndex++;
+      }
+
+      if (currentMusicIndex < musicQueue.length) {
         ytPlayer.loadVideoById(musicQueue[currentMusicIndex].id);
         renderMusicQueue();
       } else {
-        currentMusicIndex = -1; // Finished queue
+        // Finished queue, don't reset to 0
         renderMusicQueue();
       }
     }
@@ -261,19 +232,35 @@
 
     function renderMusicQueue() {
       const qBox = document.getElementById('music-queue');
-      qBox.innerHTML = musicQueue.map((item, idx) => `
-        <div class="queue-item ${idx === currentMusicIndex ? 'playing' : ''}">
-          <span>${idx === currentMusicIndex ? '▶️ ' : ''} วิดีโอ ${item.id}</span>
-        </div>
-      `).join('');
+      qBox.innerHTML = musicQueue.map((item, idx) => {
+        let isPlaying = (idx === currentMusicIndex);
+        let isPlayed = (idx < currentMusicIndex);
+        
+        let classes = "px-3 py-2 rounded-lg flex justify-between items-center ";
+        if (isPlaying) {
+          classes += "bg-amber-100 border-l-4 border-amber-500 font-semibold text-amber-900";
+        } else if (isPlayed) {
+          classes += "bg-gray-100 text-gray-400 opacity-60";
+        } else {
+          classes += "bg-white border border-gray-100 shadow-sm";
+        }
+
+        return `
+          <div class="${classes}">
+            <span class="truncate pr-2">${isPlaying ? '▶️ ' : ''}${item.title || ('วิดีโอ ' + item.id)}</span>
+            <span class="text-xs shrink-0 ${isPlayed ? '' : 'text-gray-400'}">${isPlayed ? 'เล่นแล้ว' : ''}</span>
+          </div>
+        `;
+      }).join('');
+      qBox.scrollTop = qBox.scrollHeight;
     }
 
-    // --- Audio Ducking (หรี่เพลงตอนพูด) ---
+    // --- Audio Ducking ---
     function duckMusicVolume(isDucking) {
       if (!ytPlayer || !ytPlayer.setVolume) return;
       clearInterval(fadeInterval);
       let vol = ytPlayer.getVolume();
-      let target = isDucking ? 15 : 100; // หรี่เหลือ 15%, คืนกลับ 100%
+      let target = isDucking ? 15 : 100;
       let step = isDucking ? -5 : 5;
       
       fadeInterval = setInterval(() => {
@@ -289,14 +276,13 @@
 
     function stopMusicForBell() {
       if (ytPlayer && ytPlayer.stopVideo) {
-        duckMusicVolume(true); // Fade out quickly
+        duckMusicVolume(true);
         setTimeout(() => ytPlayer.stopVideo(), 1000);
-        currentMusicIndex = -1;
-        musicQueue = [];
+        // We do NOT clear the queue, we just skip to the end so it stops playing
+        currentMusicIndex = musicQueue.length;
         renderMusicQueue();
       }
     }
-
 
     // ==========================================
     // 2. Bell Schedule System
@@ -308,11 +294,11 @@
     function renderBells() {
       bells.sort((a,b) => a.time.localeCompare(b.time));
       document.getElementById('bell-list').innerHTML = bells.map((b, idx) => `
-        <div class="bell-item">
-          <span><b>${b.time}</b> - ${b.desc}</span>
-          <div>
-            <button onclick="editBell(${idx})" style="background:none; border:none; color:#f39c12; cursor:pointer; margin-right:5px;">✏️</button>
-            <button onclick="removeBell(${idx})" style="background:none; border:none; color:#e74c3c; cursor:pointer;">❌</button>
+        <div class="flex justify-between items-center px-3 py-2 bg-white rounded-lg border border-gray-100 shadow-sm">
+          <span class="text-gray-700"><b>${b.time}</b> - ${b.desc}</span>
+          <div class="flex gap-2">
+            <button onclick="editBell(${idx})" class="text-amber-500 hover:text-amber-600 transition">✏️</button>
+            <button onclick="removeBell(${idx})" class="text-red-500 hover:text-red-600 transition">❌</button>
           </div>
         </div>
       `).join('');
@@ -353,7 +339,6 @@
       const now = new Date();
       const timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
       
-      // ถ้าเวลาตรงกับในตาราง และยังไม่ได้กดกริ่งในนาทีนี้
       const bell = bells.find(b => b.time === timeStr);
       if (bell && lastRungBell !== timeStr) {
         lastRungBell = timeStr;
@@ -364,14 +349,11 @@
     async function triggerBellSequence(desc) {
       const override = document.getElementById('override-bells').checked;
       if (!override) {
-        stopMusicForBell(); // ตัดเพลงออก (fade out 1วิ แล้วหยุด)
+        stopMusicForBell();
       }
-
-      // เล่นเสียงออด (กริ่ง)
       const bellSfx = document.getElementById('bell-player');
       await new Promise(r => { bellSfx.onended = r; bellSfx.play(); });
 
-      // เอา AI ประกาศตาม
       const txt = "ขณะนี้เวลา " + lastRungBell.replace(':', ' นาฬิกา ') + " นาที, " + desc;
       const audioUrl = await fetchAudioData(txt, "th-TH");
       if(audioUrl) { audioQueue.push(audioUrl); processAudioQueue(); }
@@ -405,7 +387,7 @@
     async function processAudioQueue() {
       if (isPlayingTTS) return;
       isPlayingTTS = true;
-      duckMusicVolume(true); // หรี่เพลงรอเลย
+      duckMusicVolume(true);
 
       while (audioQueue.length > 0) {
         const audioSrc = audioQueue.shift();
@@ -425,7 +407,7 @@
       }
 
       isPlayingTTS = false;
-      duckMusicVolume(false); // คืนเสียงเพลง
+      duckMusicVolume(false);
     }
 
     async function queueStudentPickup(student) {
@@ -446,7 +428,6 @@
     }
 
     async function queueTeacherAnnouncement(item) {
-      // item = { row, th, en }
       const audios = await Promise.all([
         fetchAudioData("Attention please, ", "en-GB"),
         fetchAudioData(item.en, "en-GB"),
@@ -464,17 +445,17 @@
 
     function renderPickups(pickups) {
       if (!pickups || pickups.length === 0) {
-        document.getElementById('pickup-list').innerHTML = '<div class="status-msg">ไม่มีคิวรับกลับบ้าน...</div>';
+        document.getElementById('pickup-list').innerHTML = '<div class="text-center text-gray-400 mt-8 text-lg">ไม่มีคิวรับกลับบ้าน...</div>';
         lastPickupString = "";
         return;
       }
       const html = pickups.map(item => `
-        <div class="student-card">
+        <div class="bg-white border-l-8 border-secondary rounded-xl p-4 shadow-sm flex justify-between items-center animate-slide-in">
           <div>
-            <div class="student-name">${item.name}</div>
-            <div class="gate-label">${item.gate || 'จุดรับนักเรียน'}</div>
+            <div class="text-2xl font-bold text-gray-800">${item.name}</div>
+            <div class="text-secondary font-medium mt-1">${item.gate || 'จุดรับนักเรียน'}</div>
           </div>
-          <span class="time-badge">${item.time} น.</span>
+          <span class="bg-secondary text-white px-4 py-1.5 rounded-full text-lg font-medium shadow-sm">${item.time} น.</span>
         </div>
       `).join('');
       
@@ -502,9 +483,9 @@
           sessionStorage.setItem('sv_announcedMsgs', JSON.stringify([...announcedIds]));
           
           const div = document.createElement('div');
-          div.className = 'announce-item';
-          div.innerHTML = `<div>${item.th}</div><div class="announce-en">${item.en}</div>`;
-          listDiv.prepend(div); // เพิ่มบนสุด
+          div.className = 'p-3 bg-white border border-gray-100 rounded-lg shadow-sm animate-slide-in';
+          div.innerHTML = `<div class="font-medium text-gray-800">${item.th}</div><div class="text-gray-500 text-sm italic mt-1">${item.en}</div>`;
+          listDiv.prepend(div);
           
           if (!isInitialLoad) queueTeacherAnnouncement(item);
         }
@@ -512,30 +493,36 @@
     }
 
     function pollServer() {
-      checkBells(); // เช็คเวลาทุกครั้งที่ loop วิ่ง (ทุก ~8 วิ ก็แม่นพอสำหรับระดับนาที)
+      checkBells(); 
 
       fetch(API_URL + "?action=get_dashboard_data&t=" + new Date().getTime())
         .then(r => r.json())
-        .then(res => {
+        .then(async res => {
           if (res.success) {
             renderPickups(res.pickups);
             renderAnnouncements(res.announcements);
             
             // Handle Remote Music Queue
             if (res.musicQueue && res.musicQueue.length > 0) {
-              res.musicQueue.forEach(item => {
+              for (const item of res.musicQueue) {
                 if (!announcedIds.has('music_' + item.row)) {
                   announcedIds.add('music_' + item.row);
                   sessionStorage.setItem('sv_announcedMsgs', JSON.stringify([...announcedIds]));
                   
-                  // Add to local queue
-                  musicQueue.push({ id: item.videoId, url: 'https://youtu.be/' + item.videoId });
+                  const title = await fetchYouTubeTitle(item.videoId);
+                  musicQueue.push({ id: item.videoId, url: 'https://youtu.be/' + item.videoId, title: title });
                   renderMusicQueue();
-                  if (currentMusicIndex === -1 || ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
-                    playNextMusic();
+                  
+                  // If queue was finished or nothing is playing, play the next one
+                  if (currentMusicIndex === -1 || currentMusicIndex >= musicQueue.length - 1 || ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
+                    if (currentMusicIndex === -1 && musicQueue.length === 1) {
+                      playNextMusic();
+                    } else if (currentMusicIndex >= musicQueue.length - 1 && ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
+                      playNextMusic();
+                    }
                   }
                 }
-              });
+              }
             }
           }
           isInitialLoad = false;
@@ -545,9 +532,9 @@
     // Init
     renderBells();
     pollServer();
-    setInterval(pollServer, 8000); // 8 วินาทีต่อรอบ
+    setInterval(pollServer, 8000);
 
-    // Register Service Worker for PWA (with Next.js bypass)
+    // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./service-worker.js')
