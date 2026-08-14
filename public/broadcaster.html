@@ -118,17 +118,22 @@
         ตารางเวลาเสียงออด
       </div>
       <div id="bell-list" class="overflow-y-auto flex-grow flex flex-col gap-2"></div>
-      <div class="flex gap-2 mt-3 shrink-0">
-        <input type="time" id="bell-time" class="px-2 py-1 border border-gray-300 rounded-lg">
-        <input type="text" id="bell-desc" placeholder="เช่น เข้าแถวเช้า" class="flex-grow px-3 py-1 border border-gray-300 rounded-lg">
-        <select id="bell-sound" class="px-2 py-1 border border-gray-300 rounded-lg bg-white">
-          <option value="default">เสียงมาตรฐาน</option>
-          <option value="start">เสียงเข้าเรียน</option>
-          <option value="end">เสียงเลิกเรียน/เปลี่ยนคาบ</option>
-        </select>
-        <button id="bell-add-btn" onclick="addBell()" class="bg-emerald-500 hover:bg-emerald-600 text-white font-medium px-4 py-1 rounded-lg transition flex items-center gap-1">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-          เพิ่ม
+      <div class="flex flex-col gap-2 mt-3 shrink-0 p-2 bg-gray-50 border border-gray-200 rounded-lg">
+        <div class="flex gap-2">
+          <input type="time" id="bell-time" class="px-2 py-1 border border-gray-300 rounded-lg w-1/3">
+          <select id="bell-sound" class="w-2/3 px-2 py-1 border border-gray-300 rounded-lg bg-white">
+            <option value="default">เสียงมาตรฐาน</option>
+            <option value="start">เสียงเข้าเรียน</option>
+            <option value="end">เสียงเลิกเรียน/เปลี่ยนคาบ</option>
+          </select>
+        </div>
+        <div class="flex gap-2">
+          <input type="text" id="bell-desc" placeholder="ประกาศ (ไทย) เช่น หมดเวลาเรียน" class="w-1/2 px-3 py-1 border border-gray-300 rounded-lg">
+          <input type="text" id="bell-desc-en" placeholder="(อังกฤษ) เช่น Class dismissed" class="w-1/2 px-3 py-1 border border-gray-300 rounded-lg">
+        </div>
+        <button id="bell-add-btn" onclick="addBell()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium px-4 py-2 rounded-lg transition flex justify-center items-center gap-1">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+          เพิ่มเวลาออด
         </button>
       </div>
     </div>
@@ -322,7 +327,8 @@
         <div class="flex justify-between items-center px-3 py-2 bg-white rounded-lg border border-gray-100 shadow-sm">
           <div class="flex flex-col">
             <span class="text-gray-700"><b>${b.time}</b> - ${b.desc}</span>
-            <span class="text-xs text-emerald-600">🎵 เสียง: ${soundName}</span>
+            ${b.descEn ? `<span class="text-sm text-gray-500 italic">${b.descEn}</span>` : ''}
+            <span class="text-xs text-emerald-600 mt-1">🎵 เสียง: ${soundName}</span>
           </div>
           <div class="flex gap-2">
             <button onclick="editBell(${idx})" class="text-amber-500 hover:text-amber-600 transition" title="แก้ไข">
@@ -340,18 +346,20 @@
     function addBell() {
       const time = document.getElementById('bell-time').value;
       const desc = document.getElementById('bell-desc').value;
+      const descEn = document.getElementById('bell-desc-en').value;
       const sound = document.getElementById('bell-sound').value;
       if(time && desc) {
         if (editBellIndex > -1) {
-          bells[editBellIndex] = {time, desc, sound};
+          bells[editBellIndex] = {time, desc, descEn, sound};
           editBellIndex = -1;
-          document.getElementById('bell-add-btn').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg> เพิ่ม';
+          document.getElementById('bell-add-btn').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg> เพิ่มเวลาออด';
         } else {
-          bells.push({time, desc, sound});
+          bells.push({time, desc, descEn, sound});
         }
         localStorage.setItem('sv_bells', JSON.stringify(bells));
         document.getElementById('bell-time').value = '';
         document.getElementById('bell-desc').value = '';
+        document.getElementById('bell-desc-en').value = '';
         document.getElementById('bell-sound').value = 'default';
         renderBells();
       }
@@ -361,8 +369,9 @@
       editBellIndex = idx;
       document.getElementById('bell-time').value = bells[idx].time;
       document.getElementById('bell-desc').value = bells[idx].desc;
+      document.getElementById('bell-desc-en').value = bells[idx].descEn || '';
       document.getElementById('bell-sound').value = bells[idx].sound || 'default';
-      document.getElementById('bell-add-btn').innerText = 'บันทึก';
+      document.getElementById('bell-add-btn').innerText = 'บันทึกการแก้ไข';
     }
 
     function removeBell(idx) {
@@ -398,6 +407,18 @@
       else if (bellObj.sound === 'end') bellSoundUrl = encodeURI("./sounds/เลิกเรียน-เปลี่ยนคาบ.mp3");
 
       audioQueue.push(bellSoundUrl);
+
+      // Parse time for English announcement
+      const [h, m] = lastRungBell.split(':');
+      let hourStr = parseInt(h);
+      let ampm = hourStr >= 12 ? 'PM' : 'AM';
+      let hour12 = hourStr % 12 || 12;
+      let minStr = parseInt(m) === 0 ? "o'clock" : parseInt(m);
+      
+      const enTextDesc = bellObj.descEn ? bellObj.descEn : bellObj.desc;
+      const txtEn = "The time is now " + hour12 + " " + minStr + " " + ampm + ", " + enTextDesc;
+      const audioUrlEn = await fetchAudioData(txtEn, "en-GB");
+      if(audioUrlEn) { audioQueue.push(audioUrlEn); }
 
       const txt = "ขณะนี้เวลา " + lastRungBell.replace(':', ' นาฬิกา ') + " นาที, " + bellObj.desc;
       const audioUrl = await fetchAudioData(txt, "th-TH");
