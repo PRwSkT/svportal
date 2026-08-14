@@ -152,6 +152,7 @@
   <!-- Hidden HTML5 Audio for TTS and Bells -->
   <audio id="main-player" class="hidden"></audio>
   <audio id="bell-player" class="hidden" src="https://assets.mixkit.co/active_storage/sfx/2042/2042-preview.mp3"></audio>
+  <audio id="sos-player" class="hidden" src="./sounds/SOS%20Alarm.mp3" loop></audio>
 
   <script>
     // ==========================================
@@ -550,15 +551,44 @@
           announcedIds.add(item.row);
           sessionStorage.setItem('sv_announcedMsgs', JSON.stringify([...announcedIds]));
           
-          if (item.th === '#SOS#') {
+          if (item.th.startsWith('#SOS#:')) {
+            const sosCode = item.th.split(':')[1] || '';
             const div = document.createElement('div');
             div.className = 'p-3 bg-red-100 border border-red-500 rounded-lg shadow-sm animate-slide-in';
-            div.innerHTML = `<div class="font-medium text-red-800 font-bold">🚨 สัญญาณเตือนภัยฉุกเฉิน (SOS)</div>`;
+            div.innerHTML = `<div class="font-medium text-red-800 font-bold">🚨 สัญญาณเตือนภัยฉุกเฉิน (SOS Code: ${sosCode})</div>`;
             listDiv.prepend(div);
             
             if (!isInitialLoad) {
-              audioQueue.push('./sounds/SOS Alarm.mp3');
-              processAudioQueue();
+              const sosPlayer = document.getElementById('sos-player');
+              if (sosPlayer) {
+                duckMusicVolume(true);
+                sosPlayer.play().catch(e => console.warn(e));
+              }
+              
+              audioQueue = []; // Clear current queue to prioritize SOS
+              fetchAudioData(`Emergency. SOS Code ${sosCode}.`, "en-GB").then(urlEn => {
+                if (urlEn) audioQueue.push(urlEn);
+                return fetchAudioData(`ประกาศเตือนภัยฉุกเฉิน. เอส โอ เอส โค้ด ${sosCode}`, "th-TH");
+              }).then(urlTh => {
+                if (urlTh) audioQueue.push(urlTh);
+                processAudioQueue();
+              });
+            }
+            return;
+          }
+          if (item.th === '#STOP_SOS#') {
+            const div = document.createElement('div');
+            div.className = 'p-3 bg-gray-100 border border-gray-400 rounded-lg shadow-sm animate-slide-in';
+            div.innerHTML = `<div class="font-medium text-gray-800 font-bold">🛑 ยกเลิกสัญญาณเตือนภัยฉุกเฉิน</div>`;
+            listDiv.prepend(div);
+
+            if (!isInitialLoad) {
+              const sosPlayer = document.getElementById('sos-player');
+              if (sosPlayer) {
+                sosPlayer.pause();
+                sosPlayer.currentTime = 0;
+              }
+              duckMusicVolume(false);
             }
             return;
           }
