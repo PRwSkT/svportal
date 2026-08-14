@@ -202,7 +202,17 @@
     }
 
     function triggerSOS() {
-      if (!confirm('ยืนยันการส่งสัญญาณเตือนภัยฉุกเฉิน (SOS Alarm) ไปยังลำโพงโรงเรียน?')) return;
+      const sosCode = prompt('เพื่อป้องกันการกดผิดพลาด กรุณาระบุรหัสผ่านฉุกเฉิน (SOS Code):');
+      
+      if (sosCode === null) return; // ยกเลิก
+      
+      if (sosCode !== '9999') {
+        alert('รหัสผ่านฉุกเฉินไม่ถูกต้อง!');
+        return;
+      }
+
+      if (!confirm('ยืนยันอีกครั้ง: คุณต้องการเปิดสัญญาณเตือนภัยฉุกเฉิน (SOS) ทั่วทั้งโรงเรียนจริงหรือไม่?')) return;
+
       const btn = document.getElementById('btn-trigger-sos');
       btn.classList.add('is-loading');
       fetch(API_URL, {
