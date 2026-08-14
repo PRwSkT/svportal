@@ -101,6 +101,21 @@
           ส่งข้อความประกาศ
         </button>
       </div>
+      </div>
+
+      <!-- Emergency Remote -->
+      <div class="bg-red-50 border border-red-200 rounded-2xl shadow-lg p-5">
+        <h2 class="text-lg font-semibold mb-3 flex items-center gap-2 text-red-600">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+          ระบบเตือนภัยฉุกเฉิน
+        </h2>
+        <p class="text-sm text-gray-600 mb-4">กดปุ่มนี้เพื่อส่งสัญญาณเตือนภัยฉุกเฉิน (SOS Alarm) ไปยังลำโพงกลางทันที</p>
+        <button id="btn-trigger-sos" onclick="triggerSOS()" 
+          class="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-3 rounded-lg shadow-sm transition flex justify-center items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" /></svg>
+          เปิดสัญญาณเตือนภัย (SOS)
+        </button>
+      </div>
 
       <button onclick="window.history.back()" 
         class="w-full mt-2 text-gray-500 hover:text-gray-800 font-medium py-2 transition">
@@ -176,6 +191,30 @@
         if (res.success) {
           input.value = '';
           alert('ส่งประกาศไปยังลำโพงเรียบร้อยแล้ว');
+        } else {
+          alert('เกิดข้อผิดพลาด: ' + res.message);
+        }
+      })
+      .catch(err => {
+        btn.classList.remove('is-loading');
+        alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+      });
+    }
+
+    function triggerSOS() {
+      if (!confirm('ยืนยันการส่งสัญญาณเตือนภัยฉุกเฉิน (SOS Alarm) ไปยังลำโพงโรงเรียน?')) return;
+      const btn = document.getElementById('btn-trigger-sos');
+      btn.classList.add('is-loading');
+      fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'add_announcement', text: '#SOS#' })
+      })
+      .then(r => r.json())
+      .then(res => {
+        btn.classList.remove('is-loading');
+        if (res.success) {
+          alert('ส่งสัญญาณเตือนภัยฉุกเฉินไปยังลำโพงเรียบร้อยแล้ว');
         } else {
           alert('เกิดข้อผิดพลาด: ' + res.message);
         }

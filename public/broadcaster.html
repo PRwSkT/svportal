@@ -121,6 +121,11 @@
       <div class="flex gap-2 mt-3 shrink-0">
         <input type="time" id="bell-time" class="px-2 py-1 border border-gray-300 rounded-lg">
         <input type="text" id="bell-desc" placeholder="เช่น เข้าแถวเช้า" class="flex-grow px-3 py-1 border border-gray-300 rounded-lg">
+        <select id="bell-sound" class="px-2 py-1 border border-gray-300 rounded-lg bg-white">
+          <option value="default">เสียงมาตรฐาน</option>
+          <option value="start">เสียงเข้าเรียน</option>
+          <option value="end">เสียงเลิกเรียน/เปลี่ยนคาบ</option>
+        </select>
         <button id="bell-add-btn" onclick="addBell()" class="bg-emerald-500 hover:bg-emerald-600 text-white font-medium px-4 py-1 rounded-lg transition flex items-center gap-1">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
           เพิ่ม
@@ -308,9 +313,17 @@
 
     function renderBells() {
       bells.sort((a,b) => a.time.localeCompare(b.time));
-      document.getElementById('bell-list').innerHTML = bells.map((b, idx) => `
+      document.getElementById('bell-list').innerHTML = bells.map((b, idx) => {
+        let soundName = 'มาตรฐาน';
+        if (b.sound === 'start') soundName = 'เข้าเรียน';
+        else if (b.sound === 'end') soundName = 'เลิกเรียน';
+        
+        return `
         <div class="flex justify-between items-center px-3 py-2 bg-white rounded-lg border border-gray-100 shadow-sm">
-          <span class="text-gray-700"><b>${b.time}</b> - ${b.desc}</span>
+          <div class="flex flex-col">
+            <span class="text-gray-700"><b>${b.time}</b> - ${b.desc}</span>
+            <span class="text-xs text-emerald-600">🎵 เสียง: ${soundName}</span>
+          </div>
           <div class="flex gap-2">
             <button onclick="editBell(${idx})" class="text-amber-500 hover:text-amber-600 transition" title="แก้ไข">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" /></svg>
@@ -320,23 +333,26 @@
             </button>
           </div>
         </div>
-      `).join('');
+        `
+      }).join('');
     }
 
     function addBell() {
       const time = document.getElementById('bell-time').value;
       const desc = document.getElementById('bell-desc').value;
+      const sound = document.getElementById('bell-sound').value;
       if(time && desc) {
         if (editBellIndex > -1) {
-          bells[editBellIndex] = {time, desc};
+          bells[editBellIndex] = {time, desc, sound};
           editBellIndex = -1;
           document.getElementById('bell-add-btn').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg> เพิ่ม';
         } else {
-          bells.push({time, desc});
+          bells.push({time, desc, sound});
         }
         localStorage.setItem('sv_bells', JSON.stringify(bells));
         document.getElementById('bell-time').value = '';
         document.getElementById('bell-desc').value = '';
+        document.getElementById('bell-sound').value = 'default';
         renderBells();
       }
     }
@@ -345,6 +361,7 @@
       editBellIndex = idx;
       document.getElementById('bell-time').value = bells[idx].time;
       document.getElementById('bell-desc').value = bells[idx].desc;
+      document.getElementById('bell-sound').value = bells[idx].sound || 'default';
       document.getElementById('bell-add-btn').innerText = 'บันทึก';
     }
 
@@ -366,19 +383,25 @@
       const bell = bells.find(b => b.time === timeStr);
       if (bell && lastRungBell !== timeStr) {
         lastRungBell = timeStr;
-        triggerBellSequence(bell.desc);
+        triggerBellSequence(bell);
       }
     }
 
-    async function triggerBellSequence(desc) {
+    async function triggerBellSequence(bellObj) {
       const override = document.getElementById('override-bells').checked;
       if (!override) {
         stopMusicForBell();
       }
+      
+      let bellSoundUrl = "https://assets.mixkit.co/active_storage/sfx/2042/2042-preview.mp3";
+      if (bellObj.sound === 'start') bellSoundUrl = "./sounds/เข้าเรียน.mp3";
+      else if (bellObj.sound === 'end') bellSoundUrl = "./sounds/เลิกเรียน-เปลี่ยนคาบ.mp3";
+
       const bellSfx = document.getElementById('bell-player');
+      bellSfx.src = bellSoundUrl;
       await new Promise(r => { bellSfx.onended = r; bellSfx.play(); });
 
-      const txt = "ขณะนี้เวลา " + lastRungBell.replace(':', ' นาฬิกา ') + " นาที, " + desc;
+      const txt = "ขณะนี้เวลา " + lastRungBell.replace(':', ' นาฬิกา ') + " นาที, " + bellObj.desc;
       const audioUrl = await fetchAudioData(txt, "th-TH");
       if(audioUrl) { audioQueue.push(audioUrl); processAudioQueue(); }
     }
@@ -453,12 +476,12 @@
 
     async function queueTeacherAnnouncement(item) {
       const audios = await Promise.all([
-        fetchAudioData("Attention please, ", "en-GB"),
         fetchAudioData(item.en, "en-GB"),
-        fetchAudioData("ประกาศ, ", "th-TH"),
         fetchAudioData(item.th, "th-TH")
       ]);
+      audioQueue.push('./sounds/ประกาศ.mp3');
       audios.forEach(a => { if(a) audioQueue.push(a); });
+      audioQueue.push('./sounds/ประกาศ.mp3');
       processAudioQueue();
     }
 
@@ -505,6 +528,19 @@
         if (!announcedIds.has(item.row)) {
           announcedIds.add(item.row);
           sessionStorage.setItem('sv_announcedMsgs', JSON.stringify([...announcedIds]));
+          
+          if (item.th === '#SOS#') {
+            const div = document.createElement('div');
+            div.className = 'p-3 bg-red-100 border border-red-500 rounded-lg shadow-sm animate-slide-in';
+            div.innerHTML = `<div class="font-medium text-red-800 font-bold">🚨 สัญญาณเตือนภัยฉุกเฉิน (SOS)</div>`;
+            listDiv.prepend(div);
+            
+            if (!isInitialLoad) {
+              audioQueue.push('./sounds/SOS Alarm.mp3');
+              processAudioQueue();
+            }
+            return;
+          }
           
           const div = document.createElement('div');
           div.className = 'p-3 bg-white border border-gray-100 rounded-lg shadow-sm animate-slide-in';
