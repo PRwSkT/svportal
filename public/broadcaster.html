@@ -215,9 +215,28 @@
         videoId: '', 
         playerVars: { 'autoplay': 1, 'controls': 0, 'disablekb': 1, 'rel': 0 },
         events: {
+          'onReady': tryPlayMusic,
           'onStateChange': onPlayerStateChange
         }
       });
+    }
+
+    function tryPlayMusic() {
+      if (!ytPlayer || typeof ytPlayer.loadVideoById !== 'function') return;
+      
+      let state = -1;
+      if (typeof ytPlayer.getPlayerState === 'function') {
+        state = ytPlayer.getPlayerState();
+      }
+      // If playing or buffering, do nothing
+      if (state === YT.PlayerState.PLAYING || state === YT.PlayerState.BUFFERING) return;
+      
+      if (currentMusicIndex < 0) currentMusicIndex = 0;
+      
+      if (currentMusicIndex < musicQueue.length) {
+        ytPlayer.loadVideoById(musicQueue[currentMusicIndex].id);
+      }
+      renderMusicQueue();
     }
 
     function onPlayerStateChange(event) {
@@ -261,19 +280,13 @@
     }
 
     function playNextMusic() {
-      if (currentMusicIndex === -1) {
-        currentMusicIndex = 0;
-      } else {
-        currentMusicIndex++;
-      }
-
+      currentMusicIndex++;
       if (currentMusicIndex < musicQueue.length) {
-        ytPlayer.loadVideoById(musicQueue[currentMusicIndex].id);
-        renderMusicQueue();
-      } else {
-        // Finished queue, don't reset to 0
-        renderMusicQueue();
+        if (ytPlayer && typeof ytPlayer.loadVideoById === 'function') {
+          ytPlayer.loadVideoById(musicQueue[currentMusicIndex].id);
+        }
       }
+      renderMusicQueue();
     }
 
     function skipMusic() {
@@ -676,15 +689,7 @@
                   const title = await fetchYouTubeTitle(item.videoId);
                   musicQueue.push({ id: item.videoId, url: 'https://youtu.be/' + item.videoId, title: title });
                   renderMusicQueue();
-                  
-                  // If queue was finished or nothing is playing, play the next one
-                  if (currentMusicIndex === -1 || currentMusicIndex >= musicQueue.length - 1 || ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
-                    if (currentMusicIndex === -1 && musicQueue.length === 1) {
-                      playNextMusic();
-                    } else if (currentMusicIndex >= musicQueue.length - 1 && ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
-                      playNextMusic();
-                    }
-                  }
+                  tryPlayMusic();
                 }
               }
             }
