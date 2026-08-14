@@ -192,10 +192,16 @@
     document.getElementById('audio-unlock-overlay').addEventListener('click', function() {
       const p1 = document.getElementById('main-player');
       if(p1) { p1.play().catch(e=>{}); p1.pause(); p1.currentTime=0; }
+      
       const p2 = document.getElementById('bell-player');
       if(p2) { p2.play().catch(e=>{}); p2.pause(); p2.currentTime=0; }
+      
       const p3 = document.getElementById('sos-player');
       if(p3) { p3.play().catch(e=>{}); p3.pause(); p3.currentTime=0; }
+
+      if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.playVideo === 'function') {
+        ytPlayer.playVideo();
+      }
 
       this.classList.add('opacity-0');
       setTimeout(() => this.classList.add('hidden'), 500);
@@ -698,14 +704,18 @@
             // Handle Remote Music Queue
             if (res.musicQueue && res.musicQueue.length > 0) {
               for (const item of res.musicQueue) {
-                if (!announcedIds.has('music_' + item.row)) {
-                  announcedIds.add('music_' + item.row);
-                  sessionStorage.setItem('sv_announcedMsgs', JSON.stringify([...announcedIds]));
-                  
-                  const title = await fetchYouTubeTitle(item.videoId);
-                  musicQueue.push({ id: item.videoId, url: 'https://youtu.be/' + item.videoId, title: title });
-                  renderMusicQueue();
-                  tryPlayMusic();
+                if (item.videoId) {
+                  if (!announcedIds.has('music_' + item.row)) {
+                    announcedIds.add('music_' + item.row);
+                    sessionStorage.setItem('sv_announcedMsgs', JSON.stringify([...announcedIds]));
+                    
+                    if (!isInitialLoad) {
+                      const title = await fetchYouTubeTitle(item.videoId);
+                      musicQueue.push({ id: item.videoId, url: 'https://youtu.be/' + item.videoId, title: title });
+                      renderMusicQueue();
+                      tryPlayMusic();
+                    }
+                  }
                 }
               }
             }
