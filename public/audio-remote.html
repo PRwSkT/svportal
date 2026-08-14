@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   
-  <script src="https://accounts.google.com/gsi/client?onload=onGoogleLibraryLoad" async defer></script>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,15 +22,7 @@
 <body>
   <div class="container" style="max-width: 600px;">
     
-    <div class="box has-text-centered" id="login-section">
-      <img src="logo2.png" alt="โลโก้โรงเรียน" class="school-logo">
-      <h1 class="title is-4" style="color: #2c3e50;">ระบบควบคุมเสียงประกาศ (Admin)</h1>
-      <p class="mb-4 has-text-grey is-size-6">กรุณาเข้าสู่ระบบด้วยอีเมลโรงเรียน<br><b>@somkidvittaya.ac.th</b></p>
-      <div id="google-btn-container" style="display: flex; justify-content: center; min-height: 44px;"></div>
-      <div id="login-error" class="has-text-danger mt-3 is-hidden">กรุณาใช้บัญชีของโรงเรียนเท่านั้น</div>
-    </div>
-
-    <div id="app-section" class="is-hidden">
+    <div id="app-section">
       <div class="box" style="background: #173d66; color: white; text-align: center;">
         <h1 class="title is-4 has-text-white mb-2">แผงควบคุมระยะไกล</h1>
         <p class="is-size-6">ผู้ใช้งาน: <span id="user-display" class="has-text-warning"></span></p>
@@ -65,7 +56,7 @@
         </button>
       </div>
 
-      <button class="button is-text is-fullwidth mt-5" onclick="logout()">ออกจากระบบ</button>
+      <button class="button is-text is-fullwidth mt-5" onclick="window.history.back()">กลับสู่หน้าหลัก</button>
     </div>
 
   </div>
@@ -74,59 +65,11 @@
     const API_URL = "https://script.google.com/macros/s/AKfycbyDmhCMyqQdnF3LdDSR_sFzCW3dj5C5Oh7D-ToR529Ij01nQLCjZM7Iqec6E_VqDlSGtg/exec"; 
 
     // ==========================================
-    // 🔐 Auth System
+    // 🚀 Init
     // ==========================================
-    window.onGoogleLibraryLoad = function() {
-      if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
-        google.accounts.id.initialize({
-          client_id: "299916053656-tlt1jbq5pol3nq8kpka89bk9tp1kqgo9.apps.googleusercontent.com",
-          callback: handleCredentialResponse
-        });
-        google.accounts.id.renderButton(
-          document.getElementById("google-btn-container"),
-          { theme: "outline", size: "large", type: "standard", shape: "rectangular", text: "signin_with", logo_alignment: "left" }
-        );
-      }
-    };
-
     window.addEventListener('load', function() {
-      const savedEmail = localStorage.getItem('sv_staff_email');
-      if (savedEmail) {
-        showApp(savedEmail);
-      } else {
-        if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
-          window.onGoogleLibraryLoad();
-        }
-      }
+      document.getElementById('user-display').innerText = 'Admin (SVPortal)';
     });
-
-    function showApp(email) {
-      document.getElementById('login-section').classList.add('is-hidden');
-      document.getElementById('app-section').classList.remove('is-hidden');
-      document.getElementById('user-display').innerText = email;
-    }
-
-    function logout() {
-      localStorage.removeItem('sv_staff_email');
-      location.reload();
-    }
-
-    function handleCredentialResponse(response) {
-      try {
-        let base64Url = response.credential.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-        while (base64Url.length % 4) { base64Url += '='; }
-        const payload = JSON.parse(decodeURIComponent(window.atob(base64Url).split('').map(function(c) { return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2); }).join('')));
-        
-        if (payload.email && payload.email.endsWith("@somkidvittaya.ac.th")) {
-          localStorage.setItem('sv_staff_email', payload.email);
-          showApp(payload.email);
-        } else { 
-          document.getElementById('login-error').classList.remove('is-hidden'); 
-        }
-      } catch (e) {
-        document.getElementById('login-error').classList.remove('is-hidden');
-      }
-    }
 
     // ==========================================
     // 🎵 Remote Control Actions

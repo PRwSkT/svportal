@@ -45,10 +45,10 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // Bypass auth for post-assistant, auth callbacks, and any public html files
+  // Bypass auth for post-assistant, auth callbacks, and any public html files except audio-remote
   if (
     request.nextUrl.pathname.startsWith('/auth') ||
-    request.nextUrl.pathname.endsWith('.html') ||
+    (request.nextUrl.pathname.endsWith('.html') && !request.nextUrl.pathname.includes('audio-remote.html')) ||
     request.nextUrl.pathname.includes('post-assistant')
   ) {
     return response;
