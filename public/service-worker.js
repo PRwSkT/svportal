@@ -2,7 +2,7 @@
 // Service Worker — SV Pickup App
 // ============================================
 
-const CACHE_NAME = 'sv-pickup-v5';
+const CACHE_NAME = 'sv-pickup-v6';
 
 const STATIC_ASSETS = [
   './',
