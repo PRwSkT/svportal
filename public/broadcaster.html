@@ -276,13 +276,7 @@
       const title = await fetchYouTubeTitle(vid);
       musicQueue.push({ id: vid, url: 'https://youtu.be/'+vid, title: title });
       renderMusicQueue();
-      if (currentMusicIndex === -1 || currentMusicIndex >= musicQueue.length - 1 || ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
-        if (currentMusicIndex === -1 && musicQueue.length === 1) {
-          playNextMusic();
-        } else if (currentMusicIndex >= musicQueue.length - 1 && ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
-          playNextMusic();
-        }
-      }
+      tryPlayMusic();
     }
 
     function playNextMusic() {
