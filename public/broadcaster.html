@@ -76,9 +76,10 @@
   </div>
 
   <!-- SOS Flashing Overlay -->
-  <div id="sos-overlay" class="fixed inset-0 z-[9999] bg-red-600 hidden flex-col items-center justify-center animate-pulse">
-    <h1 class="text-white text-6xl md:text-9xl font-black tracking-widest text-center" style="text-shadow: 0 0 20px rgba(0,0,0,0.5);">EMERGENCY</h1>
+  <div id="sos-overlay" class="fixed inset-0 z-[9999] hidden flex-col items-center justify-center animate-pulse">
+    <h1 id="sos-overlay-title" class="text-white text-6xl md:text-9xl font-black tracking-widest text-center" style="text-shadow: 0 0 20px rgba(0,0,0,0.5);">EMERGENCY</h1>
     <h2 id="sos-overlay-code" class="text-white text-4xl md:text-7xl font-bold mt-8 bg-black/30 px-12 py-6 rounded-3xl" style="text-shadow: 0 0 10px rgba(0,0,0,0.5);">CODE: -</h2>
+    <p id="sos-overlay-desc" class="text-white text-2xl md:text-4xl font-medium mt-6 text-center px-12" style="text-shadow: 0 0 10px rgba(0,0,0,0.5);"></p>
   </div>
 
   <!-- LEFT PANE: Pickups -->
@@ -240,6 +241,11 @@
     let isPlayingTTS = false;
     let isPreparingAudio = false;
     const player = document.getElementById('main-player');
+    
+    function getColorThai(color) {
+      const colors = { red: 'แดง', blue: 'น้ำเงิน', yellow: 'เหลือง', orange: 'ส้ม', silver: 'เงิน', black: 'ดำ', green: 'เขียว' };
+      return colors[color] || '';
+    }
 
     // Unlock Audio on First Click
     document.getElementById('audio-unlock-overlay').addEventListener('click', function() {
@@ -811,24 +817,106 @@
         if (!announcedIds.has(item.row)) {
           announcedIds.add(item.row);
           sessionStorage.setItem('sv_announcedMsgs', JSON.stringify([...announcedIds]));
+          // SOS Detection (Color Codes)
+          const sosMatch = item.th.match(/code\s*(red|blue|yellow|orange|silver|black|green)/i) || 
+                           item.en.match(/code\s*(red|blue|yellow|orange|silver|black|green)/i);
           
-          if (item.th.startsWith('#SOS#:')) {
-            const sosCode = item.th.split(':')[1] || '';
+          if (sosMatch) {
+            const colorCode = sosMatch[1].toLowerCase();
+            
+            const sosConfig = {
+              'red': { 
+                th: 'อัคคีภัย / ไฟไหม้',
+                action: 'ให้อพยพนักเรียนและบุคลากรออกจากอาคารไปยังจุดรวมพลที่กำหนดไว้ทันที พร้อมเช็คชื่อ',
+                bg: 'bg-red-600', textCode: 'text-red-800', bgCode: 'bg-red-100', borderCode: 'border-red-500'
+              },
+              'blue': { 
+                th: 'เหตุฉุกเฉินทางการแพทย์',
+                action: 'แจ้งทีมพยาบาลเข้าพื้นที่เกิดเหตุทันที พร้อมกันนักเรียนคนอื่นๆ ออกจากบริเวณนั้น',
+                bg: 'bg-blue-600', textCode: 'text-blue-800', bgCode: 'bg-blue-100', borderCode: 'border-blue-500'
+              },
+              'yellow': {
+                th: 'นักเรียนสูญหาย',
+                action: 'เจ้าหน้าที่รักษาความปลอดภัยปิดล็อกประตูทางเข้า-ออกของโรงเรียนทั้งหมด ครูประจำชั้นตรวจสอบและนับจำนวนนักเรียนทันที',
+                bg: 'bg-yellow-400', textCode: 'text-yellow-800', bgCode: 'bg-yellow-100', borderCode: 'border-yellow-500'
+              },
+              'orange': {
+                th: 'สารเคมีรั่วไหล / ภัยพิบัติภายนอกอาคาร',
+                action: 'ให้ทุกคนอยู่ภายในอาคาร ปิดประตู หน้าต่าง และระบบระบายอากาศ เพื่อป้องกันอันตรายจากภายนอก',
+                bg: 'bg-orange-500', textCode: 'text-orange-800', bgCode: 'bg-orange-100', borderCode: 'border-orange-500'
+              },
+              'silver': {
+                th: 'ภัยคุกคามร้ายแรง / บุคคลมีอาวุธ',
+                action: 'เข้าสู่มาตรการล็อกดาวน์แบบเต็มรูปแบบ ปิดล็อกประตูห้องเรียน ดับไฟ ปิดม่าน ให้นักเรียนซ่อนตัวและงดใช้เสียงเด็ดขาด',
+                bg: 'bg-gray-500', textCode: 'text-gray-800', bgCode: 'bg-gray-200', borderCode: 'border-gray-500'
+              },
+              'black': {
+                th: 'พบวัตถุต้องสงสัย / ขู่วางระเบิด',
+                action: 'กันพื้นที่และอพยพคนออกจากรัศมีที่คาดว่าจะเป็นอันตราย ห้ามใช้วิทยุสื่อสารหรือโทรศัพท์มือถือในระยะใกล้',
+                bg: 'bg-black', textCode: 'text-gray-900', bgCode: 'bg-gray-300', borderCode: 'border-black'
+              }
+            };
+
+            // CODE GREEN (ALL CLEAR)
+            if (colorCode === 'green' || item.th.includes('#STOP_SOS#')) {
+              const div = document.createElement('div');
+              div.className = 'p-3 bg-green-100 border border-green-500 rounded-lg shadow-sm animate-slide-in';
+              div.innerHTML = `<div class="font-medium text-green-800 font-bold">✅ ยกเลิกสถานการณ์ฉุกเฉิน (Code Green)</div>`;
+              listDiv.prepend(div);
+
+              if (!isInitialLoad) {
+                window.isSOSActive = false;
+
+                const overlay = document.getElementById('sos-overlay');
+                if (overlay) {
+                  overlay.className = "fixed inset-0 z-[9999] hidden flex-col items-center justify-center animate-pulse"; // Reset classes
+                }
+                const sosPlayer = document.getElementById('sos-player');
+                if (sosPlayer) {
+                  sosPlayer.pause();
+                  sosPlayer.currentTime = 0;
+                }
+                
+                if (typeof player !== 'undefined' && player) {
+                  player.pause();
+                }
+                audioQueue = [];
+                isPlayingTTS = false;
+                duckMusicVolume(false);
+
+                // Speak All Clear
+                fetchAudioData(`Attention please. The emergency situation is now cleared. Code Green. You may return to your normal activities.`, "en-GB").then(urlEn => {
+                  if (urlEn) audioQueue.push(urlEn);
+                  return fetchAudioData(`ประกาศยกเลิกสถานการณ์ฉุกเฉิน รหัสสีเขียว ทุกคนสามารถกลับเข้าสู่การเรียนการสอนหรือสภาวะปกติได้`, "th-TH");
+                }).then(urlTh => {
+                  if (urlTh) audioQueue.push(urlTh);
+                  processAudioQueue();
+                }).catch(err => {
+                  console.error("SOS TTS failed:", err);
+                  processAudioQueue();
+                });
+              }
+              return;
+            }
+
+            // OTHER EMERGENCY CODES
+            const cfg = sosConfig[colorCode];
             const div = document.createElement('div');
-            div.className = 'p-3 bg-red-100 border border-red-500 rounded-lg shadow-sm animate-slide-in';
-            div.innerHTML = `<div class="font-medium text-red-800 font-bold">🚨 สัญญาณเตือนภัยฉุกเฉิน (SOS Code: ${sosCode})</div>`;
+            div.className = `p-3 ${cfg.bgCode} border ${cfg.borderCode} rounded-lg shadow-sm animate-slide-in`;
+            div.innerHTML = `<div class="font-medium ${cfg.textCode} font-bold">🚨 สัญญาณเตือนภัยฉุกเฉิน (Code ${colorCode.toUpperCase()}): ${cfg.th}</div>`;
             listDiv.prepend(div);
             
             if (!isInitialLoad) {
               const overlay = document.getElementById('sos-overlay');
               if (overlay) {
-                document.getElementById('sos-overlay-code').innerText = "CODE: " + sosCode;
-                overlay.classList.remove('hidden');
-                overlay.classList.add('flex');
+                document.getElementById('sos-overlay-code').innerText = "CODE: " + colorCode.toUpperCase();
+                document.getElementById('sos-overlay-title').innerText = cfg.th;
+                document.getElementById('sos-overlay-desc').innerText = cfg.action;
+                overlay.className = `fixed inset-0 z-[9999] flex flex-col items-center justify-center animate-pulse ${cfg.bg}`;
               }
+              
               const sosPlayer = document.getElementById('sos-player');
               if (sosPlayer) {
-                // Cut music entirely safely
                 try {
                   if (typeof ytPlayer !== 'undefined' && ytPlayer && ytPlayer.stopVideo) {
                     ytPlayer.stopVideo();
@@ -837,7 +925,6 @@
                   }
                 } catch(e) { console.warn('SOS YT Stop error:', e); }
                 
-                // Stop any current announcement/bell safely
                 try {
                   if (typeof player !== 'undefined' && player) {
                     player.pause();
@@ -851,10 +938,10 @@
               isPlayingTTS = false; // Reset TTS state
               window.isSOSActive = true;
               
-              fetchAudioData(`Emergency. SOS Code ${sosCode}.`, "en-GB").then(urlEn => {
+              fetchAudioData(`Emergency Alert. Code ${colorCode}.`, "en-GB").then(urlEn => {
                 if (!window.isSOSActive) return;
                 if (urlEn) audioQueue.push(urlEn);
-                return fetchAudioData(`ประกาศเตือนภัยฉุกเฉิน. เอส โอ เอส โค้ด ${sosCode}`, "th-TH");
+                return fetchAudioData(`ประกาศเตือนภัยฉุกเฉิน รหัสสี${getColorThai(colorCode)} ${cfg.th} ${cfg.action}`, "th-TH");
               }).then(urlTh => {
                 if (!window.isSOSActive) return;
                 if (urlTh) audioQueue.push(urlTh);
@@ -863,36 +950,6 @@
                 console.error("SOS TTS failed:", err);
                 if (window.isSOSActive) processAudioQueue();
               });
-            }
-            return;
-          }
-          if (item.th === '#STOP_SOS#') {
-            const div = document.createElement('div');
-            div.className = 'p-3 bg-gray-100 border border-gray-400 rounded-lg shadow-sm animate-slide-in';
-            div.innerHTML = `<div class="font-medium text-gray-800 font-bold">🛑 ยกเลิกสัญญาณเตือนภัยฉุกเฉิน</div>`;
-            listDiv.prepend(div);
-
-            if (!isInitialLoad) {
-              window.isSOSActive = false;
-
-              const overlay = document.getElementById('sos-overlay');
-              if (overlay) {
-                overlay.classList.add('hidden');
-                overlay.classList.remove('flex');
-              }
-              const sosPlayer = document.getElementById('sos-player');
-              if (sosPlayer) {
-                sosPlayer.pause();
-                sosPlayer.currentTime = 0;
-              }
-              
-              if (typeof player !== 'undefined' && player) {
-                player.pause();
-              }
-              audioQueue = [];
-              isPlayingTTS = false;
-              
-              duckMusicVolume(false);
             }
             return;
           }
