@@ -679,7 +679,7 @@
       const audioUrlEn = await fetchAudioData(txtEn, "en-GB");
       if(audioUrlEn) { audioQueue.push(audioUrlEn); }
 
-      const txt = "ประกาศ, ขณะนี้เวลา " + lastRungBell.replace(':', ' นาฬิกา ') + " นาที, " + bellObj.desc;
+      const txt = "ประกาศ ขณะนี้เวลา " + lastRungBell.replace(':', ' นาฬิกา ') + " นาที " + bellObj.desc;
       const audioUrl = await fetchAudioData(txt, "th-TH");
       if(audioUrl) { audioQueue.push(audioUrl); }
       
@@ -701,7 +701,7 @@
         let minStr = parseInt(m) === 0 ? "o'clock" : parseInt(m);
         const enTextDesc = b.descEn ? b.descEn : b.desc;
         const txtEn = "Attention please, the time is now " + hour12 + " " + minStr + " " + ampm + ", " + enTextDesc;
-        const txt = "ประกาศ, ขณะนี้เวลา " + b.time.replace(':', ' นาฬิกา ') + " นาที, " + b.desc;
+        const txt = "ประกาศ ขณะนี้เวลา " + b.time.replace(':', ' นาฬิกา ') + " นาที " + b.desc;
         
         await fetchAudioData(txtEn, "en-GB");
         await fetchAudioData(txt, "th-TH");
@@ -789,14 +789,16 @@
       let nameForThai = name.replace(/ด\.ช\.|ดช\./g, "เด็กชาย ").replace(/ด\.ญ\.|ดญ\./g, "เด็กหญิง ");
 
       const audios = await Promise.all([
-        fetchAudioData("Attention please, student ", "en-GB", true),
+        fetchAudioData("Attention please student ", "en-GB", true),
         fetchAudioData(nameForEng, "en-GB", false), // ไม่บันทึกลง LocalStorage ถาวรเพื่อกันเต็ม
         fetchAudioData(" please meet your parents at " + gateEng, "en-GB", true),
-        fetchAudioData("ประกาศ, นักเรียนชื่อ ", "th-TH", true),
+        fetchAudioData("ประกาศ นักเรียนชื่อ ", "th-TH", true),
         fetchAudioData(nameForThai, "th-TH", false), // ไม่บันทึกลง LocalStorage ถาวรเพื่อกันเต็ม
         fetchAudioData(`ขณะนี้ผู้ปกครองมารอรับแล้วที่ ${gateThai} ค่ะ`, "th-TH", true)
       ]);
+      audioQueue.push('./sounds/ประกาศ.mp3');
       audios.forEach(a => { if(a) audioQueue.push(a); });
+      audioQueue.push('./sounds/ประกาศ.mp3');
       processAudioQueue();
     }
 
