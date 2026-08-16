@@ -3,6 +3,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { AppNav } from "@/components/AppNav";
 import { Toaster } from "sonner";
 import Image from "next/image";
+import { headers } from "next/headers";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -10,15 +11,19 @@ export const metadata: Metadata = {
   description: "ระบบบริหารจัดการโรงเรียนสมคิดวิทยา",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const headersList = await headers();
+  const nonce = headersList.get('x-nonce') || undefined;
+
   return (
     <html
       lang="th"
       className="h-full antialiased"
+      nonce={nonce}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground relative overflow-x-hidden">
         {/* Global Watermark Logos */}
