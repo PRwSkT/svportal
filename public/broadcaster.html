@@ -112,9 +112,9 @@
           ข้าม (Skip)
         </button>
       </div>
-      <div class="flex items-center gap-2 mb-3 text-sm text-gray-600">
-        <input type="checkbox" id="override-bells" class="rounded text-primary focus:ring-primary"> 
-        <label for="override-bells">ปลดล็อกระบบตัดเพลง (อนุญาตให้เพลงค่อยๆ หรี่และดับลงเมื่อมีประกาศหรือเสียงออด)</label>
+      <div class="flex items-center gap-2 mb-3 text-sm text-red-600 bg-red-50 p-2 rounded-lg border border-red-100 font-medium">
+        <input type="checkbox" id="disable-bells" class="rounded text-red-600 focus:ring-red-500 w-4 h-4"> 
+        <label for="disable-bells" class="cursor-pointer">ปิดระบบออดชั่วคราว (สำหรับวันที่มีกิจกรรมพิเศษ ออดจะไม่ทำงาน)</label>
       </div>
       <div id="music-queue" class="overflow-y-auto flex-grow text-sm flex flex-col gap-2"></div>
       
@@ -567,6 +567,9 @@
     }
 
     function checkBells() {
+      const disableBells = document.getElementById('disable-bells').checked;
+      if (disableBells) return; // If disabled, don't ring bells at all
+
       const now = new Date();
       const dayOfWeek = now.getDay();
       
@@ -583,10 +586,7 @@
     }
 
     async function triggerBellSequence(bellObj) {
-      const override = document.getElementById('override-bells').checked;
-      if (!override) {
-        stopMusicForBell();
-      }
+      stopMusicForBell();
 
       let bellSoundUrl = "https://assets.mixkit.co/active_storage/sfx/2042/2042-preview.mp3";
       if (bellObj.sound === 'start') bellSoundUrl = encodeURI("./sounds/เข้าเรียน.mp3");
