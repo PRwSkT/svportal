@@ -789,12 +789,8 @@
       let nameForThai = name.replace(/ด\.ช\.|ดช\./g, "เด็กชาย ").replace(/ด\.ญ\.|ดญ\./g, "เด็กหญิง ");
 
       const audios = await Promise.all([
-        fetchAudioData("Attention please student ", "en-GB", true),
-        fetchAudioData(nameForEng, "en-GB", false), // ไม่บันทึกลง LocalStorage ถาวรเพื่อกันเต็ม
-        fetchAudioData(" please meet your parents at " + gateEng, "en-GB", true),
-        fetchAudioData("ประกาศ นักเรียนชื่อ ", "th-TH", true),
-        fetchAudioData(nameForThai, "th-TH", false), // ไม่บันทึกลง LocalStorage ถาวรเพื่อกันเต็ม
-        fetchAudioData(`ขณะนี้ผู้ปกครองมารอรับแล้วที่ ${gateThai} ค่ะ`, "th-TH", true)
+        fetchAudioData("Attention please student " + nameForEng + " please meet your parents at " + gateEng, "en-GB", false),
+        fetchAudioData("ประกาศ นักเรียนชื่อ " + nameForThai + " ขณะนี้ผู้ปกครองมารอรับแล้วที่ " + gateThai + " ค่ะ", "th-TH", false)
       ]);
       audioQueue.push('./sounds/ประกาศ.mp3');
       audios.forEach(a => { if(a) audioQueue.push(a); });
