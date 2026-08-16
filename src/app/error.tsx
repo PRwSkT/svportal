@@ -34,7 +34,7 @@ export default function GlobalError({
         >
           <RefreshCcw className="w-5 h-5" /> ลองใหม่อีกครั้ง
         </button>
-        <Link href="/">
+        <Link href="/home">
           <button className="px-6 py-3 bg-surface border-2 border-foreground/10 text-foreground font-bold rounded-xl flex items-center justify-center gap-2 hover:border-foreground/30 transition-all w-full">
             <Home className="w-5 h-5" /> กลับหน้าหลัก
           </button>

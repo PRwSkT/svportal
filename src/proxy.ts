@@ -39,14 +39,15 @@ export async function proxy(request: NextRequest) {
       if (user.email?.endsWith('@somkidvittaya.ac.th') || user.email === 'admin@svportal.com') {
         let { data: role } = await supabase.rpc('get_user_role');
         if (user.email === 'admin@svportal.com') role = 'admin';
-        return NextResponse.redirect(new URL('/', request.url));
+        return NextResponse.redirect(new URL('/home', request.url));
       }
     }
     return response;
   }
 
-  // Bypass auth for post-assistant, auth callbacks, and any public html files except audio-remote
+  // Bypass auth for the root page (welcome menu), post-assistant, auth callbacks, and any public html files except audio-remote
   if (
+    request.nextUrl.pathname === '/' ||
     request.nextUrl.pathname.startsWith('/auth') ||
     (request.nextUrl.pathname.endsWith('.html') && !request.nextUrl.pathname.includes('audio-remote.html')) ||
     request.nextUrl.pathname.includes('post-assistant')
