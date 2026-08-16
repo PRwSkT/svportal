@@ -223,7 +223,12 @@
         .then(r => r.json())
         .then(res => {
           if (res) {
-            dashboardState = res;
+            // Fix for double-stringified JSON bug
+            let parsedRes = res;
+            if (typeof parsedRes === 'string') {
+              try { parsedRes = JSON.parse(parsedRes); } catch(e) {}
+            }
+            dashboardState = parsedRes;
             renderRemoteQueue();
           }
         }).catch(err => console.warn("Fetch state error", err));

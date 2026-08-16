@@ -1060,9 +1060,13 @@
       fetch(API_URL + "?action=get_state")
         .then(r => r.json())
         .then(state => {
-          if (state.musicQueue) {
-            musicQueue = state.musicQueue;
-            currentMusicIndex = state.currentMusicIndex || 0;
+          let parsedState = state;
+          if (typeof parsedState === 'string') {
+            try { parsedState = JSON.parse(parsedState); } catch(e) {}
+          }
+          if (parsedState.musicQueue) {
+            musicQueue = parsedState.musicQueue;
+            currentMusicIndex = parsedState.currentMusicIndex || 0;
             renderMusicQueue();
             tryPlayMusic();
           }
