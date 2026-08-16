@@ -262,21 +262,25 @@
 
     // Unlock Audio on First Click
     document.getElementById('audio-unlock-overlay').addEventListener('click', function() {
-      const p1 = document.getElementById('main-player');
-      if(p1) { p1.play().catch(e=>{}); p1.pause(); p1.currentTime=0; }
-      
-      const p2 = document.getElementById('bell-player');
-      if(p2) { p2.play().catch(e=>{}); p2.pause(); p2.currentTime=0; }
-      
-      const p3 = document.getElementById('sos-player');
-      if(p3) { p3.play().catch(e=>{}); p3.pause(); p3.currentTime=0; }
+      try {
+        const p1 = document.getElementById('main-player');
+        if(p1) { p1.play().catch(e=>{}); p1.pause(); p1.currentTime=0; }
+        
+        const p2 = document.getElementById('bell-player');
+        if(p2) { p2.play().catch(e=>{}); p2.pause(); p2.currentTime=0; }
+        
+        const p3 = document.getElementById('sos-player');
+        if(p3) { p3.play().catch(e=>{}); p3.pause(); p3.currentTime=0; }
 
-      if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.playVideo === 'function') {
-        ytPlayer.playVideo();
+        if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.playVideo === 'function') {
+          try { ytPlayer.playVideo(); } catch(e) {}
+        }
+      } catch (err) {
+        console.error("Audio unlock error:", err);
+      } finally {
+        this.classList.add('opacity-0');
+        setTimeout(() => this.classList.add('hidden'), 500);
       }
-
-      this.classList.add('opacity-0');
-      setTimeout(() => this.classList.add('hidden'), 500);
     });
 
     // ==========================================
