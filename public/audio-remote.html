@@ -78,10 +78,23 @@
             class="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition">
         </div>
         <button id="btn-add-music" onclick="addMusic()" 
-          class="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 rounded-lg shadow-sm transition flex justify-center items-center gap-2">
+          class="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 rounded-lg shadow-sm transition flex justify-center items-center gap-2 mb-4">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
           เพิ่มรายการเพลง
         </button>
+
+        <hr class="border-gray-200 mb-4">
+        
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="text-sm font-semibold text-gray-700">คิวเพลงปัจจุบัน</h3>
+          <button onclick="fetchState()" class="text-xs text-primary hover:underline flex items-center gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+            รีเฟรช
+          </button>
+        </div>
+        <div id="remote-queue-list" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+          <div class="text-sm text-gray-400 text-center py-4">กำลังดึงข้อมูล...</div>
+        </div>
       </div>
 
       <!-- Announcement Remote -->
@@ -130,30 +143,50 @@
   </div>
 
   <!-- SOS Keypad Modal -->
-  <div id="sos-modal" class="fixed inset-0 bg-gray-900/95 z-50 flex items-center justify-center hidden">
-    <div class="bg-white rounded-3xl shadow-2xl p-6 w-[90%] max-w-sm border-2 border-red-500">
-      <h3 class="text-center text-xl font-bold text-red-600 mb-2">🚨 ระบุรหัสฉุกเฉิน (SOS Code)</h3>
-      <div class="text-center text-5xl font-mono font-bold tracking-widest text-red-600 h-16 bg-red-50 border border-red-200 rounded-xl flex items-center justify-center mb-6" id="sos-code-display">-</div>
+  <div id="sos-modal" class="fixed inset-0 bg-gray-900/95 z-[100] flex items-center justify-center hidden">
+    <div class="bg-white rounded-3xl shadow-2xl p-6 w-[95%] max-w-lg border-2 border-red-500 overflow-y-auto max-h-[90vh]">
+      <h3 class="text-center text-xl font-bold text-red-600 mb-4">🚨 เลือกรหัสเหตุฉุกเฉิน (SOS Code)</h3>
       
-      <div class="grid grid-cols-3 gap-3 mb-6">
-        <button onclick="sosPad('1')" class="h-16 text-2xl font-bold bg-gray-100 hover:bg-gray-200 rounded-2xl active:bg-gray-300 transition">1</button>
-        <button onclick="sosPad('2')" class="h-16 text-2xl font-bold bg-gray-100 hover:bg-gray-200 rounded-2xl active:bg-gray-300 transition">2</button>
-        <button onclick="sosPad('3')" class="h-16 text-2xl font-bold bg-gray-100 hover:bg-gray-200 rounded-2xl active:bg-gray-300 transition">3</button>
-        <button onclick="sosPad('4')" class="h-16 text-2xl font-bold bg-gray-100 hover:bg-gray-200 rounded-2xl active:bg-gray-300 transition">4</button>
-        <button onclick="sosPad('5')" class="h-16 text-2xl font-bold bg-gray-100 hover:bg-gray-200 rounded-2xl active:bg-gray-300 transition">5</button>
-        <button onclick="sosPad('6')" class="h-16 text-2xl font-bold bg-gray-100 hover:bg-gray-200 rounded-2xl active:bg-gray-300 transition">6</button>
-        <button onclick="sosPad('7')" class="h-16 text-2xl font-bold bg-gray-100 hover:bg-gray-200 rounded-2xl active:bg-gray-300 transition">7</button>
-        <button onclick="sosPad('8')" class="h-16 text-2xl font-bold bg-gray-100 hover:bg-gray-200 rounded-2xl active:bg-gray-300 transition">8</button>
-        <button onclick="sosPad('9')" class="h-16 text-2xl font-bold bg-gray-100 hover:bg-gray-200 rounded-2xl active:bg-gray-300 transition">9</button>
-        <button onclick="sosPad('CLEAR')" class="h-16 text-lg font-bold text-red-500 bg-red-50 hover:bg-red-100 rounded-2xl active:bg-red-200 transition">ลบ</button>
-        <button onclick="sosPad('0')" class="h-16 text-2xl font-bold bg-gray-100 hover:bg-gray-200 rounded-2xl active:bg-gray-300 transition">0</button>
-        <button onclick="hideSosModal()" class="h-16 text-lg font-bold text-gray-500 bg-gray-50 hover:bg-gray-100 rounded-2xl active:bg-gray-200 transition">ยกเลิก</button>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+        <button onclick="confirmColorSos('red')" class="p-4 bg-red-100 hover:bg-red-200 border-2 border-red-500 rounded-2xl flex flex-col items-center justify-center gap-2 transition text-red-800">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 18a3.75 3.75 0 00.495-7.467 5.99 5.99 0 00-1.925 3.546 5.974 5.974 0 01-2.133-1A3.75 3.75 0 0012 18z" /></svg>
+          <div class="font-bold text-lg">Code Red</div>
+          <div class="text-xs">อัคคีภัย / ไฟไหม้</div>
+        </button>
+
+        <button onclick="confirmColorSos('blue')" class="p-4 bg-blue-100 hover:bg-blue-200 border-2 border-blue-500 rounded-2xl flex flex-col items-center justify-center gap-2 transition text-blue-800">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+          <div class="font-bold text-lg">Code Blue</div>
+          <div class="text-xs">เหตุฉุกเฉินทางการแพทย์</div>
+        </button>
+
+        <button onclick="confirmColorSos('yellow')" class="p-4 bg-yellow-100 hover:bg-yellow-200 border-2 border-yellow-500 rounded-2xl flex flex-col items-center justify-center gap-2 transition text-yellow-800">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
+          <div class="font-bold text-lg">Code Yellow</div>
+          <div class="text-xs">นักเรียนสูญหาย</div>
+        </button>
+
+        <button onclick="confirmColorSos('orange')" class="p-4 bg-orange-100 hover:bg-orange-200 border-2 border-orange-500 rounded-2xl flex flex-col items-center justify-center gap-2 transition text-orange-800">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.848 5.25 5.25 0 00-10.233 2.33A4.502 4.502 0 002.25 15z" /></svg>
+          <div class="font-bold text-lg">Code Orange</div>
+          <div class="text-xs">สารเคมีรั่ว / ภัยภายนอก</div>
+        </button>
+
+        <button onclick="confirmColorSos('silver')" class="p-4 bg-gray-200 hover:bg-gray-300 border-2 border-gray-500 rounded-2xl flex flex-col items-center justify-center gap-2 transition text-gray-800">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>
+          <div class="font-bold text-lg">Code Silver</div>
+          <div class="text-xs">ภัยคุกคาม / บุคคลมีอาวุธ</div>
+        </button>
+
+        <button onclick="confirmColorSos('black')" class="p-4 bg-gray-800 hover:bg-black border-2 border-gray-900 rounded-2xl flex flex-col items-center justify-center gap-2 transition text-white">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12 7.5a.75.75 0 01.75.75v3a.75.75 0 01-1.5 0v-3A.75.75 0 0112 7.5zM12 15a.75.75 0 110-1.5.75.75 0 010 1.5z" /></svg>
+          <div class="font-bold text-lg">Code Black</div>
+          <div class="text-xs">วัตถุต้องสงสัย / ระเบิด</div>
+        </button>
       </div>
 
-      <button id="btn-confirm-sos" onclick="confirmSosSend()" 
-        class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-xl text-xl shadow-lg flex justify-center items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-7 h-7"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-        ส่งสัญญาณเตือนภัย
+      <button onclick="hideSosModal()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-xl shadow transition">
+        ปิดหน้าต่างนี้
       </button>
     </div>
   </div>
@@ -169,6 +202,87 @@
       let match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/);
       return (match && match[1]) ? match[1] : null;
     }
+
+    // --- State & Queue Management ---
+    let dashboardState = {};
+    
+    function fetchState() {
+      fetch(API_URL + "?action=get_state&t=" + new Date().getTime())
+        .then(r => r.json())
+        .then(res => {
+          if (res) {
+            dashboardState = res;
+            renderRemoteQueue();
+          }
+        }).catch(err => console.warn("Fetch state error", err));
+    }
+
+    function renderRemoteQueue() {
+      const qBox = document.getElementById('remote-queue-list');
+      const queue = dashboardState.musicQueue || [];
+      const currIdx = dashboardState.currentMusicIndex || 0;
+
+      if (queue.length === 0) {
+        qBox.innerHTML = '<div class="text-sm text-gray-400 text-center py-4">ไม่มีคิวเพลงในขณะนี้</div>';
+        return;
+      }
+
+      qBox.innerHTML = queue.map((item, idx) => {
+        let isPlaying = (idx === currIdx);
+        let isPlayed = (idx < currIdx);
+        
+        let classes = "px-3 py-2 rounded-lg flex justify-between items-center text-sm ";
+        if (isPlaying) classes += "bg-red-50 border border-red-200";
+        else if (isPlayed) classes += "bg-gray-50 opacity-50";
+        else classes += "bg-gray-50 border border-gray-200";
+
+        let controls = '';
+        if (isPlaying) {
+          controls = `<button onclick="sendCommand('skip_music')" class="p-1 text-red-600 hover:bg-red-100 rounded" title="ข้ามเพลงนี้">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8.688c0-.864.933-1.405 1.683-.977l7.108 4.062a1.125 1.125 0 010 1.953l-7.108 4.062A1.125 1.125 0 013 16.81V8.688zM12.75 8.688c0-.864.933-1.405 1.683-.977l7.108 4.062a1.125 1.125 0 010 1.953l-7.108 4.062a1.125 1.125 0 01-1.683-.977V8.688z" /></svg>
+          </button>`;
+        } else if (!isPlayed) {
+          controls = `<button onclick="sendCommand('remove_music:${idx}')" class="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded" title="ลบเพลงนี้">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+          </button>`;
+        }
+
+        return `<div class="${classes}">
+          <div class="truncate flex-1 pr-2 ${isPlaying ? 'font-medium text-red-700' : 'text-gray-700'}">
+            ${isPlaying ? '▶️ ' : ''}${item.title || 'Unknown Video'}
+          </div>
+          <div class="flex-shrink-0">${controls}</div>
+        </div>`;
+      }).join('');
+    }
+
+    function sendCommand(cmd) {
+      if (!confirm('ยืนยันการทำรายการนี้?')) return;
+      
+      const btn = document.getElementById('btn-add-music');
+      btn.classList.add('is-loading');
+      fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'remote_command', command: cmd })
+      })
+      .then(r => r.json())
+      .then(res => {
+        btn.classList.remove('is-loading');
+        if (res.success) {
+          setTimeout(fetchState, 1500); // Wait a bit for Dashboard to process and sync back
+        } else {
+          alert('เกิดข้อผิดพลาด: ' + res.message);
+        }
+      })
+      .catch(err => {
+        btn.classList.remove('is-loading');
+        alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+      });
+    }
+
+    // Polling state every 5 seconds
+    setInterval(fetchState, 5000);
 
     function addMusic() {
       const input = document.getElementById('yt-url');
@@ -234,11 +348,7 @@
       });
     }
 
-    let currentSosCode = "";
-
     function triggerSOS() {
-      currentSosCode = "";
-      document.getElementById('sos-code-display').innerText = "-";
       document.getElementById('sos-modal').classList.remove('hidden');
     }
 
@@ -246,36 +356,34 @@
       document.getElementById('sos-modal').classList.add('hidden');
     }
 
-    function sosPad(val) {
-      if (val === 'CLEAR') {
-        currentSosCode = "";
-      } else {
-        if (currentSosCode.length < 4) {
-          currentSosCode += val;
-        }
-      }
-      document.getElementById('sos-code-display').innerText = currentSosCode || "-";
-    }
+    function confirmColorSos(code) {
+      const colors = {
+        'red': 'อัคคีภัย / ไฟไหม้',
+        'blue': 'เหตุฉุกเฉินทางการแพทย์',
+        'yellow': 'นักเรียนสูญหาย',
+        'orange': 'สารเคมีรั่ว / ภัยภายนอก',
+        'silver': 'ภัยคุกคาม / บุคคลมีอาวุธ',
+        'black': 'วัตถุต้องสงสัย / ระเบิด'
+      };
+      
+      const eventName = colors[code];
+      
+      if (!confirm(`ยืนยันการเปิดสัญญาณเตือนภัยฉุกเฉิน\n(Code ${code.toUpperCase()} - ${eventName})\nทั่วโรงเรียนใช่หรือไม่?`)) return;
 
-    function confirmSosSend() {
-      if (!currentSosCode) {
-        alert("กรุณาระบุรหัสฉุกเฉินบนปุ่มกด");
-        return;
-      }
-      if (!confirm(`ยืนยันการเปิดสัญญาณเตือนภัยฉุกเฉิน (SOS Code: ${currentSosCode}) ทั่วโรงเรียนใช่หรือไม่?`)) return;
-
-      const btn = document.getElementById('btn-confirm-sos');
+      hideSosModal();
+      // Show loading on trigger button
+      const btn = document.getElementById('btn-trigger-sos');
       btn.classList.add('is-loading');
+      
       fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'add_announcement', text: '#SOS#:' + currentSosCode })
+        body: JSON.stringify({ action: 'add_announcement', text: 'Code ' + code })
       })
       .then(r => r.json())
       .then(res => {
         btn.classList.remove('is-loading');
         if (res.success) {
-          hideSosModal();
           alert('ส่งสัญญาณเตือนภัยฉุกเฉินไปยังลำโพงเรียบร้อยแล้ว');
         } else {
           alert('เกิดข้อผิดพลาด: ' + res.message);
@@ -288,19 +396,19 @@
     }
 
     function stopSOS() {
-      if (!confirm('ยืนยันการยกเลิก/หยุดสัญญาณเตือนภัยฉุกเฉิน?')) return;
+      if (!confirm('ยืนยันการยกเลิกสถานการณ์ฉุกเฉิน (Code Green)?')) return;
       const btn = document.getElementById('btn-stop-sos');
       btn.classList.add('is-loading');
       fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'add_announcement', text: '#STOP_SOS#' })
+        body: JSON.stringify({ action: 'add_announcement', text: 'Code Green' })
       })
       .then(r => r.json())
       .then(res => {
         btn.classList.remove('is-loading');
         if (res.success) {
-          alert('ส่งคำสั่งยกเลิกสัญญาณเตือนภัยเรียบร้อยแล้ว');
+          alert('ส่งคำสั่ง Code Green ยกเลิกสถานการณ์เรียบร้อยแล้ว');
         } else {
           alert('เกิดข้อผิดพลาด: ' + res.message);
         }
@@ -310,6 +418,8 @@
         alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
       });
     }
+
+
   </script>
 </body>
 </html>

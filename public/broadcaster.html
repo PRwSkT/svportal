@@ -242,6 +242,19 @@
     let isPreparingAudio = false;
     const player = document.getElementById('main-player');
     
+    // --- State Sync ---
+    function syncQueueToServer() {
+      const state = {
+        musicQueue: musicQueue,
+        currentMusicIndex: currentMusicIndex
+      };
+      fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'sync_state', state: JSON.stringify(state) })
+      }).catch(e => console.warn("Sync error:", e));
+    }
+    
     function getColorThai(color) {
       const colors = { red: 'แดง', blue: 'น้ำเงิน', yellow: 'เหลือง', orange: 'ส้ม', silver: 'เงิน', black: 'ดำ', green: 'เขียว' };
       return colors[color] || '';
@@ -345,10 +358,24 @@
         }
       }
       renderMusicQueue();
+      syncQueueToServer();
     }
 
     function skipMusic() {
       playNextMusic();
+    }
+    
+    function removeMusic(idx) {
+      if (idx === currentMusicIndex) {
+        skipMusic();
+      } else {
+        musicQueue.splice(idx, 1);
+        if (idx < currentMusicIndex) {
+          currentMusicIndex--; // adjust index if earlier item removed
+        }
+        renderMusicQueue();
+        syncQueueToServer();
+      }
     }
 
     function renderMusicQueue() {
@@ -817,6 +844,18 @@
         if (!announcedIds.has(item.row)) {
           announcedIds.add(item.row);
           sessionStorage.setItem('sv_announcedMsgs', JSON.stringify([...announcedIds]));
+          
+          if (item.th.startsWith('REMOTE_CMD:')) {
+            const cmd = item.th.replace('REMOTE_CMD:', '').trim();
+            if (cmd === 'skip_music') {
+              skipMusic();
+            } else if (cmd.startsWith('remove_music:')) {
+              const idx = parseInt(cmd.split(':')[1], 10);
+              if (!isNaN(idx)) removeMusic(idx);
+            }
+            return; // Don't show or speak
+          }
+
           // SOS Detection (Color Codes)
           const sosMatch = item.th.match(/code\s*(red|blue|yellow|orange|silver|black|green)/i) || 
                            item.en.match(/code\s*(red|blue|yellow|orange|silver|black|green)/i);
@@ -986,6 +1025,7 @@
                       const title = await fetchYouTubeTitle(item.videoId);
                       musicQueue.push({ id: item.videoId, url: 'https://youtu.be/' + item.videoId, title: title });
                       renderMusicQueue();
+                      syncQueueToServer();
                       tryPlayMusic();
                     }
                   }
