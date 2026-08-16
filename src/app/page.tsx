@@ -13,7 +13,7 @@ export default function WelcomePage() {
     <div className="min-h-[80vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative z-10">
       <div className="max-w-xl w-full space-y-8 bg-surface/80 backdrop-blur-xl p-10 rounded-[24px] shadow-2xl border border-white/60 relative">
         {/* Decorative background gradients (wrapped to fix Safari overflow border-radius bug) */}
-        <div className="absolute inset-0 rounded-[24px] overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 pointer-events-none" style={{ clipPath: 'inset(0px round 24px)' }}>
           <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/10 rounded-full blur-3xl"></div>
           <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-secondary/10 rounded-full blur-3xl"></div>
         </div>
