@@ -602,11 +602,11 @@
       let minStr = parseInt(m) === 0 ? "o'clock" : parseInt(m);
       
       const enTextDesc = bellObj.descEn ? bellObj.descEn : bellObj.desc;
-      const txtEn = "The time is now " + hour12 + " " + minStr + " " + ampm + ", " + enTextDesc;
+      const txtEn = "Attention please, the time is now " + hour12 + " " + minStr + " " + ampm + ", " + enTextDesc;
       const audioUrlEn = await fetchAudioData(txtEn, "en-GB");
       if(audioUrlEn) { audioQueue.push(audioUrlEn); }
 
-      const txt = "ขณะนี้เวลา " + lastRungBell.replace(':', ' นาฬิกา ') + " นาที, " + bellObj.desc;
+      const txt = "ประกาศ, ขณะนี้เวลา " + lastRungBell.replace(':', ' นาฬิกา ') + " นาที, " + bellObj.desc;
       const audioUrl = await fetchAudioData(txt, "th-TH");
       if(audioUrl) { audioQueue.push(audioUrl); }
       
