@@ -72,9 +72,9 @@ function LoginForm() {
         <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-secondary/10 rounded-full blur-3xl pointer-events-none"></div>
 
         <div className="flex flex-col items-center relative z-10">
-          <Image src="/logo.png" alt="School Logo" width={80} height={80} className="mb-4 drop-shadow-md hover:scale-105 transition-transform duration-300" />
+          <Image src="/SV-Portal.png" alt="SVPortal Logo" width={140} height={40} className="mb-4 drop-shadow-sm h-10 w-auto hover:scale-105 transition-transform duration-300" />
           <h2 className="text-center text-3xl font-extrabold text-primary flex items-center gap-2">
-            <Image src="/SV-Portal.png" alt="SVPortal Logo" width={140} height={40} className="h-10 w-auto drop-shadow-sm" />
+            ยินดีต้อนรับสู่ SV Portal
           </h2>
           <p className="mt-4 text-center text-sm text-foreground/70 font-medium">
             เข้าสู่ระบบเพื่อใช้งาน (ใช้ระบบจัดการผู้ใช้ของโรงเรียน)
@@ -155,6 +155,16 @@ function LoginForm() {
             </button>
           </div>
         </form>
+
+        <div className="mt-8 text-center relative z-10 flex justify-center">
+          <Image 
+            src="/logo2.png" 
+            alt="School Logo" 
+            width={60} 
+            height={60} 
+            className="opacity-60 hover:opacity-100 transition-all duration-300 drop-shadow-sm" 
+          />
+        </div>
       </div>
     </div>
   );

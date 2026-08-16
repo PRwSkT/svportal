@@ -10,27 +10,27 @@ export default function WelcomePage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative z-10 bg-gray-50">
-      <div className="max-w-xl w-full space-y-8 bg-white/90 backdrop-blur-xl p-10 rounded-[24px] shadow-2xl border border-gray-100 relative overflow-hidden">
+    <div className="min-h-[80vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative z-10">
+      <div className="max-w-xl w-full space-y-8 bg-surface/80 backdrop-blur-xl p-10 rounded-[24px] shadow-2xl border border-white/60 relative overflow-hidden">
         {/* Decorative background gradients */}
-        <div className="absolute -top-32 -right-32 w-64 h-64 bg-blue-100 rounded-full blur-3xl pointer-events-none opacity-50"></div>
-        <div className="absolute -bottom-32 -left-32 w-64 h-64 bg-purple-100 rounded-full blur-3xl pointer-events-none opacity-50"></div>
+        <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-secondary/10 rounded-full blur-3xl pointer-events-none"></div>
 
         <div className="flex flex-col items-center relative z-10">
           <Image 
-            src="/logo.png" 
-            alt="School Logo" 
-            width={96} 
-            height={96} 
-            className="mb-6 drop-shadow-md hover:scale-105 transition-transform duration-300" 
+            src="/SV-Portal.png" 
+            alt="SVPortal Logo" 
+            width={140} 
+            height={40} 
+            className="mb-4 drop-shadow-sm h-10 w-auto hover:scale-105 transition-transform duration-300" 
           />
-          <h1 className="text-center text-3xl font-extrabold text-blue-900 mb-2">
-            ยินดีต้อนรับสู่สมคิดวิทยา
+          <h1 className="text-center text-3xl font-extrabold text-primary mb-2">
+            ยินดีต้อนรับสู่ SV Portal
           </h1>
-          <p className="text-center text-gray-500 font-medium mb-8">
-            Welcome to Somkidvittaya • 欢迎来到 Somkidvittaya
+          <p className="text-center text-foreground/60 font-medium mb-8">
+            Welcome to SV Portal • 欢迎来到 SV Portal
           </p>
-          <p className="text-center text-sm text-gray-400 mb-6">
+          <p className="text-center text-sm text-foreground/50 mb-6">
             กรุณาเลือกสถานะของคุณเพื่อเข้าสู่ระบบ
           </p>
         </div>
@@ -39,38 +39,38 @@ export default function WelcomePage() {
           {/* Parents Button */}
           <button
             onClick={handleNotReady}
-            className="w-full flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-gray-100 bg-white hover:border-blue-300 hover:bg-blue-50 transition-all duration-300 group shadow-sm hover:shadow-md"
+            className="w-full flex flex-col items-center justify-center p-4 rounded-[16px] border border-foreground/10 bg-white/60 hover:bg-white/90 backdrop-blur-sm transition-all duration-300 group shadow-sm hover:shadow-md hover:-translate-y-0.5"
           >
-            <span className="text-xl font-bold text-gray-800 group-hover:text-blue-700">ผู้ปกครอง</span>
-            <span className="text-sm font-medium text-gray-500 group-hover:text-blue-500 mt-1">Parents • 家长</span>
+            <span className="text-xl font-bold text-foreground group-hover:text-primary">ผู้ปกครอง</span>
+            <span className="text-sm font-medium text-foreground/50 group-hover:text-primary/70 mt-1">Parents • 家长</span>
           </button>
 
           {/* Students Button */}
           <button
             onClick={handleNotReady}
-            className="w-full flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-gray-100 bg-white hover:border-purple-300 hover:bg-purple-50 transition-all duration-300 group shadow-sm hover:shadow-md"
+            className="w-full flex flex-col items-center justify-center p-4 rounded-[16px] border border-foreground/10 bg-white/60 hover:bg-white/90 backdrop-blur-sm transition-all duration-300 group shadow-sm hover:shadow-md hover:-translate-y-0.5"
           >
-            <span className="text-xl font-bold text-gray-800 group-hover:text-purple-700">นักเรียน</span>
-            <span className="text-sm font-medium text-gray-500 group-hover:text-purple-500 mt-1">Students • 学生</span>
+            <span className="text-xl font-bold text-foreground group-hover:text-primary">นักเรียน</span>
+            <span className="text-sm font-medium text-foreground/50 group-hover:text-primary/70 mt-1">Students • 学生</span>
           </button>
 
           {/* Teachers & Staff Button */}
           <Link
             href="/login"
-            className="w-full flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-transparent bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 group shadow-lg shadow-blue-200 hover:shadow-blue-300 hover:-translate-y-0.5"
+            className="w-full flex flex-col items-center justify-center p-4 rounded-[16px] border border-transparent bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary transition-all duration-300 group shadow-lg shadow-primary/20 hover:shadow-primary/30 hover:-translate-y-0.5"
           >
             <span className="text-xl font-bold text-white">ครูและบุคลากร</span>
-            <span className="text-sm font-medium text-blue-100 mt-1">Teachers & Staff • 教师和员工</span>
+            <span className="text-sm font-medium text-white/90 mt-1">Teachers & Staff • 教师和员工</span>
           </Link>
         </div>
         
-        <div className="mt-8 text-center relative z-10">
+        <div className="mt-8 text-center relative z-10 flex justify-center">
           <Image 
-            src="/SV-Portal.png" 
-            alt="SVPortal Logo" 
-            width={100} 
-            height={28} 
-            className="h-7 w-auto mx-auto opacity-50 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-300" 
+            src="/logo2.png" 
+            alt="School Logo" 
+            width={60} 
+            height={60} 
+            className="opacity-60 hover:opacity-100 transition-all duration-300 drop-shadow-sm" 
           />
         </div>
       </div>
