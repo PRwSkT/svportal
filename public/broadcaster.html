@@ -408,6 +408,34 @@
     let lastRungBell = null;
     let editBellIndex = -1;
 
+    async function fetchBellsFromServer() {
+      try {
+        const response = await fetch(API_URL + "?action=get_bells&t=" + new Date().getTime());
+        const data = await response.json();
+        if (Array.isArray(data)) {
+          bells = data;
+          localStorage.setItem('sv_bells', JSON.stringify(bells));
+          renderBells();
+          preFetchTTSCache();
+        }
+      } catch (e) { console.warn("Cannot fetch bells from server, using local storage", e); }
+    }
+
+    async function saveBellsToServer() {
+      const btn = document.getElementById('bell-add-btn');
+      const originalText = btn ? btn.innerHTML : '';
+      if (btn) { btn.innerHTML = 'กำลังบันทึก...'; btn.disabled = true; }
+      try {
+        await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'save_bells', bells: JSON.stringify(bells) })
+        });
+      } catch (e) { console.warn("Cannot save bells to server", e); }
+      if (btn) { btn.innerHTML = originalText; btn.disabled = false; }
+      preFetchTTSCache();
+    }
+
     function renderBells() {
       bells.sort((a,b) => a.time.localeCompare(b.time));
       document.getElementById('bell-list').innerHTML = bells.map((b, idx) => {
@@ -532,8 +560,9 @@
           bells.push({time, desc, descEn, sound, preset, pCur, pNext});
         }
         localStorage.setItem('sv_bells', JSON.stringify(bells));
-        resetBellForm();
         renderBells();
+        saveBellsToServer();
+        toggleBellModal(false);
       } else {
         alert("กรุณาระบุเวลาและรูปแบบให้ครบถ้วน");
       }
@@ -564,6 +593,7 @@
       bells.splice(idx, 1);
       localStorage.setItem('sv_bells', JSON.stringify(bells));
       renderBells();
+      saveBellsToServer();
     }
 
     function checkBells() {
@@ -616,7 +646,26 @@
     // ==========================================
     // 3. Audio & TTS System (Pickups & Announce)
     // ==========================================
-    async function fetchAudioData(text, lang) {
+    let ttsCache = JSON.parse(localStorage.getItem('sv_tts_cache') || '{}');
+
+    async function preFetchTTSCache() {
+      // Pre-fetch all bells when saved/loaded
+      for (const b of bells) {
+        const [h, m] = b.time.split(':');
+        let hourStr = parseInt(h);
+        let ampm = hourStr >= 12 ? 'PM' : 'AM';
+        let hour12 = hourStr % 12 || 12;
+        let minStr = parseInt(m) === 0 ? "o'clock" : parseInt(m);
+        const enTextDesc = b.descEn ? b.descEn : b.desc;
+        const txtEn = "Attention please, the time is now " + hour12 + " " + minStr + " " + ampm + ", " + enTextDesc;
+        const txt = "ประกาศ, ขณะนี้เวลา " + b.time.replace(':', ' นาฬิกา ') + " นาที, " + b.desc;
+        
+        await fetchAudioData(txtEn, "en-GB");
+        await fetchAudioData(txt, "th-TH");
+      }
+    }
+
+    async function fetchAudioData(text, lang, persistToDisk = true) {
       const cleanText = String(text || '').trim();
       if (!cleanText) return null;
       const cacheKey = lang + ':' + cleanText;
@@ -631,10 +680,24 @@
         const data = await response.json();
         if (data.success && data.audioContent) {
           const audioDataUri = 'data:audio/mp3;base64,' + data.audioContent;
-          ttsCache[cacheKey] = audioDataUri;
+          ttsCache[cacheKey] = audioDataUri; // Save to RAM for this session
+          
+          if (persistToDisk) {
+            try {
+              localStorage.setItem('sv_tts_cache', JSON.stringify(ttsCache));
+            } catch(e) {
+              console.warn("Storage full, clearing TTS cache");
+              ttsCache = {};
+              ttsCache[cacheKey] = audioDataUri;
+              localStorage.setItem('sv_tts_cache', JSON.stringify(ttsCache));
+            }
+          }
           return audioDataUri;
         }
-      } catch (e) { console.error('TTS Error:', e); }
+      } catch (e) { 
+        console.error('TTS Fetch Error (Offline Mode):', e); 
+        return { isWebSpeech: true, text: cleanText, lang: lang };
+      }
       return null;
     }
 
@@ -644,20 +707,31 @@
       duckMusicVolume(true);
 
       while (audioQueue.length > 0) {
-        const audioSrc = audioQueue.shift();
-        await new Promise(function(resolve) {
-          player.src = audioSrc;
-          player.onended = resolve;
-          player.onerror = resolve;
-          player.play().catch(function(e) {
-            console.warn("Audio blocked:", e);
-            if (e.name === 'NotAllowedError') {
-              audioQueue.unshift(audioSrc);
-              const unlock = () => { document.removeEventListener('click', unlock); resolve(); };
-              document.addEventListener('click', unlock);
-            } else resolve();
+        const item = audioQueue.shift();
+        
+        if (typeof item === 'object' && item.isWebSpeech) {
+          await new Promise(function(resolve) {
+            const utterance = new SpeechSynthesisUtterance(item.text);
+            utterance.lang = item.lang;
+            utterance.onend = resolve;
+            utterance.onerror = resolve;
+            window.speechSynthesis.speak(utterance);
           });
-        });
+        } else {
+          await new Promise(function(resolve) {
+            player.src = item;
+            player.onended = resolve;
+            player.onerror = resolve;
+            player.play().catch(function(e) {
+              console.warn("Audio blocked:", e);
+              if (e.name === 'NotAllowedError') {
+                audioQueue.unshift(item);
+                const unlock = () => { document.removeEventListener('click', unlock); resolve(); };
+                document.addEventListener('click', unlock);
+              } else resolve();
+            });
+          });
+        }
       }
 
       isPlayingTTS = false;
@@ -672,10 +746,12 @@
       let nameForThai = name.replace(/ด\.ช\.|ดช\./g, "เด็กชาย ").replace(/ด\.ญ\.|ดญ\./g, "เด็กหญิง ");
 
       const audios = await Promise.all([
-        fetchAudioData("Attention please, student ", "en-GB"),
-        fetchAudioData(nameForEng, "th-TH"),
-        fetchAudioData(" please meet your parents at " + gateEng, "en-GB"),
-        fetchAudioData(`ประกาศ, นักเรียนชื่อ ${nameForThai}, ขณะนี้ผู้ปกครองมารอรับแล้วที่ ${gateThai} ค่ะ`, "th-TH")
+        fetchAudioData("Attention please, student ", "en-GB", true),
+        fetchAudioData(nameForEng, "en-GB", false), // ไม่บันทึกลง LocalStorage ถาวรเพื่อกันเต็ม
+        fetchAudioData(" please meet your parents at " + gateEng, "en-GB", true),
+        fetchAudioData("ประกาศ, นักเรียนชื่อ ", "th-TH", true),
+        fetchAudioData(nameForThai, "th-TH", false), // ไม่บันทึกลง LocalStorage ถาวรเพื่อกันเต็ม
+        fetchAudioData(`ขณะนี้ผู้ปกครองมารอรับแล้วที่ ${gateThai} ค่ะ`, "th-TH", true)
       ]);
       audios.forEach(a => { if(a) audioQueue.push(a); });
       processAudioQueue();
@@ -865,7 +941,7 @@
     }
 
     // Init
-    renderBells();
+    fetchBellsFromServer();
     pollServer();
     setInterval(pollServer, 8000);
 
