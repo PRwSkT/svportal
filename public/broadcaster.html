@@ -802,8 +802,8 @@
 
     async function queueTeacherAnnouncement(item) {
       const audios = await Promise.all([
-        fetchAudioData("Attention please. " + item.en, "en-GB"),
-        fetchAudioData("ประกาศ. " + item.th, "th-TH")
+        fetchAudioData("Attention please, " + item.en, "en-GB"),
+        fetchAudioData("ประกาศ " + item.th, "th-TH")
       ]);
       audioQueue.push('./sounds/ประกาศ.mp3');
       audios.forEach(a => { if(a) audioQueue.push(a); });
@@ -937,7 +937,7 @@
                 audioQueue.push('./sounds/ประกาศ.mp3');
                 fetchAudioData(`Code Green, All Clear. Code Green, All Clear.`, "en-GB").then(urlEn => {
                   if (urlEn) audioQueue.push(urlEn);
-                  return fetchAudioData(`รหัสสีเขียว ยกเลิกสถานการณ์ฉุกเฉิน. รหัสสีเขียว ยกเลิกสถานการณ์ฉุกเฉิน.`, "th-TH");
+                  return fetchAudioData(`รหัสสีเขียว ยกเลิกสถานการณ์ฉุกเฉิน รหัสสีเขียว ยกเลิกสถานการณ์ฉุกเฉิน`, "th-TH");
                 }).then(urlTh => {
                   if (urlTh) audioQueue.push(urlTh);
                   audioQueue.push('./sounds/ประกาศ.mp3');
@@ -990,10 +990,10 @@
               isPlayingTTS = false; // Reset TTS state
               window.isSOSActive = true;
               
-              fetchAudioData(`Code ${colorCode}. Emergency Code ${colorCode}.`, "en-GB").then(urlEn => {
+              fetchAudioData(`Code ${colorCode}, Emergency Code ${colorCode}.`, "en-GB").then(urlEn => {
                 if (!window.isSOSActive) return;
                 if (urlEn) audioQueue.push(urlEn);
-                return fetchAudioData(`รหัสสี${getColorThai(colorCode)}. เหตุฉุกเฉิน รหัสสี${getColorThai(colorCode)}.`, "th-TH");
+                return fetchAudioData(`รหัสสี${getColorThai(colorCode)} เหตุฉุกเฉิน รหัสสี${getColorThai(colorCode)}`, "th-TH");
               }).then(urlTh => {
                 if (!window.isSOSActive) return;
                 if (urlTh) audioQueue.push(urlTh);
