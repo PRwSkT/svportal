@@ -263,13 +263,13 @@
     document.getElementById('audio-unlock-overlay').addEventListener('click', function() {
       try {
         const p1 = document.getElementById('main-player');
-        if(p1) { p1.volume = 0.6; p1.play().catch(e=>{}); p1.pause(); p1.currentTime=0; }
+        if(p1) { p1.volume = 1.0; p1.play().catch(e=>{}); p1.pause(); p1.currentTime=0; }
         
         const p2 = document.getElementById('bell-player');
         if(p2) { p2.play().catch(e=>{}); p2.pause(); p2.currentTime=0; }
         
         const p3 = document.getElementById('sos-player');
-        if(p3) { p3.volume = 0.8; p3.play().catch(e=>{}); p3.pause(); p3.currentTime=0; }
+        if(p3) { p3.volume = 1.0; p3.play().catch(e=>{}); p3.pause(); p3.currentTime=0; }
 
         if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.playVideo === 'function') {
           try { ytPlayer.playVideo(); } catch(e) {}
@@ -302,7 +302,7 @@
         height: '100', width: '100',
         playerVars: { 'autoplay': 1, 'controls': 0, 'disablekb': 1, 'rel': 0 },
         events: {
-          'onReady': (e) => { e.target.setVolume(60); tryPlayMusic(); },
+          'onReady': (e) => { e.target.setVolume(40); tryPlayMusic(); },
           'onStateChange': onPlayerStateChange
         }
       });
@@ -420,7 +420,7 @@
       if (!ytPlayer || !ytPlayer.setVolume) return;
       clearInterval(fadeInterval);
       let vol = ytPlayer.getVolume();
-      let target = isDucking ? 20 : 60;
+      let target = isDucking ? 10 : 40;
       let step = isDucking ? -5 : 5;
       
       fadeInterval = setInterval(() => {
@@ -755,7 +755,7 @@
           await new Promise(function(resolve) {
             const utterance = new SpeechSynthesisUtterance(item.text);
             utterance.lang = item.lang;
-            utterance.volume = 0.6;
+            utterance.volume = 1.0;
             utterance.onend = resolve;
             utterance.onerror = resolve;
             window.speechSynthesis.speak(utterance);
@@ -1062,9 +1062,9 @@
       
       try {
         const p1 = document.getElementById('main-player');
-        if(p1) p1.volume = 0.6;
+        if(p1) p1.volume = 1.0;
         const p3 = document.getElementById('sos-player');
-        if(p3) p3.volume = 0.8;
+        if(p3) p3.volume = 1.0;
         
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         const ctx = new AudioContext();
