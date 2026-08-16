@@ -803,7 +803,7 @@
     async function queueTeacherAnnouncement(item) {
       const audios = await Promise.all([
         fetchAudioData("Attention please. " + item.en, "en-GB"),
-        fetchAudioData("โปรดทราบ. " + item.th, "th-TH")
+        fetchAudioData("ประกาศ. " + item.th, "th-TH")
       ]);
       audioQueue.push('./sounds/ประกาศ.mp3');
       audios.forEach(a => { if(a) audioQueue.push(a); });
