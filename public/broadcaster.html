@@ -282,6 +282,13 @@
       }
     });
 
+    // If running inside Electron, auto-unlock audio because autoplay-policy is disabled
+    if (navigator.userAgent.toLowerCase().includes('electron')) {
+      setTimeout(() => {
+        document.getElementById('audio-unlock-overlay').click();
+      }, 500);
+    }
+
     // ==========================================
     // 1. YouTube Music Bot Logic
     // ==========================================
