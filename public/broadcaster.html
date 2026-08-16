@@ -269,7 +269,7 @@
         if(p2) { p2.play().catch(e=>{}); p2.pause(); p2.currentTime=0; }
         
         const p3 = document.getElementById('sos-player');
-        if(p3) { p3.volume = 1.0; p3.play().catch(e=>{}); p3.pause(); p3.currentTime=0; }
+        if(p3) { p3.volume = 0.8; p3.play().catch(e=>{}); p3.pause(); p3.currentTime=0; }
 
         if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.playVideo === 'function') {
           try { ytPlayer.playVideo(); } catch(e) {}
@@ -1064,7 +1064,7 @@
         const p1 = document.getElementById('main-player');
         if(p1) p1.volume = 0.6;
         const p3 = document.getElementById('sos-player');
-        if(p3) p3.volume = 1.0;
+        if(p3) p3.volume = 0.8;
         
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         const ctx = new AudioContext();
