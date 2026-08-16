@@ -6,8 +6,8 @@ import Image from "next/image";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ระบบการเงิน SVPortal",
-  description: "ระบบบริหารจัดการการเงินและร้านค้าโรงเรียนสมคิดวิทยา",
+  title: "SV-Portal",
+  description: "ระบบบริหารจัดการโรงเรียนสมคิดวิทยา",
 };
 
 export default function RootLayout({
