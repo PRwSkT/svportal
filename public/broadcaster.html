@@ -669,14 +669,16 @@
       let hourStr = parseInt(h);
       let ampm = hourStr >= 12 ? 'PM' : 'AM';
       let hour12 = hourStr % 12 || 12;
-      let minStr = parseInt(m) === 0 ? "o'clock" : parseInt(m);
+      let minVal = parseInt(m);
+      let minStr = minVal === 0 ? "o'clock" : minVal;
       
       const enTextDesc = bellObj.descEn ? bellObj.descEn : bellObj.desc;
       const txtEn = "Attention please, the time is now " + hour12 + " " + minStr + " " + ampm + ", " + enTextDesc;
       const audioUrlEn = await fetchAudioData(txtEn, "en-GB");
       if(audioUrlEn) { audioQueue.push(audioUrlEn); }
 
-      const txt = "ประกาศ ขณะนี้เวลา " + lastRungBell.replace(':', ' นาฬิกา ') + " นาที " + bellObj.desc;
+      let mThai = minVal === 0 ? '' : parseInt(m) + ' นาที ';
+      const txt = "ประกาศ ขณะนี้เวลา " + parseInt(h) + " นาฬิกา " + mThai + bellObj.desc;
       const audioUrl = await fetchAudioData(txt, "th-TH");
       if(audioUrl) { audioQueue.push(audioUrl); }
       
