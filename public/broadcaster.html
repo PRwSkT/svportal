@@ -236,7 +236,6 @@
     let announcedIds = new Set(JSON.parse(sessionStorage.getItem('sv_announcedMsgs') || '[]'));
 
     // Audio / TTS
-    const ttsCache = {};
     let audioQueue = [];
     let isPlayingTTS = false;
     let isPreparingAudio = false;
