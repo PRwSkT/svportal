@@ -1053,9 +1053,30 @@
     }
 
     // Init
-    fetchBellsFromServer();
-    pollServer();
-    setInterval(pollServer, 8000);
+    function initApp() {
+      fetchBellsFromServer();
+      
+      // Load saved state before polling
+      fetch(API_URL + "?action=get_state")
+        .then(r => r.json())
+        .then(state => {
+          if (state.musicQueue) {
+            musicQueue = state.musicQueue;
+            currentMusicIndex = state.currentMusicIndex || 0;
+            renderMusicQueue();
+            tryPlayMusic();
+          }
+          pollServer();
+          setInterval(pollServer, 8000);
+        })
+        .catch(err => {
+          console.error("Init state error:", err);
+          pollServer();
+          setInterval(pollServer, 8000);
+        });
+    }
+
+    initApp();
 
     // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
