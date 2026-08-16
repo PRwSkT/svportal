@@ -438,10 +438,11 @@
       if (ytPlayer && ytPlayer.stopVideo) {
         duckMusicVolume(true);
         setTimeout(() => ytPlayer.stopVideo(), 1000);
-        // We do NOT clear the queue, we just skip to the end so it stops playing
-        currentMusicIndex = musicQueue.length;
-        renderMusicQueue();
       }
+      musicQueue = [];
+      currentMusicIndex = 0;
+      renderMusicQueue();
+      syncQueueToServer();
     }
 
     // ==========================================
