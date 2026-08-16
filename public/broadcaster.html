@@ -124,31 +124,16 @@
       </div>
     </div>
 
-    <!-- Bell Schedule -->
-    <div class="bg-white/80 backdrop-blur-md border border-white rounded-2xl shadow-lg p-4 flex flex-col" style="height: 30%;">
-      <div class="bg-emerald-500 text-white text-lg font-semibold text-center py-2 px-4 rounded-xl shadow-sm mb-3 shrink-0 flex items-center justify-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" /></svg>
-        ตารางเวลาเสียงออด
+    <!-- Bell Schedule Mini Toggle -->
+    <div class="bg-white/80 backdrop-blur-md border border-white rounded-2xl shadow-lg p-3 flex justify-between items-center shrink-0">
+      <div class="flex items-center gap-2 text-emerald-600 font-bold text-base">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" /></svg>
+        ระบบเสียงออดอัตโนมัติ
       </div>
-      <div id="bell-list" class="overflow-y-auto flex-grow flex flex-col gap-2"></div>
-      <div class="flex flex-col gap-2 mt-3 shrink-0 p-2 bg-gray-50 border border-gray-200 rounded-lg">
-        <div class="flex gap-2">
-          <input type="time" id="bell-time" class="px-2 py-1 border border-gray-300 rounded-lg w-1/3">
-          <select id="bell-sound" class="w-2/3 px-2 py-1 border border-gray-300 rounded-lg bg-white">
-            <option value="default">เสียงมาตรฐาน</option>
-            <option value="start">เสียงเข้าเรียน</option>
-            <option value="end">เสียงเลิกเรียน/เปลี่ยนคาบ</option>
-          </select>
-        </div>
-        <div class="flex gap-2">
-          <input type="text" id="bell-desc" placeholder="ประกาศ (ไทย) เช่น หมดเวลาเรียน" class="w-1/2 px-3 py-1 border border-gray-300 rounded-lg">
-          <input type="text" id="bell-desc-en" placeholder="(อังกฤษ) เช่น Class dismissed" class="w-1/2 px-3 py-1 border border-gray-300 rounded-lg">
-        </div>
-        <button id="bell-add-btn" onclick="addBell()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium px-4 py-2 rounded-lg transition flex justify-center items-center gap-1">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-          เพิ่มเวลาออด
-        </button>
-      </div>
+      <button onclick="toggleBellModal(true)" class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-medium transition text-sm flex items-center gap-1">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M10.34 15.84c-.688-.06-1.386-.09-2.09-.09H7.5a4.5 4.5 0 110-9h.75c.704 0 1.402-.03 2.09-.09m0 9.18c.253.962.584 1.892.985 2.783.247.55.06 1.21-.463 1.511l-.657.38c-.551.318-1.26.117-1.527-.461a20.845 20.845 0 01-1.44-4.282m3.102.069a18.03 18.03 0 01-.59-4.59c0-1.586.205-3.124.59-4.59m0 9.18a23.848 23.848 0 018.835 2.535M10.34 6.66a23.847 23.847 0 008.835-2.535m0 0A23.74 23.74 0 0018.795 3m.38 1.125a23.91 23.91 0 011.014 5.395m-1.014 8.855c-.118.38-.245.754-.38 1.125m.38-1.125a23.91 23.91 0 001.014-5.395m0-3.46c.495.413.811 1.035.811 1.73 0 .695-.316 1.317-.811 1.73m0-3.46a24.347 24.347 0 010 3.46" /></svg>
+        ตั้งค่าเวลาออด
+      </button>
     </div>
 
     <!-- Announcements -->
@@ -160,6 +145,74 @@
       <div id="announce-list" class="overflow-y-auto flex-grow flex flex-col gap-2"></div>
     </div>
 
+  </div>
+
+  <!-- Bell Schedule Modal -->
+  <div id="bell-modal" class="fixed inset-0 bg-gray-900/60 z-[9900] hidden flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden">
+      <!-- Modal Header -->
+      <div class="bg-emerald-500 p-4 flex justify-between items-center text-white shrink-0">
+        <h2 class="text-xl font-bold flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" /></svg>
+          ตั้งค่าตารางเวลาเสียงออด
+        </h2>
+        <button onclick="toggleBellModal(false)" class="text-white hover:text-gray-200 transition p-1">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <!-- Modal Body (List) -->
+      <div id="bell-list" class="overflow-y-auto p-4 flex-grow flex flex-col gap-2 bg-gray-50 min-h-[250px]"></div>
+
+      <!-- Modal Footer (Add Form) -->
+      <div class="p-4 border-t border-gray-200 bg-white flex flex-col gap-3 shrink-0">
+        <div class="flex gap-2 items-end">
+          <div class="w-1/4">
+            <label class="block text-sm text-gray-600 mb-1">เวลา</label>
+            <input type="time" id="bell-time" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+          <div class="w-3/4">
+            <label class="block text-sm text-gray-600 mb-1">รูปแบบเหตุการณ์ (Preset)</label>
+            <select id="bell-preset" onchange="handlePresetChange()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+              <option value="custom">กำหนดเอง (Custom)</option>
+              <option value="assembly">เข้าเรียน / เคารพธงชาติ (Morning Assembly)</option>
+              <option value="change_period">เปลี่ยนคาบเรียน (Change Period)</option>
+              <option value="lunch">พักรับประทานอาหารกลางวัน (Lunch Break)</option>
+              <option value="end_lunch">หมดเวลาพัก / เข้าเรียนภาคบ่าย (End of Lunch Break)</option>
+              <option value="dismissal">เลิกเรียน (School Dismissed)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Period Input (Hidden by default) -->
+        <div id="bell-period-container" class="hidden flex gap-2 items-center bg-emerald-50 p-3 rounded-lg border border-emerald-100">
+          <span class="text-sm text-gray-700">หมดคาบที่</span>
+          <input type="number" id="bell-period-current" min="1" max="10" value="1" oninput="updatePresetDesc()" class="w-16 px-2 py-1 border border-emerald-300 rounded-lg text-center font-medium bg-white outline-none focus:ring-2 focus:ring-emerald-500">
+          <span class="text-sm text-gray-700">เตรียมเข้าคาบที่</span>
+          <input type="number" id="bell-period-next" min="1" max="10" value="2" oninput="updatePresetDesc()" class="w-16 px-2 py-1 border border-emerald-300 rounded-lg text-center font-medium bg-white outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+
+        <!-- Custom Details Input -->
+        <div id="bell-custom-container" class="flex flex-col gap-2">
+          <div class="flex gap-2">
+            <input type="text" id="bell-desc" placeholder="ประกาศ (ไทย) เช่น หมดเวลาเรียน" class="w-1/2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
+            <input type="text" id="bell-desc-en" placeholder="(อังกฤษ) เช่น Class dismissed" class="w-1/2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+          <div>
+            <select id="bell-sound" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none">
+              <option value="default">เสียงมาตรฐาน</option>
+              <option value="start">เสียงเข้าเรียน</option>
+              <option value="end">เสียงเลิกเรียน/เปลี่ยนคาบ</option>
+            </select>
+          </div>
+        </div>
+
+        <button id="bell-add-btn" onclick="addBell()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium px-4 py-2.5 rounded-lg transition flex justify-center items-center gap-2 mt-1">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+          บันทึกเวลาออด
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Hidden HTML5 Audio for TTS and Bells -->
@@ -382,35 +435,129 @@
       }).join('');
     }
 
+    function toggleBellModal(show) {
+      const modal = document.getElementById('bell-modal');
+      if (show) {
+        modal.classList.remove('hidden');
+      } else {
+        modal.classList.add('hidden');
+        resetBellForm();
+      }
+    }
+
+    function resetBellForm() {
+      editBellIndex = -1;
+      document.getElementById('bell-time').value = '';
+      document.getElementById('bell-preset').value = 'custom';
+      document.getElementById('bell-desc').value = '';
+      document.getElementById('bell-desc-en').value = '';
+      document.getElementById('bell-sound').value = 'default';
+      document.getElementById('bell-add-btn').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg> บันทึกเวลาออด';
+      handlePresetChange();
+    }
+
+    function handlePresetChange() {
+      const preset = document.getElementById('bell-preset').value;
+      const customContainer = document.getElementById('bell-custom-container');
+      const periodContainer = document.getElementById('bell-period-container');
+      
+      if (preset === 'custom') {
+        customContainer.classList.remove('hidden');
+        periodContainer.classList.add('hidden');
+        periodContainer.classList.remove('flex');
+      } else {
+        customContainer.classList.add('hidden');
+        if (preset === 'change_period') {
+          periodContainer.classList.remove('hidden');
+          periodContainer.classList.add('flex');
+        } else {
+          periodContainer.classList.add('hidden');
+          periodContainer.classList.remove('flex');
+        }
+        updatePresetDesc();
+      }
+    }
+
+    function updatePresetDesc() {
+      const preset = document.getElementById('bell-preset').value;
+      const descTh = document.getElementById('bell-desc');
+      const descEn = document.getElementById('bell-desc-en');
+      const sound = document.getElementById('bell-sound');
+
+      if (preset === 'assembly') {
+        descTh.value = 'ถึงเวลาเข้าแถวเคารพธงชาติ';
+        descEn.value = "It's time for the morning assembly.";
+        sound.value = 'start';
+      } else if (preset === 'change_period') {
+        const cur = document.getElementById('bell-period-current').value;
+        const next = document.getElementById('bell-period-next').value;
+        descTh.value = `หมดเวลาคาบเรียนที่ ${cur} เตรียมเข้าสู่คาบเรียนที่ ${next}`;
+        descEn.value = `Period ${cur} is over. Please prepare for period ${next}.`;
+        sound.value = 'end';
+      } else if (preset === 'lunch') {
+        descTh.value = 'หมดเวลาคาบเรียน พักรับประทานอาหารกลางวัน';
+        descEn.value = 'It is now lunch break.';
+        sound.value = 'end';
+      } else if (preset === 'end_lunch') {
+        descTh.value = 'หมดเวลาพักรับประทานอาหารกลางวัน เตรียมเข้าสู่คาบเรียน';
+        descEn.value = 'Lunch break is over. Please prepare for classes.';
+        sound.value = 'start';
+      } else if (preset === 'dismissal') {
+        descTh.value = 'หมดเวลาเรียน เลิกเรียน';
+        descEn.value = 'Classes are dismissed for today.';
+        sound.value = 'end';
+      }
+    }
+
     function addBell() {
       const time = document.getElementById('bell-time').value;
       const desc = document.getElementById('bell-desc').value;
       const descEn = document.getElementById('bell-desc-en').value;
       const sound = document.getElementById('bell-sound').value;
+      const preset = document.getElementById('bell-preset').value;
+      
+      let pCur = null;
+      let pNext = null;
+      if(preset === 'change_period') {
+         pCur = document.getElementById('bell-period-current').value;
+         pNext = document.getElementById('bell-period-next').value;
+      }
+
       if(time && desc) {
         if (editBellIndex > -1) {
-          bells[editBellIndex] = {time, desc, descEn, sound};
+          bells[editBellIndex] = {time, desc, descEn, sound, preset, pCur, pNext};
           editBellIndex = -1;
-          document.getElementById('bell-add-btn').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg> เพิ่มเวลาออด';
+          document.getElementById('bell-add-btn').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg> บันทึกเวลาออด';
         } else {
-          bells.push({time, desc, descEn, sound});
+          bells.push({time, desc, descEn, sound, preset, pCur, pNext});
         }
         localStorage.setItem('sv_bells', JSON.stringify(bells));
-        document.getElementById('bell-time').value = '';
-        document.getElementById('bell-desc').value = '';
-        document.getElementById('bell-desc-en').value = '';
-        document.getElementById('bell-sound').value = 'default';
+        resetBellForm();
         renderBells();
+      } else {
+        alert("กรุณาระบุเวลาและรูปแบบให้ครบถ้วน");
       }
     }
     
     function editBell(idx) {
       editBellIndex = idx;
-      document.getElementById('bell-time').value = bells[idx].time;
-      document.getElementById('bell-desc').value = bells[idx].desc;
-      document.getElementById('bell-desc-en').value = bells[idx].descEn || '';
-      document.getElementById('bell-sound').value = bells[idx].sound || 'default';
-      document.getElementById('bell-add-btn').innerText = 'บันทึกการแก้ไข';
+      const b = bells[idx];
+      document.getElementById('bell-time').value = b.time;
+      document.getElementById('bell-preset').value = b.preset || 'custom';
+      
+      if(b.preset === 'change_period') {
+        document.getElementById('bell-period-current').value = b.pCur || 1;
+        document.getElementById('bell-period-next').value = b.pNext || 2;
+      }
+      
+      handlePresetChange();
+      
+      // Override desc and sound in case it was a custom setting
+      document.getElementById('bell-desc').value = b.desc;
+      document.getElementById('bell-desc-en').value = b.descEn || '';
+      document.getElementById('bell-sound').value = b.sound || 'default';
+
+      document.getElementById('bell-add-btn').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" /></svg> บันทึกการแก้ไข';
     }
 
     function removeBell(idx) {
