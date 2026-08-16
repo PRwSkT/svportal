@@ -206,6 +206,8 @@
 
     window.addEventListener('load', function() {
       document.getElementById('user-display').innerText = 'Admin (SVPortal)';
+      fetchState();
+      setInterval(fetchState, 5000);
     });
 
     function extractVideoID(url) {
