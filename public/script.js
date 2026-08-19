@@ -1029,6 +1029,8 @@ async function confirmPublish() {
                 btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> เผยแพร่ Instagram Reels...';
                 await callStep({ action: 'videoPublishIG', containerId: igContainerId });
 
+                await syncToWebsite(hl, fbCaption, activeFiles);
+
                 showToast("โพสต์วิดีโอสำเร็จทั้ง Facebook และ Instagram!", "success");
                 closePublishModal();
 
@@ -1060,6 +1062,8 @@ async function confirmPublish() {
         if (resData.error) throw new Error(resData.error.message || resData.error);
         if (resData.success === false) throw new Error(resData.message || "เกิดข้อผิดพลาดในการโพสต์");
         
+        await syncToWebsite(hl, fbCaption, activeFiles);
+
         showToast("โพสต์สำเร็จเรียบร้อย!", "success");
         closePublishModal();
     } catch(err) {
@@ -1268,3 +1272,33 @@ function setLang(lang) {
 
 checkFormReady();
 console.log('trigger build');
+
+
+// ==========================================
+// Website Sync
+// ==========================================
+async function syncToWebsite(hl, fbCaption, activeFiles) {
+    try {
+        const btn = document.getElementById('btn-confirm-publish');
+        if(btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> อัปเดตขึ้นเว็บไซต์...';
+        
+        const formData = new FormData();
+        formData.append('hl', hl || 'ข่าวสารใหม่');
+        formData.append('fbCaption', fbCaption || '');
+        
+        for (let f of activeFiles) {
+            formData.append('files', f);
+        }
+        
+        const res = await fetch('/api/admin/website/sync-post', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!res.ok) {
+            console.warn('Website sync failed with status:', res.status);
+        }
+    } catch(err) {
+        console.error('Website sync error:', err);
+    }
+}

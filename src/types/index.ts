@@ -214,3 +214,83 @@ export type GoogleBackupPayload = {
   description: string;
   receipt_url?: string;
 };
+
+// ==========================================
+// Website Content Management Tables
+// ==========================================
+
+export type Personnel = {
+  id: string;
+  name_th: string;
+  name_en: string;
+  position_th: string;
+  position_en: string;
+  category: string; // 'executive', 'teacher', 'staff'
+  image_url: string;
+  bio_th: string | null;
+  bio_en: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type News = {
+  id: string;
+  title_th: string;
+  title_en: string;
+  content_th: string;
+  content_en: string;
+  cover_image_url: string | null;
+  album_id: string | null;
+  is_published: boolean;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Album = {
+  id: string;
+  title_th: string;
+  title_en: string;
+  description_th: string | null;
+  description_en: string | null;
+  cover_image_url: string | null;
+  event_date: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AlbumPhoto = {
+  id: string;
+  album_id: string;
+  image_url: string;
+  caption_th: string | null;
+  caption_en: string | null;
+  sort_order: number;
+  created_at: string;
+};
+
+export type CalendarEvent = {
+  id: string;
+  title_th: string;
+  title_en: string;
+  start_date: string;
+  end_date: string | null;
+  is_holiday: boolean;
+  category: string; // 'academic', 'holiday', 'activity'
+  created_at: string;
+  updated_at: string;
+};
+
+export type Document = {
+  id: string;
+  title_th: string;
+  title_en: string;
+  file_url: string;
+  category: string; // 'form', 'policy', etc.
+  file_type: string; // 'pdf', 'docx', etc.
+  file_size_bytes: number | null;
+  created_at: string;
+  updated_at: string;
+};

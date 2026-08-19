@@ -25,6 +25,7 @@ export function AppNav() {
     { href: '/admin/students', label: 'งานระเบียน' },
     { href: '/admin/products', label: 'จัดการสินค้า' },
     { href: '/admin/wallet/students', label: 'Wallet นักเรียน' },
+    { href: '/admin/website', label: 'จัดการเว็บไซต์' },
   ];
 
   const links = role === 'admin' ? [...cashierLinks, ...adminLinks] : cashierLinks;
