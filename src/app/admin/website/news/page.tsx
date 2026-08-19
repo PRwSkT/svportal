@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { News } from '@/types';
 import { createClient } from '@/lib/supabase/client';
+import { insertRecord, updateRecord, deleteRecord } from '@/app/admin/website/actions';
 import { uploadWebsiteFile } from '@/lib/supabase/storage';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -70,12 +71,12 @@ export default function NewsManager() {
       };
 
       if (editingId) {
-        const { error } = await supabase.from('news').update(payload).eq('id', editingId);
-        if (error) throw error;
+        await updateRecord('news', editingId, payload);
+        
         toast.success('อัปเดตข่าวสารสำเร็จ', { id: loadingToast });
       } else {
-        const { error } = await supabase.from('news').insert([payload]);
-        if (error) throw error;
+        await insertRecord('news', payload);
+        
         toast.success('เพิ่มข่าวสารสำเร็จ', { id: loadingToast });
       }
 
@@ -93,8 +94,8 @@ export default function NewsManager() {
     if (!confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบข่าว "${title}"?`)) return;
     const loadingToast = toast.loading('กำลังลบข้อมูล...');
     try {
-      const { error } = await supabase.from('news').delete().eq('id', id);
-      if (error) throw error;
+      await deleteRecord('news', id);
+      
       toast.success('ลบข้อมูลสำเร็จ', { id: loadingToast });
       loadNews();
     } catch (err: any) {

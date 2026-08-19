@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, use } from 'react';
 import { Album, AlbumPhoto } from '@/types';
 import { createClient } from '@/lib/supabase/client';
+import { insertRecord, updateRecord, deleteRecord } from '@/app/admin/website/actions';
 import { uploadWebsiteFile } from '@/lib/supabase/storage';
 import { toast } from 'sonner';
 import { ArrowLeft, Upload, Loader2, Trash2 } from 'lucide-react';
@@ -72,7 +73,7 @@ export default function AlbumPhotosManager({ params }: { params: Promise<{ id: s
           sort_order: photos.length + i,
         };
         
-        await supabase.from('album_photos').insert([payload]);
+        await insertRecord('album_photos', payload);
         successCount++;
       } catch (err) {
         console.error('Upload error:', err);
@@ -93,8 +94,8 @@ export default function AlbumPhotosManager({ params }: { params: Promise<{ id: s
     
     const loadingToast = toast.loading('กำลังลบรูปภาพ...');
     try {
-      const { error } = await supabase.from('album_photos').delete().eq('id', photoId);
-      if (error) throw error;
+      await deleteRecord('album_photos', photoId);
+      
       toast.success('ลบรูปภาพสำเร็จ', { id: loadingToast });
       loadData();
     } catch (err: any) {

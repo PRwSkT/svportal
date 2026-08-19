@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { CalendarEvent } from '@/types';
 import { createClient } from '@/lib/supabase/client';
+import { insertRecord, updateRecord, deleteRecord } from '@/app/admin/website/actions';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar as CalendarIcon, Plus, X, Loader2, Edit, Trash2 } from 'lucide-react';
@@ -51,12 +52,12 @@ export default function CalendarManager() {
       };
 
       if (editingId) {
-        const { error } = await supabase.from('calendar_events').update(payload).eq('id', editingId);
-        if (error) throw error;
+        await updateRecord('calendar_events', editingId, payload);
+        
         toast.success('อัปเดตกิจกรรมสำเร็จ', { id: loadingToast });
       } else {
-        const { error } = await supabase.from('calendar_events').insert([payload]);
-        if (error) throw error;
+        await insertRecord('calendar_events', payload);
+        
         toast.success('เพิ่มกิจกรรมสำเร็จ', { id: loadingToast });
       }
 
@@ -74,8 +75,8 @@ export default function CalendarManager() {
     if (!confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบกิจกรรม "${title}"?`)) return;
     const loadingToast = toast.loading('กำลังลบข้อมูล...');
     try {
-      const { error } = await supabase.from('calendar_events').delete().eq('id', id);
-      if (error) throw error;
+      await deleteRecord('calendar_events', id);
+      
       toast.success('ลบข้อมูลสำเร็จ', { id: loadingToast });
       loadEvents();
     } catch (err: any) {

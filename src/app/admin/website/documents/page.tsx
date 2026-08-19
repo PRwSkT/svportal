@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Document as DocType } from '@/types';
 import { createClient } from '@/lib/supabase/client';
+import { insertRecord, updateRecord, deleteRecord } from '@/app/admin/website/actions';
 import { uploadWebsiteFile } from '@/lib/supabase/storage';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -67,12 +68,12 @@ export default function DocumentsManager() {
       }
 
       if (editingId) {
-        const { error } = await supabase.from('documents').update(payload).eq('id', editingId);
-        if (error) throw error;
+        await updateRecord('documents', editingId, payload);
+        
         toast.success('อัปเดตเอกสารสำเร็จ', { id: loadingToast });
       } else {
-        const { error } = await supabase.from('documents').insert([payload]);
-        if (error) throw error;
+        await insertRecord('documents', payload);
+        
         toast.success('เพิ่มเอกสารสำเร็จ', { id: loadingToast });
       }
 
@@ -90,8 +91,8 @@ export default function DocumentsManager() {
     if (!confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบเอกสาร "${title}"?`)) return;
     const loadingToast = toast.loading('กำลังลบข้อมูล...');
     try {
-      const { error } = await supabase.from('documents').delete().eq('id', id);
-      if (error) throw error;
+      await deleteRecord('documents', id);
+      
       toast.success('ลบข้อมูลสำเร็จ', { id: loadingToast });
       loadDocuments();
     } catch (err: any) {

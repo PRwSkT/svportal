@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Personnel } from '@/types';
 import { createClient } from '@/lib/supabase/client';
+import { insertRecord, updateRecord, deleteRecord } from '@/app/admin/website/actions';
 import { uploadWebsiteFile } from '@/lib/supabase/storage';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -85,12 +86,12 @@ export default function PersonnelManager() {
       };
 
       if (editingId) {
-        const { error } = await supabase.from('personnel').update(payload).eq('id', editingId);
-        if (error) throw error;
+        await updateRecord('personnel', editingId, payload);
+        
         toast.success('อัปเดตข้อมูลสำเร็จ', { id: loadingToast });
       } else {
-        const { error } = await supabase.from('personnel').insert([payload]);
-        if (error) throw error;
+        await insertRecord('personnel', payload);
+        
         toast.success('เพิ่มบุคลากรสำเร็จ', { id: loadingToast });
       }
 
@@ -109,8 +110,8 @@ export default function PersonnelManager() {
     
     const loadingToast = toast.loading('กำลังลบข้อมูล...');
     try {
-      const { error } = await supabase.from('personnel').delete().eq('id', id);
-      if (error) throw error;
+      await deleteRecord('personnel', id);
+      
       toast.success('ลบข้อมูลสำเร็จ', { id: loadingToast });
       loadPersonnel();
     } catch (err: any) {
@@ -121,8 +122,8 @@ export default function PersonnelManager() {
   const handleToggleActive = async (id: string, currentStatus: boolean) => {
     const loadingToast = toast.loading('กำลังอัปเดตสถานะ...');
     try {
-      const { error } = await supabase.from('personnel').update({ is_active: !currentStatus }).eq('id', id);
-      if (error) throw error;
+      await updateRecord('personnel', id, { is_active: !currentStatus });
+      
       toast.success('อัปเดตสถานะสำเร็จ', { id: loadingToast });
       loadPersonnel();
     } catch (err: any) {

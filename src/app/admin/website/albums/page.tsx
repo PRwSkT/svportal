@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Album } from '@/types';
 import { createClient } from '@/lib/supabase/client';
+import { insertRecord, updateRecord, deleteRecord } from '@/app/admin/website/actions';
 import { uploadWebsiteFile } from '@/lib/supabase/storage';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -70,12 +71,12 @@ export default function AlbumsManager() {
       };
 
       if (editingId) {
-        const { error } = await supabase.from('albums').update(payload).eq('id', editingId);
-        if (error) throw error;
+        await updateRecord('albums', editingId, payload);
+        
         toast.success('อัปเดตอัลบั้มสำเร็จ', { id: loadingToast });
       } else {
-        const { error } = await supabase.from('albums').insert([payload]);
-        if (error) throw error;
+        await insertRecord('albums', payload);
+        
         toast.success('สร้างอัลบั้มใหม่สำเร็จ', { id: loadingToast });
       }
 
@@ -95,8 +96,8 @@ export default function AlbumsManager() {
     try {
       // Supabase cascade delete should handle album_photos if foreign key is set up.
       // If not, we might need to delete photos first. Assuming cascade is on.
-      const { error } = await supabase.from('albums').delete().eq('id', id);
-      if (error) throw error;
+      await deleteRecord('albums', id);
+      
       toast.success('ลบอัลบั้มสำเร็จ', { id: loadingToast });
       loadAlbums();
     } catch (err: any) {
