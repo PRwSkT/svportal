@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, Wallet, ShoppingBag, GraduationCap, TrendingUp, Clock, RefreshCw, AlertTriangle, CheckCircle2, Server } from 'lucide-react';
+import { LayoutDashboard, Wallet, ShoppingBag, GraduationCap, TrendingUp, Clock, RefreshCw, AlertTriangle, CheckCircle2, Server, Globe, FileText, Image as ImageIcon, Users } from 'lucide-react';
 
 const formatTHB = (amount: number) => {
   return new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount || 0);
@@ -49,6 +49,12 @@ export default function DashboardView({ initialData, thaiDate, localISOTime }: {
     processing: 0,
     completed: 0,
     failed: 0
+  };
+
+  const websiteStats = data?.website_stats || {
+    news: 0,
+    albums: 0,
+    personnel: 0
   };
 
   return (
@@ -155,48 +161,85 @@ export default function DashboardView({ initialData, thaiDate, localISOTime }: {
         </motion.div>
       </div>
 
-      {/* Sync Queue Monitor */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-        className="bg-surface backdrop-blur-xl rounded-3xl shadow-lg border border-white/60 p-8"
-      >
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
-            <Server className="w-5 h-5" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Sync Queue Monitor */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="bg-surface backdrop-blur-xl rounded-3xl shadow-lg border border-white/60 p-8"
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
+              <Server className="w-5 h-5" />
+            </div>
+            <h2 className="text-xl font-bold text-foreground">สถานะคิวซิงค์ข้อมูล</h2>
           </div>
-          <h2 className="text-xl font-bold text-foreground">สถานะคิวซิงค์ข้อมูล (SVPortal Sync)</h2>
-        </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-background border border-foreground/10 rounded-2xl p-4 flex flex-col items-center justify-center text-center">
-            <div className="text-3xl font-black text-blue-500 mb-1">{syncStats.pending}</div>
-            <div className="text-sm font-medium text-foreground/60">รอการส่ง (Pending)</div>
-          </div>
-          
-          <div className="bg-background border border-foreground/10 rounded-2xl p-4 flex flex-col items-center justify-center text-center">
-            <div className="text-3xl font-black text-orange-500 mb-1">{syncStats.processing}</div>
-            <div className="text-sm font-medium text-foreground/60">กำลังส่ง (Processing)</div>
-          </div>
-          
-          <div className="bg-background border border-foreground/10 rounded-2xl p-4 flex flex-col items-center justify-center text-center">
-            <div className="text-3xl font-black text-green-500 mb-1 flex items-center gap-2">
-              <CheckCircle2 className="w-6 h-6" />
-              {syncStats.completed}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-background border border-foreground/10 rounded-2xl p-4 flex flex-col items-center justify-center text-center">
+              <div className="text-3xl font-black text-blue-500 mb-1">{syncStats.pending}</div>
+              <div className="text-sm font-medium text-foreground/60">รอการส่ง (Pending)</div>
             </div>
-            <div className="text-sm font-medium text-foreground/60">สำเร็จ (Completed)</div>
-          </div>
-          
-          <div className={`bg-background border ${syncStats.failed > 0 ? 'border-red-500/50 bg-red-500/5' : 'border-foreground/10'} rounded-2xl p-4 flex flex-col items-center justify-center text-center`}>
-            <div className={`text-3xl font-black mb-1 flex items-center gap-2 ${syncStats.failed > 0 ? 'text-red-500' : 'text-foreground/30'}`}>
-              {syncStats.failed > 0 && <AlertTriangle className="w-6 h-6" />}
-              {syncStats.failed}
+            
+            <div className="bg-background border border-foreground/10 rounded-2xl p-4 flex flex-col items-center justify-center text-center">
+              <div className="text-3xl font-black text-orange-500 mb-1">{syncStats.processing}</div>
+              <div className="text-sm font-medium text-foreground/60">กำลังส่ง (Processing)</div>
             </div>
-            <div className="text-sm font-medium text-foreground/60">ล้มเหลว (Failed)</div>
+            
+            <div className="bg-background border border-foreground/10 rounded-2xl p-4 flex flex-col items-center justify-center text-center">
+              <div className="text-3xl font-black text-green-500 mb-1 flex items-center gap-2">
+                <CheckCircle2 className="w-6 h-6" />
+                {syncStats.completed}
+              </div>
+              <div className="text-sm font-medium text-foreground/60">สำเร็จ (Completed)</div>
+            </div>
+            
+            <div className={`bg-background border ${syncStats.failed > 0 ? 'border-red-500/50 bg-red-500/5' : 'border-foreground/10'} rounded-2xl p-4 flex flex-col items-center justify-center text-center`}>
+              <div className={`text-3xl font-black mb-1 flex items-center gap-2 ${syncStats.failed > 0 ? 'text-red-500' : 'text-foreground/30'}`}>
+                {syncStats.failed > 0 && <AlertTriangle className="w-6 h-6" />}
+                {syncStats.failed}
+              </div>
+              <div className="text-sm font-medium text-foreground/60">ล้มเหลว (Failed)</div>
+            </div>
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
+
+        {/* Website Stats */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="bg-surface backdrop-blur-xl rounded-3xl shadow-lg border border-white/60 p-8"
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-500">
+              <Globe className="w-5 h-5" />
+            </div>
+            <h2 className="text-xl font-bold text-foreground">ข้อมูลหน้าเว็บไซต์</h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-background border border-foreground/10 rounded-2xl p-4 flex flex-col items-center justify-center text-center">
+              <FileText className="w-6 h-6 text-foreground/40 mb-2" />
+              <div className="text-3xl font-black text-foreground mb-1">{websiteStats.news}</div>
+              <div className="text-sm font-medium text-foreground/60">ข่าวสาร</div>
+            </div>
+            
+            <div className="bg-background border border-foreground/10 rounded-2xl p-4 flex flex-col items-center justify-center text-center">
+              <ImageIcon className="w-6 h-6 text-foreground/40 mb-2" />
+              <div className="text-3xl font-black text-foreground mb-1">{websiteStats.albums}</div>
+              <div className="text-sm font-medium text-foreground/60">อัลบั้มภาพ</div>
+            </div>
+            
+            <div className="bg-background border border-foreground/10 rounded-2xl p-4 flex flex-col items-center justify-center text-center">
+              <Users className="w-6 h-6 text-foreground/40 mb-2" />
+              <div className="text-3xl font-black text-foreground mb-1">{websiteStats.personnel}</div>
+              <div className="text-sm font-medium text-foreground/60">บุคลากร</div>
+            </div>
+          </div>
+        </motion.div>
+      </div>
     </motion.div>
   );
 }

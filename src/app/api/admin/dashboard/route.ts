@@ -41,7 +41,20 @@ export async function GET(request: Request) {
       });
     }
 
-    return NextResponse.json({ summary, sync_stats });
+    // Get Website Stats
+    const [{ count: newsCount }, { count: albumsCount }, { count: personnelCount }] = await Promise.all([
+      supabase.from('news').select('*', { count: 'exact', head: true }),
+      supabase.from('albums').select('*', { count: 'exact', head: true }),
+      supabase.from('personnel').select('*', { count: 'exact', head: true }),
+    ]);
+
+    const website_stats = {
+      news: newsCount || 0,
+      albums: albumsCount || 0,
+      personnel: personnelCount || 0
+    };
+
+    return NextResponse.json({ summary, sync_stats, website_stats });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
