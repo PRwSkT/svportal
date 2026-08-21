@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
         width: 300,
         height: 300,
         margin: 20,
-        type: "svg",
+        type: "canvas",
         data: qrDataInput.value || "https://svportal.example.com",
         image: currentLogoUrl,
         dotsOptions: {
@@ -118,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
         backgroundOptions: {
             color: bgColorInput.value === '#ffffff' ? 'transparent' : bgColorInput.value,
         },
-        imageOptions: {
+        imageOptions: { crossOrigin: "anonymous",
             margin: parseInt(logoMarginInput.value),
             imageSize: parseFloat(logoSizeInput.value)
         },
@@ -158,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 type: cornerDotStyle.value,
                 color: cornerDotColor.value
             },
-            imageOptions: {
+            imageOptions: { crossOrigin: "anonymous",
                 margin: parseInt(logoMarginInput.value),
                 imageSize: parseFloat(logoSizeInput.value)
             },
