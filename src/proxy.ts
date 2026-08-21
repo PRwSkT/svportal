@@ -5,7 +5,7 @@ export async function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https:;
+    script-src 'self' 'unsafe-eval' 'nonce-${nonce}' 'strict-dynamic' https:;
     style-src 'self' 'unsafe-inline' https:;
     img-src 'self' blob: data: https:;
     font-src 'self' data: https:;
@@ -67,7 +67,8 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/auth') ||
     (request.nextUrl.pathname.endsWith('.html') && !request.nextUrl.pathname.includes('audio-remote.html')) ||
     request.nextUrl.pathname.includes('post-assistant') ||
-    request.nextUrl.pathname === '/api/admin/website/sync-post'
+    request.nextUrl.pathname === '/api/admin/website/sync-post' ||
+    request.nextUrl.pathname.startsWith('/qr-generator')
   ) {
     return response;
   }
