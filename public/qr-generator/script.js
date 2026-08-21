@@ -271,10 +271,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Handle Download
-    downloadBtn.addEventListener('click', () => {
-        qrCode.download({
-            name: "sv-portal-qr",
-            extension: 'png'
-        });
+        downloadBtn.addEventListener('click', async () => {
+        try {
+            const blob = await qrCode.getRawData('png');
+            if (!blob) {
+                alert("Error: Could not generate QR Code image.");
+                return;
+            }
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "sv-portal-qr.png";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 100);
+        } catch (err) {
+            alert("Download failed: " + err);
+            console.error(err);
+        }
     });
 });
