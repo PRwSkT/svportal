@@ -91,8 +91,8 @@ Every image receives an internal score based on: Story Score, Emotion Score, Com
 Select images by total score. Never output scores.
 Select the strongest image as Cover. Cover image should immediately communicate the story.
 
-Avoid choosing multiple images with nearly identical composition. Prefer different moments, different students, different angles.
-Keep as many good images as possible. Only remove images that are severely blurry, completely duplicated, or unusable.
+DO NOT discard images just because they look similar. KEEP ALMOST ALL IMAGES. Only remove if completely black or broken.
+Keep as many good images as possible. Keep 100% of the images if possible. Do not filter out variations.
 When unsure, keep the image.
 
 Cover Headline Rules
