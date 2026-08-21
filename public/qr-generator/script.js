@@ -142,6 +142,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         qrCode.update({
             data: data,
+            width: 1024,
+            height: 1024,
             margin: 64,
             dotsOptions: {
                 color: qrColorInput.value,
@@ -291,4 +293,27 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error(err);
         }
     });
+
+    const downloadSvgBtn = document.getElementById('btn-download-svg');
+    downloadSvgBtn.addEventListener('click', async () => {
+        try {
+            const blob = await qrCode.getRawData('svg');
+            if (!blob) {
+                alert("Error: Could not generate SVG.");
+                return;
+            }
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "sv-portal-qr.svg";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 100);
+        } catch (err) {
+            alert("SVG Download failed: " + err);
+            console.error(err);
+        }
+    });
 });
+
