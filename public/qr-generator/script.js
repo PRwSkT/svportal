@@ -105,9 +105,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize QR Code Styling instance
     const qrCode = new QRCodeStyling({
-        width: 300,
-        height: 300,
-        margin: 20,
+        width: 1024,
+        height: 1024,
+        margin: 64,
         type: "canvas",
         data: qrDataInput.value || "https://svportal.example.com",
         image: currentLogoUrl,
@@ -119,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
             color: bgColorInput.value === '#ffffff' ? 'transparent' : bgColorInput.value,
         },
         imageOptions: { crossOrigin: "anonymous",
-            margin: parseInt(logoMarginInput.value),
+            margin: parseInt(logoMarginInput.value) * 3,
             imageSize: parseFloat(logoSizeInput.value)
         },
         cornersSquareOptions: {
@@ -142,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         qrCode.update({
             data: data,
-            margin: 20,
+            margin: 64,
             dotsOptions: {
                 color: qrColorInput.value,
                 type: qrDotsSelect.value
@@ -159,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 color: cornerDotColor.value
             },
             imageOptions: { crossOrigin: "anonymous",
-                margin: parseInt(logoMarginInput.value),
+                margin: parseInt(logoMarginInput.value) * 3,
                 imageSize: parseFloat(logoSizeInput.value)
             },
             image: currentLogoUrl || ""
