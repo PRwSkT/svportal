@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
         width: 1024,
         height: 1024,
         margin: 64,
-        type: "canvas",
+        type: "svg",
         data: qrDataInput.value || "https://svportal.example.com",
         image: currentLogoUrl,
         dotsOptions: {
