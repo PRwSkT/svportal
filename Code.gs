@@ -636,11 +636,11 @@ function handleTranslateCaption(params) {
   var verifiedFacts = "";
   if (thaiCaption.trim().length > 5) {
     try {
-      var searchPrompt = "You are a research assistant. Please use Google Search to find and verify the correct English terminology, proper nouns, location names, technical terms, and current facts related to this Thai context from a school:
+      var searchPrompt = `You are a research assistant. Please use Google Search to find and verify the correct English terminology, proper nouns, location names, technical terms, and current facts related to this Thai context from a school:
 
-" + thaiCaption + "
+` + thaiCaption + `
 
-Return a concise list of verified English terms and facts to use in a social media translation. Do not write a full caption.";
+Return a concise list of verified English terms and facts to use in a social media translation. Do not write a full caption.`;
       var searchPayload = {
         "contents": [{ "role": "user", "parts": [{ "text": searchPrompt }] }],
         "tools": [{ "google_search": {} }]
