@@ -1,6 +1,6 @@
 // ==========================================
 // Code.gs — Somkidvittaya School
-// Social Post Assistant (ฉบับสมบูรณ์ - อัปเดต API Key และระบบจัดการ Error)
+// Social Post Assistant
 // ==========================================
 
 function doPost(e) {
@@ -259,7 +259,7 @@ Evaluate quality scores (0-100) for: Brand, Storytelling, Emotion, Overall.
 Return in the quality object.
 `;
 
-    var rawResponse = callGeminiAPI(base64ImagesArray, mimeType, prompt);
+    var rawResponse = callGeminiAPI(base64ImagesArray, mimeType, prompt, activityInfo);
 
     // ดักจับ Error จาก API
     if (rawResponse.error) {
@@ -467,9 +467,42 @@ function handlePublishToSocial(params) {
 // ==========================================
 // เรียก Gemini API (รองรับหลายรูปภาพ + JSON Schema)
 // ==========================================
-function callGeminiAPI(base64ImagesArray, mimeType, prompt) {
-   var apiKey = "YOUR_GEMINI_API_KEY"; // ใส่คีย์ของคุณระหว่างเครื่องหมาย " "
-   var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=" + apiKey;
+function callGeminiAPI(base64ImagesArray, mimeType, prompt, activityInfo) {
+  var apiKey = "YOUR_GEMINI_API_KEY"; // ใส่คีย์ของคุณระหว่างเครื่องหมาย " "
+  
+  // --- Step 1: Researcher (gemini-2.5-flash) ---
+  var verifiedFacts = "";
+  if (activityInfo && activityInfo.trim().length > 5) {
+    try {
+      var searchPrompt = "You are a research assistant. Please use Google Search to find and verify the correct English terminology, proper nouns, location names, technical terms, and current facts related to this Thai context from a school:\n\n" + activityInfo + "\n\nReturn a concise list of verified English terms and facts to use in a social media post. Do not write a caption.";
+      
+      var searchPayload = {
+        "contents": [{ "role": "user", "parts": [{ "text": searchPrompt }] }],
+        "tools": [{ "google_search": {} }]
+      };
+      
+      var searchRes = UrlFetchApp.fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey, {
+        "method": "post",
+        "contentType": "application/json",
+        "payload": JSON.stringify(searchPayload),
+        "muteHttpExceptions": true
+      });
+      
+      var searchData = JSON.parse(searchRes.getContentText());
+      if (searchData.candidates && searchData.candidates.length > 0) {
+        verifiedFacts = searchData.candidates[0].content.parts[0].text;
+      }
+    } catch (e) {
+      // Silently continue if search fails
+    }
+  }
+  
+  if (verifiedFacts) {
+    prompt += "\n\n==================================================\nRESEARCH FACTS (FROM GEMINI 2.5 FLASH)\n==================================================\n" + verifiedFacts + "\n\nPlease use these verified facts and terminology when writing the caption.";
+  }
+
+  // --- Step 2: Writer (gemini-3.6-flash) ---
+  var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=" + apiKey;
 
   var jsonSchema = {
     "type": "OBJECT",
@@ -551,12 +584,7 @@ Never expose your reasoning.`
       "topP": 0.95,
       "topK": 40,
       "maxOutputTokens": 8192
-    },
-    "tools": [
-      {
-        "google_search": {}
-      }
-    ]
+    }
   };
 
   var options = { 
