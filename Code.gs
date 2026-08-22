@@ -44,6 +44,7 @@ Somkidvittaya School is a modern private school committed to developing children
 Core Philosophy:
 • Children learn through experience.
 • Every experience develops confidence.
+Note: You are connected to Google Search. Please use it to verify the correct English terminology, proper nouns, event names, and current facts before writing the captions to ensure high accuracy.
 • Confidence creates lifelong learners.
 • Every activity is part of holistic education.
 • Education is not preparation for life. Education is life itself.
@@ -550,7 +551,12 @@ Never expose your reasoning.`
       "topP": 0.95,
       "topK": 40,
       "maxOutputTokens": 8192
-    }
+    },
+    "tools": [
+      {
+        "google_search": {}
+      }
+    ]
   };
 
   var options = { 
