@@ -800,7 +800,7 @@ Thai Caption to Translate:
 // ==========================================
 function getMetaConfig_(targetPage) {
   var config = {
-    token: "EAAYA0g05EhoBRkw8us77ykfLJI1V5p0c6RCS1BUKvDv5Uzj0uHysQALJm9iATqlNjFNSCzakf3EfCM5ktVahwnheASgGjNNm2RSg3DeQJZCic0rK43W8fdmbzxPJZBfdk8HZCa5serZBMk2OUosKJj2EZBvwPmFzDbs4uJoffPMHRZAzTT8dJTtss3Qm3KenEpidsZD",
+    token: "EAAYA0g05EhoBSY0mxZARe3hje6CjMqnoez2SJl4N7R4FZBMZAU0TpXG3D7kxBCO8k826wGd84vkrHd809UZCyyj5J4LSo8mgoRMXvqYOR1joESZAX4aZCxrYVsPZAEjVxJsZCpnA6Ouq3fcX17ZALIoZBs8EbySfKwTqaQS17AOsT4kNOLF694QXdbF2BNzQdQOAB6EAZDZD",
     pageId: "192831060756593", // main
     igId: "17841446069053774"
   };
