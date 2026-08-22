@@ -11,7 +11,33 @@ let hasFiles = false;
 let currentLang = 'th';
 let currentCaptionFB = "";
 let currentCaptionIG = "";
+let currentCaptionIG = "";
 let mediaMode = 'photo'; // 'photo' or 'video'
+let targetPage = 'main';
+
+function selectPage(btn) {
+    document.querySelectorAll('.page-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    targetPage = btn.getAttribute('data-page');
+    
+    // Hide IG if not main (other pages only use FB)
+    const igTab = document.querySelector('.lang-btn[onclick="setPlatform(\'ig\')"]');
+    if (igTab) {
+        if (targetPage === 'main') {
+            igTab.style.display = 'inline-flex';
+        } else {
+            igTab.style.display = 'none';
+            if(window.currentPlatform === 'ig') setPlatform('fb');
+        }
+    }
+
+    // Hide EN/CN language toggles for sub pages
+    const langToggle = document.querySelector('.sv-lang-toggle');
+    if (langToggle) {
+        langToggle.style.display = (targetPage === 'main') ? 'flex' : 'none';
+        if(targetPage !== 'main' && window.setLang) setLang('th');
+    }
+}
 
 function setMediaMode(mode) {
     mediaMode = mode;
@@ -262,11 +288,17 @@ async function processPost() {
         await document.fonts.ready;
         
         // Fetch blobs for templates to send to worker
+        const pageSuffix = targetPage === 'main' ? '' : `-${targetPage}`;
+        const fetchGraceful = (url) => fetch(url).then(r => r.ok ? r.blob() : null).catch(() => null);
+        
+        // If it's main page, it uses watermark-new.png, else watermark-new-xxx.png
+        // If the user names it watermark-football.png instead of watermark-new-football.png, we might need a map.
+        // Let's assume watermark-new-football.png for now.
         const [fbCovBlob, igCovBlob, fbSubBlob, igSubBlob] = await Promise.all([
-            fetch('cover-fb.png').then(r => r.blob()),
-            fetch('cover-ig.png').then(r => r.blob()),
-            fetch('watermark-new.png').then(r => r.blob()),
-            fetch('overlay-ig.png').then(r => r.blob())
+            fetchGraceful(`cover-fb${pageSuffix}.png`),
+            fetchGraceful(`cover-ig${pageSuffix}.png`),
+            fetchGraceful(`watermark-new${pageSuffix}.png`),
+            fetchGraceful(`overlay-ig${pageSuffix}.png`)
         ]);
         
         templateFBCover = fbCovBlob;
@@ -294,7 +326,8 @@ async function processPost() {
                 'images': JSON.stringify(imagesDataForAI),
                 'mimeType': 'image/jpeg',
                 'activityInfo': activityContext,
-                'mediaMode': mediaMode
+                'mediaMode': mediaMode,
+                'targetPage': targetPage
             })
         });
 
@@ -924,7 +957,8 @@ async function confirmPublish() {
                 'fbImages': JSON.stringify(processedImages.fbImages),
                 'igImages': JSON.stringify(processedImages.igImages.slice(0, 10)),
                 'fbCaption': fbCaption,
-                'igCaption': igCaption
+                'igCaption': igCaption,
+                'targetPage': targetPage
             });
         } else {
             // ==========================================
@@ -950,6 +984,7 @@ async function confirmPublish() {
 
             // --- Helper: เรียก API ย่อย ---
             async function callStep(params) {
+                params.targetPage = targetPage;
                 const res = await fetch(WEB_APP_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },

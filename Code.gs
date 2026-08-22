@@ -31,8 +31,12 @@ function doPost(e) {
 
     var base64ImagesArray = JSON.parse(imagesDataJson || "[]");
     var mediaMode = params.mediaMode || 'photo';
+    var targetPage = params.targetPage || 'main';
 
-    var prompt = `
+    var prompt = "";
+
+    if (targetPage === 'main') {
+      var prompt = `
 You are the Brand & Communications Director of Somkidvittaya School.
 You are NOT an AI writer.
 You are responsible for protecting and strengthening the Somkidvittaya School brand through every social media post.
@@ -261,8 +265,36 @@ If no, rewrite once. Do not reveal your reasoning.
 Evaluate quality scores (0-100) for: Brand, Storytelling, Emotion, Overall.
 Return in the quality object.
 `;
+    } else if (targetPage === 'football') {
+      prompt = `You are the Brand Manager for Somkidvittaya Football Academy (อคาเดมี่ฟุตบอลสมคิดวิทยา).
+Write a highly engaging Facebook post caption in THAI ONLY.
+Tone: Energetic, Professional, Sporty, Encouraging, Teamwork-focused.
+Focus on: Skills development, physical health, sportsmanship, and having fun.
+Do not write in English or Chinese. Be concise and impactful.
 
-    var rawResponse = callGeminiAPI(base64ImagesArray, mimeType, prompt, activityInfo);
+Activity Details:
+` + activityInfo;
+    } else if (targetPage === 'swimming') {
+      prompt = `You are the Brand Manager for Somkidvittaya Swimming Club (สโมสรว่ายน้ำสมคิดวิทยา).
+Write a highly engaging Facebook post caption in THAI ONLY.
+Tone: Fresh, Active, Safe, Professional, Encouraging.
+Focus on: Water safety, physical health, overcoming fear, technique, and having fun.
+Do not write in English or Chinese. Be concise and impactful.
+
+Activity Details:
+` + activityInfo;
+    } else if (targetPage === 'tutoring') {
+      prompt = `You are the Brand Manager for Somkidvittaya Tutoring Center (ศูนย์เรียนพิเศษสมคิดวิทยา).
+Write a highly engaging Facebook post caption in THAI ONLY.
+Tone: Academic, Encouraging, Focus, Supportive, Goal-oriented.
+Focus on: Academic excellence, understanding concepts, preparing for exams, dedicated teachers.
+Do not write in English or Chinese. Be concise and impactful.
+
+Activity Details:
+` + activityInfo;
+    }
+
+    var rawResponse = callGeminiAPI(base64ImagesArray, mimeType, prompt, activityInfo, targetPage);
 
     // ดักจับ Error จาก API
     if (rawResponse.error) {
@@ -306,10 +338,10 @@ function handlePublishToSocial(params) {
   var fbCaption = params.fbCaption || "";
   var igCaption = params.igCaption || "";
   
-  // ข้อมูล Meta Graph API ของคุณ
-  var PAGE_ACCESS_TOKEN = "EAAYA0g05EhoBRkw8us77ykfLJI1V5p0c6RCS1BUKvDv5Uzj0uHysQALJm9iATqlNjFNSCzakf3EfCM5ktVahwnheASgGjNNm2RSg3DeQJZCic0rK43W8fdmbzxPJZBfdk8HZCa5serZBMk2OUosKJj2EZBvwPmFzDbs4uJoffPMHRZAzTT8dJTtss3Qm3KenEpidsZD";
-  var PAGE_ID = "192831060756593";
-  var IG_ACCOUNT_ID = "17841446069053774";
+  var metaConfig = getMetaConfig_(params.targetPage);
+  var PAGE_ACCESS_TOKEN = metaConfig.token;
+  var PAGE_ID = metaConfig.pageId;
+  var IG_ACCOUNT_ID = metaConfig.igId;
   
   try {
     if (mediaMode === "video") {
@@ -375,6 +407,13 @@ function handlePublishToSocial(params) {
       }
 
       // 2. INSTAGRAM POSTING
+      if (params.targetPage !== 'main') {
+        // Skip Instagram for non-main pages
+        return ContentService.createTextOutput(JSON.stringify({
+          success: true,
+          fbStatus: "Facebook post created"
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
       var driveFiles = [];
       var igContainerIds = [];
       
@@ -470,7 +509,7 @@ function handlePublishToSocial(params) {
 // ==========================================
 // เรียก Gemini API (รองรับหลายรูปภาพ + JSON Schema)
 // ==========================================
-function callGeminiAPI(base64ImagesArray, mimeType, prompt, activityInfo) {
+function callGeminiAPI(base64ImagesArray, mimeType, prompt, activityInfo, targetPage) {
   var apiKey = "YOUR_GEMINI_API_KEY"; // ใส่คีย์ของคุณระหว่างเครื่องหมาย " "
   
   // --- Step 1: Researcher (gemini-2.5-flash) ---
@@ -555,11 +594,18 @@ function callGeminiAPI(base64ImagesArray, mimeType, prompt, activityInfo) {
           "facebook": { "type": "STRING" },
           "instagram": { "type": "STRING" }
         },
-        "required": ["facebook", "instagram"]
+        "required": ["facebook"]
       }
     },
     "required": ["kept_image_indices", "cover_headline", "cover_design", "hero_quote", "quality", "post_caption"]
   };
+  
+  // If not main page, Instagram caption is not required.
+  if (targetPage !== 'main') {
+      // It is already not strictly required, but just to be safe.
+      // We also don't even ask the AI for instagram in the prompt.
+  }
+
 
   var partsArray = [{ "text": prompt }];
   for (var i = 0; i < base64ImagesArray.length; i++) {
@@ -752,12 +798,22 @@ Thai Caption to Translate:
 // ==========================================
 // Helper: Meta API Config
 // ==========================================
-function getMetaConfig_() {
-  return {
+function getMetaConfig_(targetPage) {
+  var config = {
     token: "EAAYA0g05EhoBRkw8us77ykfLJI1V5p0c6RCS1BUKvDv5Uzj0uHysQALJm9iATqlNjFNSCzakf3EfCM5ktVahwnheASgGjNNm2RSg3DeQJZCic0rK43W8fdmbzxPJZBfdk8HZCa5serZBMk2OUosKJj2EZBvwPmFzDbs4uJoffPMHRZAzTT8dJTtss3Qm3KenEpidsZD",
-    pageId: "192831060756593",
+    pageId: "192831060756593", // main
     igId: "17841446069053774"
   };
+  
+  if (targetPage === 'football') {
+    config.pageId = "FOOTBALL_PAGE_ID"; // To be updated by user
+  } else if (targetPage === 'swimming') {
+    config.pageId = "SWIMMING_PAGE_ID"; // To be updated by user
+  } else if (targetPage === 'tutoring') {
+    config.pageId = "TUTORING_PAGE_ID"; // To be updated by user
+  }
+  
+  return config;
 }
 
 // ==========================================
@@ -767,7 +823,7 @@ function getMetaConfig_() {
 // step=finish: จบ session
 // ==========================================
 function handleVideoStepFB(params) {
-  var c = getMetaConfig_();
+  var c = getMetaConfig_(params.targetPage);
   var step = params.step || "start";
   try {
     if (step === "start") {
@@ -827,7 +883,7 @@ function handleVideoStepFB(params) {
 // step=transfer: รับ chunkBase64 แล้วส่งไป uploadUri
 // ==========================================
 function handleVideoStepIG(params) {
-  var c = getMetaConfig_();
+  var c = getMetaConfig_(params.targetPage);
   var step = params.step || "create";
   try {
     if (step === "create") {
@@ -865,7 +921,7 @@ function handleVideoStepIG(params) {
 // VIDEO STEP: Check IG Reel Status
 // ==========================================
 function handleVideoCheckIG(params) {
-  var c = getMetaConfig_();
+  var c = getMetaConfig_(params.targetPage);
   try {
     var res = UrlFetchApp.fetch("https://graph.facebook.com/v20.0/" + params.containerId + "?fields=status_code&access_token=" + c.token, {muteHttpExceptions:true});
     var d = JSON.parse(res.getContentText());
@@ -879,7 +935,7 @@ function handleVideoCheckIG(params) {
 // VIDEO STEP: Publish IG Reel
 // ==========================================
 function handleVideoPublishIG(params) {
-  var c = getMetaConfig_();
+  var c = getMetaConfig_(params.targetPage);
   try {
     var res = UrlFetchApp.fetch("https://graph.facebook.com/v20.0/" + c.igId + "/media_publish", {
       method: "post",
