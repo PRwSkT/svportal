@@ -11,7 +11,6 @@ let hasFiles = false;
 let currentLang = 'th';
 let currentCaptionFB = "";
 let currentCaptionIG = "";
-let currentCaptionIG = "";
 let mediaMode = 'photo'; // 'photo' or 'video'
 let targetPage = 'main';
 
@@ -21,13 +20,14 @@ function selectPage(btn) {
     targetPage = btn.getAttribute('data-page');
     
     // Hide IG if not main (other pages only use FB)
-    const igTab = document.querySelector('.lang-btn[onclick="setPlatform(\'ig\')"]');
+    const igTab = document.getElementById('tab-ig');
     if (igTab) {
         if (targetPage === 'main') {
-            igTab.style.display = 'inline-flex';
+            igTab.style.display = 'inline-block';
         } else {
             igTab.style.display = 'none';
-            if(window.currentPlatform === 'ig') setPlatform('fb');
+            // Switch back to FB tab if IG is active
+            if(igTab.classList.contains('active')) switchCaptionTab('fb');
         }
     }
 
