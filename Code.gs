@@ -92,7 +92,7 @@ Select images by total score. Never output scores.
 Select the strongest image as Cover. Cover image should immediately communicate the story.
 
 DO NOT discard images just because they look similar. KEEP ALMOST ALL IMAGES. Only remove if completely black or broken.
-Keep as many good images as possible. Keep 100% of the images if possible. Do not filter out variations.
+Keep as many good images as possible. Keep 80% of the images if possible. Do not filter out variations.
 When unsure, keep the image.
 
 Cover Headline Rules
@@ -409,12 +409,13 @@ function handlePublishToSocial(params) {
           var igCarouselPayload = {
             "access_token": PAGE_ACCESS_TOKEN,
             "media_type": "CAROUSEL",
-            "children": igContainerIds.join(","),
+            "children": igContainerIds, // Pass as an actual array
             "caption": igCaption
           };
           var igCarouselRes = UrlFetchApp.fetch(igCarouselUrl, {
             "method": "post",
-            "payload": igCarouselPayload,
+            "contentType": "application/json",
+            "payload": JSON.stringify(igCarouselPayload),
             "muteHttpExceptions": true
           });
           var igCarouselData = JSON.parse(igCarouselRes.getContentText());
