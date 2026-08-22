@@ -806,11 +806,11 @@ function getMetaConfig_(targetPage) {
   };
   
   if (targetPage === 'football') {
-    config.pageId = "FOOTBALL_PAGE_ID"; // To be updated by user
+    config.pageId = "1204516039414311"; // To be updated by user
   } else if (targetPage === 'swimming') {
-    config.pageId = "SWIMMING_PAGE_ID"; // To be updated by user
+    config.pageId = "1188473751019404"; // To be updated by user
   } else if (targetPage === 'tutoring') {
-    config.pageId = "TUTORING_PAGE_ID"; // To be updated by user
+    config.pageId = "1235898419607130"; // To be updated by user
   }
   
   return config;
