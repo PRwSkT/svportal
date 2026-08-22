@@ -631,18 +631,71 @@ function handleTranslateCaption(params) {
   }
 
   var apiKey = "YOUR_GEMINI_API_KEY"; // ใส่คีย์ของคุณระหว่างเครื่องหมาย " "
+  
+  // --- Step 1: Researcher (gemini-2.5-flash) ---
+  var verifiedFacts = "";
+  if (thaiCaption.trim().length > 5) {
+    try {
+      var searchPrompt = "You are a research assistant. Please use Google Search to find and verify the correct English terminology, proper nouns, location names, technical terms, and current facts related to this Thai context from a school:
+
+" + thaiCaption + "
+
+Return a concise list of verified English terms and facts to use in a social media translation. Do not write a full caption.";
+      var searchPayload = {
+        "contents": [{ "role": "user", "parts": [{ "text": searchPrompt }] }],
+        "tools": [{ "google_search": {} }]
+      };
+      var searchRes = UrlFetchApp.fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey, {
+        "method": "post",
+        "contentType": "application/json",
+        "payload": JSON.stringify(searchPayload),
+        "muteHttpExceptions": true
+      });
+      var searchData = JSON.parse(searchRes.getContentText());
+      if (searchData.candidates && searchData.candidates.length > 0) {
+        verifiedFacts = searchData.candidates[0].content.parts[0].text;
+      }
+    } catch (e) {}
+  }
+
+  // --- Step 2: Translator (gemini-3.6-flash) ---
   var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=" + apiKey;
 
   var jsonSchema = {
     "type": "OBJECT",
     "properties": {
-      "english": { "type": "STRING", "description": "แปลเป็นภาษาอังกฤษล้วน สไตล์มืออาชีพ กระตือรือร้น แบบอินเตอร์ และคงการจัดตำแหน่งทุกอย่างให้เหมือนเดิม" },
-      "chinese": { "type": "STRING", "description": "แปลเป็นภาษาจีนล้วน สไตล์มืออาชีพ กระตือรือร้น แบบอินเตอร์ และคงการจัดตำแหน่งทุกอย่างให้เหมือนเดิม" }
+      "english": { "type": "STRING", "description": "แปลเป็นภาษาอังกฤษล้วน สไตล์มืออาชีพ พรีเมียม อินเตอร์เนชั่นแนล และคงการจัดตำแหน่งทุกอย่างให้เหมือนเดิม" },
+      "chinese": { "type": "STRING", "description": "แปลเป็นภาษาจีนล้วน สไตล์มืออาชีพ พรีเมียม อินเตอร์เนชั่นแนล และคงการจัดตำแหน่งทุกอย่างให้เหมือนเดิม" }
     },
     "required": ["english", "chinese"]
   };
 
-  var prompt = "Translate the following Thai social media caption into English and Chinese. Maintain the friendly, professional, and enthusiastic tone of an international school. Do not include hashtags or contact information, just translate the text provided.\n\nThai Caption:\n" + thaiCaption;
+  var prompt = "You are the Brand & Communications Director of Somkidvittaya School.
+Your task is to translate the provided Thai social media caption into English and Chinese.
+
+BRAND TONE: Premium, Warm, Confident, International, Professional, Optimistic.
+Write like a premium international school copywriter. Every sentence must sound natural to native speakers, not like a direct translation.
+
+RULES:
+1. Do not include hashtags or contact information. Just translate the text body.
+2. Keep the exact same paragraph spacing and line breaks as the original Thai text.
+3. Be concise and impactful.";
+
+  if (verifiedFacts) {
+    prompt += "
+
+==================================================
+RESEARCH FACTS (FROM GEMINI 2.5 FLASH)
+==================================================
+" + verifiedFacts + "
+
+Please use these verified English proper nouns and facts in your translation.";
+  }
+
+  prompt += "
+
+Thai Caption to Translate:
+" + thaiCaption;
 
   var payload = {
     "contents": [
@@ -653,7 +706,9 @@ function handleTranslateCaption(params) {
     ],
     "generationConfig": {
       "responseMimeType": "application/json",
-      "responseSchema": jsonSchema
+      "responseSchema": jsonSchema,
+      "temperature": 0.7,
+      "maxOutputTokens": 2048
     }
   };
 
@@ -680,22 +735,15 @@ function handleTranslateCaption(params) {
         continue;
       }
     }
-    break;
-  }
-  
-  try {
-    var data = JSON.parse(responseText);
-    // Return the successfully generated content directly
-    if (data.candidates && data.candidates[0].content.parts[0].text) {
-      return ContentService.createTextOutput(data.candidates[0].content.parts[0].text).setMimeType(ContentService.MimeType.JSON);
-    } else if (data.error && data.error.message) {
-      return ContentService.createTextOutput(JSON.stringify({error: {message: "Gemini API Error: " + data.error.message, raw: data}})).setMimeType(ContentService.MimeType.JSON);
+    
+    if (responseCode === 200) {
+      break; 
     } else {
-      return ContentService.createTextOutput(JSON.stringify({error: {message: "Unexpected response format from Gemini", raw: data}})).setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(JSON.stringify({error: "Gemini API Error: " + responseText})).setMimeType(ContentService.MimeType.JSON);
     }
-  } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({error: {message: "JSON Parse error from Gemini", raw: responseText}})).setMimeType(ContentService.MimeType.JSON);
   }
+
+  return ContentService.createTextOutput(responseText).setMimeType(ContentService.MimeType.JSON);
 }
 
 // ==========================================
