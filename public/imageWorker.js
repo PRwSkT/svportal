@@ -40,7 +40,7 @@ async function drawOnCanvas(imgBtm, w, h, tplBtm, hl, pos) {
         fitAndDrawText(ctx, hl.detail  ||'', pos[2].x, pos[2].y, pos[2].s, '400',  sharedMaxWidth);
     }
     
-    const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.92 });
+    const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.8 });
     return new Promise((resolve) => {
         const reader = new FileReader();
         reader.readAsDataURL(blob);
