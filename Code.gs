@@ -670,32 +670,32 @@ Return a concise list of verified English terms and facts to use in a social med
     "required": ["english", "chinese"]
   };
 
-  var prompt = "You are the Brand & Communications Director of Somkidvittaya School.
+  var prompt = `You are the Brand & Communications Director of Somkidvittaya School.
 Your task is to translate the provided Thai social media caption into English and Chinese.
 
 BRAND TONE: Premium, Warm, Confident, International, Professional, Optimistic.
-Write like a premium international school copywriter. Every sentence must sound natural to native speakers, not like a direct translation.
+Write like a premium international school copywriter, ensuring the language sounds natural to native speakers.
 
 RULES:
-1. Do not include hashtags or contact information. Just translate the text body.
-2. Keep the exact same paragraph spacing and line breaks as the original Thai text.
-3. Be concise and impactful.";
+1. STRICT ACCURACY: You must strictly preserve all original facts, names, numbers, and core meanings from the Thai text. Do not invent new information, exaggerate, or omit existing details. The translation must be highly faithful to the source.
+2. EXACT FORMATTING: Keep the exact same paragraph spacing and line breaks as the original Thai text.
+3. NO EXTRAS: Do not include hashtags or contact information. Translate only the text body.`;
 
   if (verifiedFacts) {
-    prompt += "
+    prompt += `
 
 ==================================================
 RESEARCH FACTS (FROM GEMINI 2.5 FLASH)
 ==================================================
-" + verifiedFacts + "
+` + verifiedFacts + `
 
-Please use these verified English proper nouns and facts in your translation.";
+Please use these verified English proper nouns and facts in your translation.`;
   }
 
-  prompt += "
+  prompt += `
 
 Thai Caption to Translate:
-" + thaiCaption;
+` + thaiCaption;
 
   var payload = {
     "contents": [
