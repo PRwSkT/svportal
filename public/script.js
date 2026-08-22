@@ -6,7 +6,7 @@ const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwtl4265ih1xovbR2aR
 let currentAIResult = null;
 let uploadedFiles = [];
 let excludedIndices = new Set();
-let templateFBCover = null, templateIGCover = null, templateFBSub = null, templateIGSub = null;
+let templateFBCover = null, templateIGCover = null, templateFBSub = null, templateIGSub = null, templateFBSub4x3 = null;
 let hasFiles = false;
 let currentLang = 'th';
 let currentCaptionFB = "";
@@ -294,17 +294,19 @@ async function processPost() {
         // If it's main page, it uses watermark-new.png, else watermark-new-xxx.png
         // If the user names it watermark-football.png instead of watermark-new-football.png, we might need a map.
         // Let's assume watermark-new-football.png for now.
-        const [fbCovBlob, igCovBlob, fbSubBlob, igSubBlob] = await Promise.all([
+        const [fbCovBlob, igCovBlob, fbSubBlob, igSubBlob, fbSub4x3Blob] = await Promise.all([
             fetchGraceful(`cover-fb${pageSuffix}.png`),
             fetchGraceful(`cover-ig${pageSuffix}.png`),
             fetchGraceful(`watermark-new${pageSuffix}.png`),
-            fetchGraceful(`overlay-ig${pageSuffix}.png`)
+            fetchGraceful(`overlay-ig${pageSuffix}.png`),
+            fetchGraceful(`watermark-4x3-new${pageSuffix}.png`)
         ]);
         
         templateFBCover = fbCovBlob;
         templateIGCover = igCovBlob;
         templateFBSub = fbSubBlob;
         templateIGSub = igSubBlob;
+        templateFBSub4x3 = fbSub4x3Blob;
 
         setStep(2); statusText.innerText = "เตรียมภาพทั้งหมดส่งให้ AI วิเคราะห์ และคัดรูปที่ซ้ำออก...";
         
@@ -747,7 +749,7 @@ async function generateAndDownloadZip() {
             maxPhotos: maxPhotos,
             hl: hl,
             caption: `=== FACEBOOK CAPTION ===\n${captionFB}\n\n=== INSTAGRAM CAPTION ===\n${captionIG}`,
-            templates: { fbCover: templateFBCover, igCover: templateIGCover, fbSub: templateFBSub, igSub: templateIGSub }
+            templates: { fbCover: templateFBCover, igCover: templateIGCover, fbSub: templateFBSub, igSub: templateIGSub, fbSub4x3: templateFBSub4x3 }
         });
 
         saveAs(zipBlob, `SomkidPost_${Date.now()}.zip`);
@@ -845,7 +847,7 @@ async function openPublishModal() {
             const processedImages = await runWorkerTask('prepareImagesForSocial', {
                 files: activeFiles.slice(0, 40),
                 hl: hl,
-                templates: { fbCover: templateFBCover, igCover: templateIGCover, fbSub: templateFBSub, igSub: templateIGSub }
+                templates: { fbCover: templateFBCover, igCover: templateIGCover, fbSub: templateFBSub, igSub: templateIGSub, fbSub4x3: templateFBSub4x3 }
             });
             
             // Cache globally for confirmPublish
@@ -948,7 +950,7 @@ async function confirmPublish() {
                 processedImages = await runWorkerTask('prepareImagesForSocial', {
                     files: activeFiles.slice(0, 40),
                     hl: hl,
-                    templates: { fbCover: templateFBCover, igCover: templateIGCover, fbSub: templateFBSub, igSub: templateIGSub }
+                    templates: { fbCover: templateFBCover, igCover: templateIGCover, fbSub: templateFBSub, igSub: templateIGSub, fbSub4x3: templateFBSub4x3 }
                 });
             }
             requestBody = JSON.stringify({

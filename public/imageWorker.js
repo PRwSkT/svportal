@@ -145,6 +145,7 @@ self.onmessage = async function(e) {
             const tplBtmIG = templates.igCover ? await createImageBitmap(templates.igCover) : null;
             const tplBtmFBSub = templates.fbSub ? await createImageBitmap(templates.fbSub) : null;
             const tplBtmIGSub = templates.igSub ? await createImageBitmap(templates.igSub) : null;
+            const tplBtmFBSub4x3 = templates.fbSub4x3 ? await createImageBitmap(templates.fbSub4x3) : null;
             
             for (let i = 0; i < maxPhotos; i++) {
                 self.postMessage({ action: 'progress', text: `กำลังแพ็คไฟล์รูปที่ ${i + 1} จาก ${maxPhotos}...` });
@@ -158,7 +159,7 @@ self.onmessage = async function(e) {
                     igFolder.file(`${num}_IG_Cover.jpg`, (await drawIGCover(eBmp, hl, tplBtmIG)).split(',')[1], {base64:true});
                 } else {
                     const fbRatio = (i <= 4) ? '1:1' : (eBmp.width >= eBmp.height ? '4:3' : '4:5');
-                    const fbTpl   = (fbRatio === '1:1' || fbRatio === '4:3') ? tplBtmFBSub : tplBtmIGSub;
+                    const fbTpl   = (fbRatio === '1:1') ? tplBtmFBSub : (fbRatio === '4:3' ? tplBtmFBSub4x3 : tplBtmIGSub);
                     fbFolder.file(`${num}_FB_Photo.jpg`, (await processSubPhoto(eBmp, fbRatio, fbTpl)).split(',')[1], {base64:true});
                     igFolder.file(`${num}_IG_Photo.jpg`, (await processSubPhoto(eBmp, '4:5', tplBtmIGSub)).split(',')[1], {base64:true});
                 }
@@ -176,6 +177,7 @@ self.onmessage = async function(e) {
             const tplBtmIG = templates.igCover ? await createImageBitmap(templates.igCover) : null;
             const tplBtmFBSub = templates.fbSub ? await createImageBitmap(templates.fbSub) : null;
             const tplBtmIGSub = templates.igSub ? await createImageBitmap(templates.igSub) : null;
+            const tplBtmFBSub4x3 = templates.fbSub4x3 ? await createImageBitmap(templates.fbSub4x3) : null;
             
             // Limit IG to max 10
             const maxIGPhotos = Math.min(10, files.length);
@@ -192,7 +194,7 @@ self.onmessage = async function(e) {
                 } else {
                     // FB image
                     const fbRatio = (i <= 4) ? '1:1' : (eBmp.width >= eBmp.height ? '4:3' : '4:5');
-                    const fbTpl   = (fbRatio === '1:1' || fbRatio === '4:3') ? tplBtmFBSub : tplBtmIGSub;
+                    const fbTpl   = (fbRatio === '1:1') ? tplBtmFBSub : (fbRatio === '4:3' ? tplBtmFBSub4x3 : tplBtmIGSub);
                     fbImages.push((await processSubPhoto(eBmp, fbRatio, fbTpl)).split(',')[1]);
                     
                     // IG image (only first 10)
