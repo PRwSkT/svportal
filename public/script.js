@@ -921,8 +921,8 @@ async function confirmPublish() {
             requestBody = JSON.stringify({
                 'action': 'publishToSocial',
                 'mediaMode': 'photo',
-                'fbImages': JSON.stringify(processedImages.fbImages),
-                'igImages': JSON.stringify(processedImages.igImages),
+                'fbImages': JSON.stringify(processedImages.fbImages.slice(0, 15)),
+                'igImages': JSON.stringify(processedImages.igImages.slice(0, 10)),
                 'fbCaption': fbCaption,
                 'igCaption': igCaption
             });
