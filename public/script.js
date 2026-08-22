@@ -407,7 +407,7 @@ async function processPost() {
             
             document.getElementById('photo-selector').style.display = 'block';
             document.getElementById('preview-grid').style.display = 'grid';
-            document.getElementById('headline-editor').style.display = 'block';
+            document.getElementById('headline-editor').style.display = (targetPage === 'main') ? 'block' : 'none';
             
             await renderPhotoSelector(uploadedFiles);
         } else {
@@ -423,7 +423,7 @@ async function processPost() {
         }
 
         if (mediaMode === 'photo') {
-            document.getElementById('headline-editor').style.display = 'block';
+            document.getElementById('headline-editor').style.display = (targetPage === 'main') ? 'block' : 'none';
             document.getElementById('btn-download-zip').style.display = 'flex';
             document.getElementById('dl-label').innerText = `ดาวน์โหลด ${uploadedFiles.length} รูปภาพ (.zip) — FB + IG Ready`;
         } else {
@@ -533,6 +533,7 @@ async function setAsCover(newCoverIdx) {
 // HEADLINE & CAPTION
 // ==========================================
 function getHeadlineFromEditor() {
+    if (targetPage !== 'main') return null;
     return {
         headline: document.getElementById('hl-line1').value || 'SOMKIDVITTAYA SCHOOL',
         subhead:  document.getElementById('hl-line2').value || 'Creating the Best Experience',
