@@ -67,8 +67,14 @@ async function drawIGCover(imgBtm, hl, tplBtm) {
 }
 
 async function processSubPhoto(imgBtm, ratio, tplBtm) {
-    const w = ratio === '1:1' ? 2160 : 2048;
-    const h = ratio === '1:1' ? 2160 : 2560;
+    let w, h;
+    if (ratio === '1:1') {
+        w = 2160; h = 2160;
+    } else if (ratio === '4:3') {
+        w = 2160; h = 1620;
+    } else { // 4:5
+        w = 2048; h = 2560;
+    }
     return drawOnCanvas(imgBtm, w, h, tplBtm, null, null);
 }
 
@@ -151,8 +157,8 @@ self.onmessage = async function(e) {
                     fbFolder.file(`${num}_FB_Cover.jpg`, (await drawCoverTemplate(eBmp, hl, tplBtmFB)).split(',')[1], {base64:true});
                     igFolder.file(`${num}_IG_Cover.jpg`, (await drawIGCover(eBmp, hl, tplBtmIG)).split(',')[1], {base64:true});
                 } else {
-                    const fbRatio = (i <= 4) ? '1:1' : '4:5';
-                    const fbTpl   = (fbRatio === '1:1') ? tplBtmFBSub : tplBtmIGSub;
+                    const fbRatio = (i <= 4) ? '1:1' : (eBmp.width >= eBmp.height ? '4:3' : '4:5');
+                    const fbTpl   = (fbRatio === '1:1' || fbRatio === '4:3') ? tplBtmFBSub : tplBtmIGSub;
                     fbFolder.file(`${num}_FB_Photo.jpg`, (await processSubPhoto(eBmp, fbRatio, fbTpl)).split(',')[1], {base64:true});
                     igFolder.file(`${num}_IG_Photo.jpg`, (await processSubPhoto(eBmp, '4:5', tplBtmIGSub)).split(',')[1], {base64:true});
                 }
@@ -185,8 +191,8 @@ self.onmessage = async function(e) {
                     igImages.push((await drawIGCover(eBmp, hl, tplBtmIG)).split(',')[1]);
                 } else {
                     // FB image
-                    const fbRatio = (i <= 4) ? '1:1' : '4:5';
-                    const fbTpl   = (fbRatio === '1:1') ? tplBtmFBSub : tplBtmIGSub;
+                    const fbRatio = (i <= 4) ? '1:1' : (eBmp.width >= eBmp.height ? '4:3' : '4:5');
+                    const fbTpl   = (fbRatio === '1:1' || fbRatio === '4:3') ? tplBtmFBSub : tplBtmIGSub;
                     fbImages.push((await processSubPhoto(eBmp, fbRatio, fbTpl)).split(',')[1]);
                     
                     // IG image (only first 10)
