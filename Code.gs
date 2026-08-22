@@ -181,8 +181,6 @@ Invite parents. (e.g. Come experience learning beyond the classroom. / Admission
   เว็บไซต์: somkidvittaya.ac.th
   นัดหมายเยี่ยมชมโรงเรียน: https://calendar.app.google/HhhN11dAj8r3HehM7
 
-  • ชื่อโรงเรียน: "โรงเรียนสมคิดวิทยา" / "Somkidvittaya School" / "somkidvittaya学校" เท่านั้น
-  • ระดับชั้นภาษาอังกฤษและจีนใช้ G.แทนประถม และ K.แทนอนุบาล ส่วนภาษาไทยใช้ป.แทนประถม และ อ.แทนอนุบาล
 
 ------------------------------------------
 9 DIVIDER LINES (เส้นคั่น)
@@ -206,6 +204,11 @@ WRITING STYLE & NEGATIVE PROMPTS
 Tone: Premium, Warm, Confident, International, Professional, Optimistic
 Avoid these words: จัดกิจกรรม, เพื่อส่งเสริม, เปิดโอกาส, ได้เรียนรู้, ได้มีโอกาส, บรรยากาศเต็มไปด้วย, นักเรียนได้ร่วม
 Instead: Write as a premium international school copywriter. Be concise. Every sentence must add new information. Avoid unnecessary storytelling. Use elegant but efficient language. Maximum impact with minimum words. Focus on student transformation.
+
+Wording rules:
+  • ชื่อโรงเรียน: "โรงเรียนสมคิดวิทยา" / "Somkidvittaya School" / "somkidvittaya学校" เท่านั้น
+  • ระดับชั้นภาษาอังกฤษและจีนใช้ G.แทนคำนำหน้าเลขชั้นระดับประถม และ K.แทนคำนำหน้าเลขชั้นระดับอนุบาล ส่วนภาษาไทยใช้ป.แทนคำนำหน้าเลขชั้นระดับประถม และ อ.แทนคำนำหน้าเลขชั้นระดับอนุบาล
+  • ชื่อบุคคลสำคัญ "นาย ณัฐวัฒน์ สงเคราะห์ธรรม" = "Mr. Nattawat Songkrotham" / "นางสาว อติภา สุขศิริ" = "Miss Atipa Sooksiri" / "นาย พีรวัส สงเคราะห์ธรรม" = "Mr. Peerawat Songkrohtham"
 
 [ANTI-REPETITION RULES]
 • Avoid repetition. Do not restate the same idea.
