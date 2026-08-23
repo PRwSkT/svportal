@@ -288,18 +288,45 @@ async function processPost() {
         await document.fonts.ready;
         
         // Fetch blobs for templates to send to worker
-        const pageSuffix = targetPage === 'main' ? '' : `-${targetPage}`;
-        const fetchGraceful = (url) => fetch(url).then(r => r.ok ? r.blob() : null).catch(() => null);
+        const fileMap = {
+            'main': {
+                coverFb: 'cover-fb.png',
+                coverIg: 'cover-ig.png',
+                sub1x1: 'watermark-new.png',
+                sub4x5: 'overlay-ig.png',
+                sub4x3: 'sv-cover-4-3.png'
+            },
+            'football': {
+                coverFb: 'lion1-1.png',
+                coverIg: null,
+                sub1x1: 'lion1-1.png',
+                sub4x5: 'lion4-5.png',
+                sub4x3: 'lion4-3.png'
+            },
+            'swimming': {
+                coverFb: 'aquatics1-1.png',
+                coverIg: null,
+                sub1x1: 'aquatics1-1.png',
+                sub4x5: 'aquatics4-5.png',
+                sub4x3: 'aquatics4-3.png'
+            },
+            'tutoring': {
+                coverFb: 'somkid+1-1.png',
+                coverIg: null,
+                sub1x1: 'somkid+1-1.png',
+                sub4x5: 'Somkid+4-5.png',
+                sub4x3: 'Somkid+4-3.png'
+            }
+        };
+        const mapping = fileMap[targetPage];
+        const fetchGraceful = (url) => url ? fetch(url).then(r => r.ok ? r.blob() : null).catch(() => null) : Promise.resolve(null);
         
-        // If it's main page, it uses watermark-new.png, else watermark-new-xxx.png
-        // If the user names it watermark-football.png instead of watermark-new-football.png, we might need a map.
-        // Let's assume watermark-new-football.png for now.
         const [fbCovBlob, igCovBlob, fbSubBlob, igSubBlob, fbSub4x3Blob] = await Promise.all([
-            fetchGraceful(`cover-fb${pageSuffix}.png`),
-            fetchGraceful(`cover-ig${pageSuffix}.png`),
-            fetchGraceful(`watermark-new${pageSuffix}.png`),
-            fetchGraceful(`overlay-ig${pageSuffix}.png`),
-            fetchGraceful(`watermark-4x3-new${pageSuffix}.png`)
+            fetchGraceful(mapping.coverFb),
+            fetchGraceful(mapping.coverIg),
+            fetchGraceful(mapping.sub1x1),
+            fetchGraceful(mapping.sub4x5),
+            fetchGraceful(mapping.sub4x3)
         ]);
         
         templateFBCover = fbCovBlob;
