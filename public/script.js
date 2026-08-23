@@ -337,13 +337,15 @@ async function processPost() {
 
         setStep(2); statusText.innerText = "เตรียมภาพทั้งหมดส่งให้ AI วิเคราะห์ และคัดรูปที่ซ้ำออก...";
         
-        const maxProcess = Math.min(uploadedFiles.length, 40);
+        // SAFARI TIMEOUT FIX: Safari drops fetch requests that take >60 seconds.
+        // Gemini processing 40 images takes >60s. Limit to 15 images to ensure it finishes within 30-40s.
+        const maxProcess = Math.min(uploadedFiles.length, 15);
         const filesToProcess = uploadedFiles.slice(0, maxProcess);
         
-        // Run resize in worker only if photo mode
+        // Run resize in worker only if photo mode (Resize to 400 to make payload even smaller/faster)
         let imagesDataForAI = [];
         if (mediaMode === 'photo') {
-            imagesDataForAI = await runWorkerTask('resizeImagesForAI', { images: filesToProcess, maxW: 600 });
+            imagesDataForAI = await runWorkerTask('resizeImagesForAI', { images: filesToProcess, maxW: 400 });
         }
 
         setStep(3); statusText.innerText = "AI กำลังคัดกรองรูปภาพและเขียนแคปชั่น... (รอประมาณ 15-30 วินาที)";
