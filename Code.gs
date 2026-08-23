@@ -266,7 +266,7 @@ Evaluate quality scores (0-100) for: Brand, Storytelling, Emotion, Overall.
 Return in the quality object.
 `;
     } else if (targetPage === 'football') {
-      prompt = `You are the Brand Manager for Somkidvittaya Football Academy (อคาเดมี่ฟุตบอลสมคิดวิทยา).
+      prompt = `You are the Brand Manager for SV Lion Football Academy (อคาเดมี่ฟุตบอลสมคิดวิทยา).
 Write a highly engaging Facebook post caption in THAI ONLY.
 Tone: Energetic, Professional, Sporty, Encouraging, Teamwork-focused.
 Focus on: Skills development, physical health, sportsmanship, and having fun.
@@ -275,7 +275,7 @@ Do not write in English or Chinese. Be concise and impactful.
 Activity Details:
 ` + activityInfo;
     } else if (targetPage === 'swimming') {
-      prompt = `You are the Brand Manager for Somkidvittaya Swimming Club (สโมสรว่ายน้ำสมคิดวิทยา).
+      prompt = `You are the Brand Manager for SV Aquatics Centre (สโมสรว่ายน้ำสมคิดวิทยา).
 Write a highly engaging Facebook post caption in THAI ONLY.
 Tone: Fresh, Active, Safe, Professional, Encouraging.
 Focus on: Water safety, physical health, overcoming fear, technique, and having fun.
@@ -284,7 +284,7 @@ Do not write in English or Chinese. Be concise and impactful.
 Activity Details:
 ` + activityInfo;
     } else if (targetPage === 'tutoring') {
-      prompt = `You are the Brand Manager for Somkidvittaya Tutoring Center (ศูนย์เรียนพิเศษสมคิดวิทยา).
+      prompt = `You are the Brand Manager for Somkid+ (ศูนย์เรียนพิเศษสมคิดวิทยา).
 Write a highly engaging Facebook post caption in THAI ONLY.
 Tone: Academic, Encouraging, Focus, Supportive, Goal-oriented.
 Focus on: Academic excellence, understanding concepts, preparing for exams, dedicated teachers.
