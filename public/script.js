@@ -1343,6 +1343,10 @@ console.log('trigger build');
 // Website Sync
 // ==========================================
 async function syncToWebsite(hl, fbCaption, activeFiles) {
+    if (targetPage !== 'main') {
+        console.log("Skipping website sync for non-main page.");
+        return;
+    }
     try {
         const btn = document.getElementById('btn-confirm-publish');
         if(btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> อัปเดตขึ้นเว็บไซต์...';
