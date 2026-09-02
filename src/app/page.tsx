@@ -70,9 +70,9 @@ export default function WelcomePage() {
           <Image 
             src="/logo2.png" 
             alt="School Logo" 
-            width={60} 
-            height={60} 
-            className="opacity-60 hover:opacity-100 transition-all duration-300 drop-shadow-sm" 
+            width={320} 
+            height={180} 
+            className="h-16 w-auto opacity-60 hover:opacity-100 transition-all duration-300 drop-shadow-sm" 
           />
         </div>
       </div>

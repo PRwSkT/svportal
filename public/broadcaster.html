@@ -909,47 +909,67 @@
               }
             };
 
-            // CODE GREEN (ALL CLEAR)
+            // CODE GREEN (ALL CLEAR) OR STOP_SOS
             if (colorCode === 'green' || item.th.includes('#STOP_SOS#')) {
-              const div = document.createElement('div');
-              div.className = 'p-3 bg-green-100 border border-green-500 rounded-lg shadow-sm animate-slide-in';
-              div.innerHTML = `<div class="font-medium text-green-800 font-bold">✅ ยกเลิกสถานการณ์ฉุกเฉิน (Code Green)</div>`;
-              listDiv.prepend(div);
+              const isSilentStop = item.th.includes('#STOP_SOS#');
+              
+              if (!isSilentStop) {
+                const div = document.createElement('div');
+                div.className = 'p-3 bg-green-100 border border-green-500 rounded-lg shadow-sm animate-slide-in';
+                div.innerHTML = `<div class="font-medium text-green-800 font-bold">✅ ยกเลิกสถานการณ์ฉุกเฉิน (Code Green)</div>`;
+                listDiv.prepend(div);
+              }
 
               if (!isInitialLoad) {
                 window.isSOSActive = false;
 
                 const overlay = document.getElementById('sos-overlay');
                 if (overlay) {
-                  overlay.className = "fixed inset-0 z-[9999] hidden flex-col items-center justify-center animate-pulse"; // Reset classes
+                  overlay.classList.add('hidden');
+                  overlay.className = 'fixed inset-0 z-50 hidden flex-col items-center justify-center'; // Reset classes
                 }
+                
+                if (typeof player !== 'undefined' && player) {
+                  player.pause();
+                }
+                
+                // Stop the SOS siren alarm!
                 const sosPlayer = document.getElementById('sos-player');
                 if (sosPlayer) {
                   sosPlayer.pause();
                   sosPlayer.currentTime = 0;
                 }
                 
-                if (typeof player !== 'undefined' && player) {
-                  player.pause();
+                // Stop any native Web Speech API TTS that is currently playing
+                if (window.speechSynthesis) {
+                  window.speechSynthesis.cancel();
                 }
+
+                if (window.silverTimeout) {
+                  clearTimeout(window.silverTimeout);
+                  window.silverTimeout = null;
+                }
+
                 audioQueue = [];
                 isPlayingTTS = false;
                 duckMusicVolume(false);
 
-                // Speak All Clear
-                audioQueue.push('./sounds/ประกาศ.mp3');
-                fetchAudioData(`Code Green, All Clear. Code Green, All Clear.`, "en-GB").then(urlEn => {
-                  if (urlEn) audioQueue.push(urlEn);
-                  return fetchAudioData(`รหัสสีเขียว ยกเลิกสถานการณ์ฉุกเฉิน รหัสสีเขียว ยกเลิกสถานการณ์ฉุกเฉิน`, "th-TH");
-                }).then(urlTh => {
-                  if (urlTh) audioQueue.push(urlTh);
+                if (!isSilentStop) {
+                  // Speak All Clear ONLY if it's Code Green, NOT #STOP_SOS#
                   audioQueue.push('./sounds/ประกาศ.mp3');
-                  processAudioQueue();
-                }).catch(err => {
-                  console.error("SOS TTS failed:", err);
-                  audioQueue.push('./sounds/ประกาศ.mp3');
-                  processAudioQueue();
-                });
+                  fetchAudioData(`Code Green, All Clear. Code Green, All Clear.`, "en-GB").then(urlEn => {
+                    if (urlEn) audioQueue.push(urlEn);
+                    return fetchAudioData(`รหัสสีเขียว ยกเลิกสถานการณ์ฉุกเฉิน รหัสสีเขียว ยกเลิกสถานการณ์ฉุกเฉิน`, "th-TH");
+                  }).then(urlTh => {
+                    if (urlTh) audioQueue.push(urlTh);
+                    audioQueue.push('./sounds/ประกาศ.mp3');
+                    processAudioQueue();
+                  }).catch(err => {
+                    console.error("SOS TTS failed:", err);
+                    audioQueue.push('./sounds/ประกาศ.mp3');
+                    processAudioQueue();
+                  });
+                }
               }
               return;
             }
@@ -992,6 +1012,32 @@
               audioQueue = []; // Clear current queue to prioritize SOS
               isPlayingTTS = false; // Reset TTS state
               window.isSOSActive = true;
+              
+              // Clear any existing silver timeout
+              if (window.silverTimeout) {
+                clearTimeout(window.silverTimeout);
+                window.silverTimeout = null;
+              }
+              
+              // Code Silver: Auto-mute after 2 minutes (120000 ms) for lockdown safety
+              if (colorCode === 'silver') {
+                window.silverTimeout = setTimeout(() => {
+                  console.log("Auto-muting Code Silver after 2 minutes.");
+                  if (typeof player !== 'undefined' && player) player.pause();
+                  
+                  const sosPlayer = document.getElementById('sos-player');
+                  if (sosPlayer) {
+                    sosPlayer.pause();
+                    sosPlayer.currentTime = 0;
+                  }
+                  
+                  if (window.speechSynthesis) window.speechSynthesis.cancel();
+                  
+                  audioQueue = [];
+                  isPlayingTTS = false;
+                  // Note: window.isSOSActive remains true so the visual warning stays on!
+                }, 120000);
+              }
               
               fetchAudioData(`Code ${colorCode}, Emergency Code ${colorCode}.`, "en-GB").then(urlEn => {
                 if (!window.isSOSActive) return;

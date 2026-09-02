@@ -162,9 +162,9 @@ function LoginForm() {
           <Image 
             src="/logo2.png" 
             alt="School Logo" 
-            width={60} 
-            height={60} 
-            className="opacity-60 hover:opacity-100 transition-all duration-300 drop-shadow-sm" 
+            width={320} 
+            height={180} 
+            className="h-16 w-auto opacity-60 hover:opacity-100 transition-all duration-300 drop-shadow-sm"
           />
         </div>
       </div>
@@ -173,6 +173,16 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      window.location.href = '/home';
+    }
+  }, []);
+
+  if (process.env.NODE_ENV === 'development') {
+    return <div className="min-h-screen flex items-center justify-center">Redirecting (Dev Mode)...</div>;
+  }
+
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
       <LoginForm />

@@ -21,14 +21,26 @@ function selectPage(btn) {
     
     // Hide IG if not main (other pages only use FB)
     const igTab = document.getElementById('tab-ig');
-    if (igTab) {
-        if (targetPage === 'main') {
-            igTab.style.display = 'inline-block';
-        } else {
+    const igCoverContainer = document.getElementById('ig-cover-container');
+    const modalIgColumn = document.getElementById('modal-ig-column');
+    const previewGrid = document.getElementById('preview-grid');
+    const modalFbColumn = document.getElementById('modal-fb-column');
+    
+    if (targetPage === 'main') {
+        if (igTab) igTab.style.display = 'inline-block';
+        if (igCoverContainer) igCoverContainer.style.display = 'block';
+        if (modalIgColumn) modalIgColumn.style.display = 'block';
+        if (previewGrid) previewGrid.style.gridTemplateColumns = '1fr 1fr';
+        if (modalFbColumn) { modalFbColumn.classList.remove('is-full'); modalFbColumn.classList.add('is-half'); }
+    } else {
+        if (igTab) {
             igTab.style.display = 'none';
-            // Switch back to FB tab if IG is active
             if(igTab.classList.contains('active')) switchCaptionTab('fb');
         }
+        if (igCoverContainer) igCoverContainer.style.display = 'none';
+        if (modalIgColumn) modalIgColumn.style.display = 'none';
+        if (previewGrid) previewGrid.style.gridTemplateColumns = '1fr';
+        if (modalFbColumn) { modalFbColumn.classList.remove('is-half'); modalFbColumn.classList.add('is-full'); }
     }
 
     // Hide EN/CN language toggles for sub pages
@@ -337,10 +349,17 @@ async function processPost() {
 
         setStep(2); statusText.innerText = "เตรียมภาพทั้งหมดส่งให้ AI วิเคราะห์ และคัดรูปที่ซ้ำออก...";
         
-        // SAFARI TIMEOUT FIX: Safari drops fetch requests that take >60 seconds.
-        // Gemini processing 40 images takes >60s. Limit to 15 images to ensure it finishes within 30-40s.
-        const maxProcess = Math.min(uploadedFiles.length, 15);
-        const filesToProcess = uploadedFiles.slice(0, maxProcess);
+        // SAFARI TIMEOUT FIX + DIVERSE SAMPLING
+        const MAX_AI_IMAGES = 20; 
+        window.aiSampleIndices = [];
+        if (uploadedFiles.length <= MAX_AI_IMAGES) {
+            for (let i = 0; i < uploadedFiles.length; i++) window.aiSampleIndices.push(i);
+        } else {
+            const step = (uploadedFiles.length - 1) / (MAX_AI_IMAGES - 1);
+            for (let i = 0; i < MAX_AI_IMAGES; i++) window.aiSampleIndices.push(Math.round(i * step));
+        }
+        window.aiSampleIndices = [...new Set(window.aiSampleIndices)];
+        const filesToProcess = window.aiSampleIndices.map(i => uploadedFiles[i]);
         
         // Run resize in worker only if photo mode (Resize to 400 to make payload even smaller/faster)
         let imagesDataForAI = [];
@@ -397,20 +416,27 @@ async function processPost() {
         if (mediaMode === 'photo') {
             let keptIndices = parsedData.kept_image_indices;
             if (keptIndices && keptIndices.length > 0) {
-                let coverIdx = keptIndices[0];
-                let restIndices = keptIndices.slice(1).sort((a, b) => a - b);
-                let sortedIndices = [coverIdx, ...restIndices];
+                let coverOriginalIdx = window.aiSampleIndices[keptIndices[0]];
+                if (coverOriginalIdx === undefined) coverOriginalIdx = 0;
                 
-                let filteredFiles = [];
-                for (let idx of sortedIndices) {
-                    if (idx >= 0 && idx < uploadedFiles.length) {
-                        if (!filteredFiles.includes(uploadedFiles[idx])) {
-                            filteredFiles.push(uploadedFiles[idx]);
-                        }
+                let aiRejectedOriginalIndices = [];
+                for (let i = 0; i < window.aiSampleIndices.length; i++) {
+                    if (!keptIndices.includes(i)) {
+                        aiRejectedOriginalIndices.push(window.aiSampleIndices[i]);
                     }
                 }
-                if (filteredFiles.length > 0) {
-                    uploadedFiles = filteredFiles;
+
+                let finalFiles = [];
+                finalFiles.push(uploadedFiles[coverOriginalIdx]);
+                
+                for (let i = 0; i < uploadedFiles.length; i++) {
+                    if (i !== coverOriginalIdx && !aiRejectedOriginalIndices.includes(i)) {
+                        finalFiles.push(uploadedFiles[i]);
+                    }
+                }
+                
+                if (finalFiles.length > 0) {
+                    uploadedFiles = finalFiles;
                 }
             }
 
@@ -428,8 +454,8 @@ async function processPost() {
                 templates: { fbCover: templateFBCover, igCover: templateIGCover }
             });
             
-            document.getElementById('final-cover-fb').src = covers.fbData;
-            document.getElementById('final-cover-ig').src = covers.igData;
+            if (covers.fbData) document.getElementById('final-cover-fb').src = covers.fbData;
+            if (covers.igData) document.getElementById('final-cover-ig').src = covers.igData;
 
             setStep(5);
             statusText.innerText = `เสร็จสมบูรณ์! AI ได้คัดภาพที่ดี ไว้ให้คุณแล้ว ${uploadedFiles.length} รูป (ตัดภาพซ้ำ/เบลอ) ตรวจสอบแล้วกดดาวน์โหลดได้เลย`;
@@ -769,7 +795,7 @@ async function generateAndDownloadZip() {
 
     try {
         const activeFiles = uploadedFiles.filter((_, i) => !excludedIndices.has(i));
-        const maxPhotos = Math.min(activeFiles.length, 40);
+        const maxPhotos = Math.min(activeFiles.length, 100);
         const hl = getHeadlineFromEditor();
         const captionFB = getCaptionText('final-caption-fb');
         const captionIG = getCaptionText('final-caption-ig');
@@ -875,7 +901,7 @@ async function openPublishModal() {
 
             // Process images for preview so user sees the overlays
             const processedImages = await runWorkerTask('prepareImagesForSocial', {
-                files: activeFiles.slice(0, 40),
+                files: activeFiles.slice(0, 20),
                 hl: hl,
                 templates: { fbCover: templateFBCover, igCover: templateIGCover, fbSub: templateFBSub, igSub: templateIGSub, fbSub4x3: templateFBSub4x3 }
             });
@@ -978,7 +1004,7 @@ async function confirmPublish() {
             let processedImages = window.socialProcessedImagesCache;
             if (!processedImages) {
                 processedImages = await runWorkerTask('prepareImagesForSocial', {
-                    files: activeFiles.slice(0, 40),
+                    files: activeFiles.slice(0, 20),
                     hl: hl,
                     templates: { fbCover: templateFBCover, igCover: templateIGCover, fbSub: templateFBSub, igSub: templateIGSub, fbSub4x3: templateFBSub4x3 }
                 });
@@ -987,7 +1013,7 @@ async function confirmPublish() {
                 'action': 'publishToSocial',
                 'mediaMode': 'photo',
                 'fbImages': JSON.stringify(processedImages.fbImages),
-                'igImages': JSON.stringify(processedImages.igImages.slice(0, 10)),
+                'igImages': targetPage === 'main' ? JSON.stringify(processedImages.igImages.slice(0, 10)) : '[]',
                 'fbCaption': fbCaption,
                 'igCaption': igCaption,
                 'targetPage': targetPage

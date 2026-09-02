@@ -144,8 +144,9 @@ export type Transaction = TuitionPayment | ShopTransaction | WalletTopup | Walle
 export type AppUser = {
   id: string;
   full_name: string;
-  role: 'cashier' | 'admin';
+  role: 'admin' | 'executive' | 'teacher' | 'academic staff' | 'non-academic staff' | 'cashier';
   is_active: boolean;
+  assigned_features: string[];
   created_at: string;
 };
 

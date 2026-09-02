@@ -35,7 +35,7 @@ export const ReceiptPrint = forwardRef<HTMLDivElement, ReceiptPrintProps>(
         className="hidden print:block w-full max-w-[80mm] mx-auto text-black bg-white p-4 font-mono text-sm leading-relaxed"
       >
         <div className="text-center mb-4">
-          <img src="/logo.png" alt="School Logo" className="w-12 h-12 mx-auto mb-2 grayscale" />
+          <img src="/logo2.png" alt="School Logo" className="h-12 w-auto mx-auto mb-2 grayscale" />
           <h1 className="font-bold text-lg">โรงเรียนสมคิดวิทยา</h1>
           <p className="text-xs">{formattedDate}</p>
           <h2 className="font-bold text-base mt-2 flex items-center justify-center gap-1">

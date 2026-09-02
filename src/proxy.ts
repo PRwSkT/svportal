@@ -45,6 +45,11 @@ export async function proxy(request: NextRequest) {
     }
   );
 
+  // DEV MODE BYPASS
+  if (process.env.NODE_ENV === 'development') {
+    return response;
+  }
+
   // This will refresh session if expired
   const { data: { user } } = await supabase.auth.getUser();
 

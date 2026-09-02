@@ -124,14 +124,14 @@ self.onmessage = async function(e) {
             const { leadImgBlob, hl, templates } = payload;
             const imgBtm = await createImageBitmap(leadImgBlob);
             
-            const fbTplBtm = await createImageBitmap(templates.fbCover);
-            const igTplBtm = await createImageBitmap(templates.igCover);
+            const fbTplBtm = templates.fbCover ? await createImageBitmap(templates.fbCover) : null;
+            const igTplBtm = templates.igCover ? await createImageBitmap(templates.igCover) : null;
             
             const enhancedB64 = await autoEnhanceAndWarm(imgBtm);
             const enhancedBtm = await createImageBitmap(await fetch(enhancedB64).then(r => r.blob()));
 
-            const fbData = await drawCoverTemplate(enhancedBtm, hl, fbTplBtm);
-            const igData = await drawIGCover(enhancedBtm, hl, igTplBtm);
+            const fbData = fbTplBtm ? await drawCoverTemplate(enhancedBtm, hl, fbTplBtm) : (await processSubPhoto(enhancedBtm, '1:1', null));
+            const igData = igTplBtm ? await drawIGCover(enhancedBtm, hl, igTplBtm) : null;
             
             self.postMessage({ id, status: 'success', data: { fbData, igData } });
         }

@@ -17,25 +17,23 @@ import {
   CreditCard,
   MessageSquare,
   Radio,
-  Globe
+  Globe,
+  Clock
 } from 'lucide-react';
 
 export default function HomeLaunchpad() {
-  const { role } = useAuth();
-
-  // Temporary: In the future we will filter by role, but for now we show all
-  // const isAdmin = role === 'admin';
-  // const isCashier = role === 'cashier';
+  const { appUser } = useAuth();
   
-  const departments = [
+  // All possible departments and tools
+  const allDepartments = [
     {
       title: "งานการเงิน",
       icon: <Wallet className="w-5 h-5 text-emerald-500" />,
       color: "border-emerald-500/20 bg-emerald-500/5",
       tools: [
-        { name: "แดชบอร์ดสรุปยอด", href: "/dashboard", icon: <LineChart className="w-6 h-6" />, color: "bg-emerald-500 text-white" },
-        { name: "ชำระค่าเทอม", href: "/pos/fees", icon: <CreditCard className="w-6 h-6" />, color: "bg-emerald-500/20 text-emerald-600" },
-        { name: "รายงานการเงิน", href: "/admin/reports", icon: <FileText className="w-6 h-6" />, color: "bg-emerald-500/20 text-emerald-600" }
+        { id: "dashboard", name: "แดชบอร์ดสรุปยอด", href: "/dashboard", icon: <LineChart className="w-6 h-6" />, color: "bg-emerald-500 text-white" },
+        { id: "pos_fees", name: "ชำระค่าเทอม", href: "/pos/fees", icon: <CreditCard className="w-6 h-6" />, color: "bg-emerald-500/20 text-emerald-600" },
+        { id: "admin_reports", name: "รายงานการเงิน", href: "/admin/reports", icon: <FileText className="w-6 h-6" />, color: "bg-emerald-500/20 text-emerald-600" }
       ]
     },
     {
@@ -43,10 +41,10 @@ export default function HomeLaunchpad() {
       icon: <ShoppingBag className="w-5 h-5 text-blue-500" />,
       color: "border-blue-500/20 bg-blue-500/5",
       tools: [
-        { name: "POS ขายสินค้า", href: "/pos/shop", icon: <ShoppingCart className="w-6 h-6" />, color: "bg-blue-500 text-white" },
-        { name: "จัดการสินค้า", href: "/admin/products", icon: <ShoppingBag className="w-6 h-6" />, color: "bg-blue-500/20 text-blue-600" },
-        { name: "เติมเงิน Wallet", href: "/pos/wallet/topup", icon: <Wallet className="w-6 h-6" />, color: "bg-blue-500/20 text-blue-600" },
-        { name: "Wallet นักเรียน", href: "/admin/wallet/students", icon: <Users className="w-6 h-6" />, color: "bg-blue-500/20 text-blue-600" }
+        { id: "pos_shop", name: "POS ขายสินค้า", href: "/pos/shop", icon: <ShoppingCart className="w-6 h-6" />, color: "bg-blue-500 text-white" },
+        { id: "admin_products", name: "จัดการสินค้า", href: "/admin/products", icon: <ShoppingBag className="w-6 h-6" />, color: "bg-blue-500/20 text-blue-600" },
+        { id: "pos_wallet_topup", name: "เติมเงิน Wallet", href: "/pos/wallet/topup", icon: <Wallet className="w-6 h-6" />, color: "bg-blue-500/20 text-blue-600" },
+        { id: "admin_wallet_students", name: "Wallet นักเรียน", href: "/admin/wallet/students", icon: <Users className="w-6 h-6" />, color: "bg-blue-500/20 text-blue-600" }
       ]
     },
     {
@@ -54,7 +52,7 @@ export default function HomeLaunchpad() {
       icon: <FileText className="w-5 h-5 text-indigo-500" />,
       color: "border-indigo-500/20 bg-indigo-500/5",
       tools: [
-        { name: "ข้อมูลนักเรียน", href: "/admin/students", icon: <Users className="w-6 h-6" />, color: "bg-indigo-500/20 text-indigo-600" }
+        { id: "admin_students", name: "ข้อมูลนักเรียน", href: "/admin/students", icon: <Users className="w-6 h-6" />, color: "bg-indigo-500/20 text-indigo-600" }
       ]
     },
     {
@@ -62,7 +60,8 @@ export default function HomeLaunchpad() {
       icon: <Users className="w-5 h-5 text-purple-500" />,
       color: "border-purple-500/20 bg-purple-500/5",
       tools: [
-        { name: "จัดการผู้ใช้งาน", href: "/admin/users", icon: <Users className="w-6 h-6" />, color: "bg-purple-500/20 text-purple-600" }
+        { id: "admin_users", name: "จัดการผู้ใช้งาน", href: "/admin/users", icon: <Users className="w-6 h-6" />, color: "bg-purple-500/20 text-purple-600" },
+        { id: "admin_attendance", name: "ข้อมูลการเข้างาน", href: "/admin/attendance", icon: <Clock className="w-6 h-6" />, color: "bg-purple-500/20 text-purple-600" }
       ]
     },
     {
@@ -70,9 +69,10 @@ export default function HomeLaunchpad() {
       icon: <Megaphone className="w-5 h-5 text-rose-500" />,
       color: "border-rose-500/20 bg-rose-500/5",
       tools: [
-        { name: "จัดการเว็บไซต์", href: "/admin/website", icon: <Globe className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
-        { name: "Post Assistance", href: "/post-assistant.html", icon: <MessageSquare className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
-        { name: "Audio Remote", href: "/audio-remote.html", icon: <Radio className="w-6 h-6" />, color: "bg-rose-500 text-white" }
+        { id: "admin_website", name: "จัดการเว็บไซต์", href: "/admin/website", icon: <Globe className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
+        { id: "post_assistant", name: "Post Assistance", href: "/post-assistant.html", icon: <MessageSquare className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
+        { id: "audio_remote", name: "Audio Remote", href: "/audio-remote.html", icon: <Radio className="w-6 h-6" />, color: "bg-rose-500 text-white" },
+        { id: "qr_generator", name: "สร้าง QR Code", href: "/qr-generator", icon: <QrCode className="w-6 h-6" />, color: "bg-rose-500 text-white" }
       ]
     },
     {
@@ -80,7 +80,7 @@ export default function HomeLaunchpad() {
       icon: <Settings className="w-5 h-5 text-slate-500" />,
       color: "border-slate-500/20 bg-slate-500/5",
       tools: [
-        { name: "การตั้งค่า", href: "#", icon: <Settings className="w-6 h-6" />, color: "bg-slate-500/20 text-slate-600" }
+        { id: "settings", name: "การตั้งค่า", href: "#", icon: <Settings className="w-6 h-6" />, color: "bg-slate-500/20 text-slate-600" }
       ]
     },
     {
@@ -88,10 +88,28 @@ export default function HomeLaunchpad() {
       icon: <GraduationCap className="w-5 h-5 text-orange-500" />,
       color: "border-orange-500/20 bg-orange-500/5",
       tools: [
-        { name: "รอการพัฒนา", href: "#", icon: <GraduationCap className="w-6 h-6" />, color: "bg-orange-500/20 text-orange-600" }
+        { id: "academic_todo", name: "รอการพัฒนา", href: "#", icon: <GraduationCap className="w-6 h-6" />, color: "bg-orange-500/20 text-orange-600" }
       ]
     }
   ];
+
+  // Filter departments based on assigned features
+  // If the user has 'admin' role, maybe show everything? 
+  // "ถ้าทำเป็นroleเลยอาจจะไม่เวิร์คเพราะหลายคนทำหลายจ็อบ ให้adminเป็นคนassignฟีเจอร์แต่ละหมวดให้แต่ละยูสเซอร์"
+  // This implies even admins should be filtered by assigned_features if we want it truly individualized,
+  // but let's assume if assigned_features is empty and they are admin, maybe we show nothing until assigned.
+  // We'll strictly rely on assigned_features, but for fallback (e.g. before migration), we can fallback to all if admin.
+  const assignedFeatures = appUser?.assigned_features || [];
+  
+  // Temporarily show all if it's admin AND assignedFeatures is empty (legacy support during transition)
+  const showAll = appUser?.role === 'admin' && assignedFeatures.length === 0;
+
+  const filteredDepartments = allDepartments.map(dept => {
+    return {
+      ...dept,
+      tools: dept.tools.filter(tool => showAll || assignedFeatures.includes(tool.id))
+    };
+  }).filter(dept => dept.tools.length > 0);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -112,55 +130,65 @@ export default function HomeLaunchpad() {
       {/* Header & Quick Actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-surface backdrop-blur-xl p-6 rounded-3xl shadow-lg border border-white/60">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-primary mb-1">ศูนย์กลางระบบงาน</h1>
-          <p className="text-foreground/60 font-medium">เลือกเครื่องมือที่ต้องการใช้งานตามแผนก</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-primary mb-1">
+            สวัสดี, {appUser?.full_name || 'ผู้ใช้งาน'}
+          </h1>
+          <p className="text-foreground/60 font-medium">ยินดีต้อนรับสู่ศูนย์กลางระบบงาน (SVPortal)</p>
         </div>
         
         {/* Quick Actions / Standalone */}
         <div className="flex gap-4">
-          <Link href="/qr-generator">
+          <Link href="/attendance">
             <motion.div 
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="flex items-center gap-3 bg-gradient-to-r from-primary to-primary/80 text-white px-5 py-3 rounded-2xl shadow-md hover:shadow-lg transition-all"
+              className="flex items-center gap-3 bg-gradient-to-r from-primary to-primary/80 text-white px-6 py-4 rounded-2xl shadow-md hover:shadow-lg transition-all"
             >
               <div className="p-2 bg-white/20 rounded-xl">
-                <QrCode className="w-5 h-5" />
+                <Clock className="w-6 h-6" />
               </div>
-              <span className="font-bold">สร้าง QR Code</span>
+              <span className="font-bold text-lg">ลงเวลาทำงาน</span>
             </motion.div>
           </Link>
         </div>
       </div>
 
       {/* Departments Grid */}
-      <motion.div 
-        variants={containerVariants}
-        initial="hidden"
-        animate="show"
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-      >
-        {departments.map((dept, idx) => (
-          <motion.div key={idx} variants={itemVariants} className={`rounded-3xl border ${dept.color} overflow-hidden backdrop-blur-md shadow-sm hover:shadow-md transition-shadow`}>
-            <div className="p-4 border-b border-foreground/5 flex items-center gap-3 bg-white/40">
-              {dept.icon}
-              <h2 className="font-bold text-lg text-foreground/80">{dept.title}</h2>
-            </div>
-            <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-4 bg-white/20">
-              {dept.tools.map((tool, i) => (
-                <Link key={i} href={tool.href} className="group flex flex-col items-center text-center gap-2">
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110 group-hover:shadow-md ${tool.color}`}>
-                    {tool.icon}
-                  </div>
-                  <span className="text-xs font-medium text-foreground/70 group-hover:text-primary transition-colors line-clamp-2">
-                    {tool.name}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </motion.div>
-        ))}
-      </motion.div>
+      {filteredDepartments.length === 0 ? (
+        <div className="bg-surface backdrop-blur-xl rounded-3xl p-12 text-center border border-white/60">
+          <Settings className="w-16 h-16 text-foreground/20 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-foreground/60 mb-2">ยังไม่มีโมดูลที่ได้รับมอบหมาย</h2>
+          <p className="text-foreground/40">กรุณาติดต่อผู้ดูแลระบบเพื่อกำหนดสิทธิ์การเข้าถึงฟีเจอร์ต่างๆ</p>
+        </div>
+      ) : (
+        <motion.div 
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+        >
+          {filteredDepartments.map((dept, idx) => (
+            <motion.div key={idx} variants={itemVariants} className={`rounded-3xl border ${dept.color} overflow-hidden backdrop-blur-md shadow-sm hover:shadow-md transition-shadow flex flex-col md:h-[320px]`}>
+              <div className="p-4 md:p-5 border-b border-foreground/5 flex items-center gap-3 bg-white/40 shrink-0">
+                {dept.icon}
+                <h2 className="font-bold text-lg text-foreground/80">{dept.title}</h2>
+              </div>
+              <div className="p-4 md:p-5 grid grid-cols-3 gap-4 md:gap-5 bg-white/20 flex-1 min-h-0 overflow-y-auto content-start">
+                {dept.tools.map((tool, i) => (
+                  <Link key={i} href={tool.href} className="group flex flex-col items-center text-center gap-2">
+                    <div className={`w-16 h-16 md:w-14 md:h-14 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110 group-hover:shadow-md ${tool.color}`}>
+                      {tool.icon}
+                    </div>
+                    <span className="text-[11px] md:text-xs font-medium text-foreground/80 group-hover:text-primary transition-colors line-clamp-2 leading-tight">
+                      {tool.name}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
+      )}
     </div>
   );
 }
