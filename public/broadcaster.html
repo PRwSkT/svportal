@@ -456,7 +456,13 @@
       try {
         const response = await fetch(API_URL + "?action=get_bells&t=" + new Date().getTime());
         const data = await response.json();
-        if (Array.isArray(data)) {
+        if (data && data.success && Array.isArray(data.data)) {
+          bells = data.data;
+          localStorage.setItem('sv_bells', JSON.stringify(bells));
+          renderBells();
+          preFetchTTSCache();
+        } else if (Array.isArray(data)) {
+          // Fallback if the API returns just the array directly
           bells = data;
           localStorage.setItem('sv_bells', JSON.stringify(bells));
           renderBells();
