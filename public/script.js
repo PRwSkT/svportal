@@ -350,7 +350,7 @@ async function processPost() {
         setStep(2); statusText.innerText = "เตรียมภาพทั้งหมดส่งให้ AI วิเคราะห์ และคัดรูปที่ซ้ำออก...";
         
         // SAFARI TIMEOUT FIX + DIVERSE SAMPLING
-        const MAX_AI_IMAGES = 20; 
+        const MAX_AI_IMAGES = 8; 
         window.aiSampleIndices = [];
         if (uploadedFiles.length <= MAX_AI_IMAGES) {
             for (let i = 0; i < uploadedFiles.length; i++) window.aiSampleIndices.push(i);
@@ -364,7 +364,7 @@ async function processPost() {
         // Run resize in worker only if photo mode (Resize to 400 to make payload even smaller/faster)
         let imagesDataForAI = [];
         if (mediaMode === 'photo') {
-            imagesDataForAI = await runWorkerTask('resizeImagesForAI', { images: filesToProcess, maxW: 400 });
+            imagesDataForAI = await runWorkerTask('resizeImagesForAI', { images: filesToProcess, maxW: 200 });
         }
 
         setStep(3); statusText.innerText = "AI กำลังคัดกรองรูปภาพและเขียนแคปชั่น... (รอประมาณ 15-30 วินาที)";
