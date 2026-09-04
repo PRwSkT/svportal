@@ -350,7 +350,7 @@ async function processPost() {
         setStep(2); statusText.innerText = "เตรียมภาพทั้งหมดส่งให้ AI วิเคราะห์ และคัดรูปที่ซ้ำออก...";
         
         // SAFARI TIMEOUT FIX + DIVERSE SAMPLING
-        const MAX_AI_IMAGES = 8; 
+        const MAX_AI_IMAGES = 25; 
         window.aiSampleIndices = [];
         if (uploadedFiles.length <= MAX_AI_IMAGES) {
             for (let i = 0; i < uploadedFiles.length; i++) window.aiSampleIndices.push(i);
