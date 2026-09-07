@@ -27,7 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const fetchAppUser = async (userId: string) => {
       const res = await fetch(`/api/auth/me?id=${userId}`, { cache: 'no-store' });
-      const data = res.ok ? await res.json() : null;
+      const data = res.ok ? await res.json().catch(() => null) : null;
       const error = !res.ok;
       if (!error && data) {
         setAppUser(data as AppUser);

@@ -72,6 +72,7 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/auth') ||
     (request.nextUrl.pathname.endsWith('.html') && !request.nextUrl.pathname.includes('audio-remote.html')) ||
     request.nextUrl.pathname.includes('post-assistant') ||
+    request.nextUrl.pathname.startsWith('/api/auth/me') ||
     request.nextUrl.pathname === '/api/admin/website/sync-post' ||
     request.nextUrl.pathname.startsWith('/qr-generator')
   ) {
