@@ -28,7 +28,10 @@ export function AppNav() {
     { href: '/admin/website', label: 'จัดการเว็บไซต์' },
   ];
 
-  const links = role === 'admin' ? [...cashierLinks, ...adminLinks] : cashierLinks;
+  const adminEmails = ['admin@somkidvittaya.ac.th', 'peerawat@somkidvittaya.ac.th', 'media@somkidvittaya.ac.th', 'admin@svportal.com'];
+  const isAdmin = role === 'admin' || (user?.email ? adminEmails.includes(user.email.toLowerCase()) : false);
+
+  const links = isAdmin ? [...cashierLinks, ...adminLinks] : cashierLinks;
 
   return (
     <nav className="bg-surface/80 backdrop-blur-md border-b border-foreground/5 shadow-sm sticky top-0 z-50 print:hidden transition-all">
@@ -64,9 +67,9 @@ export function AppNav() {
               <span className="text-sm text-foreground/80">
                 {user.email} 
                 <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  role === 'admin' ? 'bg-primary/10 text-primary' : 'bg-primary/10 text-primary'
+                  isAdmin ? 'bg-primary/10 text-primary' : 'bg-primary/10 text-primary'
                 }`}>
-                  {role === 'admin' ? 'Admin' : 'Cashier'}
+                  {isAdmin ? 'Admin' : 'Cashier'}
                 </span>
               </span>
               <button

@@ -101,7 +101,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const currentUser = session?.user || null;
         setUser(currentUser);
         if (currentUser) {
-          if (currentUser.email === 'admin@svportal.com') {
+          const adminEmails = ['admin@somkidvittaya.ac.th', 'peerawat@somkidvittaya.ac.th', 'media@somkidvittaya.ac.th', 'admin@svportal.com'];
+          if (currentUser.email && adminEmails.includes(currentUser.email.toLowerCase())) {
             setRole('admin');
           }
           await fetchAppUser(currentUser.id, currentUser.email);
@@ -125,7 +126,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const currentUser = session?.user || null;
         setUser(currentUser);
         if (currentUser) {
-          if (currentUser.email === 'admin@svportal.com') {
+          const adminEmails = ['admin@somkidvittaya.ac.th', 'peerawat@somkidvittaya.ac.th', 'media@somkidvittaya.ac.th', 'admin@svportal.com'];
+          if (currentUser.email && adminEmails.includes(currentUser.email.toLowerCase())) {
             setRole('admin');
           }
           await fetchAppUser(currentUser.id, currentUser.email);
@@ -147,9 +149,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    window.location.href = '/login';
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error('Client signout error:', e);
+    }
+    window.location.href = '/api/auth/logout';
   };
 
   return (

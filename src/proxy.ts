@@ -55,11 +55,12 @@ export async function proxy(request: NextRequest) {
 
   // Handle public route
   if (request.nextUrl.pathname.startsWith('/login')) {
+    if (request.nextUrl.searchParams.get('logout') === 'true') {
+      return response;
+    }
     if (user) {
       // Allow logged-in users to access login page if their domain is wrong, so they can sign out or switch accounts.
       if (user.email?.endsWith('@somkidvittaya.ac.th') || user.email === 'admin@svportal.com') {
-        let { data: role } = await supabase.rpc('get_user_role');
-        if (user.email === 'admin@svportal.com') role = 'admin';
         return NextResponse.redirect(new URL('/home', request.url));
       }
     }
@@ -70,6 +71,7 @@ export async function proxy(request: NextRequest) {
   if (
     request.nextUrl.pathname === '/' ||
     request.nextUrl.pathname.startsWith('/auth') ||
+    request.nextUrl.pathname.startsWith('/api/auth/logout') ||
     (request.nextUrl.pathname.endsWith('.html') && !request.nextUrl.pathname.includes('audio-remote.html')) ||
     request.nextUrl.pathname.includes('post-assistant') ||
     request.nextUrl.pathname === '/api/admin/website/sync-post' ||

@@ -110,18 +110,25 @@ export default function HomeLaunchpad() {
   // This implies even admins should be filtered by assigned_features if we want it truly individualized,
   // but let's assume if assigned_features is empty and they are admin, maybe we show nothing until assigned.
   // We'll strictly rely on assigned_features, but for fallback (e.g. before migration), we can fallback to all if admin.
+  const adminEmails = ['admin@somkidvittaya.ac.th', 'peerawat@somkidvittaya.ac.th', 'media@somkidvittaya.ac.th', 'admin@svportal.com'];
+  const isAdmin = appUser?.role === 'admin' || role === 'admin' || (user?.email ? adminEmails.includes(user.email.toLowerCase()) : false);
   const assignedFeatures = appUser?.assigned_features || [];
-  
-  // Temporarily show all if it's admin AND assignedFeatures is empty (legacy support during transition)
-  const isAdmin = appUser?.role === 'admin' || role === 'admin';
   const showAll = isAdmin && assignedFeatures.length === 0;
 
   const filteredDepartments = allDepartments.map(dept => {
     return {
       ...dept,
-      tools: dept.tools.filter(tool => showAll || assignedFeatures.includes(tool.id))
+      tools: dept.tools.filter(tool => showAll || assignedFeatures.includes(tool.id) || (isAdmin && assignedFeatures.length === 0))
     };
   }).filter(dept => dept.tools.length > 0);
+
+  let displayName = appUser?.full_name;
+  if (!displayName) {
+    if (user?.email?.toLowerCase() === 'admin@somkidvittaya.ac.th') displayName = 'Workspace Admin';
+    else if (user?.email?.toLowerCase() === 'peerawat@somkidvittaya.ac.th') displayName = 'peerawat';
+    else if (user?.email?.toLowerCase() === 'media@somkidvittaya.ac.th') displayName = 'media';
+    else displayName = user?.email ? user.email.split('@')[0] : 'ผู้ใช้งาน';
+  }
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -143,7 +150,7 @@ export default function HomeLaunchpad() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-surface backdrop-blur-xl p-6 rounded-3xl shadow-lg border border-white/60">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-primary mb-1">
-            สวัสดี, {appUser?.full_name || (user?.email ? user.email.split('@')[0] : 'ผู้ใช้งาน')}
+            สวัสดี, {displayName}
           </h1>
           <p className="text-foreground/60 font-medium">ยินดีต้อนรับสู่ศูนย์กลางระบบงาน (SVPortal)</p>
         </div>
