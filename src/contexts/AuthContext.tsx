@@ -26,7 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const supabase = createClient();
 
     const fetchAppUser = async (userId: string) => {
-      const res = await fetch(`/api/auth/me?id=${userId}`);
+      const res = await fetch(`/api/auth/me?id=${userId}`, { cache: 'no-store' });
       const data = res.ok ? await res.json() : null;
       const error = !res.ok;
       if (!error && data) {
