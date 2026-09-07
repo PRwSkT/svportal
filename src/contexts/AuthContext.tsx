@@ -26,7 +26,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const supabase = createClient();
 
     const fetchAppUser = async (userId: string) => {
-      const { data, error } = await supabase.from('app_users').select('*').eq('id', userId).single();
+      const res = await fetch(`/api/auth/me?id=${userId}`);
+      const data = res.ok ? await res.json() : null;
+      const error = !res.ok;
       if (!error && data) {
         setAppUser(data as AppUser);
       } else {
