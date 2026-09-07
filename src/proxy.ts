@@ -96,8 +96,14 @@ export async function proxy(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith('/admin') || request.nextUrl.pathname === '/dashboard') {
     let { data: role, error } = await supabase.rpc('get_user_role');
     
-    // HARDCODE FALLBACK FOR SYSTEM ADMIN
-    if (user?.email === 'admin@svportal.com') {
+    // HARDCODE FALLBACK FOR SYSTEM ADMINS
+    const adminEmails = [
+      'admin@somkidvittaya.ac.th',
+      'peerawat@somkidvittaya.ac.th',
+      'media@somkidvittaya.ac.th',
+      'admin@svportal.com',
+    ];
+    if (user?.email && adminEmails.includes(user.email)) {
       role = 'admin';
       error = null;
     }

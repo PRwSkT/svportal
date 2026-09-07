@@ -42,9 +42,20 @@ export async function POST(request: Request) {
     // Check if the current user is an admin
     if (process.env.NODE_ENV !== 'development') {
       const supabase = await createClient();
-      const { data: roleData, error: roleError } = await supabase.rpc('get_user_role');
-      if (roleError || roleData !== 'admin') {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData?.user;
+      const adminEmails = [
+        'admin@somkidvittaya.ac.th',
+        'peerawat@somkidvittaya.ac.th',
+        'media@somkidvittaya.ac.th',
+        'admin@svportal.com'
+      ];
+      const isHardcodedAdmin = user?.email && adminEmails.includes(user.email);
+      if (!isHardcodedAdmin) {
+        const { data: roleData, error: roleError } = await supabase.rpc('get_user_role');
+        if (roleError || roleData !== 'admin') {
+          return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+        }
       }
     }
 
@@ -104,9 +115,18 @@ export async function PATCH(request: Request) {
           return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
       }
 
-      const { data: roleData, error: roleError } = await supabase.rpc('get_user_role');
-      if (roleError || roleData !== 'admin') {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+      const adminEmails = [
+        'admin@somkidvittaya.ac.th',
+        'peerawat@somkidvittaya.ac.th',
+        'media@somkidvittaya.ac.th',
+        'admin@svportal.com'
+      ];
+      const isHardcodedAdmin = user?.email && adminEmails.includes(user.email);
+      if (!isHardcodedAdmin) {
+        const { data: roleData, error: roleError } = await supabase.rpc('get_user_role');
+        if (roleError || roleData !== 'admin') {
+          return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+        }
       }
     }
 
