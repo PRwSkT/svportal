@@ -25,6 +25,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const supabase = createClient();
 
+    // Hard safety timeout to ensure isLoading never stays stuck on slow/hanging network
+    const safetyTimer = setTimeout(() => {
+      setIsLoading(false);
+    }, 2500);
+
     const fetchAppUser = async (userId: string) => {
       try {
         // 1. Fetch user record via RPC get_current_app_user (bypasses any RLS restrictions cleanly)
@@ -40,12 +45,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!error && data) {
           setAppUser(data as AppUser);
           if (data.role) setRole(data.role);
-        } else {
-          setAppUser(null);
         }
       } catch (err) {
         console.error('Error in fetchAppUser:', err);
-        setAppUser(null);
       }
     };
 
@@ -117,6 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
+      clearTimeout(safetyTimer);
       subscription.unsubscribe();
     };
   }, []);

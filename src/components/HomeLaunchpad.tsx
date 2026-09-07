@@ -22,9 +22,9 @@ import {
 } from 'lucide-react';
 
 export default function HomeLaunchpad() {
-  const { appUser, isLoading } = useAuth();
+  const { user, appUser, role, isLoading } = useAuth();
 
-  if (isLoading) {
+  if (isLoading && !appUser && !user) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -113,7 +113,8 @@ export default function HomeLaunchpad() {
   const assignedFeatures = appUser?.assigned_features || [];
   
   // Temporarily show all if it's admin AND assignedFeatures is empty (legacy support during transition)
-  const showAll = appUser?.role === 'admin' && assignedFeatures.length === 0;
+  const isAdmin = appUser?.role === 'admin' || role === 'admin';
+  const showAll = isAdmin && assignedFeatures.length === 0;
 
   const filteredDepartments = allDepartments.map(dept => {
     return {
@@ -142,7 +143,7 @@ export default function HomeLaunchpad() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-surface backdrop-blur-xl p-6 rounded-3xl shadow-lg border border-white/60">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-primary mb-1">
-            สวัสดี, {appUser?.full_name || 'ผู้ใช้งาน'}
+            สวัสดี, {appUser?.full_name || (user?.email ? user.email.split('@')[0] : 'ผู้ใช้งาน')}
           </h1>
           <p className="text-foreground/60 font-medium">ยินดีต้อนรับสู่ศูนย์กลางระบบงาน (SVPortal)</p>
         </div>
