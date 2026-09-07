@@ -169,7 +169,7 @@ export default function NewsManager() {
                   </td>
                   <td className="p-4">
                     <p className="font-bold text-foreground/80 text-sm line-clamp-1">{n.title_th}</p>
-                    <p className="text-xs text-foreground/50 mt-0.5 line-clamp-1">{n.content_th.substring(0, 50)}...</p>
+                    <p className="text-xs text-foreground/50 mt-0.5 line-clamp-1">{(n.content_th || '').substring(0, 50)}...</p>
                   </td>
                   <td className="p-4 text-xs text-foreground/60">
                     {new Date(n.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}

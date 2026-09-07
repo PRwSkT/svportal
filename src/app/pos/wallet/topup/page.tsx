@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { WalletAccount } from '@/types';
 
 import type { WalletTransaction } from '@/types';
@@ -74,7 +74,11 @@ export default function TopupPage() {
     };
   }, [step]);
 
+  const isScanningRef = useRef(false);
+
   const handleCardScan = useCallback(async (uid: string) => {
+    if (isScanningRef.current) return;
+    isScanningRef.current = true;
     setSearching(true);
     const loadingToast = toast.loading('กำลังตรวจสอบข้อมูลบัตร...');
     try {
@@ -89,6 +93,7 @@ export default function TopupPage() {
       toast.error('เกิดข้อผิดพลาดในการค้นหา', { id: loadingToast });
     } finally {
       setSearching(false);
+      isScanningRef.current = false;
     }
   }, []);
 

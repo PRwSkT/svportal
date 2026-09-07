@@ -53,11 +53,12 @@ export async function GET(request: Request) {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${svPortalToken}`
           },
-          body: JSON.stringify(job.payload)
-        }).catch(() => ({ ok: true })); // Default simulate success if URL is unreachable
+          body: JSON.stringify(job.payload),
+          signal: AbortSignal.timeout(10000),
+        });
 
         if (!res.ok) {
-          throw new Error(`External API returned ${'status' in res ? res.status : 'Unknown Error'}`);
+          throw new Error(`External API returned status ${res.status}`);
         }
 
         // Mark completed

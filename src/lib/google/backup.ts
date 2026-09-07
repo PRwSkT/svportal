@@ -23,9 +23,6 @@ function getGoogleAuth() {
   });
 }
 
-// In-memory queue for rate-limited requests (Serverless envs will lose this on cold boot,
-// but it suffices for immediate retries within the same container instance)
-const rateLimitQueue: GoogleBackupPayload[] = [];
 
 export async function appendTransactionRow(payload: GoogleBackupPayload): Promise<void> {
   const auth = getGoogleAuth();
@@ -72,26 +69,9 @@ export async function appendTransactionRow(payload: GoogleBackupPayload): Promis
 
     console.log(`Successfully backed up transaction ${payload.transaction_id}`);
     
-    // Drain queue if we have pending items and we succeeded
-    if (rateLimitQueue.length > 0) {
-       const nextItem = rateLimitQueue.shift();
-       if (nextItem) {
-          // Fire and forget
-          appendTransactionRow(nextItem).catch(console.error);
-       }
-    }
+
   } catch (error: unknown) {
     console.error('Google Sheets API Error:', error);
-    const err = error as { status?: number; code?: number };
-    
-    // Rate limit check
-    if (err.status === 429 || err.code === 429) {
-      console.warn(`Rate limited by Google APIs. Queueing transaction ${payload.transaction_id} for retry.`);
-      rateLimitQueue.push(payload);
-      // Return silently, never throw to caller on rate limits
-      return;
-    }
-    
     throw error;
   }
 }

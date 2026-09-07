@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AppNav } from "@/components/AppNav";
 import { Toaster } from "sonner";
@@ -6,9 +6,25 @@ import Image from "next/image";
 import { headers } from "next/headers";
 import "./globals.css";
 
+export const viewport: Viewport = {
+  themeColor: "#7B1C3E",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+};
+
 export const metadata: Metadata = {
-  title: "SV-Portal",
+  title: "SV-Portal | โรงเรียนสมคิดวิทยา",
   description: "ระบบบริหารจัดการโรงเรียนสมคิดวิทยา",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/logo2.png",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "SV-Portal",
+  },
 };
 
 export default async function RootLayout({

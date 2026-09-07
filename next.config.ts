@@ -16,7 +16,18 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'ufsqavndpjphowuacxfi.supabase.co',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.googleusercontent.com',
+      },
+    ],
+  },
   async headers() {
     return [
       {
@@ -24,7 +35,7 @@ const nextConfig: NextConfig = {
         source: '/(.*)',
         headers: securityHeaders,
       },
-    ]
+    ];
   },
 };
 

@@ -44,6 +44,7 @@ export default function POSShopPage() {
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
     };
   }, []);
 

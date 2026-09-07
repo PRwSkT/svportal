@@ -7,23 +7,35 @@ export async function POST(request: Request) {
     const hl = formData.get('hl') as string;
     const fbCaption = formData.get('fbCaption') as string;
     
-    // Use Service Role Key to bypass RLS for insertions
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ufsqavndpjphowuacxfi.supabase.co',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmc3Fhdm5kcGpwaG93dWFjeGZpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTExMzg3OCwiZXhwIjoyMDk2Njg5ODc4fQ.ntNcIPdTwLRIy25nScwqPs6d_RuT28l11Ttqoo7r8NU'
-    );
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !serviceRoleKey) {
+      throw new Error('Missing Supabase Service Role configuration');
+    }
 
-    const files = formData.getAll('files') as File[];
+    const supabase = createClient(url, serviceRoleKey);
+
+    const rawFiles = formData.getAll('files') as File[];
+    // Filter and validate files: max 10MB and image only
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
+    const files = rawFiles.filter(file => {
+      if (!file || typeof file.size !== 'number') return false;
+      if (file.size > MAX_FILE_SIZE) return false;
+      return file.type.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif)$/i.test(file.name);
+    });
     
     // Concurrent Upload using Promise.all
     const uploadPromises = files.map(async (file) => {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${crypto.randomUUID()}.${fileExt}`;
+      const fileExt = file.name.split('.').pop() || 'jpg';
+      const fileName = `${crypto.randomUUID()}.${fileExt.toLowerCase()}`;
       const filePath = `post/${new Date().getFullYear()}/${new Date().getMonth() + 1}/${fileName}`;
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('website-content')
-        .upload(filePath, file);
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
 
       if (uploadError) {
         console.error('Upload error:', uploadError);
@@ -38,21 +50,18 @@ export async function POST(request: Request) {
     });
 
     const results = await Promise.all(uploadPromises);
-    const uploadedUrls = results.filter((url): url is string => url !== null);
+    const uploadedUrls = results.filter((item): item is string => item !== null);
 
-    let albumId = null;
+    let albumId: string | null = null;
 
     if (uploadedUrls.length > 0) {
       const { data: album, error: albumError } = await supabase.from('albums').insert({
         title_th: hl,
         title_en: hl,
-        title_zh: hl,
         description_th: fbCaption,
         description_en: '',
-        description_zh: '',
-        cover_image: uploadedUrls[0],
-        is_published: true,
-        published_at: new Date().toISOString()
+        cover_image_url: uploadedUrls[0],
+        event_date: new Date().toISOString().split('T')[0],
       }).select().single();
       
       if (albumError) throw albumError;
@@ -60,8 +69,8 @@ export async function POST(request: Request) {
 
       const photos = uploadedUrls.map((url, index) => ({
         album_id: album.id,
-        photo_url: url,
-        display_order: index
+        image_url: url,
+        sort_order: index,
       }));
 
       const { error: photosError } = await supabase.from('album_photos').insert(photos);
@@ -76,7 +85,7 @@ export async function POST(request: Request) {
       cover_image_url: uploadedUrls.length > 0 ? uploadedUrls[0] : null,
       is_published: true,
       published_at: new Date().toISOString(),
-      album_id: albumId
+      album_id: albumId,
     }).select().single();
     
     if (newsError) throw newsError;

@@ -2,16 +2,19 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { toast } from 'sonner';
 
 export default function WelcomePage() {
   const handleNotReady = (e: React.MouseEvent) => {
     e.preventDefault();
-    alert('ฟังก์ชันนี้ยังไม่พร้อมใช้งาน\nThis function is not ready yet.\n此功能尚未准备好');
+    toast.info('ฟังก์ชันนี้ยังไม่พร้อมใช้งาน (กำลังพัฒนา)', {
+      description: 'This function is coming soon • 此功能正在开发中',
+    });
   };
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative z-10">
-      <div className="max-w-xl w-full space-y-8 bg-surface/80 backdrop-blur-xl p-10 rounded-[24px] shadow-2xl border border-white/60 relative">
+      <div className="max-w-xl w-full space-y-8 bg-surface/80 backdrop-blur-xl p-6 sm:p-10 rounded-3xl shadow-2xl border border-white/60 relative">
         {/* Decorative background gradients (wrapped to fix Safari overflow border-radius bug) */}
         <div className="absolute inset-0 pointer-events-none" style={{ clipPath: 'inset(0px round 24px)' }}>
           <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/10 rounded-full blur-3xl"></div>

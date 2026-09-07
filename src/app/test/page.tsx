@@ -1,7 +1,11 @@
 import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
 import OfflineTestClient from './offline-client';
 
 export default async function TestPage() {
+  if (process.env.NODE_ENV === 'production') {
+    redirect('/');
+  }
   const supabase = await createClient();
   
   // This might fail if the user hasn't created the table or provided the keys, 

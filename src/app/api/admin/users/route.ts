@@ -2,14 +2,33 @@ import { NextResponse } from 'next/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 
+import { isSystemAdmin } from '@/lib/constants/auth';
+
 function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ufsqavndpjphowuacxfi.supabase.co';
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmc3Fhdm5kcGpwaG93dWFjeGZpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTExMzg3OCwiZXhwIjoyMDk2Njg5ODc4fQ.ntNcIPdTwLRIy25nScwqPs6d_RuT28l11Ttqoo7r8NU';
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error('Missing Supabase Service Role configuration');
+  }
   return createSupabaseClient(url, key);
 }
 
 export async function GET(request: Request) {
   try {
+    const supabase = await createClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!isSystemAdmin(user.email)) {
+      const { data: role, error: roleError } = await supabase.rpc('get_user_role');
+      if (roleError || role !== 'admin') {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
+
     const supabaseAdmin = getAdminClient();
     const { data, error } = await supabaseAdmin
       .from('app_users')
@@ -160,10 +179,10 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
 
-    // Optionally ban the user in auth.users
+    // Optionally ban or unban the user in auth.users only when is_active is explicitly provided
     if (is_active === false) {
         await supabaseAdmin.auth.admin.updateUserById(userId, { ban_duration: '876000h' }); // Ban for 100 years
-    } else {
+    } else if (is_active === true) {
         await supabaseAdmin.auth.admin.updateUserById(userId, { ban_duration: 'none' }); // Unban
     }
 

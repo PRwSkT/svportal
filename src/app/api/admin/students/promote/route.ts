@@ -72,41 +72,22 @@ export async function POST(request: Request) {
 
     // 4. Process E-Students (Convert to Normal ID, no grade change)
     if (eStudents.length > 0) {
-      // Find max normal ID
-      const { data: allIds } = await supabase.from('students').select('id');
-      let maxNormal = 0;
-      for (const { id } of allIds || []) {
-        if (!id.toUpperCase().startsWith('E')) {
-          const num = parseInt(id, 10);
-          if (!isNaN(num) && num > maxNormal) {
-            maxNormal = num;
-          }
-        }
-      }
+      const { data: maxIdData, error: maxIdErr } = await supabase.rpc('get_max_student_id');
+      if (maxIdErr) throw maxIdErr;
+      let currentMax = Number(maxIdData) || 0;
 
       for (const eStudent of eStudents) {
-        maxNormal++;
-        const newId = maxNormal.toString();
-        
-        const newStudent = {
-          ...eStudent,
-          id: newId,
-          status: 'กำลังศึกษาอยู่', // Clean their status
-          updated_at: new Date().toISOString()
-        };
+        currentMax++;
+        const newId = currentMax.toString();
 
-        // Insert new profile
-        const { error: insertErr } = await supabase.from('students').insert(newStudent);
-        if (insertErr) throw insertErr;
-
-        // Re-assign foreign keys (Application-level migration)
-        await supabase.from('student_addresses').update({ student_id: newId }).eq('student_id', eStudent.id);
-        await supabase.from('student_parents').update({ student_id: newId }).eq('student_id', eStudent.id);
-        await supabase.from('wallet_transactions').update({ student_id: newId }).eq('student_id', eStudent.id);
-        
-        // Delete old profile
-        const { error: deleteErr } = await supabase.from('students').delete().eq('id', eStudent.id);
-        if (deleteErr) console.error('Failed to delete old E-student', deleteErr);
+        const { error: migrateErr } = await supabase.rpc('migrate_student_id', {
+          old_id: eStudent.id,
+          new_id: newId,
+        });
+        if (migrateErr) {
+          console.error(`Failed to migrate student ${eStudent.id} to ${newId}:`, migrateErr);
+          throw migrateErr;
+        }
       }
     }
 

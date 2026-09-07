@@ -7,7 +7,14 @@ export function exportToCSV(filename: string, headers: string[], rows: any[][]) 
     ...rows.map(row => 
       row.map(cell => {
         // Handle quotes, commas, and newlines in CSV cells
-        const cellStr = cell === null || cell === undefined ? '' : String(cell);
+        let cellStr = '';
+        if (cell === null || cell === undefined) {
+          cellStr = '';
+        } else if (typeof cell === 'object') {
+          cellStr = JSON.stringify(cell);
+        } else {
+          cellStr = String(cell);
+        }
         if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
           return `"${cellStr.replace(/"/g, '""')}"`;
         }

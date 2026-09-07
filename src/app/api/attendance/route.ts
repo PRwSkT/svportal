@@ -107,17 +107,23 @@ export async function POST(request: Request) {
       }, { status: 403 });
     }
 
-    // Get today's local date YYYY-MM-DD
-    const today = new Date();
-    const offset = today.getTimezoneOffset() * 60000;
-    const localISODate = (new Date(today.getTime() - offset)).toISOString().split('T')[0];
+    // Get today's local date in Asia/Bangkok (GMT+7)
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Bangkok',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const localISODate = formatter.format(new Date());
 
     // We use a service role key to insert/update the timestamp securely on the server
     const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
-    const supabaseAdmin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ufsqavndpjphowuacxfi.supabase.co',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmc3Fhdm5kcGpwaG93dWFjeGZpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTExMzg3OCwiZXhwIjoyMDk2Njg5ODc4fQ.ntNcIPdTwLRIy25nScwqPs6d_RuT28l11Ttqoo7r8NU'
-    );
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !serviceKey) {
+      throw new Error('Missing Supabase Service Role configuration');
+    }
+    const supabaseAdmin = createSupabaseClient(url, serviceKey);
 
     // Check if record exists
     const { data: existingRecord } = await supabaseAdmin

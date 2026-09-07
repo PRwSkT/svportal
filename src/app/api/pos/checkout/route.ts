@@ -14,43 +14,20 @@ export async function POST(request: Request) {
     const transactionId = crypto.randomUUID();
     const supabase = await createClient();
 
-    if (paymentMethod === 'wallet') {
-      if (!studentId) return NextResponse.json({ error: 'INSUFFICIENT_WALLET' }, { status: 400 });
-
-      // Call deduct_wallet_balance directly
-      const payload = {
-        student_id: studentId,
-        amount: totalAmount,
-        reference_id: transactionId,
-      };
-      const { data: deductData, error: deductErr } = await supabase.rpc('deduct_wallet_balance', { payload });
-      if (deductErr) throw new Error(deductErr.message);
-
-      // Save shop transaction via RPC
-      const shopPayload = {
-        id: transactionId,
-        student_id: studentId,
-        total_amount: totalAmount,
-        payment_method: paymentMethod,
-        cashier_note: null,
-        items: cart,
-      };
-      const { error: shopErr } = await supabase.rpc('checkout_shop_transaction', { payload: shopPayload });
-      if (shopErr) throw shopErr;
-
-    } else {
-      // Cash payment
-      const shopPayload = {
-        id: transactionId,
-        student_id: studentId || null,
-        total_amount: totalAmount,
-        payment_method: paymentMethod,
-        cashier_note: null,
-        items: cart,
-      };
-      const { error: shopErr } = await supabase.rpc('checkout_shop_transaction', { payload: shopPayload });
-      if (shopErr) throw shopErr;
+    if (paymentMethod === 'wallet' && !studentId) {
+      return NextResponse.json({ error: 'INSUFFICIENT_WALLET' }, { status: 400 });
     }
+
+    const shopPayload = {
+      id: transactionId,
+      student_id: studentId || null,
+      total_amount: totalAmount,
+      payment_method: paymentMethod,
+      cashier_note: null,
+      items: cart,
+    };
+    const { error: shopErr } = await supabase.rpc('checkout_shop_transaction', { payload: shopPayload });
+    if (shopErr) throw shopErr;
 
     return NextResponse.json({
       id: transactionId,

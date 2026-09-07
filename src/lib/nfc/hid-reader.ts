@@ -1,142 +1,87 @@
-import type { NFCReaderService } from './reader'
+import type { NFCReaderService } from './reader';
 
 /**
  * HIDKeyboardReader
  *
- * Most USB NFC readers emulate a keyboard: they type the card UID as
- * a rapid sequence of keystrokes and finish with Enter.
- *
- * Strategy:
- *  1. Create a hidden <input> and keep it focused.
- *  2. On each keystroke reset a 100 ms debounce timer.
- *  3. When Enter fires (or the debounce expires with content) treat
- *     the accumulated value as a card UID.
+ * Modern keyboard-wedge RFID reader handler that uses window-level key events
+ * and timing heuristics without stealing focus from interactive form inputs.
  */
-
-/** Threshold (ms) — keystrokes arriving faster than this are from a scanner */
-const DEBOUNCE_MS = 100
-
 export class HIDKeyboardReader implements NFCReaderService {
-  private hiddenInput: HTMLInputElement | null = null
-  private onCardRead: ((uid: string) => void) | null = null
-  private debounceTimer: ReturnType<typeof setTimeout> | null = null
-  private listening = false
-
-  /* ------------------------------------------------------------------ */
-  /*  NFCReaderService                                                   */
-  /* ------------------------------------------------------------------ */
+  private onCardRead: ((uid: string) => void) | null = null;
+  private buffer: string = '';
+  private lastKeyTime: number = 0;
+  private listening = false;
+  private readonly MAX_INTERVAL_MS = 100; // Keystrokes faster than this are from a scanner
 
   async isAvailable(): Promise<boolean> {
-    // HID keyboard mode is always available inside a browser
-    return typeof document !== 'undefined'
+    return typeof window !== 'undefined';
   }
 
   async startListening(onCardRead: (uid: string) => void): Promise<void> {
-    if (this.listening) return
-    this.onCardRead = onCardRead
-    this.listening = true
+    if (this.listening) return;
+    this.onCardRead = onCardRead;
+    this.listening = true;
+    this.buffer = '';
+    this.lastKeyTime = 0;
 
-    this.hiddenInput = document.createElement('input')
-    const input = this.hiddenInput
-
-    // Make the element invisible but still focusable
-    Object.assign(input.style, {
-      position: 'fixed',
-      top: '-9999px',
-      left: '-9999px',
-      opacity: '0',
-      width: '0',
-      height: '0',
-      border: 'none',
-      outline: 'none',
-    } satisfies Partial<CSSStyleDeclaration>)
-
-    input.setAttribute('aria-hidden', 'true')
-    input.setAttribute('tabindex', '-1')
-    input.setAttribute('autocomplete', 'off')
-
-    document.body.appendChild(input)
-    input.focus()
-
-    input.addEventListener('keydown', this.handleKeyDown)
-    input.addEventListener('input', this.handleInput)
-
-    // Re-focus when the element loses focus (e.g. user clicks elsewhere)
-    input.addEventListener('blur', this.refocus)
+    window.addEventListener('keydown', this.handleKeyDown, true);
   }
 
   stopListening(): void {
-    this.listening = false
-    this.clearDebounce()
+    this.listening = false;
+    this.buffer = '';
+    this.lastKeyTime = 0;
+    this.onCardRead = null;
 
-    if (this.hiddenInput) {
-      this.hiddenInput.removeEventListener('keydown', this.handleKeyDown)
-      this.hiddenInput.removeEventListener('input', this.handleInput)
-      this.hiddenInput.removeEventListener('blur', this.refocus)
-      this.hiddenInput.remove()
-      this.hiddenInput = null
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('keydown', this.handleKeyDown, true);
     }
-
-    this.onCardRead = null
   }
 
   getMode(): 'hid' {
-    return 'hid'
+    return 'hid';
   }
-
-  /* ------------------------------------------------------------------ */
-  /*  Internal handlers                                                  */
-  /* ------------------------------------------------------------------ */
 
   private handleKeyDown = (event: KeyboardEvent): void => {
+    if (!this.listening) return;
+
+    const target = event.target as HTMLElement | null;
+    const isEditingInput =
+      target &&
+      (target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable);
+
+    // If typing inside an active form input, don't hijack unless it's a designated scanner input
+    if (isEditingInput && !target?.dataset.nfcScanner) {
+      return;
+    }
+
+    const now = Date.now();
+    const isRapid = this.lastKeyTime === 0 || now - this.lastKeyTime <= this.MAX_INTERVAL_MS;
+    this.lastKeyTime = now;
+
     if (event.key === 'Enter') {
-      event.preventDefault()
-      this.flushUID()
-    }
-  }
-
-  private handleInput = (): void => {
-    this.resetDebounce()
-  }
-
-  /** Keep the hidden input focused so keystrokes land here */
-  private refocus = (): void => {
-    if (this.listening && this.hiddenInput) {
-      // Small delay prevents focus‑fight loops with other UI elements
-      setTimeout(() => this.hiddenInput?.focus(), 10)
-    }
-  }
-
-  /* ------------------------------------------------------------------ */
-  /*  Debounce helpers                                                   */
-  /* ------------------------------------------------------------------ */
-
-  private resetDebounce(): void {
-    this.clearDebounce()
-    this.debounceTimer = setTimeout(() => this.flushUID(), DEBOUNCE_MS)
-  }
-
-  private clearDebounce(): void {
-    if (this.debounceTimer !== null) {
-      clearTimeout(this.debounceTimer)
-      this.debounceTimer = null
-    }
-  }
-
-  /** Normalize & emit whatever has been accumulated so far */
-  private flushUID(): void {
-    this.clearDebounce()
-
-    const raw = this.hiddenInput?.value ?? ''
-    const uid = raw.trim().toUpperCase()
-
-    if (uid.length > 0 && this.onCardRead) {
-      this.onCardRead(uid)
+      if (this.buffer.length >= 4 && this.onCardRead) {
+        event.preventDefault();
+        event.stopPropagation();
+        const uid = this.buffer.trim().toUpperCase();
+        this.buffer = '';
+        this.onCardRead(uid);
+      } else {
+        this.buffer = '';
+      }
+      return;
     }
 
-    // Clear for next scan
-    if (this.hiddenInput) {
-      this.hiddenInput.value = ''
+    // Accumulate printable characters
+    if (event.key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
+      if (!isRapid && this.buffer.length > 0) {
+        // Slow typing reset
+        this.buffer = '';
+      }
+      this.buffer += event.key;
     }
-  }
+  };
 }

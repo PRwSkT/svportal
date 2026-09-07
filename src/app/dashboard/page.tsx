@@ -1,29 +1,62 @@
 import DashboardView from './DashboardView';
-import { headers } from 'next/headers';
+import { getDailySummary } from '@/lib/supabase/reports.server';
+import { createClient } from '@/lib/supabase/server';
+
+export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
-  // Get today's summary in YYYY-MM-DD
-  const today = new Date();
-  const offset = today.getTimezoneOffset() * 60000;
-  const localISOTime = (new Date(today.getTime() - offset)).toISOString().split('T')[0];
-  
-  // Format date to Thai format
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const localISOTime = formatter.format(new Date());
+
   const thaiDate = new Intl.DateTimeFormat('th-TH', { 
+    timeZone: 'Asia/Bangkok',
     year: 'numeric', 
     month: 'long', 
     day: 'numeric' 
-  }).format(today);
+  }).format(new Date());
 
-  // We fetch initial data on server to keep SSR
-  let initialData = { summary: null, sync_stats: null };
+  let initialData: any = { summary: null, sync_stats: null, website_stats: null };
   try {
-    const headersList = await headers();
-    const host = headersList.get('host') || 'localhost:3000';
-    const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
-    const res = await fetch(`${protocol}://${host}/api/admin/dashboard?date=${localISOTime}`, { cache: 'no-store' });
-    if (res.ok) {
-      initialData = await res.json();
-    }
+    const summary = await getDailySummary(localISOTime);
+    const supabase = await createClient();
+
+    const [
+      { count: pendingCount },
+      { count: failedCount },
+      { count: completedCount },
+      { count: processingCount },
+      { count: newsCount },
+      { count: albumsCount },
+      { count: personnelCount },
+    ] = await Promise.all([
+      supabase.from('sync_queue').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabase.from('sync_queue').select('*', { count: 'exact', head: true }).eq('status', 'failed'),
+      supabase.from('sync_queue').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
+      supabase.from('sync_queue').select('*', { count: 'exact', head: true }).eq('status', 'processing'),
+      supabase.from('news').select('*', { count: 'exact', head: true }),
+      supabase.from('albums').select('*', { count: 'exact', head: true }),
+      supabase.from('personnel').select('*', { count: 'exact', head: true }),
+    ]);
+
+    initialData = {
+      summary,
+      sync_stats: {
+        pending: pendingCount || 0,
+        failed: failedCount || 0,
+        completed: completedCount || 0,
+        processing: processingCount || 0,
+      },
+      website_stats: {
+        news: newsCount || 0,
+        albums: albumsCount || 0,
+        personnel: personnelCount || 0,
+      },
+    };
   } catch (e) {
     console.error('Failed to fetch initial dashboard data', e);
   }

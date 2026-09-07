@@ -5,28 +5,31 @@ export async function getDailySummary(dateStr: string): Promise<DailySummary> {
   // dateStr format: YYYY-MM-DD
   const supabase = await createClient();
   
-  // Use timezone-aware bounds (assuming UTC internally, but simple date bounds for now)
-  const startOfDay = `${dateStr}T00:00:00.000Z`;
-  const endOfDay = `${dateStr}T23:59:59.999Z`;
+  // Use Bangkok timezone-aware bounds (GMT+7)
+  const startOfDay = `${dateStr}T00:00:00.000+07:00`;
+  const endOfDay = `${dateStr}T23:59:59.999+07:00`;
   
   // 1. Get tuition payments
   const { data: tuitionData } = await supabase
     .from('tuition_payments')
     .select('total_amount')
     .gte('created_at', startOfDay)
-    .lte('created_at', endOfDay); // Changed lt to lte to fix off-by-one
+    .lte('created_at', endOfDay);
     
-  const tuitionAmount = (tuitionData || []).reduce((sum: number, row: any) => sum + row.total_amount, 0);
+  const tuitionAmount = (tuitionData || []).reduce((sum: number, row: any) => sum + Number(row.total_amount || 0), 0);
   const tuitionCount = (tuitionData || []).length;
 
   // 2. Get shop transactions
   const { data: shopData } = await supabase
     .from('shop_transactions')
-    .select('total_amount')
+    .select('total_amount, payment_method')
     .gte('created_at', startOfDay)
     .lte('created_at', endOfDay);
     
-  const shopAmount = (shopData || []).reduce((sum: number, row: any) => sum + row.total_amount, 0);
+  const shopAmount = (shopData || []).reduce((sum: number, row: any) => sum + Number(row.total_amount || 0), 0);
+  const shopCashAmount = (shopData || [])
+    .filter((row: any) => row.payment_method === 'cash')
+    .reduce((sum: number, row: any) => sum + Number(row.total_amount || 0), 0);
   const shopCount = (shopData || []).length;
 
   // 3. Get wallet topups
@@ -37,12 +40,12 @@ export async function getDailySummary(dateStr: string): Promise<DailySummary> {
     .gte('created_at', startOfDay)
     .lte('created_at', endOfDay);
     
-  const topupAmount = (topupData || []).reduce((sum: number, row: any) => sum + row.amount, 0);
+  const topupAmount = (topupData || []).reduce((sum: number, row: any) => sum + Number(row.amount || 0), 0);
   const topupCount = (topupData || []).length;
 
   return {
     date: dateStr,
-    total_received: tuitionAmount + shopAmount + topupAmount,
+    total_received: tuitionAmount + shopCashAmount + topupAmount,
     tuition_count: tuitionCount,
     tuition_amount: tuitionAmount,
     shop_count: shopCount,

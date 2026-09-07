@@ -89,24 +89,27 @@ export async function importStudentsFromCSV(
   const supabase = createClient();
   let success = 0;
   let failed = 0;
-  const errors = [];
+  const errors: any[] = [];
 
-  for (const item of fileData) {
+  const BATCH_SIZE = 100;
+  for (let i = 0; i < fileData.length; i += BATCH_SIZE) {
+    const batch = fileData.slice(i, i + BATCH_SIZE).map(item => ({
+      id: item.id,
+      name: item.name,
+      grade: item.grade,
+      citizen_id: item.citizen_id,
+      status: item.status || 'กำลังศึกษาอยู่',
+    }));
+
     const { error } = await supabase
       .from('students')
-      .upsert([{
-        id: item.id,
-        name: item.name,
-        grade: item.grade,
-        citizen_id: item.citizen_id,
-        status: item.status || 'กำลังศึกษาอยู่'
-      }], { onConflict: 'id', ignoreDuplicates: false });
+      .upsert(batch, { onConflict: 'id', ignoreDuplicates: false });
 
     if (error) {
-      failed++;
-      errors.push({ id: item.id, message: error.message });
+      failed += batch.length;
+      errors.push({ batchRange: `${i + 1} - ${i + batch.length}`, message: error.message });
     } else {
-      success++;
+      success += batch.length;
     }
   }
 

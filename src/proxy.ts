@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { isSystemAdmin } from '@/lib/constants/auth';
 
 export async function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
@@ -24,9 +25,15 @@ export async function proxy(request: NextRequest) {
   });
   response.headers.set('Content-Security-Policy', cspHeader);
 
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) {
+    return response;
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ufsqavndpjphowuacxfi.supabase.co',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmc3Fhdm5kcGpwaG93dWFjeGZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMTM4NzgsImV4cCI6MjA5NjY4OTg3OH0.fpaVZY8i7YQLRewcv3cuEZR_P9wNz1rWs5Q1UOk3Hz0',
+    url,
+    anonKey,
     {
       cookies: {
         getAll() {
@@ -45,6 +52,14 @@ export async function proxy(request: NextRequest) {
     }
   );
 
+  function redirectWithCookies(targetUrl: URL): NextResponse {
+    const redirectResponse = NextResponse.redirect(targetUrl);
+    response.cookies.getAll().forEach(cookie => {
+      redirectResponse.cookies.set(cookie.name, cookie.value, cookie);
+    });
+    return redirectResponse;
+  }
+
   // DEV MODE BYPASS
   if (process.env.NODE_ENV === 'development') {
     return response;
@@ -60,8 +75,8 @@ export async function proxy(request: NextRequest) {
     }
     if (user) {
       // Allow logged-in users to access login page if their domain is wrong, so they can sign out or switch accounts.
-      if (user.email?.endsWith('@somkidvittaya.ac.th') || user.email === 'admin@svportal.com') {
-        return NextResponse.redirect(new URL('/home', request.url));
+      if (user.email?.endsWith('@somkidvittaya.ac.th') || isSystemAdmin(user.email)) {
+        return redirectWithCookies(new URL('/home', request.url));
       }
     }
     return response;
@@ -82,37 +97,37 @@ export async function proxy(request: NextRequest) {
 
   // Handle protected routes
   if (!user) {
-    return NextResponse.redirect(new URL('/login', request.url));
+    return redirectWithCookies(new URL('/login', request.url));
   }
 
   // Enforce Domain Restriction
-  if (!user.email?.endsWith('@somkidvittaya.ac.th') && user.email !== 'admin@svportal.com') {
+  if (!user.email?.endsWith('@somkidvittaya.ac.th') && !isSystemAdmin(user.email)) {
     // If they bypass Google's hosted domain prompt, middleware will catch them
     // and send them back to login with an error query param
-    return NextResponse.redirect(new URL('/login?error=Invalid_Domain', request.url));
+    return redirectWithCookies(new URL('/login?error=Invalid_Domain', request.url));
   }
 
   // Protect admin routes
-  if (request.nextUrl.pathname.startsWith('/admin') || request.nextUrl.pathname === '/dashboard') {
+  if (
+    request.nextUrl.pathname.startsWith('/admin') ||
+    request.nextUrl.pathname === '/dashboard' ||
+    (request.nextUrl.pathname.startsWith('/api/admin') && request.nextUrl.pathname !== '/api/admin/website/sync-post')
+  ) {
     let { data: role, error } = await supabase.rpc('get_user_role');
     
-    // HARDCODE FALLBACK FOR SYSTEM ADMINS
-    const adminEmails = [
-      'admin@somkidvittaya.ac.th',
-      'peerawat@somkidvittaya.ac.th',
-      'media@somkidvittaya.ac.th',
-      'admin@svportal.com',
-    ];
-    if (user?.email && adminEmails.includes(user.email)) {
+    if (isSystemAdmin(user?.email)) {
       role = 'admin';
       error = null;
     }
 
     if (error || role !== 'admin') {
+      if (request.nextUrl.pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
       const debugUrl = new URL('/pos/shop', request.url);
       debugUrl.searchParams.set('debug_err', error ? error.message : 'none');
       debugUrl.searchParams.set('debug_role', String(role));
-      return NextResponse.redirect(debugUrl);
+      return redirectWithCookies(debugUrl);
     }
   }
 

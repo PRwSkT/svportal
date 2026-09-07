@@ -14,42 +14,12 @@ export async function GET(request: Request) {
 
     const supabase = await createClient();
 
-    // Fetch all student IDs to calculate max
-    const { data: allIds, error } = await supabase
-      .from('students')
-      .select('id');
+    const { data: nextId, error } = await supabase.rpc('get_next_student_id', {
+      p_type: type === 'e' ? 'e' : 'normal',
+    });
 
     if (error) {
       throw error;
-    }
-
-    let maxNormal = 0;
-    let maxE = 0;
-
-    for (const { id } of allIds || []) {
-      if (!id) continue;
-      
-      if (id.toUpperCase().startsWith('E')) {
-        const num = parseInt(id.substring(1), 10);
-        if (!isNaN(num) && num > maxE) {
-          maxE = num;
-        }
-      } else {
-        const num = parseInt(id, 10);
-        if (!isNaN(num) && num > maxNormal) {
-          maxNormal = num;
-        }
-      }
-    }
-
-    let nextId = '';
-    if (type === 'e') {
-      const nextNum = maxE + 1;
-      // Format as E + 4 digits minimum (e.g., E0001)
-      nextId = `E${nextNum.toString().padStart(4, '0')}`;
-    } else {
-      const nextNum = maxNormal + 1;
-      nextId = nextNum.toString();
     }
 
     return NextResponse.json({ nextId });
