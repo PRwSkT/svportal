@@ -30,19 +30,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
     }, 2500);
 
-    const fetchAppUser = async (userId: string) => {
+    const fetchAppUser = async (userId: string, email?: string) => {
       try {
-        // 1. Fetch user record via RPC get_current_app_user (bypasses any RLS restrictions cleanly)
-        const { data: rpcData, error: rpcError } = await supabase.rpc('get_current_app_user');
-        if (!rpcError && rpcData) {
+        // 1. Fetch user record via RPC get_app_user_by_id (bypasses RLS cleanly)
+        const { data: idData, error: idError } = await supabase.rpc('get_app_user_by_id', {
+          target_user_id: userId
+        });
+        if (!idError && idData) {
+          setAppUser(idData as AppUser);
+          if (idData.role) setRole(idData.role);
+          return;
+        }
+
+        // 2. Fetch user record via RPC get_app_user_by_email
+        if (email) {
+          const { data: emailData, error: emailError } = await supabase.rpc('get_app_user_by_email', {
+            target_email: email
+          });
+          if (!emailError && emailData) {
+            setAppUser(emailData as AppUser);
+            if (emailData.role) setRole(emailData.role);
+            return;
+          }
+        }
+
+        // 3. Fallback: get_current_app_user
+        const { data: rpcData } = await supabase.rpc('get_current_app_user');
+        if (rpcData) {
           setAppUser(rpcData as AppUser);
           if (rpcData.role) setRole(rpcData.role);
           return;
         }
 
-        // 2. Direct table fallback
-        const { data, error } = await supabase.from('app_users').select('*').eq('id', userId).single();
-        if (!error && data) {
+        // 4. Direct table fallback
+        const { data } = await supabase.from('app_users').select('*').eq('id', userId).single();
+        if (data) {
           setAppUser(data as AppUser);
           if (data.role) setRole(data.role);
         }
@@ -82,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (currentUser.email === 'admin@svportal.com') {
             setRole('admin');
           }
-          await fetchAppUser(currentUser.id);
+          await fetchAppUser(currentUser.id, currentUser.email);
         } else {
           setRole(null);
           setAppUser(null);
@@ -106,7 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (currentUser.email === 'admin@svportal.com') {
             setRole('admin');
           }
-          await fetchAppUser(currentUser.id);
+          await fetchAppUser(currentUser.id, currentUser.email);
         } else {
           setRole(null);
           setAppUser(null);
