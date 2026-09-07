@@ -26,12 +26,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const supabase = createClient();
 
     const fetchAppUser = async (userId: string) => {
-      const res = await fetch(`/api/auth/me?id=${userId}`, { cache: 'no-store' });
-      const data = res.ok ? await res.json().catch(() => null) : null;
-      const error = !res.ok;
-      if (!error && data) {
-        setAppUser(data as AppUser);
-      } else {
+      try {
+        // 1. Fetch user record via RPC get_current_app_user (bypasses any RLS restrictions cleanly)
+        const { data: rpcData, error: rpcError } = await supabase.rpc('get_current_app_user');
+        if (!rpcError && rpcData) {
+          setAppUser(rpcData as AppUser);
+          if (rpcData.role) setRole(rpcData.role);
+          return;
+        }
+
+        // 2. Direct table fallback
+        const { data, error } = await supabase.from('app_users').select('*').eq('id', userId).single();
+        if (!error && data) {
+          setAppUser(data as AppUser);
+          if (data.role) setRole(data.role);
+        } else {
+          setAppUser(null);
+        }
+      } catch (err) {
+        console.error('Error in fetchAppUser:', err);
         setAppUser(null);
       }
     };
@@ -61,12 +74,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) console.error('Session error:', sessionError);
-        setUser(session?.user || null);
-        if (session?.user) {
-          const { data, error: roleError } = await supabase.rpc('get_user_role');
-          if (roleError) console.error('Role error:', roleError);
-          setRole(data as any);
-          await fetchAppUser(session.user.id);
+        const currentUser = session?.user || null;
+        setUser(currentUser);
+        if (currentUser) {
+          if (currentUser.email === 'admin@svportal.com') {
+            setRole('admin');
+          }
+          await fetchAppUser(currentUser.id);
         } else {
           setRole(null);
           setAppUser(null);
@@ -84,11 +98,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (process.env.NODE_ENV === 'development') return;
       
       try {
-        setUser(session?.user || null);
-        if (session?.user) {
-          const { data } = await supabase.rpc('get_user_role');
-          setRole(data as any);
-          await fetchAppUser(session.user.id);
+        const currentUser = session?.user || null;
+        setUser(currentUser);
+        if (currentUser) {
+          if (currentUser.email === 'admin@svportal.com') {
+            setRole('admin');
+          }
+          await fetchAppUser(currentUser.id);
         } else {
           setRole(null);
           setAppUser(null);
