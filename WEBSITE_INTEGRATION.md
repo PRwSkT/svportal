@@ -1,20 +1,50 @@
-# Website Integration Updates (Aug 2026)
+# Website Integration Specification & Architecture
 
-**Note for Claude / SV-Portal AI Developers:**
+**Note for Claude / SV-Portal AI / Human Developers:**
 
-The website team (Antigravity AI) has implemented an integration between the SV-Portal's "Social Post Assistant" and the static school website. Please be aware of the following changes made to this repository to ensure we stay on the same page and avoid overwriting this functionality:
+The School Website (`somkidvittaya.ac.th`) and SV-Portal (`sv-portal.somkidvittaya.ac.th`) are seamlessly integrated using a **Hybrid Static + Real-time Client Hydration** architecture.
 
-## 1. Database Schema Changes
-- We added an `album_id` column to the `news` table in Supabase (`ALTER TABLE news ADD COLUMN album_id UUID REFERENCES albums(id);`). This allows a single social post to be represented as both a News announcement and a Photo Album on the website.
+---
 
-## 2. New API Route
-- **Added:** `src/app/api/admin/website/sync-post/route.ts`
-- **Purpose:** This endpoint receives `FormData` (headline, caption, and image files) directly from the client. It uploads the images to the `website-content` Supabase Storage bucket.
-- **Logic:** It creates an `albums` entry (and associated `album_photos`) if there are images, and it ALWAYS creates a `news` entry, linking it to the newly created `album_id`.
+## 1. Core Architecture (Hybrid Real-Time + 7-Day Cycle)
 
-## 3. Post Assistant Modifications
-- **Modified:** `public/script.js`
-- **Purpose:** We injected a `syncToWebsite()` function that is called immediately after a successful social media publish (`publishToSocial` / `videoPublishIG`).
-- **Logic:** It captures the `activeFiles` (the raw image/video files selected by the user), the headline (`hl`), and the `fbCaption`, and sends them via POST to `/api/admin/website/sync-post` before showing the final success toast.
+### A. Real-Time Content Sync (Zero Netlify Build Quota Used)
+- When content is posted via **Social Post Assistant** (`public/script.js` -> `/api/admin/website/sync-post`) or managed via **Website CMS** (`/admin/website/*`), it is saved directly into Supabase tables (`news`, `albums`, `album_photos`, `personnel`, `calendar_events`, `documents`) and Supabase Storage (`website-content`).
+- **On the public website (`somkidvittaya.ac.th`):**
+  - When visitors load any page, `src/main.js` automatically queries Supabase REST API in the background using the public Anon Key.
+  - The latest News and Albums are injected/hydrated dynamically into the DOM in real-time.
+  - **No Netlify rebuild is triggered on daily posts**, saving 100% of Netlify build minutes!
 
-**Maintenance Warning:** If you are asked to refactor `public/script.js` or the Social Post Assistant UI, please ensure the `syncToWebsite()` logic remains intact so that the automatic syncing to the school website continues to function correctly.
+### B. Full Site Rebuild (Every 7 Days or on Manual Demand)
+- **Netlify Build Hook:**
+  - URL: `https://api.netlify.com/build_hooks/6a9f6146cf134165e6622bc2`
+  - Saved in `.env.local` as `NETLIFY_BUILD_HOOK_URL`.
+- **Manual Trigger Button:**
+  - Located in SV-Portal Admin Sidebar at `/admin/website` (`[ 🚀 สั่ง Deploy เว็บไซต์จริง ]`).
+  - Calls `manualTriggerDeploy()` in `src/app/admin/website/actions.ts`.
+  - Rebuilds all static HTML, regenerates SEO snapshots, and updates hardcoded static content.
+- **7-Day Scheduled Build:**
+  - Set to trigger every 7 days via Netlify/External Cron to take a full static snapshot.
+
+---
+
+## 2. Key Files & Integration Points in SV-Portal
+
+1. **`src/lib/website-sync.ts`**:
+   - `triggerWebsiteRebuild(reason)`: Dispatches an HTTP POST request to `NETLIFY_BUILD_HOOK_URL`.
+2. **`src/app/admin/website/actions.ts`**:
+   - Contains CRUD Server Actions for CMS (`insertRecord`, `updateRecord`, `deleteRecord`, `manualTriggerDeploy`).
+   - Note: Do NOT add auto-rebuild triggers to `insertRecord`/`updateRecord` because real-time client hydration already handles live updates on the website without burning build minutes.
+3. **`src/app/api/admin/website/sync-post/route.ts`**:
+   - Receives FormData from Post Assistant.
+   - Uploads photos to `website-content` bucket.
+   - Creates records in `albums` (if photos exist) and `news`.
+4. **`public/script.js`**:
+   - `syncToWebsite(hl, fbCaption, activeFiles)`: Captures published social posts for the main school page and syncs to `/api/admin/website/sync-post` with real-time UI toasts.
+
+---
+
+## 3. Maintenance Rules for SV-Portal AI
+- **Do NOT delete or overwrite `syncToWebsite()`** in `public/script.js`.
+- **Do NOT remove `NETLIFY_BUILD_HOOK_URL`** from `.env.local`.
+- School Address in website layouts must always be **"โรงเรียนสมคิดวิทยา อ.เมือง จ.ระยอง"** (Phone: 038-611251).
