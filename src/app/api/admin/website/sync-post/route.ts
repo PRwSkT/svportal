@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireAuth } from '@/lib/auth';
+import { triggerWebsiteRebuild } from '@/lib/website-sync';
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireAuth('admin');
-    if (auth.error) {
-      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    const authHeader = request.headers.get('authorization') || request.headers.get('x-sync-secret');
+    const isSecretValid = process.env.SYNC_SECRET && authHeader?.includes(process.env.SYNC_SECRET);
+
+    if (!isSecretValid) {
+      const auth = await requireAuth('admin');
+      if (auth.error) {
+        return NextResponse.json({ error: auth.error }, { status: auth.status });
+      }
     }
 
     const formData = await request.formData();
@@ -107,7 +113,10 @@ export async function POST(request: Request) {
     
     if (newsError) throw newsError;
 
-    return NextResponse.json({ success: true, news: newsData });
+    // Trigger Netlify automated rebuild so news appears on website in real-time
+    await triggerWebsiteRebuild(`Social Post: ${hl}`);
+
+    return NextResponse.json({ success: true, news: newsData, album_id: albumId });
   } catch (error: any) {
     console.error('Sync post error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -1377,7 +1377,7 @@ async function syncToWebsite(hl, fbCaption, activeFiles) {
     }
     try {
         const btn = document.getElementById('btn-confirm-publish');
-        if(btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> อัปเดตขึ้นเว็บไซต์...';
+        if(btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ซิงค์ขึ้นหน้าเว็บไซต์...';
         
         const formData = new FormData();
         formData.append('hl', hl || 'ข่าวสารใหม่');
@@ -1392,8 +1392,17 @@ async function syncToWebsite(hl, fbCaption, activeFiles) {
             body: formData
         });
         
-        if (!res.ok) {
-            console.warn('Website sync failed with status:', res.status);
+        if (res.ok) {
+            console.log('Website sync succeeded!');
+            if (typeof showToast === 'function') {
+                showToast("ซิงค์ข่าวสารขึ้นหน้าเว็บไซต์โรงเรียนสำเร็จ! 🌐", "success");
+            }
+        } else {
+            const errData = await res.json().catch(() => ({}));
+            console.warn('Website sync failed with status:', res.status, errData);
+            if (typeof showToast === 'function') {
+                showToast("ซิงค์ขึ้นเว็บไม่สำเร็จ: " + (errData.error || 'กรุณาตรวจสอบสิทธิ์ Admin'), "warning");
+            }
         }
     } catch(err) {
         console.error('Website sync error:', err);

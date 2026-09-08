@@ -43,10 +43,10 @@ export default function WebsiteLayout({
       <div className="bg-primary text-white text-xs py-2 px-4 sm:px-8 flex justify-between items-center z-40">
         <div className="flex items-center gap-4 flex-wrap">
           <span className="flex items-center gap-1.5 opacity-90">
-            <MapPin className="w-3.5 h-3.5" /> โรงเรียนสมคิดวิทยา อ.เมือง จ.บุรีรัมย์
+            <MapPin className="w-3.5 h-3.5" /> โรงเรียนสมคิดวิทยา อ.เมือง จ.ระยอง
           </span>
           <span className="hidden sm:flex items-center gap-1.5 opacity-90">
-            <Phone className="w-3.5 h-3.5" /> 044-611222
+            <Phone className="w-3.5 h-3.5" /> 038-611251
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -204,7 +204,7 @@ export default function WebsiteLayout({
                 </li>
                 <li className="flex items-center gap-2">
                   <Phone className="w-4 h-4 text-primary shrink-0" />
-                  <span>044-611222</span>
+                  <span>038-611251</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <Mail className="w-4 h-4 text-primary shrink-0" />
