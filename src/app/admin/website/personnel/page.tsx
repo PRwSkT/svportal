@@ -5,6 +5,7 @@ import { Personnel } from '@/types';
 import { createClient } from '@/lib/supabase/client';
 import { insertRecord, updateRecord, deleteRecord } from '@/app/admin/website/actions';
 import { uploadWebsiteFile } from '@/lib/supabase/storage';
+import { compressImage } from '@/lib/image-compression';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users, UserPlus, X, Check, Search, Upload, Loader2, Edit, Trash2 } from 'lucide-react';
@@ -65,16 +66,26 @@ export default function PersonnelManager() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showModal]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error('ไฟล์มีขนาดเกิน 10MB กรุณาเลือกไฟล์ที่มีขนาดไม่เกิน 10MB');
+      if (file.size > 30 * 1024 * 1024) {
+        toast.error('ไฟล์มีขนาดเกิน 30MB กรุณาเลือกไฟล์ที่มีขนาดไม่เกิน 30MB');
         e.target.value = '';
         return;
       }
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
+
+      const toastId = file.size > 2 * 1024 * 1024 ? toast.loading('กำลังปรับขนาดและปรับปรุงความคมชัดรูปภาพ...') : undefined;
+      try {
+        const optimizedFile = await compressImage(file);
+        setSelectedFile(optimizedFile);
+        setPreviewUrl(URL.createObjectURL(optimizedFile));
+        if (toastId) toast.dismiss(toastId);
+      } catch {
+        setSelectedFile(file);
+        setPreviewUrl(URL.createObjectURL(file));
+        if (toastId) toast.dismiss(toastId);
+      }
     }
   };
 

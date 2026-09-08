@@ -54,8 +54,8 @@ export default function DocumentsManager() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error('ไฟล์มีขนาดเกิน 10MB กรุณาเลือกไฟล์ที่มีขนาดไม่เกิน 10MB');
+      if (file.size > 25 * 1024 * 1024) {
+        toast.error('ไฟล์มีขนาดเกิน 25MB กรุณาเลือกไฟล์ที่มีขนาดไม่เกิน 25MB');
         e.target.value = '';
         return;
       }

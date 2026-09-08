@@ -5,6 +5,7 @@ import { Album, AlbumPhoto } from '@/types';
 import { createClient } from '@/lib/supabase/client';
 import { insertRecord, updateRecord, deleteRecord } from '@/app/admin/website/actions';
 import { uploadWebsiteFile } from '@/lib/supabase/storage';
+import { compressImage } from '@/lib/image-compression';
 import { toast } from 'sonner';
 import { ArrowLeft, Upload, Loader2, Trash2 } from 'lucide-react';
 import Image from 'next/image';
@@ -65,7 +66,8 @@ export default function AlbumPhotosManager({ params }: { params: Promise<{ id: s
     for (let i = 0; i < files.length; i++) {
       try {
         const file = files[i];
-        const imageUrl = await uploadWebsiteFile(file, `albums/${id}`);
+        const optimizedFile = await compressImage(file);
+        const imageUrl = await uploadWebsiteFile(optimizedFile, `albums/${id}`);
         
         const payload = {
           album_id: id,
