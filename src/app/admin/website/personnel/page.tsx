@@ -112,12 +112,12 @@ export default function PersonnelManager() {
       };
 
       if (editingId) {
-        await updateRecord('personnel', editingId, payload);
-        
+        const res = await updateRecord('personnel', editingId, payload);
+        if (!res.success) throw new Error(res.error || 'ไม่สามารถอัปเดตข้อมูลได้');
         toast.success('อัปเดตข้อมูลสำเร็จ', { id: loadingToast });
       } else {
-        await insertRecord('personnel', payload);
-        
+        const res = await insertRecord('personnel', payload);
+        if (!res.success) throw new Error(res.error || 'ไม่สามารถเพิ่มบุคลากรได้');
         toast.success('เพิ่มบุคลากรสำเร็จ', { id: loadingToast });
       }
 
@@ -136,8 +136,8 @@ export default function PersonnelManager() {
     
     const loadingToast = toast.loading('กำลังลบข้อมูล...');
     try {
-      await deleteRecord('personnel', id);
-      
+      const res = await deleteRecord('personnel', id);
+      if (!res.success) throw new Error(res.error || 'ไม่สามารถลบข้อมูลได้');
       toast.success('ลบข้อมูลสำเร็จ', { id: loadingToast });
       loadPersonnel();
     } catch (err: any) {
@@ -148,8 +148,8 @@ export default function PersonnelManager() {
   const handleToggleActive = async (id: string, currentStatus: boolean) => {
     const loadingToast = toast.loading('กำลังอัปเดตสถานะ...');
     try {
-      await updateRecord('personnel', id, { is_active: !currentStatus });
-      
+      const res = await updateRecord('personnel', id, { is_active: !currentStatus });
+      if (!res.success) throw new Error(res.error || 'ไม่สามารถเปลี่ยนสถานะได้');
       toast.success('อัปเดตสถานะสำเร็จ', { id: loadingToast });
       loadPersonnel();
     } catch (err: any) {

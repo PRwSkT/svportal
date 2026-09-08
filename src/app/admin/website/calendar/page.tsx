@@ -62,12 +62,12 @@ export default function CalendarManager() {
       };
 
       if (editingId) {
-        await updateRecord('calendar_events', editingId, payload);
-        
+        const res = await updateRecord('calendar_events', editingId, payload);
+        if (!res.success) throw new Error(res.error || 'ไม่สามารถอัปเดตกิจกรรมได้');
         toast.success('อัปเดตกิจกรรมสำเร็จ', { id: loadingToast });
       } else {
-        await insertRecord('calendar_events', payload);
-        
+        const res = await insertRecord('calendar_events', payload);
+        if (!res.success) throw new Error(res.error || 'ไม่สามารถเพิ่มกิจกรรมได้');
         toast.success('เพิ่มกิจกรรมสำเร็จ', { id: loadingToast });
       }
 
@@ -85,8 +85,8 @@ export default function CalendarManager() {
     if (!confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบกิจกรรม "${title}"?`)) return;
     const loadingToast = toast.loading('กำลังลบข้อมูล...');
     try {
-      await deleteRecord('calendar_events', id);
-      
+      const res = await deleteRecord('calendar_events', id);
+      if (!res.success) throw new Error(res.error || 'ไม่สามารถลบกิจกรรมได้');
       toast.success('ลบข้อมูลสำเร็จ', { id: loadingToast });
       loadEvents();
     } catch (err: any) {

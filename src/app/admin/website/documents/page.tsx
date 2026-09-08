@@ -84,12 +84,12 @@ export default function DocumentsManager() {
       }
 
       if (editingId) {
-        await updateRecord('documents', editingId, payload);
-        
+        const res = await updateRecord('documents', editingId, payload);
+        if (!res.success) throw new Error(res.error || 'ไม่สามารถอัปเดตเอกสารได้');
         toast.success('อัปเดตเอกสารสำเร็จ', { id: loadingToast });
       } else {
-        await insertRecord('documents', payload);
-        
+        const res = await insertRecord('documents', payload);
+        if (!res.success) throw new Error(res.error || 'ไม่สามารถเพิ่มเอกสารได้');
         toast.success('เพิ่มเอกสารสำเร็จ', { id: loadingToast });
       }
 
@@ -107,8 +107,8 @@ export default function DocumentsManager() {
     if (!confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบเอกสาร "${title}"?`)) return;
     const loadingToast = toast.loading('กำลังลบข้อมูล...');
     try {
-      await deleteRecord('documents', id);
-      
+      const res = await deleteRecord('documents', id);
+      if (!res.success) throw new Error(res.error || 'ไม่สามารถลบเอกสารได้');
       toast.success('ลบข้อมูลสำเร็จ', { id: loadingToast });
       loadDocuments();
     } catch (err: any) {

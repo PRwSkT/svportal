@@ -97,12 +97,12 @@ export default function AlbumsManager() {
       };
 
       if (editingId) {
-        await updateRecord('albums', editingId, payload);
-        
+        const res = await updateRecord('albums', editingId, payload);
+        if (!res.success) throw new Error(res.error || 'ไม่สามารถอัปเดตอัลบั้มได้');
         toast.success('อัปเดตอัลบั้มสำเร็จ', { id: loadingToast });
       } else {
-        await insertRecord('albums', payload);
-        
+        const res = await insertRecord('albums', payload);
+        if (!res.success) throw new Error(res.error || 'ไม่สามารถสร้างอัลบั้มได้');
         toast.success('สร้างอัลบั้มใหม่สำเร็จ', { id: loadingToast });
       }
 
@@ -122,8 +122,8 @@ export default function AlbumsManager() {
     try {
       // Supabase cascade delete should handle album_photos if foreign key is set up.
       // If not, we might need to delete photos first. Assuming cascade is on.
-      await deleteRecord('albums', id);
-      
+      const res = await deleteRecord('albums', id);
+      if (!res.success) throw new Error(res.error || 'ไม่สามารถลบอัลบั้มได้');
       toast.success('ลบอัลบั้มสำเร็จ', { id: loadingToast });
       loadAlbums();
     } catch (err: any) {

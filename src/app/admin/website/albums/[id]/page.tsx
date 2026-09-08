@@ -75,7 +75,8 @@ export default function AlbumPhotosManager({ params }: { params: Promise<{ id: s
           sort_order: photos.length + i,
         };
         
-        await insertRecord('album_photos', payload);
+        const res = await insertRecord('album_photos', payload);
+        if (!res.success) throw new Error(res.error || 'บันทึกรูปภาพล้มเหลว');
         successCount++;
       } catch (err) {
         console.error('Upload error:', err);
@@ -96,7 +97,8 @@ export default function AlbumPhotosManager({ params }: { params: Promise<{ id: s
     
     const loadingToast = toast.loading('กำลังลบรูปภาพ...');
     try {
-      await deleteRecord('album_photos', photoId);
+      const res = await deleteRecord('album_photos', photoId);
+      if (!res.success) throw new Error(res.error || 'ไม่สามารถลบรูปภาพได้');
       
       toast.success('ลบรูปภาพสำเร็จ', { id: loadingToast });
       loadData();

@@ -97,12 +97,12 @@ export default function NewsManager() {
       };
 
       if (editingId) {
-        await updateRecord('news', editingId, payload);
-        
+        const res = await updateRecord('news', editingId, payload);
+        if (!res.success) throw new Error(res.error || 'ไม่สามารถอัปเดตข่าวสารได้');
         toast.success('อัปเดตข่าวสารสำเร็จ', { id: loadingToast });
       } else {
-        await insertRecord('news', payload);
-        
+        const res = await insertRecord('news', payload);
+        if (!res.success) throw new Error(res.error || 'ไม่สามารถเพิ่มข่าวสารได้');
         toast.success('เพิ่มข่าวสารสำเร็จ', { id: loadingToast });
       }
 
@@ -120,8 +120,8 @@ export default function NewsManager() {
     if (!confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบข่าว "${title}"?`)) return;
     const loadingToast = toast.loading('กำลังลบข้อมูล...');
     try {
-      await deleteRecord('news', id);
-      
+      const res = await deleteRecord('news', id);
+      if (!res.success) throw new Error(res.error || 'ไม่สามารถลบข่าวสารได้');
       toast.success('ลบข้อมูลสำเร็จ', { id: loadingToast });
       loadNews();
     } catch (err: any) {
