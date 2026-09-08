@@ -113,8 +113,7 @@ export async function POST(request: Request) {
     
     if (newsError) throw newsError;
 
-    // Trigger Netlify automated rebuild so news appears on website in real-time
-    await triggerWebsiteRebuild(`Social Post: ${hl}`);
+    // Saved to Supabase. Live website reflects news/albums immediately via client-side hydration.
 
     return NextResponse.json({ success: true, news: newsData, album_id: albumId });
   } catch (error: any) {

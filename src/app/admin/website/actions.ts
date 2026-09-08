@@ -25,7 +25,6 @@ export async function insertRecord(table: string, payload: any) {
   const supabase = getAdminClient();
   const { data, error } = await supabase.from(table).insert([payload]).select();
   if (error) throw new Error(error.message);
-  await triggerWebsiteRebuild(`${table} inserted`);
   return data;
 }
 
@@ -34,7 +33,6 @@ export async function updateRecord(table: string, id: string, payload: any) {
   const supabase = getAdminClient();
   const { data, error } = await supabase.from(table).update(payload).eq('id', id).select();
   if (error) throw new Error(error.message);
-  await triggerWebsiteRebuild(`${table} updated`);
   return data;
 }
 
@@ -43,7 +41,6 @@ export async function deleteRecord(table: string, id: string) {
   const supabase = getAdminClient();
   const { data, error } = await supabase.from(table).delete().eq('id', id).select();
   if (error) throw new Error(error.message);
-  await triggerWebsiteRebuild(`${table} deleted`);
   return data;
 }
 
@@ -52,6 +49,15 @@ export async function toggleActive(table: string, id: string, currentStatus: boo
   const supabase = getAdminClient();
   const { data, error } = await supabase.from(table).update({ is_active: !currentStatus }).eq('id', id).select();
   if (error) throw new Error(error.message);
-  await triggerWebsiteRebuild(`${table} status toggled`);
   return data;
+}
+
+/**
+ * Explicit manual deploy trigger initiated by school admin.
+ * Rebuilds the entire static website on Netlify with the latest Supabase content.
+ */
+export async function manualTriggerDeploy() {
+  await verifyAdmin();
+  const success = await triggerWebsiteRebuild('Manual trigger by Admin in SVPortal');
+  return { success };
 }

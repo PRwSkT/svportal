@@ -1,12 +1,16 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Users, FileText, Image as ImageIcon, Calendar, FileBox, LayoutDashboard } from 'lucide-react';
+import { Users, FileText, Image as ImageIcon, Calendar, FileBox, LayoutDashboard, Rocket, Loader2 } from 'lucide-react';
+import { manualTriggerDeploy } from '@/app/admin/website/actions';
+import { toast } from 'sonner';
 
 export default function WebsiteAdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [isDeploying, setIsDeploying] = useState(false);
 
   const navItems = [
     { href: '/admin/website/personnel', label: 'บุคลากร', icon: Users },
@@ -15,6 +19,23 @@ export default function WebsiteAdminLayout({ children }: { children: React.React
     { href: '/admin/website/calendar', label: 'ปฏิทิน', icon: Calendar },
     { href: '/admin/website/documents', label: 'เอกสารดาวน์โหลด', icon: FileBox },
   ];
+
+  const handleManualDeploy = async () => {
+    setIsDeploying(true);
+    const toastId = toast.loading('กำลังส่งสัญญาณสั่ง Deploy ไปยัง Netlify...');
+    try {
+      const res = await manualTriggerDeploy();
+      if (res.success) {
+        toast.success('สั่ง Deploy สำเร็จ! 🚀 เว็บไซต์จะอัปเดตเวอร์ชันเต็มภายใน 1-2 นาที', { id: toastId });
+      } else {
+        toast.info('บันทึกคำขอ Deploy แล้ว (หากยังไม่ได้ใส่ NETLIFY_BUILD_HOOK_URL ใน .env ข้อมูลยังแสดงบนเว็บแบบเรียลไทม์ได้ตามปกติ)', { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error('ไม่สามารถสั่ง Deploy ได้', { id: toastId, description: err.message });
+    } finally {
+      setIsDeploying(false);
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 font-sans">
@@ -64,6 +85,32 @@ export default function WebsiteAdminLayout({ children }: { children: React.React
                 );
               })}
             </nav>
+
+            {/* Manual Deploy Section */}
+            <div className="mt-5 pt-4 border-t border-foreground/10">
+              <button
+                type="button"
+                onClick={handleManualDeploy}
+                disabled={isDeploying}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl text-xs font-bold text-white bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all disabled:opacity-50"
+              >
+                {isDeploying ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>กำลังสั่ง Deploy...</span>
+                  </>
+                ) : (
+                  <>
+                    <Rocket className="w-3.5 h-3.5" />
+                    <span>สั่ง Deploy เว็บไซต์จริง</span>
+                  </>
+                )}
+              </button>
+              <p className="text-[11px] text-foreground/50 text-center mt-1.5 leading-tight">
+                *ข่าวสารและอัลบั้มอัปเดตแบบเรียลไทม์ และระบบจะ Rebuild อัตโนมัติทุก 7 วัน
+              </p>
+            </div>
+
           </div>
         </div>
 
