@@ -57,6 +57,7 @@ export async function POST(request: Request) {
 
         return {
           id: student.id,
+          name: student.name,
           grade: newGrade,
           status: newStatus,
           updated_at: new Date().toISOString(),

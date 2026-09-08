@@ -14,7 +14,8 @@ export async function getDailySummary(dateStr: string): Promise<DailySummary> {
     .from('tuition_payments')
     .select('total_amount')
     .gte('created_at', startOfDay)
-    .lte('created_at', endOfDay);
+    .lte('created_at', endOfDay)
+    .limit(5000);
     
   const tuitionAmount = (tuitionData || []).reduce((sum: number, row: any) => sum + Number(row.total_amount || 0), 0);
   const tuitionCount = (tuitionData || []).length;
@@ -24,7 +25,8 @@ export async function getDailySummary(dateStr: string): Promise<DailySummary> {
     .from('shop_transactions')
     .select('total_amount, payment_method')
     .gte('created_at', startOfDay)
-    .lte('created_at', endOfDay);
+    .lte('created_at', endOfDay)
+    .limit(5000);
     
   const shopAmount = (shopData || []).reduce((sum: number, row: any) => sum + Number(row.total_amount || 0), 0);
   const shopCashAmount = (shopData || [])
@@ -32,13 +34,15 @@ export async function getDailySummary(dateStr: string): Promise<DailySummary> {
     .reduce((sum: number, row: any) => sum + Number(row.total_amount || 0), 0);
   const shopCount = (shopData || []).length;
 
-  // 3. Get wallet topups
+  // 3. Get wallet topups (exclude system corrections)
   const { data: topupData } = await supabase
     .from('wallet_transactions')
-    .select('amount')
+    .select('amount, channel')
     .eq('type', 'topup')
+    .neq('channel', 'system')
     .gte('created_at', startOfDay)
-    .lte('created_at', endOfDay);
+    .lte('created_at', endOfDay)
+    .limit(5000);
     
   const topupAmount = (topupData || []).reduce((sum: number, row: any) => sum + Number(row.amount || 0), 0);
   const topupCount = (topupData || []).length;

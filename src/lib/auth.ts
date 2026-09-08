@@ -1,4 +1,5 @@
 import { createClient } from './supabase/server';
+import { isSystemAdmin } from './constants/auth';
 
 export async function getServerUser() {
   const supabase = await createClient();
@@ -20,12 +21,9 @@ export async function requireAuth(requiredRole?: 'admin' | 'cashier') {
     return { error: 'Unauthorized', status: 401 };
   }
 
-  // Hardcode fallback for admin
-  if (user.email === 'admin@svportal.com') {
-    if (requiredRole && requiredRole !== 'admin') {
-      // Actually admin can do everything
-    }
-    return { user, role: 'admin', error: null };
+  // Fallback for system administrators
+  if (isSystemAdmin(user.email)) {
+    return { user, role: 'admin' as const, error: null };
   }
 
   const role = await getUserRole();

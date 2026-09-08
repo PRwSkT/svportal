@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, Wallet, ShoppingBag, GraduationCap, TrendingUp, Clock, RefreshCw, AlertTriangle, CheckCircle2, Server, Globe, FileText, Image as ImageIcon, Users } from 'lucide-react';
+import { LayoutDashboard, Wallet, ShoppingBag, GraduationCap, TrendingUp, Clock, RefreshCw, AlertTriangle, CheckCircle2, Server, Globe, FileText, Image as ImageIcon, Users, Calendar } from 'lucide-react';
 
 const formatTHB = (amount: number) => {
   return new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount || 0);
@@ -12,11 +12,12 @@ export default function DashboardView({ initialData, thaiDate, localISOTime }: {
   const [data, setData] = useState(initialData);
   const [lastUpdated, setLastUpdated] = useState<string>(new Date().toLocaleTimeString('th-TH'));
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>(localISOTime);
 
-  const fetchData = async () => {
+  const fetchData = async (targetDate = selectedDate) => {
     setIsRefreshing(true);
     try {
-      const res = await fetch(`/api/admin/dashboard?date=${localISOTime}`);
+      const res = await fetch(`/api/admin/dashboard?date=${targetDate}`);
       if (res.ok) {
         const newData = await res.json();
         setData(newData);
@@ -30,9 +31,23 @@ export default function DashboardView({ initialData, thaiDate, localISOTime }: {
   };
 
   useEffect(() => {
-    const interval = setInterval(fetchData, 15000);
+    fetchData(selectedDate);
+    const interval = setInterval(() => fetchData(selectedDate), 15000);
     return () => clearInterval(interval);
-  }, [localISOTime]);
+  }, [selectedDate]);
+
+  const currentThaiDate = (() => {
+    try {
+      return new Intl.DateTimeFormat('th-TH', { 
+        timeZone: 'Asia/Bangkok',
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      }).format(new Date(selectedDate + 'T00:00:00+07:00'));
+    } catch {
+      return thaiDate;
+    }
+  })();
 
   const summary = data?.summary || {
     total_received: 0,
@@ -63,26 +78,69 @@ export default function DashboardView({ initialData, thaiDate, localISOTime }: {
       animate={{ opacity: 1, y: 0 }}
       className="p-8 max-w-7xl mx-auto space-y-8 font-sans"
     >
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-surface backdrop-blur-xl p-6 rounded-3xl shadow-lg border border-white/60">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 bg-surface backdrop-blur-xl p-6 rounded-3xl shadow-lg border border-white/60">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
             <LayoutDashboard className="w-8 h-8" />
           </div>
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-primary mb-1">แดชบอร์ดสรุปยอด</h1>
-            <p className="text-foreground/60 font-medium">ข้อมูล ณ วันที่ {thaiDate}</p>
+            <p className="text-foreground/60 font-medium">ข้อมูล ณ วันที่ {currentThaiDate}</p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Date Picker */}
+          <div className="flex items-center gap-2 bg-background px-3 py-2 rounded-xl border border-foreground/10 shadow-sm">
+            <Calendar className="w-4 h-4 text-primary shrink-0" />
+            <input 
+              type="date" 
+              value={selectedDate} 
+              onChange={(e) => {
+                if (e.target.value) setSelectedDate(e.target.value);
+              }}
+              className="bg-transparent text-sm font-bold text-foreground outline-none cursor-pointer" 
+            />
+          </div>
+
+          {/* Quick presets */}
+          <div className="flex items-center gap-1.5 bg-foreground/5 p-1 rounded-xl">
+            <button
+              onClick={() => setSelectedDate(localISOTime)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                selectedDate === localISOTime 
+                  ? 'bg-primary text-white shadow-sm' 
+                  : 'text-foreground/60 hover:text-foreground'
+              }`}
+            >
+              วันนี้
+            </button>
+            <button
+              onClick={() => {
+                const d = new Date();
+                d.setDate(d.getDate() - 1);
+                const yesterday = new Intl.DateTimeFormat('en-CA', {
+                  timeZone: 'Asia/Bangkok',
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                }).format(d);
+                setSelectedDate(yesterday);
+              }}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold text-foreground/60 hover:text-foreground transition-all"
+            >
+              เมื่อวาน
+            </button>
+          </div>
+
           <button 
-            onClick={fetchData} 
+            onClick={() => fetchData(selectedDate)} 
             disabled={isRefreshing}
             className="flex items-center gap-2 text-sm font-bold text-primary bg-primary/10 hover:bg-primary/20 px-4 py-2 rounded-xl transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             รีเฟรช
           </button>
-          <div className="flex items-center gap-2 text-sm font-bold text-foreground/50 bg-background px-4 py-2 rounded-xl border border-foreground/10">
+          <div className="hidden sm:flex items-center gap-2 text-sm font-bold text-foreground/50 bg-background px-4 py-2 rounded-xl border border-foreground/10">
             <Clock className="w-4 h-4" /> อัปเดตล่าสุด: {lastUpdated}
           </div>
         </div>

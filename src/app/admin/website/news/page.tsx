@@ -45,9 +45,24 @@ export default function NewsManager() {
 
   useEffect(() => { loadNews(); }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showModal) {
+        setShowModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showModal]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('ไฟล์มีขนาดเกิน 10MB กรุณาเลือกไฟล์ที่มีขนาดเล็กกว่านี้');
+        e.target.value = '';
+        return;
+      }
       setSelectedFile(file);
       setPreviewUrl(URL.createObjectURL(file));
     }
@@ -145,59 +160,61 @@ export default function NewsManager() {
             <Loader2 className="w-8 h-8 animate-spin text-primary/40" />
           </div>
         ) : (
-          <table className="w-full text-left">
-            <thead className="bg-foreground/[0.02] border-b border-foreground/5">
-              <tr>
-                <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider w-24">รูปปก</th>
-                <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">หัวข้อข่าว</th>
-                <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">วันที่สร้าง</th>
-                <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">สถานะ</th>
-                <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider text-right">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-foreground/5">
-              {news.map(n => (
-                <tr key={n.id} className="hover:bg-foreground/[0.02] transition-colors">
-                  <td className="p-4">
-                    <div className="w-16 h-12 rounded-lg bg-foreground/5 overflow-hidden relative border border-foreground/10">
-                      {n.cover_image_url ? (
-                        <Image src={n.cover_image_url} alt={n.title_th} fill className="object-cover" unoptimized />
-                      ) : (
-                        <FileText className="w-5 h-5 text-foreground/20 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                      )}
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <p className="font-bold text-foreground/80 text-sm line-clamp-1">{n.title_th}</p>
-                    <p className="text-xs text-foreground/50 mt-0.5 line-clamp-1">{(n.content_th || '').substring(0, 50)}...</p>
-                  </td>
-                  <td className="p-4 text-xs text-foreground/60">
-                    {new Date(n.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}
-                  </td>
-                  <td className="p-4">
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold ${
-                      n.is_published ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {n.is_published ? 'เผยแพร่แล้ว' : 'ฉบับร่าง'}
-                    </span>
-                  </td>
-                  <td className="p-4 text-right space-x-2">
-                    <button onClick={() => openEditModal(n)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => handleDelete(n.id, n.title_th)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {news.length === 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left min-w-[640px]">
+              <thead className="bg-foreground/[0.02] border-b border-foreground/5">
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-foreground/40 text-sm">ไม่พบข้อมูลข่าวสาร</td>
+                  <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider w-24">รูปปก</th>
+                  <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">หัวข้อข่าว</th>
+                  <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">วันที่สร้าง</th>
+                  <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">สถานะ</th>
+                  <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider text-right">จัดการ</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-foreground/5">
+                {news.map(n => (
+                  <tr key={n.id} className="hover:bg-foreground/[0.02] transition-colors">
+                    <td className="p-4">
+                      <div className="w-16 h-12 rounded-lg bg-foreground/5 overflow-hidden relative border border-foreground/10">
+                        {n.cover_image_url ? (
+                          <Image src={n.cover_image_url} alt={n.title_th} fill className="object-cover" unoptimized />
+                        ) : (
+                          <FileText className="w-5 h-5 text-foreground/20 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <p className="font-bold text-foreground/80 text-sm line-clamp-1">{n.title_th}</p>
+                      <p className="text-xs text-foreground/50 mt-0.5 line-clamp-1">{(n.content_th || '').substring(0, 50)}...</p>
+                    </td>
+                    <td className="p-4 text-xs text-foreground/60">
+                      {new Date(n.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}
+                    </td>
+                    <td className="p-4">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold ${
+                        n.is_published ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {n.is_published ? 'เผยแพร่แล้ว' : 'ฉบับร่าง'}
+                      </span>
+                    </td>
+                    <td className="p-4 text-right space-x-2">
+                      <button onClick={() => openEditModal(n)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleDelete(n.id, n.title_th)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {news.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-foreground/40 text-sm">ไม่พบข้อมูลข่าวสาร</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -205,11 +222,13 @@ export default function NewsManager() {
         {showModal && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}
+            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto cursor-pointer"
           >
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-surface w-full max-w-4xl rounded-3xl shadow-2xl border border-foreground/10 overflow-hidden my-8"
+              onClick={(e) => e.stopPropagation()}
+              className="bg-surface w-full max-w-4xl rounded-3xl shadow-2xl border border-foreground/10 overflow-hidden my-8 cursor-default"
             >
               <div className="p-5 border-b border-foreground/5 flex justify-between items-center bg-foreground/[0.02] sticky top-0 z-10">
                 <h2 className="text-lg font-extrabold text-foreground">{editingId ? 'แก้ไขข่าวสาร' : 'สร้างข่าวสารใหม่'}</h2>
@@ -240,7 +259,7 @@ export default function NewsManager() {
                     <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
                       <div>
                         <label className="block text-xs font-bold text-foreground/70 mb-1">หัวข้อข่าว (ภาษาไทย) *</label>

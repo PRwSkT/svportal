@@ -12,7 +12,7 @@ export function AppNav() {
   const { user, role, isLoading, signOut } = useAuth();
 
   if (isLoading || !user) return null;
-  if (pathname === '/login') return null;
+  if (pathname === '/login' || pathname.startsWith('/website')) return null;
 
   const cashierLinks = [
     { href: '/pos/shop', label: 'POS ร้านค้า' },
@@ -46,8 +46,8 @@ export function AppNav() {
   return (
     <nav className="bg-surface/80 backdrop-blur-md border-b border-foreground/5 shadow-sm sticky top-0 z-50 print:hidden transition-all">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex items-center">
+        <div className="flex justify-between items-center h-16">
+          <div className="flex items-center min-w-0 flex-1 overflow-hidden">
             <Link href="/home" className="flex-shrink-0 flex items-center gap-3 mr-4 group">
               <Image src="/logo2.png" alt="School Logo" width={320} height={180} className="h-10 w-auto drop-shadow-md group-hover:scale-105 transition-transform object-contain" />
               <Image src="/SV-Portal.png" alt="SVPortal" width={120} height={34} className="h-8 w-auto hidden sm:block drop-shadow-sm group-hover:opacity-90 transition-opacity" />
@@ -72,8 +72,8 @@ export function AppNav() {
               })}
             </div>
           </div>
-          <div className="flex items-center ml-auto pl-4">
-            <div className="flex items-center space-x-3 sm:space-x-4">
+          <div className="flex items-center ml-auto pl-4 flex-shrink-0">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <span className="text-sm text-foreground/80 hidden sm:inline-block">
                 {user.email} 
               </span>
@@ -82,7 +82,7 @@ export function AppNav() {
               </span>
               <button
                 onClick={signOut}
-                className="text-sm font-semibold text-secondary hover:text-secondary/80 px-2 py-1 rounded-lg hover:bg-secondary/10 transition-colors"
+                className="text-sm font-semibold text-secondary hover:text-secondary/80 px-3 py-2 min-h-[44px] rounded-lg hover:bg-secondary/10 transition-colors flex items-center justify-center"
               >
                 ออกจากระบบ
               </button>

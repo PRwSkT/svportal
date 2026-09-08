@@ -10,10 +10,12 @@ export async function getStudents(
   let query = supabase
     .from('students')
     .select('*, student_addresses(*), student_parents(*)')
-    .order('id', { ascending: true });
+    .order('id', { ascending: true })
+    .limit(5000);
 
   if (searchQuery) {
-    query = query.or(`id.ilike.%${searchQuery}%,name.ilike.%${searchQuery}%`);
+    const sanitized = searchQuery.replace(/[,()"]/g, '');
+    query = query.or(`id.ilike.%${sanitized}%,name.ilike.%${sanitized}%`);
   }
   if (statusFilter && statusFilter !== 'all') {
     query = query.eq('status', statusFilter);

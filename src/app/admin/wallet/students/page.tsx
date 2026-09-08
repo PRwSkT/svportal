@@ -309,13 +309,21 @@ export default function AdminWalletStudentsPage() {
       {/* Slide-in Panel */}
       <AnimatePresence>
         {selectedAccount && (
-          <motion.div 
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed right-0 top-0 bottom-0 w-[480px] bg-surface shadow-2xl border-l border-foreground/10 flex flex-col z-50"
-          >
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={closePanel}
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+            />
+            <motion.div 
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed right-0 top-0 bottom-0 w-full sm:max-w-[480px] bg-surface shadow-2xl border-l border-foreground/10 flex flex-col z-50"
+            >
             {/* Panel Header */}
             <div className="p-6 border-b border-foreground/5 flex justify-between items-center bg-foreground/[0.02]">
               <div>
@@ -505,7 +513,8 @@ export default function AdminWalletStudentsPage() {
               </div>
             </div>
           </motion.div>
-        )}
+        </>
+      )}
       </AnimatePresence>
     </div>
   );

@@ -82,14 +82,16 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // Bypass auth for the root page (welcome menu), post-assistant, auth callbacks, and any public html files except audio-remote
+  // Bypass auth for the root page (welcome menu), public website, webhooks/cron, auth callbacks
   if (
     request.nextUrl.pathname === '/' ||
+    request.nextUrl.pathname.startsWith('/website') ||
     request.nextUrl.pathname.startsWith('/auth') ||
     request.nextUrl.pathname.startsWith('/api/auth/logout') ||
+    request.nextUrl.pathname.startsWith('/api/cron') ||
+    request.nextUrl.pathname.startsWith('/api/webhook') ||
     (request.nextUrl.pathname.endsWith('.html') && !request.nextUrl.pathname.includes('audio-remote.html')) ||
     request.nextUrl.pathname.includes('post-assistant') ||
-    request.nextUrl.pathname === '/api/admin/website/sync-post' ||
     request.nextUrl.pathname.startsWith('/qr-generator')
   ) {
     return response;
@@ -111,7 +113,7 @@ export async function proxy(request: NextRequest) {
   if (
     request.nextUrl.pathname.startsWith('/admin') ||
     request.nextUrl.pathname === '/dashboard' ||
-    (request.nextUrl.pathname.startsWith('/api/admin') && request.nextUrl.pathname !== '/api/admin/website/sync-post')
+    request.nextUrl.pathname.startsWith('/api/admin')
   ) {
     let { data: role, error } = await supabase.rpc('get_user_role');
     

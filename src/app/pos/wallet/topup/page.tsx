@@ -85,6 +85,10 @@ export default function TopupPage() {
       const res = await fetch(`/api/pos/wallet?card_uid=${encodeURIComponent(uid)}`);
       if (res.ok) {
         const { wallet, today_spend, student_name } = await res.json();
+        if (!wallet.is_active) {
+          toast.error('Wallet ถูกระงับการใช้งาน', { id: loadingToast });
+          return;
+        }
         await loadStudentInfo(wallet, student_name, today_spend, loadingToast);
       } else {
         toast.error('ไม่พบบัตรในระบบ', { id: loadingToast, description: 'กรุณาลองกรอกรหัสนักเรียนด้วยตนเอง' });
@@ -134,7 +138,10 @@ export default function TopupPage() {
     }
   }
 
+  const isSubmittingRef = useRef(false);
+
   async function handleConfirmTopup() {
+    if (isSubmittingRef.current) return;
     if (!wallet) return;
     const topupAmount = parseFloat(amount);
     if (isNaN(topupAmount) || topupAmount < 20) {
@@ -142,6 +149,7 @@ export default function TopupPage() {
       return;
     }
 
+    isSubmittingRef.current = true;
     setProcessing(true);
     const loadingToast = toast.loading('กำลังประมวลผลการเติมเงิน...');
     try {
@@ -166,6 +174,7 @@ export default function TopupPage() {
       toast.error('เติมเงินไม่สำเร็จ', { id: loadingToast, description: e.message });
     } finally {
       setProcessing(false);
+      isSubmittingRef.current = false;
     }
   }
 
@@ -180,7 +189,7 @@ export default function TopupPage() {
     setCountdown(5);
   }
 
-  const quickAmounts = [50, 100, 200, 500];
+  const quickAmounts = [20, 50, 100, 200, 500];
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden font-sans relative">

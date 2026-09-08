@@ -69,7 +69,7 @@ export const ReceiptPrint = forwardRef<HTMLDivElement, ReceiptPrintProps>(
           {items.map((item, idx) => (
             <div key={item.id || idx} className="flex justify-between items-start mb-1 text-xs">
               <span className="flex-1 pr-2">{item.fee_type?.name || 'ค่าธรรมเนียม'}</span>
-              <span>{item.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+              <span>{Number(item.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
             </div>
           ))}
         </div>
@@ -79,7 +79,7 @@ export const ReceiptPrint = forwardRef<HTMLDivElement, ReceiptPrintProps>(
         <div className="mb-4">
           <div className="flex justify-between font-bold text-base">
             <span>รวม:</span>
-            <span>{totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} บาท</span>
+            <span>{Number(totalAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} บาท</span>
           </div>
           <div className="flex justify-between text-sm mt-1">
             <span>วิธีชำระ:</span>

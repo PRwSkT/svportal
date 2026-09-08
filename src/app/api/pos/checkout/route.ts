@@ -9,7 +9,26 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { cart, paymentMethod, studentId } = body;
-    const totalAmount = cart.reduce((sum: number, item: any) => sum + item.subtotal, 0);
+
+    if (!cart || !Array.isArray(cart) || cart.length === 0) {
+      return NextResponse.json({ error: 'ตะกร้าสินค้าว่างเปล่า' }, { status: 400 });
+    }
+
+    if (!['cash', 'wallet'].includes(paymentMethod)) {
+      return NextResponse.json({ error: 'รูปแบบการชำระเงินไม่ถูกต้อง' }, { status: 400 });
+    }
+
+    for (const item of cart) {
+      const qty = Number(item.quantity);
+      if (!item.product?.id || isNaN(qty) || qty <= 0) {
+        return NextResponse.json({ error: 'ข้อมูลสินค้าในตะกร้าไม่ถูกต้อง' }, { status: 400 });
+      }
+    }
+
+    const totalAmount = cart.reduce((sum: number, item: any) => sum + (Number(item.subtotal) || (Number(item.product?.price || 0) * Number(item.quantity))), 0);
+    if (totalAmount <= 0) {
+      return NextResponse.json({ error: 'ยอดรวมต้องมากกว่า 0 บาท' }, { status: 400 });
+    }
 
     const transactionId = crypto.randomUUID();
     const supabase = await createClient();

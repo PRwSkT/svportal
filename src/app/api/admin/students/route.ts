@@ -24,7 +24,8 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from('students')
-      .select('*, student_addresses(*), student_parents(*)');
+      .select('*, student_addresses(*), student_parents(*)')
+      .limit(10000);
 
     if (searchQuery) {
       const sanitized = searchQuery.replace(/[,()"]/g, '');

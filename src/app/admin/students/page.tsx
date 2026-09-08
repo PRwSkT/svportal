@@ -268,59 +268,61 @@ export default function StudentRecordsPage() {
           </div>
         ) : (
           <>
-          <table className="w-full text-left">
-            <thead className="bg-foreground/[0.02] border-b border-foreground/5">
-              <tr>
-                <th className="p-5 font-bold text-foreground/50 text-sm uppercase tracking-wider">รหัส</th>
-                <th className="p-5 font-bold text-foreground/50 text-sm uppercase tracking-wider">ชื่อ-สกุล</th>
-                {selectedGradeTab === 'all' && (
-                  <th className="p-5 font-bold text-foreground/50 text-sm uppercase tracking-wider">ชั้นเรียน</th>
-                )}
-                <th className="p-5 font-bold text-foreground/50 text-sm uppercase tracking-wider">สถานะ</th>
-                <th className="p-5 font-bold text-foreground/50 text-sm uppercase tracking-wider text-right">Wallet</th>
-                <th className="p-5 font-bold text-foreground/50 text-sm uppercase tracking-wider text-center">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-foreground/5">
-              <AnimatePresence>
-                {students.map(s => (
-                  <motion.tr 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    layout
-                    key={s.id} 
-                    className="hover:bg-foreground/[0.02] transition-colors group cursor-pointer"
-                    onClick={() => document.getElementById(`link-${s.id}`)?.click()}
-                  >
-                    <td className="p-5 font-mono font-medium text-foreground/70">{s.id}</td>
-                    <td className="p-5 font-bold text-primary">
-                      {s.first_name && s.last_name 
-                        ? `${s.prefix || ''}${s.first_name} ${s.last_name}`.trim()
-                        : s.name}
-                    </td>
-                    {selectedGradeTab === 'all' && (
-                      <td className="p-5 font-medium text-foreground/80">{s.grade || '-'}</td>
-                    )}
-                    <td className="p-5">
-                      <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${
-                        s.status?.includes('กำลังศึกษา') || s.status === 'active' ? 'bg-secondary/10 text-secondary' : 
-                        'bg-foreground/10 text-foreground/50'
-                      }`}>
-                        {s.status}
-                      </span>
-                    </td>
-                    <td className="p-5 text-right font-mono font-bold text-foreground/80">฿{(s.wallet_balance || 0).toLocaleString()}</td>
-                    <td className="p-5 text-center">
-                      <Link id={`link-${s.id}`} href={`/admin/students/${s.id}`} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface border border-foreground/10 text-primary hover:bg-primary hover:text-white transition-all shadow-sm group-hover:scale-110">
-                        <ChevronRight className="w-5 h-5" />
-                      </Link>
-                    </td>
-                  </motion.tr>
-                ))}
-              </AnimatePresence>
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left min-w-[650px]">
+              <thead className="bg-foreground/[0.02] border-b border-foreground/5">
+                <tr>
+                  <th className="p-5 font-bold text-foreground/50 text-sm uppercase tracking-wider">รหัส</th>
+                  <th className="p-5 font-bold text-foreground/50 text-sm uppercase tracking-wider">ชื่อ-สกุล</th>
+                  {selectedGradeTab === 'all' && (
+                    <th className="p-5 font-bold text-foreground/50 text-sm uppercase tracking-wider">ชั้นเรียน</th>
+                  )}
+                  <th className="p-5 font-bold text-foreground/50 text-sm uppercase tracking-wider">สถานะ</th>
+                  <th className="p-5 font-bold text-foreground/50 text-sm uppercase tracking-wider text-right">Wallet</th>
+                  <th className="p-5 font-bold text-foreground/50 text-sm uppercase tracking-wider text-center">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-foreground/5">
+                <AnimatePresence>
+                  {students.map(s => (
+                    <motion.tr 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      layout
+                      key={s.id} 
+                      className="hover:bg-foreground/[0.02] transition-colors group cursor-pointer"
+                      onClick={() => document.getElementById(`link-${s.id}`)?.click()}
+                    >
+                      <td className="p-5 font-mono font-medium text-foreground/70">{s.id}</td>
+                      <td className="p-5 font-bold text-primary">
+                        {s.first_name && s.last_name 
+                          ? `${s.prefix || ''}${s.first_name} ${s.last_name}`.trim()
+                          : s.name}
+                      </td>
+                      {selectedGradeTab === 'all' && (
+                        <td className="p-5 font-medium text-foreground/80">{s.grade || '-'}</td>
+                      )}
+                      <td className="p-5">
+                        <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${
+                          s.status?.includes('กำลังศึกษา') || s.status === 'active' ? 'bg-secondary/10 text-secondary' : 
+                          'bg-foreground/10 text-foreground/50'
+                        }`}>
+                          {s.status}
+                        </span>
+                      </td>
+                      <td className="p-5 text-right font-mono font-bold text-foreground/80">฿{(s.wallet_balance || 0).toLocaleString()}</td>
+                      <td className="p-5 text-center">
+                        <Link id={`link-${s.id}`} href={`/admin/students/${s.id}`} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface border border-foreground/10 text-primary hover:bg-primary hover:text-white transition-all shadow-sm group-hover:scale-110">
+                          <ChevronRight className="w-5 h-5" />
+                        </Link>
+                      </td>
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
+              </tbody>
+            </table>
+          </div>
           
           {totalPages > 1 && (
             <div className="flex justify-between items-center p-4 bg-foreground/[0.02] border-t border-foreground/5">

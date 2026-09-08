@@ -183,8 +183,9 @@ export default function AdminUsersPage() {
             <p className="text-xl font-medium">ไม่พบผู้ใช้งานในระบบ</p>
           </div>
         ) : (
-          <table className="w-full text-left">
-            <thead className="bg-foreground/[0.02] border-b border-foreground/5">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left min-w-[650px]">
+              <thead className="bg-foreground/[0.02] border-b border-foreground/5">
               <tr>
                 <th className="p-5 font-bold text-foreground/50 text-sm uppercase tracking-wider">ชื่อ-นามสกุล</th>
                 <th className="p-5 font-bold text-foreground/50 text-sm uppercase tracking-wider">บทบาท</th>
@@ -257,8 +258,9 @@ export default function AdminUsersPage() {
               </AnimatePresence>
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+      )}
+    </div>
 
       {/* Feature Assignment Modal */}
       <AnimatePresence>

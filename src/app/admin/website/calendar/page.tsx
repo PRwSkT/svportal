@@ -40,6 +40,16 @@ export default function CalendarManager() {
 
   useEffect(() => { loadEvents(); }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showModal) {
+        setShowModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showModal]);
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -123,55 +133,57 @@ export default function CalendarManager() {
             <Loader2 className="w-8 h-8 animate-spin text-primary/40" />
           </div>
         ) : (
-          <table className="w-full text-left">
-            <thead className="bg-foreground/[0.02] border-b border-foreground/5">
-              <tr>
-                <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">วันที่</th>
-                <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">หัวข้อกิจกรรม</th>
-                <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">หมวดหมู่</th>
-                <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider text-right">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-foreground/5">
-              {events.map(e => (
-                <tr key={e.id} className="hover:bg-foreground/[0.02] transition-colors">
-                  <td className="p-4">
-                    <p className="font-bold text-foreground/80 text-sm">
-                      {new Date(e.start_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      {e.end_date && ` - ${new Date(e.end_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}`}
-                    </p>
-                  </td>
-                  <td className="p-4">
-                    <p className="font-bold text-foreground/80 text-sm">{e.title_th}</p>
-                    <p className="text-xs text-foreground/50 mt-0.5">{e.title_en}</p>
-                  </td>
-                  <td className="p-4 space-x-2">
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-foreground/5 text-foreground/70">
-                      {e.category === 'academic' ? 'วิชาการ' : e.category === 'activity' ? 'กิจกรรม' : 'อื่นๆ'}
-                    </span>
-                    {e.is_holiday && (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-red-100 text-red-800">
-                        วันหยุด
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-4 text-right space-x-2">
-                    <button onClick={() => openEditModal(e)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => handleDelete(e.id, e.title_th)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {events.length === 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left min-w-[500px]">
+              <thead className="bg-foreground/[0.02] border-b border-foreground/5">
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-foreground/40 text-sm">ไม่พบกิจกรรม</td>
+                  <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">วันที่</th>
+                  <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">หัวข้อกิจกรรม</th>
+                  <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">หมวดหมู่</th>
+                  <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider text-right">จัดการ</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-foreground/5">
+                {events.map(e => (
+                  <tr key={e.id} className="hover:bg-foreground/[0.02] transition-colors">
+                    <td className="p-4">
+                      <p className="font-bold text-foreground/80 text-sm">
+                        {new Date(e.start_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {e.end_date && ` - ${new Date(e.end_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                      </p>
+                    </td>
+                    <td className="p-4">
+                      <p className="font-bold text-foreground/80 text-sm">{e.title_th}</p>
+                      <p className="text-xs text-foreground/50 mt-0.5">{e.title_en}</p>
+                    </td>
+                    <td className="p-4 space-x-2">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-foreground/5 text-foreground/70">
+                        {e.category === 'academic' ? 'วิชาการ' : e.category === 'activity' ? 'กิจกรรม' : 'อื่นๆ'}
+                      </span>
+                      {e.is_holiday && (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-red-100 text-red-800">
+                          วันหยุด
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-4 text-right space-x-2">
+                      <button onClick={() => openEditModal(e)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleDelete(e.id, e.title_th)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {events.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="p-8 text-center text-foreground/40 text-sm">ไม่พบกิจกรรม</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -179,11 +191,13 @@ export default function CalendarManager() {
         {showModal && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}
+            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto cursor-pointer"
           >
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-surface w-full max-w-lg rounded-3xl shadow-2xl border border-foreground/10 overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+              className="bg-surface w-full max-w-lg rounded-3xl shadow-2xl border border-foreground/10 overflow-hidden my-8 cursor-default"
             >
               <div className="p-5 border-b border-foreground/5 flex justify-between items-center bg-foreground/[0.02]">
                 <h2 className="text-lg font-extrabold text-foreground">{editingId ? 'แก้ไขกิจกรรม' : 'เพิ่มกิจกรรมใหม่'}</h2>

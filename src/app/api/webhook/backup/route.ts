@@ -30,10 +30,10 @@ export async function POST(request: Request) {
     const payload: GoogleBackupPayload = {
       transaction_id: record.id,
       timestamp: record.created_at || new Date().toISOString(),
-      student_id: record.student_id,
-      transaction_type: record.transaction_type,
-      amount: record.amount, // stored in satang/decimal
-      description: record.description || `${record.transaction_type} transaction`,
+      student_id: record.student_id || record.studentId || null,
+      transaction_type: record.transaction_type || record.type || (record.total_amount ? 'shop_transaction' : 'tuition_payment'),
+      amount: Number(record.amount ?? record.total_amount ?? 0),
+      description: record.description || record.cashier_note || `${record.transaction_type || record.type || 'transaction'}`,
     };
 
     // Google backup logic is idempotent and handles its own rate limiting quietly

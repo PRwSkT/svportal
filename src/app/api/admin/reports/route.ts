@@ -11,7 +11,8 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const dateStr = searchParams.get('date') || new Date().toISOString().split('T')[0];
+    const bangkokToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+    const dateStr = searchParams.get('date') || bangkokToday;
     const limit = parseInt(searchParams.get('limit') || '50', 10);
 
     // 1. Get Summary

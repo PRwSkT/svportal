@@ -54,11 +54,8 @@ export async function createShopTransaction(
       throw new Error('ระบบออฟไลน์: ไม่สามารถชำระเงินผ่าน Wallet ได้ กรุณาเชื่อมต่ออินเทอร์เน็ต');
     }
 
-    // Atomic deduction via RPC (handles balance check + daily limit + ledger entry)
-    const { deductWallet } = await import('./wallet');
-    await deductWallet(studentId, totalAmount, transactionId);
-
-    // Also save the shop transaction itself through queue
+    // Atomic deduction & checkout via RPC (handles balance check + daily limit + stock + ledger entry)
+    const supabase = createClient();
     const payload = {
       id: transactionId,
       student_id: studentId,
@@ -67,7 +64,12 @@ export async function createShopTransaction(
       cashier_note: null,
       items: cart,
     };
-    saveToQueue('checkout_shop_transaction', payload, 'rpc');
+
+    const { error } = await supabase.rpc('checkout_shop_transaction', { payload });
+    if (error) {
+      console.error('checkout_shop_transaction error:', error);
+      throw new Error(error.message || 'DB_ERROR');
+    }
 
     logAction({
       action: 'shop_checkout',

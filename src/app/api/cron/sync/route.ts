@@ -1,17 +1,19 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient as createServerClient } from '@/lib/supabase/server';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic'; // Prevent caching for cron route
 
 export async function GET(request: Request) {
   try {
-    // In production, you would want to verify a secret token for cron jobs
     const authHeader = request.headers.get('authorization');
     if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      return new Response('Unauthorized', { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = await createClient();
+    const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL
+      ? createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+      : await createServerClient();
 
     // Fetch pending or failed (up to 3 retries) jobs
     const { data: jobs, error } = await supabase
@@ -41,9 +43,10 @@ export async function GET(request: Request) {
           endpoint = '/webhooks/pos/payments';
         } else if (job.entity_type === 'wallet_topup') {
           endpoint = '/webhooks/pos/wallet-topups';
+        } else if (job.entity_type === 'shop_transaction') {
+          endpoint = '/webhooks/pos/shop-transactions';
         } else {
-          // Mock success for unknown for now
-          endpoint = '/mock-success';
+          throw new Error(`Unsupported entity_type: ${job.entity_type}`);
         }
 
         // Try to sync with external system (simulate if not configured properly)

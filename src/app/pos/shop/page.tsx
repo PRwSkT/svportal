@@ -48,6 +48,16 @@ export default function POSShopPage() {
     };
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showCheckout && !isCheckingOut) {
+        setShowCheckout(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showCheckout, isCheckingOut]);
+
   const addToCart = (product: Product) => {
     setCart(prev => {
       const existing = prev.find(item => item.product.id === product.id);
@@ -62,8 +72,18 @@ export default function POSShopPage() {
             : item
         );
       }
+      if (product.stock_qty <= 0) {
+        toast.warning('สินค้าหมดสต๊อก');
+        return prev;
+      }
       return [...prev, { product, quantity: 1, subtotal: product.price }];
     });
+  };
+
+  const [cashReceived, setCashReceived] = useState<number | ''>('');
+
+  const deleteItemFromCart = (productId: string) => {
+    setCart(prev => prev.filter(item => item.product.id !== productId));
   };
 
   const removeFromCart = (productId: string) => {
@@ -167,7 +187,7 @@ export default function POSShopPage() {
       } else if (w.daily_limit !== null && (spend + cartTotal) > w.daily_limit) {
         toast.error(`เกินวงเงินรายวัน (วงเงิน ฿${w.daily_limit.toLocaleString()})`, { id: loadingToast });
       } else {
-        toast.success(`พบข้อมูล: ${walletStudentName || w.student_id}`, { id: loadingToast });
+        toast.success(`พบข้อมูล: ${student_name || w.student_id}`, { id: loadingToast });
       }
     } catch (err: any) {
       toast.error('เกิดข้อผิดพลาดในการค้นหา', { id: loadingToast, description: err.message });
@@ -177,6 +197,7 @@ export default function POSShopPage() {
   }, [cart, walletStudentName]);
 
   const handleCheckout = async () => {
+    if (isCheckingOut) return;
     setIsCheckingOut(true);
     const loadingToast = toast.loading('กำลังชำระเงิน...');
     try {
@@ -205,7 +226,7 @@ export default function POSShopPage() {
     } catch (err: any) {
       const msg = err.message || '';
       let errorMsg = 'เกิดข้อผิดพลาดในการชำระเงิน';
-      if (msg.includes('INSUFFICIENT_BALANCE')) errorMsg = `ยอดเงินไม่เพียงพอ (คงเหลือ ฿${walletAccount?.balance.toLocaleString() || '?'})`;
+      if (msg.includes('INSUFFICIENT_BALANCE') || msg.includes('INSUFFICIENT_WALLET')) errorMsg = `ยอดเงินไม่เพียงพอ (คงเหลือ ฿${walletAccount?.balance.toLocaleString() || '?'})`;
       else if (msg.includes('DAILY_LIMIT_EXCEEDED')) errorMsg = `เกินวงเงินรายวัน (วงเงิน ฿${walletAccount?.daily_limit?.toLocaleString() || '?'})`;
       else if (msg.includes('WALLET_NOT_FOUND')) errorMsg = 'ไม่พบ Wallet';
       else if (msg.includes('WALLET_INACTIVE')) errorMsg = 'Wallet ถูกระงับการใช้งาน';
@@ -350,17 +371,24 @@ export default function POSShopPage() {
                       <p className="text-foreground/50 font-medium text-sm">฿{item.product.price.toFixed(2)} / ชิ้น</p>
                     </div>
                     <div className="flex items-center gap-2 bg-background p-1.5 rounded-xl border border-foreground/5">
-                      <button onClick={() => removeFromCart(item.product.id)} className="w-10 h-10 rounded-lg hover:bg-surface text-foreground/70 transition-colors flex items-center justify-center">
+                      <button onClick={() => removeFromCart(item.product.id)} className="w-10 h-10 rounded-lg hover:bg-surface text-foreground/70 transition-colors flex items-center justify-center" title="ลดจำนวน">
                         <Minus className="w-5 h-5" />
                       </button>
                       <span className="text-xl font-extrabold w-10 text-center text-primary">{item.quantity}</span>
-                      <button onClick={() => addToCart(item.product)} disabled={item.quantity >= item.product.stock_qty} className="w-10 h-10 rounded-lg hover:bg-surface text-foreground/70 transition-colors disabled:opacity-30 flex items-center justify-center">
+                      <button onClick={() => addToCart(item.product)} disabled={item.quantity >= item.product.stock_qty} className="w-10 h-10 rounded-lg hover:bg-surface text-foreground/70 transition-colors disabled:opacity-30 flex items-center justify-center" title="เพิ่มจำนวน">
                         <Plus className="w-5 h-5" />
                       </button>
                     </div>
-                    <div className="w-32 text-right">
+                    <div className="w-24 text-right">
                       <p className="font-black text-2xl text-primary">฿{item.subtotal.toFixed(2)}</p>
                     </div>
+                    <button 
+                      onClick={() => deleteItemFromCart(item.product.id)} 
+                      className="w-10 h-10 rounded-xl hover:bg-red-50 text-foreground/40 hover:text-red-500 transition-colors flex items-center justify-center ml-2"
+                      title="ลบรายการนี้"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
                   </motion.div>
                 ))
               )}
@@ -373,7 +401,10 @@ export default function POSShopPage() {
               <span className="text-6xl font-black text-primary tracking-tight">฿{total.toFixed(2)}</span>
             </div>
             <button 
-              onClick={() => setShowCheckout(true)}
+              onClick={() => {
+                setCashReceived(total);
+                setShowCheckout(true);
+              }}
               disabled={cart.length === 0}
               className="w-full bg-primary hover:bg-primary/90 disabled:bg-foreground/20 disabled:text-foreground/40 text-white text-2xl font-black py-6 rounded-2xl shadow-xl shadow-primary/20 transition-all active:scale-[0.98] flex items-center justify-center gap-3"
             >
@@ -461,13 +492,15 @@ export default function POSShopPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowCheckout(false); }}
+            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer"
           >
             <motion.div 
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-surface w-full max-w-2xl rounded-[2rem] shadow-2xl border border-white/20 overflow-hidden flex flex-col max-h-[90vh]"
+              onClick={(e) => e.stopPropagation()}
+              className="bg-surface w-full max-w-2xl rounded-[2rem] shadow-2xl border border-white/20 overflow-hidden flex flex-col max-h-[90vh] cursor-default"
             >
               <div className="p-6 bg-background/30 border-b border-foreground/5 flex justify-between items-center">
                 <h2 className="text-2xl font-extrabold text-primary flex items-center gap-2">
@@ -506,6 +539,80 @@ export default function POSShopPage() {
                     </label>
                   </div>
                 </div>
+
+                <AnimatePresence>
+                  {paymentMethod === 'cash' && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden mb-8"
+                    >
+                      <div className="bg-background p-6 rounded-3xl border border-foreground/10 space-y-4">
+                        <div className="flex justify-between items-center">
+                          <label className="font-extrabold text-foreground text-sm flex items-center gap-2">
+                            <Banknote className="w-4 h-4 text-green-600" />
+                            เงินสดที่ได้รับ (บาท)
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setCashReceived(total)}
+                            className="text-xs font-bold text-primary hover:underline"
+                          >
+                            จ่ายพอดี (฿{total.toFixed(2)})
+                          </button>
+                        </div>
+
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-foreground/40">฿</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step="any"
+                            value={cashReceived}
+                            onChange={(e) => setCashReceived(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                            placeholder={total.toFixed(2)}
+                            className="w-full text-2xl font-black pl-10 pr-4 py-3 rounded-2xl bg-surface border-2 border-foreground/10 focus:border-green-500 focus:ring-4 focus:ring-green-500/10 outline-none text-foreground"
+                          />
+                        </div>
+
+                        {/* Quick preset buttons */}
+                        <div className="flex flex-wrap gap-2">
+                          {Array.from(new Set([total, 50, 100, 500, 1000].filter(v => v >= total))).sort((a, b) => a - b).map((preset) => (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => setCashReceived(preset)}
+                              className={`px-4 py-2 rounded-xl font-bold text-sm border transition-all ${
+                                cashReceived === preset 
+                                  ? 'bg-green-600 text-white border-green-600 shadow-sm'
+                                  : 'bg-surface hover:bg-foreground/5 text-foreground/70 border-foreground/10'
+                              }`}
+                            >
+                              ฿{preset.toLocaleString()}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Change display */}
+                        {typeof cashReceived === 'number' && (
+                          <div className={`p-4 rounded-2xl border flex justify-between items-center ${
+                            cashReceived >= total 
+                              ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800' 
+                              : 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800'
+                          }`}>
+                            <span className={`font-bold ${cashReceived >= total ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300'}`}>
+                              {cashReceived >= total ? 'เงินทอน' : 'ยอดเงินยังไม่พอ'}
+                            </span>
+                            <span className={`text-2xl font-black ${cashReceived >= total ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              ฿{Math.abs(cashReceived - total).toFixed(2)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 <AnimatePresence>
                   {paymentMethod === 'wallet' && (
@@ -613,7 +720,7 @@ export default function POSShopPage() {
                 </button>
                 <button 
                   onClick={handleCheckout} 
-                  disabled={isCheckingOut || (paymentMethod === 'wallet' && !walletAccount)}
+                  disabled={isCheckingOut || (paymentMethod === 'wallet' && !walletAccount) || (paymentMethod === 'cash' && typeof cashReceived === 'number' && cashReceived < total)}
                   className="flex-1 py-5 text-2xl font-black text-white bg-primary rounded-2xl hover:bg-primary/90 disabled:opacity-50 disabled:bg-foreground/20 flex justify-center items-center shadow-xl shadow-primary/20 transition-all active:scale-[0.98]"
                 >
                   {isCheckingOut ? (

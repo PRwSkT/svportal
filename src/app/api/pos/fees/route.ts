@@ -17,10 +17,15 @@ export async function GET(request: Request) {
 
     const supabase = await createClient();
     
+    const sanitized = q.replace(/[,()"]/g, '').trim();
+    if (!sanitized) {
+      return NextResponse.json([]);
+    }
+
     const { data: students, error: studentError } = await supabase
       .from('students')
       .select('*')
-      .or(`id.eq.${q},name.ilike.%${q}%`)
+      .or(`id.ilike.%${sanitized}%,name.ilike.%${sanitized}%`)
       .limit(10);
 
     if (studentError) throw studentError;

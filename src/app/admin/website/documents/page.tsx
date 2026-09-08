@@ -41,9 +41,25 @@ export default function DocumentsManager() {
 
   useEffect(() => { loadDocuments(); }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showModal) {
+        setShowModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showModal]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+      const file = e.target.files[0];
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('ไฟล์มีขนาดเกิน 10MB กรุณาเลือกไฟล์ที่มีขนาดไม่เกิน 10MB');
+        e.target.value = '';
+        return;
+      }
+      setSelectedFile(file);
     }
   };
 
@@ -147,55 +163,57 @@ export default function DocumentsManager() {
             <Loader2 className="w-8 h-8 animate-spin text-primary/40" />
           </div>
         ) : (
-          <table className="w-full text-left">
-            <thead className="bg-foreground/[0.02] border-b border-foreground/5">
-              <tr>
-                <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">ชื่อเอกสาร</th>
-                <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">หมวดหมู่</th>
-                <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">ชนิดไฟล์ / ขนาด</th>
-                <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider text-right">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-foreground/5">
-              {documents.map(d => (
-                <tr key={d.id} className="hover:bg-foreground/[0.02] transition-colors">
-                  <td className="p-4 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center text-red-500">
-                      <FileText className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="font-bold text-foreground/80 text-sm">{d.title_th}</p>
-                      <p className="text-xs text-foreground/50 mt-0.5">{d.title_en}</p>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-foreground/5 text-foreground/70">
-                      {d.category === 'form' ? 'แบบฟอร์ม' : d.category === 'policy' ? 'ระเบียบการ' : 'อื่นๆ'}
-                    </span>
-                  </td>
-                  <td className="p-4 text-xs font-medium text-foreground/60 uppercase">
-                    {d.file_type} <span className="lowercase text-foreground/40 font-normal">({formatBytes(d.file_size_bytes)})</span>
-                  </td>
-                  <td className="p-4 text-right space-x-2">
-                    <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="inline-block p-2 text-green-600 bg-green-50 hover:bg-green-100 rounded-lg transition-colors">
-                      <Download className="w-4 h-4" />
-                    </a>
-                    <button onClick={() => openEditModal(d)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => handleDelete(d.id, d.title_th)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {documents.length === 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left min-w-[500px]">
+              <thead className="bg-foreground/[0.02] border-b border-foreground/5">
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-foreground/40 text-sm">ไม่พบเอกสาร</td>
+                  <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">ชื่อเอกสาร</th>
+                  <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">หมวดหมู่</th>
+                  <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">ชนิดไฟล์ / ขนาด</th>
+                  <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider text-right">จัดการ</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-foreground/5">
+                {documents.map(d => (
+                  <tr key={d.id} className="hover:bg-foreground/[0.02] transition-colors">
+                    <td className="p-4 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center text-red-500">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-foreground/80 text-sm">{d.title_th}</p>
+                        <p className="text-xs text-foreground/50 mt-0.5">{d.title_en}</p>
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-foreground/5 text-foreground/70">
+                        {d.category === 'form' ? 'แบบฟอร์ม' : d.category === 'policy' ? 'ระเบียบการ' : 'อื่นๆ'}
+                      </span>
+                    </td>
+                    <td className="p-4 text-xs font-medium text-foreground/60 uppercase">
+                      {d.file_type} <span className="lowercase text-foreground/40 font-normal">({formatBytes(d.file_size_bytes)})</span>
+                    </td>
+                    <td className="p-4 text-right space-x-2">
+                      <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="inline-block p-2 text-green-600 bg-green-50 hover:bg-green-100 rounded-lg transition-colors">
+                        <Download className="w-4 h-4" />
+                      </a>
+                      <button onClick={() => openEditModal(d)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleDelete(d.id, d.title_th)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {documents.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="p-8 text-center text-foreground/40 text-sm">ไม่พบเอกสาร</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -203,11 +221,13 @@ export default function DocumentsManager() {
         {showModal && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}
+            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto cursor-pointer"
           >
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-surface w-full max-w-lg rounded-3xl shadow-2xl border border-foreground/10 overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+              className="bg-surface w-full max-w-lg rounded-3xl shadow-2xl border border-foreground/10 overflow-hidden my-8 cursor-default"
             >
               <div className="p-5 border-b border-foreground/5 flex justify-between items-center bg-foreground/[0.02]">
                 <h2 className="text-lg font-extrabold text-foreground">{editingId ? 'แก้ไขเอกสาร' : 'เพิ่มเอกสารใหม่'}</h2>

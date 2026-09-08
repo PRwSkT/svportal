@@ -67,6 +67,15 @@ export default function WelcomePage() {
             <span className="text-xl font-bold text-white">ครูและบุคลากร</span>
             <span className="text-sm font-medium text-white/90 mt-1">Teachers & Staff • 教师和员工</span>
           </Link>
+
+          {/* School Website Link */}
+          <Link
+            href="/website"
+            className="w-full flex flex-col items-center justify-center p-3.5 rounded-[16px] border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all duration-300 group shadow-sm hover:shadow-md hover:-translate-y-0.5"
+          >
+            <span className="text-base font-bold text-primary">เข้าชมเว็บไซต์โรงเรียน</span>
+            <span className="text-xs font-medium text-foreground/50 group-hover:text-primary/70">Visit School Website • 访问学校网站</span>
+          </Link>
         </div>
         
         <div className="mt-8 text-center relative z-10 flex justify-center">

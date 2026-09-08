@@ -55,9 +55,24 @@ export default function PersonnelManager() {
     loadPersonnel();
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showModal) {
+        setShowModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showModal]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('ไฟล์มีขนาดเกิน 10MB กรุณาเลือกไฟล์ที่มีขนาดไม่เกิน 10MB');
+        e.target.value = '';
+        return;
+      }
       setSelectedFile(file);
       setPreviewUrl(URL.createObjectURL(file));
     }
@@ -179,64 +194,66 @@ export default function PersonnelManager() {
             <Loader2 className="w-8 h-8 animate-spin text-primary/40" />
           </div>
         ) : (
-          <table className="w-full text-left">
-            <thead className="bg-foreground/[0.02] border-b border-foreground/5">
-              <tr>
-                <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">รูปภาพ</th>
-                <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">ชื่อ-นามสกุล / ตำแหน่ง</th>
-                <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">หมวดหมู่</th>
-                <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">สถานะ</th>
-                <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider text-right">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-foreground/5">
-              {personnel.map(p => (
-                <tr key={p.id} className="hover:bg-foreground/[0.02] transition-colors">
-                  <td className="p-4">
-                    <div className="w-12 h-12 rounded-xl bg-foreground/5 overflow-hidden relative border border-foreground/10">
-                      {p.image_url ? (
-                        <Image src={p.image_url} alt={p.name_th} fill className="object-cover" unoptimized />
-                      ) : (
-                        <Users className="w-6 h-6 text-foreground/20 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                      )}
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <p className="font-bold text-foreground/80 text-sm">{p.name_th}</p>
-                    <p className="text-xs text-foreground/50 mt-0.5">{p.position_th}</p>
-                  </td>
-                  <td className="p-4">
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-foreground/5 text-foreground/70">
-                      {p.category === 'executive' ? 'ผู้บริหาร' : p.category === 'teacher' ? 'ครูผู้สอน' : 'บุคลากรอื่นๆ'}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <button
-                      onClick={() => handleToggleActive(p.id, p.is_active)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-colors ${
-                        p.is_active ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-red-100 text-red-800 hover:bg-red-200'
-                      }`}
-                    >
-                      {p.is_active ? 'แสดงผล' : 'ซ่อน'}
-                    </button>
-                  </td>
-                  <td className="p-4 text-right space-x-2">
-                    <button onClick={() => openEditModal(p)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => handleDelete(p.id, p.name_th)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {personnel.length === 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left min-w-[600px]">
+              <thead className="bg-foreground/[0.02] border-b border-foreground/5">
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-foreground/40 text-sm">ไม่พบข้อมูลบุคลากร</td>
+                  <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">รูปภาพ</th>
+                  <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">ชื่อ-นามสกุล / ตำแหน่ง</th>
+                  <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">หมวดหมู่</th>
+                  <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider">สถานะ</th>
+                  <th className="p-4 font-bold text-foreground/50 text-xs uppercase tracking-wider text-right">จัดการ</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-foreground/5">
+                {personnel.map(p => (
+                  <tr key={p.id} className="hover:bg-foreground/[0.02] transition-colors">
+                    <td className="p-4">
+                      <div className="w-12 h-12 rounded-xl bg-foreground/5 overflow-hidden relative border border-foreground/10">
+                        {p.image_url ? (
+                          <Image src={p.image_url} alt={p.name_th} fill className="object-cover" unoptimized />
+                        ) : (
+                          <Users className="w-6 h-6 text-foreground/20 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <p className="font-bold text-foreground/80 text-sm">{p.name_th}</p>
+                      <p className="text-xs text-foreground/50 mt-0.5">{p.position_th}</p>
+                    </td>
+                    <td className="p-4">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-foreground/5 text-foreground/70">
+                        {p.category === 'executive' ? 'ผู้บริหาร' : p.category === 'teacher' ? 'ครูผู้สอน' : 'บุคลากรอื่นๆ'}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <button
+                        onClick={() => handleToggleActive(p.id, p.is_active)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-colors ${
+                          p.is_active ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-red-100 text-red-800 hover:bg-red-200'
+                        }`}
+                      >
+                        {p.is_active ? 'แสดงผล' : 'ซ่อน'}
+                      </button>
+                    </td>
+                    <td className="p-4 text-right space-x-2">
+                      <button onClick={() => openEditModal(p)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleDelete(p.id, p.name_th)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {personnel.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-foreground/40 text-sm">ไม่พบข้อมูลบุคลากร</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -244,11 +261,13 @@ export default function PersonnelManager() {
         {showModal && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}
+            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto cursor-pointer"
           >
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-surface w-full max-w-2xl rounded-3xl shadow-2xl border border-foreground/10 overflow-hidden my-8"
+              onClick={(e) => e.stopPropagation()}
+              className="bg-surface w-full max-w-2xl rounded-3xl shadow-2xl border border-foreground/10 overflow-hidden my-8 cursor-default"
             >
               <div className="p-5 border-b border-foreground/5 flex justify-between items-center bg-foreground/[0.02] sticky top-0 z-10">
                 <h2 className="text-lg font-extrabold text-foreground">{editingId ? 'แก้ไขข้อมูลบุคลากร' : 'เพิ่มบุคลากรใหม่'}</h2>
@@ -259,8 +278,8 @@ export default function PersonnelManager() {
               
               <div className="p-6">
                 <form onSubmit={handleSave} className="space-y-5">
-                  <div className="flex gap-6">
-                    <div className="w-1/3 flex flex-col items-center gap-3">
+                  <div className="flex flex-col sm:flex-row gap-6">
+                    <div className="w-full sm:w-1/3 flex flex-col items-center gap-3">
                       <div 
                         onClick={() => fileInputRef.current?.click()}
                         className="w-full aspect-[3/4] bg-foreground/5 rounded-2xl border-2 border-dashed border-foreground/20 hover:border-primary/50 cursor-pointer flex flex-col items-center justify-center relative overflow-hidden transition-colors"

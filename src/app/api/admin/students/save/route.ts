@@ -14,12 +14,29 @@ export async function POST(request: Request) {
 
     const supabase = await createClient();
 
-    let savedId = studentData.id;
+    const sanitizedStudentData = { ...studentData };
+    if (sanitizedStudentData.birth_date === '' || sanitizedStudentData.birth_date === undefined) {
+      sanitizedStudentData.birth_date = null;
+    }
+    if (sanitizedStudentData.height === '' || sanitizedStudentData.height === undefined) {
+      sanitizedStudentData.height = null;
+    } else if (sanitizedStudentData.height !== null) {
+      const h = Number(sanitizedStudentData.height);
+      sanitizedStudentData.height = isNaN(h) ? null : h;
+    }
+    if (sanitizedStudentData.weight === '' || sanitizedStudentData.weight === undefined) {
+      sanitizedStudentData.weight = null;
+    } else if (sanitizedStudentData.weight !== null) {
+      const w = Number(sanitizedStudentData.weight);
+      sanitizedStudentData.weight = isNaN(w) ? null : w;
+    }
+
+    let savedId = sanitizedStudentData.id;
 
     if (isNew) {
       const { data: newSt, error: createError } = await supabase
         .from('students')
-        .insert([studentData])
+        .insert([sanitizedStudentData])
         .select()
         .single();
         
@@ -31,7 +48,7 @@ export async function POST(request: Request) {
       const { error: updateError } = await supabase
         .from('students')
         .update({
-          ...studentData,
+          ...sanitizedStudentData,
           updated_at: new Date().toISOString()
         })
         .eq('id', savedId);

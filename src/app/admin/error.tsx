@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
-import { AlertCircle, RefreshCcw } from 'lucide-react';
+import Link from 'next/link';
+import { AlertCircle, RefreshCcw, LayoutDashboard } from 'lucide-react';
 
 export default function AdminError({
   error,
@@ -24,12 +25,20 @@ export default function AdminError({
         <span className="text-xs font-mono text-red-500/80 mt-2 block bg-red-50 p-2 rounded-lg">{error.message}</span>
       </p>
       
-      <button
-        onClick={() => reset()}
-        className="px-6 py-3 bg-red-50 text-red-600 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-red-100 transition-colors border border-red-100"
-      >
-        <RefreshCcw className="w-5 h-5" /> ลองใหม่อีกครั้ง
-      </button>
+      <div className="flex flex-wrap gap-3 justify-center">
+        <button
+          onClick={() => reset()}
+          className="px-6 py-3 bg-red-50 text-red-600 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-red-100 transition-colors border border-red-100"
+        >
+          <RefreshCcw className="w-5 h-5" /> ลองใหม่อีกครั้ง
+        </button>
+        <Link
+          href="/dashboard"
+          className="px-6 py-3 bg-primary text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90 transition-all shadow-md shadow-primary/20"
+        >
+          <LayoutDashboard className="w-5 h-5" /> กลับสู่แดชบอร์ด
+        </Link>
+      </div>
     </div>
   );
 }

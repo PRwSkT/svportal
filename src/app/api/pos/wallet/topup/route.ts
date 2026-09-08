@@ -12,17 +12,41 @@ export async function POST(request: Request) {
 
     const supabase = await createClient();
     
+    if (!studentId || !amount || typeof amount !== 'number' || amount <= 0) {
+      return NextResponse.json({ error: 'ข้อมูลการเติมเงินไม่ถูกต้อง' }, { status: 400 });
+    }
+
     // Call the RPC function
-    const { data, error } = await supabase.rpc('process_wallet_topup', {
-      p_student_id: studentId,
-      p_amount: amount,
-      p_method: topupMethod
+    const { data, error } = await supabase.rpc('topup_wallet', {
+      payload: {
+        student_id: studentId,
+        amount: amount,
+        channel: topupMethod || 'counter',
+        cashier_note: null,
+        svportal_ref: null
+      }
     });
 
     if (error) throw error;
 
-    return NextResponse.json(data);
+    const result = data as {
+      success: boolean;
+      transaction_id: string;
+      balance_before: number;
+      balance_after: number;
+    };
+
+    return NextResponse.json({
+      id: result.transaction_id,
+      student_id: studentId,
+      type: 'topup',
+      amount: amount,
+      balance_before: result.balance_before,
+      balance_after: result.balance_after,
+      channel: topupMethod || 'counter',
+      created_at: new Date().toISOString()
+    });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'เกิดข้อผิดพลาดในการเติมเงิน' }, { status: 500 });
   }
 }

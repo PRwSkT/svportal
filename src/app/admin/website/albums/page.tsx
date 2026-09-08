@@ -46,9 +46,24 @@ export default function AlbumsManager() {
 
   useEffect(() => { loadAlbums(); }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showModal) {
+        setShowModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showModal]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('ไฟล์มีขนาดเกิน 10MB กรุณาเลือกไฟล์ที่มีขนาดเล็กกว่านี้');
+        e.target.value = '';
+        return;
+      }
       setSelectedFile(file);
       setPreviewUrl(URL.createObjectURL(file));
     }
@@ -194,11 +209,13 @@ export default function AlbumsManager() {
         {showModal && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}
+            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto cursor-pointer"
           >
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-surface w-full max-w-lg rounded-3xl shadow-2xl border border-foreground/10 overflow-hidden my-8"
+              onClick={(e) => e.stopPropagation()}
+              className="bg-surface w-full max-w-lg rounded-3xl shadow-2xl border border-foreground/10 overflow-hidden my-8 cursor-default"
             >
               <div className="p-5 border-b border-foreground/5 flex justify-between items-center bg-foreground/[0.02]">
                 <h2 className="text-lg font-extrabold text-foreground">{editingId ? 'แก้ไขข้อมูลอัลบั้ม' : 'สร้างอัลบั้มใหม่'}</h2>
