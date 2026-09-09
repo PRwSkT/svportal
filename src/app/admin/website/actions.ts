@@ -21,13 +21,13 @@ function getAdminClient() {
 
 async function verifyAdmin(): Promise<{ authorized: boolean; error?: string }> {
   try {
-    const auth = await requireAuth('admin');
+    const auth = await requireAuth('admin', 'admin_website');
     if (auth.error) {
       return { 
         authorized: false, 
         error: auth.error === 'Unauthorized' 
           ? 'กรุณาเข้าสู่ระบบใหม่ (เซสชันหมดอายุ)' 
-          : 'คุณไม่มีสิทธิ์ผู้ดูแลระบบในการดำเนินการนี้' 
+          : 'คุณไม่มีสิทธิ์ในการจัดการข้อมูลเว็บไซต์นี้' 
       };
     }
     return { authorized: true };

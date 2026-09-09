@@ -1,25 +1,18 @@
 import { NextResponse } from 'next/server';
 import { getDailySummary } from '@/lib/supabase/reports.server';
 import { createClient } from '@/lib/supabase/server';
-import { isSystemAdmin } from '@/lib/constants/auth';
+import { requireAuth } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
+    const auth = await requireAuth('admin', 'dashboard');
+    if (auth.error) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const supabase = await createClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    if (!isSystemAdmin(user.email)) {
-      const { data: role, error: roleError } = await supabase.rpc('get_user_role');
-      if (roleError || role !== 'admin') {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
-    }
 
     const { searchParams } = new URL(request.url);
     const dateStr = searchParams.get('date');

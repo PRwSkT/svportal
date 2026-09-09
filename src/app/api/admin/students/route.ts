@@ -5,7 +5,7 @@ import { requireAuth } from '@/lib/auth';
 export async function GET(request: Request) {
   try {
     // Add auth check
-    const auth = await requireAuth();
+    const auth = await requireAuth('admin', 'admin_students');
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }

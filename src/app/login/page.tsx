@@ -30,7 +30,7 @@ function LoginForm() {
     const { error: signInError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${window.location.origin}/auth/callback?next=/home`,
         queryParams: {
           hd: 'somkidvittaya.ac.th',
         },
@@ -64,8 +64,8 @@ function LoginForm() {
         setError(signInError.message);
       }
     } else {
-      // successful login, middleware will redirect
-      window.location.reload();
+      // successful login, navigate to Launchpad
+      window.location.href = '/home';
     }
   };
 

@@ -109,28 +109,62 @@ export async function proxy(request: NextRequest) {
     return redirectWithCookies(new URL('/login?error=Invalid_Domain', request.url));
   }
 
-  // Protect admin routes
+  // Protect admin and assigned-feature routes
   if (
     request.nextUrl.pathname.startsWith('/admin') ||
     request.nextUrl.pathname === '/dashboard' ||
     request.nextUrl.pathname.startsWith('/api/admin')
   ) {
-    let { data: role, error } = await supabase.rpc('get_user_role');
-    
     if (isSystemAdmin(user?.email)) {
-      role = 'admin';
-      error = null;
+      return response;
     }
 
-    if (error || role !== 'admin') {
-      if (request.nextUrl.pathname.startsWith('/api/')) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
-      const debugUrl = new URL('/pos/shop', request.url);
-      debugUrl.searchParams.set('debug_err', error ? error.message : 'none');
-      debugUrl.searchParams.set('debug_role', String(role));
-      return redirectWithCookies(debugUrl);
+    // Retrieve user record from app_users
+    const { data: appUserData } = await supabase.rpc('get_app_user_by_id', {
+      target_user_id: user.id,
+    });
+
+    const userRole = appUserData?.role;
+    if (userRole === 'admin') {
+      return response;
     }
+
+    const assignedFeatures: string[] = appUserData?.assigned_features || [];
+    const path = request.nextUrl.pathname;
+    let requiredFeature: string | null = null;
+
+    if (path === '/dashboard' || path.startsWith('/api/admin/dashboard')) {
+      requiredFeature = 'dashboard';
+    } else if (path.startsWith('/admin/students') || path.startsWith('/api/admin/students')) {
+      requiredFeature = 'admin_students';
+    } else if (path.startsWith('/admin/reports') || path.startsWith('/api/admin/reports')) {
+      requiredFeature = 'admin_reports';
+    } else if (path.startsWith('/admin/products') || path.startsWith('/api/admin/products')) {
+      requiredFeature = 'admin_products';
+    } else if (path.startsWith('/admin/wallet') || path.startsWith('/api/admin/wallet')) {
+      requiredFeature = 'admin_wallet_students';
+    } else if (path.startsWith('/admin/website') || path.startsWith('/api/admin/website')) {
+      requiredFeature = 'admin_website';
+    } else if (path.startsWith('/admin/attendance') || path.startsWith('/api/admin/attendance')) {
+      requiredFeature = 'admin_attendance';
+    } else if (path.startsWith('/admin/fees') || path.startsWith('/api/admin/fees')) {
+      if (assignedFeatures.includes('pos_fees') || assignedFeatures.includes('admin_reports')) {
+        return response;
+      }
+      requiredFeature = 'pos_fees';
+    } else if (path.startsWith('/admin/users') || path.startsWith('/api/admin/users')) {
+      requiredFeature = 'admin_users';
+    }
+
+    if (requiredFeature && assignedFeatures.includes(requiredFeature)) {
+      return response;
+    }
+
+    // Unauthorized - redirect to /home or return 403 for API
+    if (request.nextUrl.pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    return redirectWithCookies(new URL('/home', request.url));
   }
 
   return response;

@@ -20,6 +20,7 @@ import {
   Globe,
   Clock
 } from 'lucide-react';
+import { getRoleConfig } from '@/lib/constants/roles';
 
 export default function HomeLaunchpad() {
   const { user, appUser, role, isLoading } = useAuth();
@@ -130,6 +131,9 @@ export default function HomeLaunchpad() {
     else displayName = user?.email ? user.email.split('@')[0] : 'ผู้ใช้งาน';
   }
 
+  const userRole = isAdmin ? 'admin' : (appUser?.role || role);
+  const roleBadge = getRoleConfig(userRole);
+
   const containerVariants = {
     hidden: { opacity: 0 },
     show: {
@@ -149,9 +153,14 @@ export default function HomeLaunchpad() {
       {/* Header & Quick Actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-surface backdrop-blur-xl p-6 rounded-3xl shadow-lg border border-white/60">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-primary mb-1">
-            สวัสดี, {displayName}
-          </h1>
+          <div className="flex items-center gap-3 mb-1 flex-wrap">
+            <h1 className="text-3xl font-extrabold tracking-tight text-primary">
+              สวัสดี, {displayName}
+            </h1>
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border shadow-sm ${roleBadge.badgeClass}`}>
+              {roleBadge.fullLabel}
+            </span>
+          </div>
           <p className="text-foreground/60 font-medium">ยินดีต้อนรับสู่ศูนย์กลางระบบงาน (SVPortal)</p>
         </div>
         

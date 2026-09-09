@@ -153,7 +153,7 @@ export async function PATCH(request: Request) {
     // For PATCH /api/admin/users?id=xxx
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('id');
-    const { is_active, assigned_features } = await request.json();
+    const { is_active, assigned_features, role, full_name } = await request.json();
 
     if (!userId) {
       return NextResponse.json({ error: 'Missing user ID' }, { status: 400 });
@@ -168,6 +168,8 @@ export async function PATCH(request: Request) {
     const updates: any = {};
     if (is_active !== undefined) updates.is_active = is_active;
     if (assigned_features !== undefined) updates.assigned_features = assigned_features;
+    if (role !== undefined) updates.role = role;
+    if (full_name !== undefined) updates.full_name = full_name;
 
     // Update app_users
     const { error: updateError } = await supabaseAdmin
