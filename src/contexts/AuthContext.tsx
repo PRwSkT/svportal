@@ -25,20 +25,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const supabase = createClient();
 
-    // Hard safety timeout to ensure isLoading never stays stuck on slow/hanging network
+    // Safety timer to prevent any indefinite loading freeze
     const safetyTimer = setTimeout(() => {
       setIsLoading(false);
-    }, 2500);
+    }, 4000);
 
-    const fetchAppUser = async (userId: string, email?: string) => {
+    const fetchAppUserFallback = async (userId: string, email?: string) => {
       try {
-        // 1. Fetch user record via RPC get_app_user_by_id (bypasses RLS cleanly)
+        // 1. Fetch user record via RPC get_app_user_by_id
         const { data: idData, error: idError } = await supabase.rpc('get_app_user_by_id', {
           target_user_id: userId
         });
         if (!idError && idData) {
-          setAppUser(idData as AppUser);
-          if (idData.role) setRole(idData.role);
+          const parsed = typeof idData === 'string' ? JSON.parse(idData) : idData;
+          setAppUser(parsed as AppUser);
+          if (parsed.role) setRole(parsed.role);
           return;
         }
 
@@ -48,8 +49,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             target_email: email
           });
           if (!emailError && emailData) {
-            setAppUser(emailData as AppUser);
-            if (emailData.role) setRole(emailData.role);
+            const parsed = typeof emailData === 'string' ? JSON.parse(emailData) : emailData;
+            setAppUser(parsed as AppUser);
+            if (parsed.role) setRole(parsed.role);
             return;
           }
         }
@@ -57,8 +59,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // 3. Fallback: get_current_app_user
         const { data: rpcData } = await supabase.rpc('get_current_app_user');
         if (rpcData) {
-          setAppUser(rpcData as AppUser);
-          if (rpcData.role) setRole(rpcData.role);
+          const parsed = typeof rpcData === 'string' ? JSON.parse(rpcData) : rpcData;
+          setAppUser(parsed as AppUser);
+          if (parsed.role) setRole(parsed.role);
           return;
         }
 
@@ -69,14 +72,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (data.role) setRole(data.role);
         }
       } catch (err) {
-        console.error('Error in fetchAppUser:', err);
+        console.error('Error in fetchAppUserFallback:', err);
       }
     };
 
-    const fetchSession = async () => {
-      // ----------------------------------------------------
+    const loadSession = async () => {
       // DEV MODE BYPASS FOR TESTING
-      // ----------------------------------------------------
       if (process.env.NODE_ENV === 'development') {
         const dummyUser = { id: 'dev-user-id', email: 'admin@dev.local' } as User;
         const dummyAppUser: AppUser = {
@@ -84,7 +85,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           full_name: 'ผู้ดูแลระบบ (Dev Mode)',
           role: 'admin',
           is_active: true,
-          assigned_features: ['dashboard', 'pos_fees', 'admin_reports', 'pos_shop', 'admin_products', 'pos_wallet_topup', 'admin_wallet_students', 'admin_students', 'admin_users', 'admin_website', 'post_assistant', 'audio_remote', 'qr_generator', 'settings', 'academic_todo', 'admin_attendance'],
+          assigned_features: [
+            'dashboard', 'pos_fees', 'admin_reports', 'pos_shop', 'admin_products', 
+            'pos_wallet_topup', 'admin_wallet_students', 'admin_students', 'admin_users', 
+            'admin_website', 'post_assistant', 'audio_remote', 'qr_generator', 
+            'settings', 'academic_todo', 'admin_attendance'
+          ],
           created_at: new Date().toISOString()
         };
         setUser(dummyUser);
@@ -93,8 +99,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false);
         return;
       }
-      // ----------------------------------------------------
 
+      try {
+        // 1. Primary: Load directly from /api/auth/me (Same-origin server verified, avoids client RLS/CORS)
+        const res = await fetch('/api/auth/me', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user) {
+            setUser(data.user);
+            setAppUser(data.appUser);
+            setRole(data.role);
+            setIsLoading(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load session from /api/auth/me:', err);
+      }
+
+      // 2. Client-side fallback via Supabase client
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) console.error('Session error:', sessionError);
@@ -105,39 +128,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (currentUser.email && adminEmails.includes(currentUser.email.toLowerCase())) {
             setRole('admin');
           }
-          await fetchAppUser(currentUser.id, currentUser.email);
+          await fetchAppUserFallback(currentUser.id, currentUser.email);
         } else {
           setRole(null);
           setAppUser(null);
         }
       } catch (err) {
-        console.error('Auth fetch error:', err);
+        console.error('Auth fetch fallback error:', err);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchSession();
+    loadSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: import('@supabase/supabase-js').AuthChangeEvent, session: import('@supabase/supabase-js').Session | null) => {
       if (process.env.NODE_ENV === 'development') return;
       
-      try {
-        const currentUser = session?.user || null;
-        setUser(currentUser);
-        if (currentUser) {
-          const adminEmails = ['admin@somkidvittaya.ac.th', 'peerawat@somkidvittaya.ac.th', 'media@somkidvittaya.ac.th', 'admin@svportal.com'];
-          if (currentUser.email && adminEmails.includes(currentUser.email.toLowerCase())) {
-            setRole('admin');
-          }
-          await fetchAppUser(currentUser.id, currentUser.email);
-        } else {
-          setRole(null);
-          setAppUser(null);
-        }
-      } catch (err) {
-        console.error('Auth state change error:', err);
-      } finally {
+      if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
+        loadSession();
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setRole(null);
+        setAppUser(null);
         setIsLoading(false);
       }
     });

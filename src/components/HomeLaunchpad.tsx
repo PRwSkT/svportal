@@ -25,7 +25,7 @@ import { getRoleConfig } from '@/lib/constants/roles';
 export default function HomeLaunchpad() {
   const { user, appUser, role, isLoading } = useAuth();
 
-  if (isLoading && !appUser && !user) {
+  if (isLoading || (!appUser && user)) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
