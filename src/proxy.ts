@@ -87,7 +87,7 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname === '/' ||
     request.nextUrl.pathname.startsWith('/website') ||
     request.nextUrl.pathname.startsWith('/auth') ||
-    request.nextUrl.pathname.startsWith('/api/auth/logout') ||
+    request.nextUrl.pathname.startsWith('/api/auth') ||
     request.nextUrl.pathname.startsWith('/api/cron') ||
     request.nextUrl.pathname.startsWith('/api/webhook') ||
     (request.nextUrl.pathname.endsWith('.html') && !request.nextUrl.pathname.includes('audio-remote.html')) ||
@@ -99,6 +99,9 @@ export async function proxy(request: NextRequest) {
 
   // Handle protected routes
   if (!user) {
+    if (request.nextUrl.pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     return redirectWithCookies(new URL('/login', request.url));
   }
 
@@ -106,6 +109,9 @@ export async function proxy(request: NextRequest) {
   if (!user.email?.endsWith('@somkidvittaya.ac.th') && !isSystemAdmin(user.email)) {
     // If they bypass Google's hosted domain prompt, middleware will catch them
     // and send them back to login with an error query param
+    if (request.nextUrl.pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Invalid domain' }, { status: 403 });
+    }
     return redirectWithCookies(new URL('/login?error=Invalid_Domain', request.url));
   }
 
