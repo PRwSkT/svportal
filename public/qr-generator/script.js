@@ -1,4 +1,13 @@
-document.addEventListener('DOMContentLoaded', () => {
+function initQRCodeGenerator() {
+    if (typeof QRCodeStyling === 'undefined') {
+        console.error('QRCodeStyling library is not loaded.');
+        const container = document.getElementById('qr-code-canvas');
+        if (container) {
+            container.innerHTML = '<div style="color: #6E0D22; text-align: center; padding: 24px; font-weight: 600;">ไม่สามารถโหลดระบบสร้าง QR Code ได้ กรุณารีเฟรชหน้าเว็บอีกครั้ง</div>';
+        }
+        return;
+    }
+
     // Presets
     const presetBtns = document.querySelectorAll('.preset-card');
     
@@ -28,9 +37,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const logoMarginInput = document.getElementById('logo-margin');
     
     const downloadBtn = document.getElementById('btn-download');
+    const downloadSvgBtn = document.getElementById('btn-download-svg');
     const qrContainer = document.getElementById('qr-code-canvas');
 
-    let currentLogoUrl = 'logo/sv-logo-social.png'; // Set default logo
+    if (!qrContainer) {
+        console.error('QR container element (#qr-code-canvas) not found.');
+        return;
+    }
 
     // CI Colors
     const ciRed = '#6E0D22';
@@ -103,42 +116,55 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // Default to ruby preset
+    let currentLogoUrl = presets.ruby.logo;
+    if (qrColorInput) qrColorInput.value = presets.ruby.qrColor;
+    if (bgColorInput) bgColorInput.value = presets.ruby.bgColor;
+    if (qrDotsSelect) qrDotsSelect.value = presets.ruby.dotsStyle;
+    if (cornerSquareColor) cornerSquareColor.value = presets.ruby.cornerSquareColor;
+    if (cornerSquareStyle) cornerSquareStyle.value = presets.ruby.cornerSquareStyle;
+    if (cornerDotColor) cornerDotColor.value = presets.ruby.cornerDotColor;
+    if (cornerDotStyle) cornerDotStyle.value = presets.ruby.cornerDotStyle;
+    if (predefinedLogoSelect) predefinedLogoSelect.value = presets.ruby.logo;
+
     // Initialize QR Code Styling instance
     const qrCode = new QRCodeStyling({
         width: 1024,
         height: 1024,
         margin: 64,
-        type: "svg",
-        data: qrDataInput.value || "https://svportal.example.com",
+        type: 'svg',
+        data: (qrDataInput && qrDataInput.value) ? qrDataInput.value.trim() : 'https://svportal.example.com',
         image: currentLogoUrl,
         dotsOptions: {
-            color: qrColorInput.value,
-            type: qrDotsSelect.value
+            color: qrColorInput ? qrColorInput.value : ciRed,
+            type: qrDotsSelect ? qrDotsSelect.value : 'classy'
         },
         backgroundOptions: {
-            color: bgColorInput.value === '#ffffff' ? 'transparent' : bgColorInput.value,
+            color: (bgColorInput && bgColorInput.value === '#ffffff') ? 'transparent' : (bgColorInput ? bgColorInput.value : 'transparent'),
         },
-        imageOptions: { crossOrigin: "anonymous",
-            margin: parseInt(logoMarginInput.value) * 3,
-            imageSize: parseFloat(logoSizeInput.value)
+        imageOptions: {
+            crossOrigin: 'anonymous',
+            margin: logoMarginInput ? parseInt(logoMarginInput.value) * 3 : 30,
+            imageSize: logoSizeInput ? parseFloat(logoSizeInput.value) : 0.4
         },
         cornersSquareOptions: {
-            type: cornerSquareStyle.value,
-            color: cornerSquareColor.value
+            type: cornerSquareStyle ? cornerSquareStyle.value : 'square',
+            color: cornerSquareColor ? cornerSquareColor.value : ciRed
         },
         cornersDotOptions: {
-            type: cornerDotStyle.value,
-            color: cornerDotColor.value
+            type: cornerDotStyle ? cornerDotStyle.value : 'dot',
+            color: cornerDotColor ? cornerDotColor.value : ciRed
         }
     });
 
+    qrContainer.innerHTML = '';
     qrCode.append(qrContainer);
 
     function updateQR() {
-        const data = qrDataInput.value.trim() || " ";
+        const data = (qrDataInput && qrDataInput.value.trim()) ? qrDataInput.value.trim() : ' ';
         
-        colorHexDisplay.textContent = qrColorInput.value.toUpperCase();
-        bgColorHexDisplay.textContent = bgColorInput.value.toUpperCase();
+        if (colorHexDisplay && qrColorInput) colorHexDisplay.textContent = qrColorInput.value.toUpperCase();
+        if (bgColorHexDisplay && bgColorInput) bgColorHexDisplay.textContent = bgColorInput.value.toUpperCase();
 
         qrCode.update({
             data: data,
@@ -146,63 +172,68 @@ document.addEventListener('DOMContentLoaded', () => {
             height: 1024,
             margin: 64,
             dotsOptions: {
-                color: qrColorInput.value,
-                type: qrDotsSelect.value
+                color: qrColorInput ? qrColorInput.value : ciRed,
+                type: qrDotsSelect ? qrDotsSelect.value : 'classy'
             },
             backgroundOptions: {
-                color: bgColorInput.value === '#ffffff' ? 'transparent' : bgColorInput.value
+                color: (bgColorInput && bgColorInput.value === '#ffffff') ? 'transparent' : (bgColorInput ? bgColorInput.value : 'transparent')
             },
             cornersSquareOptions: {
-                type: cornerSquareStyle.value,
-                color: cornerSquareColor.value
+                type: cornerSquareStyle ? cornerSquareStyle.value : 'square',
+                color: cornerSquareColor ? cornerSquareColor.value : ciRed
             },
             cornersDotOptions: {
-                type: cornerDotStyle.value,
-                color: cornerDotColor.value
+                type: cornerDotStyle ? cornerDotStyle.value : 'dot',
+                color: cornerDotColor ? cornerDotColor.value : ciRed
             },
-            imageOptions: { crossOrigin: "anonymous",
-                margin: parseInt(logoMarginInput.value) * 3,
-                imageSize: parseFloat(logoSizeInput.value)
+            imageOptions: {
+                crossOrigin: 'anonymous',
+                margin: logoMarginInput ? parseInt(logoMarginInput.value) * 3 : 30,
+                imageSize: logoSizeInput ? parseFloat(logoSizeInput.value) : 0.4
             },
-            image: currentLogoUrl || ""
+            image: currentLogoUrl || ''
         });
     }
+
+    // Call updateQR to ensure labels and colors are properly synced
+    updateQR();
     
     // Handle Predefined Logo Selection
-    predefinedLogoSelect.addEventListener('change', (e) => {
-        const val = e.target.value;
-        presetBtns.forEach(b => b.classList.remove('active')); // Custom tweak
-        if (val === 'custom') {
-            customLogoGroup.style.display = 'flex';
-            if (logoUpload.files.length > 0) {
-                const file = logoUpload.files[0];
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    currentLogoUrl = event.target.result;
+    if (predefinedLogoSelect) {
+        predefinedLogoSelect.addEventListener('change', (e) => {
+            const val = e.target.value;
+            presetBtns.forEach(b => b.classList.remove('active'));
+            if (val === 'custom') {
+                if (customLogoGroup) customLogoGroup.style.display = 'flex';
+                if (logoUpload && logoUpload.files.length > 0) {
+                    const file = logoUpload.files[0];
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        currentLogoUrl = event.target.result;
+                        updateQR();
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    currentLogoUrl = null;
                     updateQR();
-                };
-                reader.readAsDataURL(file);
+                }
             } else {
-                currentLogoUrl = null;
+                if (customLogoGroup) customLogoGroup.style.display = 'none';
+                currentLogoUrl = val === '' ? null : val;
                 updateQR();
             }
-        } else {
-            customLogoGroup.style.display = 'none';
-            currentLogoUrl = val === "" ? null : val;
-            updateQR();
-        }
-    });
+        });
+    }
 
     // Attach event listeners to all manual inputs
     const inputs = [
         qrDataInput, qrColorInput, bgColorInput, qrDotsSelect,
         cornerSquareStyle, cornerSquareColor, cornerDotStyle, cornerDotColor,
         logoSizeInput, logoMarginInput
-    ];
+    ].filter(Boolean);
     
     inputs.forEach(input => {
         input.addEventListener('input', () => {
-            // Remove active state from presets if user manually tweaks colors
             presetBtns.forEach(b => b.classList.remove('active'));
             updateQR();
         });
@@ -213,107 +244,128 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', () => {
             const presetId = btn.dataset.preset;
             const preset = presets[presetId];
-            if(!preset) return;
+            if (!preset) return;
             
-            // Update UI inputs
-            qrColorInput.value = preset.qrColor;
-            bgColorInput.value = preset.bgColor;
-            cornerSquareColor.value = preset.cornerSquareColor;
-            cornerDotColor.value = preset.cornerDotColor;
+            if (qrColorInput) qrColorInput.value = preset.qrColor;
+            if (bgColorInput) bgColorInput.value = preset.bgColor;
+            if (cornerSquareColor) cornerSquareColor.value = preset.cornerSquareColor;
+            if (cornerDotColor) cornerDotColor.value = preset.cornerDotColor;
             
-            qrDotsSelect.value = preset.dotsStyle;
-            cornerSquareStyle.value = preset.cornerSquareStyle;
-            cornerDotStyle.value = preset.cornerDotStyle;
+            if (qrDotsSelect) qrDotsSelect.value = preset.dotsStyle;
+            if (cornerSquareStyle) cornerSquareStyle.value = preset.cornerSquareStyle;
+            if (cornerDotStyle) cornerDotStyle.value = preset.cornerDotStyle;
             
             if (preset.logo !== undefined) {
                 currentLogoUrl = preset.logo;
-                if (currentLogoUrl !== '') {
-                    predefinedLogoSelect.value = currentLogoUrl;
-                    customLogoGroup.style.display = 'none';
-                } else {
-                    predefinedLogoSelect.value = '';
-                    customLogoGroup.style.display = 'none';
-                }
+                if (predefinedLogoSelect) predefinedLogoSelect.value = currentLogoUrl;
+                if (customLogoGroup) customLogoGroup.style.display = 'none';
             }
 
-            // Update active state
             presetBtns.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
 
-            // Apply updates
             updateQR();
         });
     });
 
     // Handle Logo Upload
-    logoUpload.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            fileNameDisplay.textContent = file.name;
-            clearLogoBtn.classList.remove('hidden');
-            presetBtns.forEach(b => b.classList.remove('active'));
-            
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                currentLogoUrl = event.target.result;
-                updateQR();
-            };
-            reader.readAsDataURL(file);
-        }
-    });
+    if (logoUpload) {
+        logoUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                if (fileNameDisplay) fileNameDisplay.textContent = file.name;
+                if (clearLogoBtn) clearLogoBtn.classList.remove('hidden');
+                presetBtns.forEach(b => b.classList.remove('active'));
+                
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    currentLogoUrl = event.target.result;
+                    updateQR();
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
 
     // Handle Clear Custom Logo
-    clearLogoBtn.addEventListener('click', () => {
-        logoUpload.value = '';
-        currentLogoUrl = null;
-        fileNameDisplay.textContent = 'No file selected';
-        clearLogoBtn.classList.add('hidden');
-        presetBtns.forEach(b => b.classList.remove('active'));
-        updateQR();
-    });
+    if (clearLogoBtn) {
+        clearLogoBtn.addEventListener('click', () => {
+            if (logoUpload) logoUpload.value = '';
+            currentLogoUrl = null;
+            if (fileNameDisplay) fileNameDisplay.textContent = 'No file selected';
+            clearLogoBtn.classList.add('hidden');
+            presetBtns.forEach(b => b.classList.remove('active'));
+            updateQR();
+        });
+    }
 
-    // Handle Download
+    // Handle PNG Download
+    if (downloadBtn) {
         downloadBtn.addEventListener('click', async () => {
-        try {
-            const blob = await qrCode.getRawData('png');
-            if (!blob) {
-                alert("Error: Could not generate QR Code image.");
-                return;
+            const originalHTML = downloadBtn.innerHTML;
+            try {
+                downloadBtn.disabled = true;
+                downloadBtn.innerHTML = '<span>กำลังประมวลผล...</span>';
+                await qrCode.download({ name: 'sv-portal-qr', extension: 'png' });
+            } catch (err) {
+                console.warn('qrCode.download PNG failed, attempting fallback:', err);
+                try {
+                    const blob = await qrCode.getRawData('png');
+                    if (!blob) throw new Error('Could not generate PNG blob');
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'sv-portal-qr.png';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    setTimeout(() => URL.revokeObjectURL(url), 500);
+                } catch (fallbackErr) {
+                    alert('ไม่สามารถดาวน์โหลด PNG ได้: ' + fallbackErr.message);
+                    console.error(fallbackErr);
+                }
+            } finally {
+                downloadBtn.disabled = false;
+                downloadBtn.innerHTML = originalHTML;
             }
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = "sv-portal-qr.png";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(url), 100);
-        } catch (err) {
-            alert("Download failed: " + err);
-            console.error(err);
-        }
-    });
+        });
+    }
 
-    const downloadSvgBtn = document.getElementById('btn-download-svg');
-    downloadSvgBtn.addEventListener('click', async () => {
-        try {
-            const blob = await qrCode.getRawData('svg');
-            if (!blob) {
-                alert("Error: Could not generate SVG.");
-                return;
+    // Handle SVG Download
+    if (downloadSvgBtn) {
+        downloadSvgBtn.addEventListener('click', async () => {
+            const originalHTML = downloadSvgBtn.innerHTML;
+            try {
+                downloadSvgBtn.disabled = true;
+                downloadSvgBtn.innerHTML = '<span>กำลังประมวลผล...</span>';
+                await qrCode.download({ name: 'sv-portal-qr', extension: 'svg' });
+            } catch (err) {
+                console.warn('qrCode.download SVG failed, attempting fallback:', err);
+                try {
+                    const blob = await qrCode.getRawData('svg');
+                    if (!blob) throw new Error('Could not generate SVG blob');
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'sv-portal-qr.svg';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    setTimeout(() => URL.revokeObjectURL(url), 500);
+                } catch (fallbackErr) {
+                    alert('ไม่สามารถดาวน์โหลด SVG ได้: ' + fallbackErr.message);
+                    console.error(fallbackErr);
+                }
+            } finally {
+                downloadSvgBtn.disabled = false;
+                downloadSvgBtn.innerHTML = originalHTML;
             }
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = "sv-portal-qr.svg";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(url), 100);
-        } catch (err) {
-            alert("SVG Download failed: " + err);
-            console.error(err);
-        }
-    });
-});
+        });
+    }
+}
 
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initQRCodeGenerator);
+} else {
+    initQRCodeGenerator();
+}

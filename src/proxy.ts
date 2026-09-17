@@ -6,12 +6,13 @@ export async function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'unsafe-eval' 'nonce-${nonce}' 'strict-dynamic' https:;
+    script-src 'self' 'unsafe-eval' 'unsafe-inline' https: blob: data:;
     style-src 'self' 'unsafe-inline' https:;
     img-src 'self' blob: data: https:;
     font-src 'self' data: https:;
     connect-src 'self' https: wss:;
     frame-src 'self' https:;
+    worker-src 'self' blob:;
   `.replace(/\s{2,}/g, ' ').trim();
 
   const requestHeaders = new Headers(request.headers);
@@ -92,9 +93,14 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/api/webhook') ||
     (request.nextUrl.pathname.endsWith('.html') && !request.nextUrl.pathname.includes('audio-remote.html')) ||
     request.nextUrl.pathname.includes('post-assistant') ||
-    request.nextUrl.pathname === '/api/admin/website/sync-post' ||
-    request.nextUrl.pathname.startsWith('/qr-generator')
+    request.nextUrl.pathname === '/api/admin/website/sync-post'
   ) {
+    return response;
+  }
+
+  // Bypass auth and CSP for QR Generator
+  if (request.nextUrl.pathname.startsWith('/qr-generator')) {
+    response.headers.delete('Content-Security-Policy');
     return response;
   }
 
