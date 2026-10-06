@@ -88,12 +88,14 @@ interface FormViewerProps {
   initialForm: FormDefinition;
   initialFields: FormField[];
   currentUser: { id: string; email: string } | null;
+  isDraftPreview?: boolean;
 }
 
 export default function FormViewerClient({
   initialForm,
   initialFields,
   currentUser,
+  isDraftPreview = false,
 }: FormViewerProps) {
   const [lang, setLang] = useState<SupportedLang>('th');
   const [answers, setAnswers] = useState<Record<string, any>>({});
@@ -378,6 +380,29 @@ export default function FormViewerClient({
           </div>
         </div>
       </header>
+
+      {/* Draft Preview Banner */}
+      {isDraftPreview && (
+        <div className="bg-amber-500 text-amber-950 px-4 py-2.5 shadow-sm border-b border-amber-600/30">
+          <div className="max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs sm:text-sm">
+            <div className="flex items-center gap-2">
+              <span className="bg-amber-900 text-amber-100 px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider">
+                โหมดตัวอย่างแบบร่าง
+              </span>
+              <span className="font-medium text-amber-950">
+                ฟอร์มนี้ยังไม่เปิดเผยแพร่สู่บุคคลภายนอก (คุณมองเห็นหน้านี้เพราะเข้าสู่ระบบในฐานะบุคลากร)
+              </span>
+            </div>
+            <Link
+              href={`/admin/forms/${initialForm.id}/edit`}
+              className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-amber-50 text-amber-950 font-bold text-xs rounded-lg shadow-xs transition-colors shrink-0"
+            >
+              <span>แก้ไข / เผยแพร่ในสตูดิโอ</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Main Form Container */}
       <main className="max-w-3xl mx-auto px-4 sm:px-6 pt-6">

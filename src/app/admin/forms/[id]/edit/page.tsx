@@ -501,23 +501,43 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
             </Link>
 
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-tight max-w-md truncate">
                   {form.title?.th || 'แบบฟอร์มไม่มีชื่อ'}
                 </h1>
                 <button
+                  type="button"
                   onClick={handleTogglePublish}
-                  className={`text-[11px] font-semibold px-2 py-0.5 rounded-full transition-colors ${
+                  className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full transition-all cursor-pointer shadow-2xs ${
                     form.is_published
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-amber-100 text-amber-800'
+                      ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300'
+                      : 'bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300'
                   }`}
+                  title={
+                    form.is_published
+                      ? 'ฟอร์มกำลังเปิดให้บุคคลทั่วไปเข้าใช้งาน (คลิกเพื่อปิดกลับเป็นแบบร่าง)'
+                      : 'ฟอร์มยังเป็นแบบร่าง (คลิกเพื่อเผยแพร่เปิดให้บุคคลทั่วไปเข้าใช้งาน)'
+                  }
                 >
-                  {form.is_published ? 'เผยแพร่อยู่' : 'แบบร่าง'}
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      form.is_published ? 'bg-emerald-600 animate-pulse' : 'bg-amber-600'
+                    }`}
+                  />
+                  <span>{form.is_published ? 'เผยแพร่อยู่ (ออนไลน์)' : 'แบบร่าง (คลิกเพื่อเผยแพร่)'}</span>
                 </button>
               </div>
-              <div className="flex items-center gap-2 text-xs text-slate-400 font-mono mt-0.5">
-                <span>/forms/{form.slug}</span>
+              <div className="flex items-center gap-2 text-xs text-slate-500 font-mono mt-0.5">
+                <a
+                  href={`/forms/${form.slug}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-[#7B1C3E] underline flex items-center gap-1"
+                  title="เปิดดูหน้าฟอร์มจริงในแท็บใหม่"
+                >
+                  <span>/forms/{form.slug}</span>
+                  <ExternalLink className="w-3 h-3 inline" />
+                </a>
                 {hasUnsavedChanges && (
                   <span className="text-amber-600 font-sans font-semibold">● มีการแก้ไขที่ยังไม่ได้บันทึก</span>
                 )}

@@ -169,6 +169,8 @@ export async function proxy(request: NextRequest) {
       requiredFeature = 'pos_fees';
     } else if (path.startsWith('/admin/users') || path.startsWith('/api/admin/users')) {
       requiredFeature = 'admin_users';
+    } else if (path.startsWith('/admin/forms') || path.startsWith('/api/admin/forms')) {
+      requiredFeature = 'admin_forms';
     }
 
     if (requiredFeature && assignedFeatures.includes(requiredFeature)) {

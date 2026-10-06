@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getServerUser } from '@/lib/auth';
+import { isSystemAdmin } from '@/lib/constants/auth';
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -35,10 +36,19 @@ export async function POST(
 
     // 2. Check if published
     if (!form.is_published) {
-      return NextResponse.json(
-        { error: 'แบบฟอร์มนี้ปิดรับคำตอบอยู่ หรือยังไม่เผยแพร่' },
-        { status: 403 }
-      );
+      const user = await getServerUser();
+      const isStaffOrAdmin =
+        !!user &&
+        (isSystemAdmin(user.email) ||
+          Boolean(user.email?.endsWith('@somkidvittaya.ac.th')) ||
+          user.user_metadata?.role === 'admin');
+
+      if (!isStaffOrAdmin) {
+        return NextResponse.json(
+          { error: 'แบบฟอร์มนี้ปิดรับคำตอบอยู่ หรือยังไม่เผยแพร่' },
+          { status: 403 }
+        );
+      }
     }
 
     // 3. Check time windows
