@@ -1,11 +1,13 @@
 export type KpiStatus = 'pending_self' | 'self_submitted' | 'completed';
 export type KpiGrade = 'A' | 'B+' | 'B' | 'C' | 'D';
+export type KpiQuarter = 'Q1' | 'Q2' | 'Q3' | 'Q4';
 
 export interface KpiCycle {
   id: string;
   title: string;
   academic_year: string;
   semester: string;
+  quarter?: KpiQuarter;
   start_date: string | null;
   end_date: string | null;
   status: 'draft' | 'active' | 'closed';
@@ -53,7 +55,8 @@ export interface KpiEvaluation {
   self_total_score: number | null;
   self_submitted_at: string | null;
 
-  // Supervisor assessment
+  // Supervisor assignment & assessment
+  assigned_evaluator_id: string | null;
   supervisor_id: string | null;
   supervisor_scores: Record<string, number>; // { [itemId]: 1-5 }
   supervisor_feedback: Record<string, string>; // { [sectionId]: feedback text }
@@ -92,6 +95,17 @@ export interface KpiEvaluation {
 
   // Joined template details
   template?: KpiTemplate;
+
+  // Joined assigned evaluator details
+  assigned_evaluator?: {
+    id: string;
+    name_th: string;
+    name_en?: string;
+    position_th: string;
+    category?: string;
+    email?: string | null;
+    image_url?: string | null;
+  };
 }
 
 export interface SectionScoreSummary {

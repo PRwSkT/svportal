@@ -3,7 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { getServerUser } from '@/lib/auth';
 import { isSystemAdmin } from '@/lib/constants/auth';
-import { KpiCycle, KpiEvaluation, KpiTemplate } from '@/types/kpi';
+import { KpiCycle, KpiEvaluation, KpiTemplate, KpiQuarter } from '@/types/kpi';
 import { calculateKpiScoreSummaries } from '@/lib/kpi/scoring';
 import { sendAnonymousKpiEmail } from '@/lib/kpi/email';
 
@@ -25,12 +25,55 @@ export async function getKpiCycles(): Promise<{ success: boolean; data?: KpiCycl
     const { data, error } = await supabase
       .from('kpi_cycles')
       .select('*')
+      .order('academic_year', { ascending: false })
+      .order('quarter', { ascending: false })
       .order('created_at', { ascending: false });
 
     if (error) throw error;
     return { success: true, data: data as KpiCycle[] };
   } catch (err: any) {
     console.error('getKpiCycles error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Create a new Quarterly Evaluation Cycle
+ */
+export async function createQuarterlyCycle(payload: {
+  title: string;
+  academic_year: string;
+  semester: string;
+  quarter: KpiQuarter;
+  start_date?: string;
+  end_date?: string;
+}): Promise<{ success: boolean; data?: KpiCycle; error?: string }> {
+  try {
+    const supabase = getAdminClient();
+    const { data, error } = await supabase
+      .from('kpi_cycles')
+      .insert([
+        {
+          title: payload.title,
+          academic_year: payload.academic_year,
+          semester: payload.semester,
+          quarter: payload.quarter,
+          start_date: payload.start_date || null,
+          end_date: payload.end_date || null,
+          status: 'active',
+        },
+      ])
+      .select('*')
+      .single();
+
+    if (error) throw error;
+
+    // Automatically sync active personnel for this new cycle
+    await syncPersonnelForCycle(data.id);
+
+    return { success: true, data: data as KpiCycle };
+  } catch (err: any) {
+    console.error('createQuarterlyCycle error:', err);
     return { success: false, error: err.message };
   }
 }
@@ -56,7 +99,39 @@ export async function getKpiTemplates(): Promise<{ success: boolean; data?: KpiT
 }
 
 /**
- * Fetch all evaluations for a specific cycle
+ * Fetch all active personnel candidates for evaluator dropdown
+ */
+export async function getEvaluatorCandidates(): Promise<{
+  success: boolean;
+  data?: {
+    id: string;
+    name_th: string;
+    name_en?: string;
+    position_th: string;
+    category?: string;
+    email: string | null;
+    image_url?: string | null;
+  }[];
+  error?: string;
+}> {
+  try {
+    const supabase = getAdminClient();
+    const { data, error } = await supabase
+      .from('personnel')
+      .select('id, name_th, name_en, position_th, category, email, image_url')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+
+    if (error) throw error;
+    return { success: true, data: data || [] };
+  } catch (err: any) {
+    console.error('getEvaluatorCandidates error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Fetch all evaluations for a specific cycle with user role awareness
  */
 export async function getKpiEvaluations(cycleId: string): Promise<{
   success: boolean;
@@ -68,15 +143,36 @@ export async function getKpiEvaluations(cycleId: string): Promise<{
     completed: number;
     avgScore: number;
   };
+  currentUserContext?: {
+    userId: string | null;
+    personnelId: string | null;
+    isAdmin: boolean;
+  };
   error?: string;
 }> {
   try {
     const supabase = getAdminClient();
+    const currentUser = await getServerUser();
+    const isAdmin = Boolean(
+      currentUser && (isSystemAdmin(currentUser.email) || currentUser.user_metadata?.role === 'admin')
+    );
+
+    let currentPersonnelId: string | null = null;
+    if (currentUser?.email) {
+      const { data: pData } = await supabase
+        .from('personnel')
+        .select('id')
+        .eq('email', currentUser.email)
+        .maybeSingle();
+      currentPersonnelId = pData?.id || null;
+    }
+
     const { data, error } = await supabase
       .from('kpi_evaluations')
       .select(`
         *,
         personnel:personnel_id(*),
+        assigned_evaluator:assigned_evaluator_id(*),
         cycle:cycle_id(*),
         template:template_id(*)
       `)
@@ -113,6 +209,11 @@ export async function getKpiEvaluations(cycleId: string): Promise<{
         completed: completedCount,
         avgScore,
       },
+      currentUserContext: {
+        userId: currentUser?.id || null,
+        personnelId: currentPersonnelId,
+        isAdmin,
+      },
     };
   } catch (err: any) {
     console.error('getKpiEvaluations error:', err);
@@ -121,20 +222,92 @@ export async function getKpiEvaluations(cycleId: string): Promise<{
 }
 
 /**
- * Fetch a single evaluation detail with personnel, cycle, and template
+ * Assign Evaluator (Supervisor) to an Evaluation
+ */
+export async function assignEvaluator(
+  evaluationId: string,
+  evaluatorPersonnelId: string | null
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = getAdminClient();
+    const { error } = await supabase
+      .from('kpi_evaluations')
+      .update({
+        assigned_evaluator_id: evaluatorPersonnelId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', evaluationId);
+
+    if (error) throw error;
+    return { success: true };
+  } catch (err: any) {
+    console.error('assignEvaluator error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Bulk Assign Evaluators
+ */
+export async function bulkAssignEvaluators(
+  assignments: { evaluationId: string; evaluatorPersonnelId: string | null }[]
+): Promise<{ success: boolean; count: number; error?: string }> {
+  try {
+    const supabase = getAdminClient();
+    let count = 0;
+    for (const item of assignments) {
+      const { error } = await supabase
+        .from('kpi_evaluations')
+        .update({
+          assigned_evaluator_id: item.evaluatorPersonnelId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', item.evaluationId);
+      if (!error) count++;
+    }
+    return { success: true, count };
+  } catch (err: any) {
+    console.error('bulkAssignEvaluators error:', err);
+    return { success: false, count: 0, error: err.message };
+  }
+}
+
+/**
+ * Fetch a single evaluation detail with personnel, cycle, template, and assigned evaluator
  */
 export async function getEvaluationDetail(evaluationId: string): Promise<{
   success: boolean;
   data?: KpiEvaluation;
+  currentUserContext?: {
+    userId: string | null;
+    personnelId: string | null;
+    isAdmin: boolean;
+  };
   error?: string;
 }> {
   try {
     const supabase = getAdminClient();
+    const currentUser = await getServerUser();
+    const isAdmin = Boolean(
+      currentUser && (isSystemAdmin(currentUser.email) || currentUser.user_metadata?.role === 'admin')
+    );
+
+    let currentPersonnelId: string | null = null;
+    if (currentUser?.email) {
+      const { data: pData } = await supabase
+        .from('personnel')
+        .select('id')
+        .eq('email', currentUser.email)
+        .maybeSingle();
+      currentPersonnelId = pData?.id || null;
+    }
+
     const { data, error } = await supabase
       .from('kpi_evaluations')
       .select(`
         *,
         personnel:personnel_id(*),
+        assigned_evaluator:assigned_evaluator_id(*),
         cycle:cycle_id(*),
         template:template_id(*)
       `)
@@ -142,7 +315,15 @@ export async function getEvaluationDetail(evaluationId: string): Promise<{
       .single();
 
     if (error) throw error;
-    return { success: true, data: data as KpiEvaluation };
+    return {
+      success: true,
+      data: data as KpiEvaluation,
+      currentUserContext: {
+        userId: currentUser?.id || null,
+        personnelId: currentPersonnelId,
+        isAdmin,
+      },
+    };
   } catch (err: any) {
     console.error('getEvaluationDetail error:', err);
     return { success: false, error: err.message };
@@ -193,7 +374,7 @@ export async function submitSelfEvaluation(
         updated_at: new Date().toISOString(),
       })
       .eq('id', evaluationId)
-      .select(`*, personnel:personnel_id(*), cycle:cycle_id(*), template:template_id(*)`)
+      .select(`*, personnel:personnel_id(*), assigned_evaluator:assigned_evaluator_id(*), cycle:cycle_id(*), template:template_id(*)`)
       .single();
 
     if (updateErr) throw updateErr;
@@ -257,7 +438,7 @@ export async function submitSupervisorEvaluation(
         updated_at: new Date().toISOString(),
       })
       .eq('id', evaluationId)
-      .select(`*, personnel:personnel_id(*), cycle:cycle_id(*), template:template_id(*)`)
+      .select(`*, personnel:personnel_id(*), assigned_evaluator:assigned_evaluator_id(*), cycle:cycle_id(*), template:template_id(*)`)
       .single();
 
     if (updateErr) throw updateErr;
@@ -288,6 +469,7 @@ export async function dispatchEvaluationEmail(evaluationId: string): Promise<{
       .select(`
         *,
         personnel:personnel_id(*),
+        assigned_evaluator:assigned_evaluator_id(*),
         cycle:cycle_id(*),
         template:template_id(*)
       `)
