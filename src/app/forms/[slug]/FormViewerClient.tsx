@@ -10,7 +10,8 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle2, AlertCircle, Upload, Star, Check, Globe,
-  Lock, ArrowRight, Loader2, RefreshCw, FileText, ChevronRight
+  Lock, ArrowRight, Loader2, RefreshCw, FileText, ChevronRight,
+  Info, Image as ImageIcon
 } from 'lucide-react';
 
 const UI_TEXT: Record<SupportedLang, {
@@ -202,12 +203,13 @@ export default function FormViewerClient({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 1. Validation check
+    // 1. Validation check (skip non-input fields)
+    const nonInputTypes = ['section_header', 'image', 'info_text'];
     const errors: Record<string, boolean> = {};
     let hasError = false;
 
     for (const field of initialFields) {
-      if (field.is_required && field.field_type !== 'section_header') {
+      if (field.is_required && !nonInputTypes.includes(field.field_type)) {
         const val = answers[field.field_key];
         const isEmpty =
           val === undefined ||
@@ -380,6 +382,17 @@ export default function FormViewerClient({
       {/* Main Form Container */}
       <main className="max-w-3xl mx-auto px-4 sm:px-6 pt-6">
         <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Form Header Banner (if uploaded) */}
+          {initialForm.banner_url && (
+            <div className="w-full rounded-3xl overflow-hidden border border-slate-200/80 shadow-xs">
+              <img
+                src={initialForm.banner_url}
+                alt={formTitle}
+                className="w-full max-h-72 object-cover object-center"
+              />
+            </div>
+          )}
+
           {/* Form Header Card */}
           <div className="bg-white rounded-3xl border-t-8 border-t-[#7B1C3E] border border-slate-200/80 p-6 sm:p-8 shadow-sm">
             <div className="flex items-center gap-2 text-xs font-bold text-[#7B1C3E] mb-2 uppercase tracking-wider">
@@ -408,269 +421,329 @@ export default function FormViewerClient({
             </div>
           </div>
 
-          {/* Render Form Fields */}
-          {initialFields.map((field, index) => {
-            const fieldLabel = getLocalized(field.label);
-            const fieldHelp = getLocalized(field.help_text);
-            const isError = validationErrors[field.field_key];
+          {/* Render Form Elements in Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            {initialFields.map((field) => {
+              const fieldLabel = getLocalized(field.label);
+              const fieldHelp = getLocalized(field.help_text);
+              const isError = validationErrors[field.field_key];
+              const colSpanClass = field.width === 'half' ? 'sm:col-span-1' : 'col-span-full';
 
-            // Section Header Field
-            if (field.field_type === 'section_header') {
-              return (
-                <div
-                  key={field.id}
-                  className="bg-[#1B3A6B] text-white rounded-2xl p-5 shadow-xs border-l-4 border-l-[#7B1C3E]"
-                >
-                  <h3 className="text-base sm:text-lg font-bold">{fieldLabel}</h3>
-                  {fieldHelp && <p className="text-xs text-white/80 mt-1">{fieldHelp}</p>}
-                </div>
-              );
-            }
+              // 1. Section Header Field
+              if (field.field_type === 'section_header') {
+                return (
+                  <div
+                    key={field.id}
+                    className="col-span-full bg-[#1B3A6B] text-white rounded-2xl p-5 shadow-xs border-l-4 border-l-[#7B1C3E]"
+                  >
+                    <h3 className="text-base sm:text-lg font-bold">{fieldLabel}</h3>
+                    {fieldHelp && <p className="text-xs text-white/80 mt-1">{fieldHelp}</p>}
+                  </div>
+                );
+              }
 
-            return (
-              <motion.div
-                key={field.id}
-                id={`field-${field.field_key}`}
-                layout
-                className={`bg-white rounded-2xl border p-5 sm:p-6 shadow-2xs transition-all ${
-                  isError
-                    ? 'border-rose-400 ring-2 ring-rose-100 bg-rose-50/10'
-                    : 'border-slate-200/90'
-                }`}
-              >
-                {/* Field Label & Required asterisk */}
-                <div className="mb-3">
-                  <label className="block text-sm font-bold text-slate-900 leading-snug">
-                    {fieldLabel}
-                    {field.is_required && (
-                      <span className="text-rose-500 ml-1 text-base leading-none">*</span>
+              // 2. Informational Detail / Note Field (No Input)
+              if (field.field_type === 'info_text') {
+                return (
+                  <div
+                    key={field.id}
+                    className={`${colSpanClass} bg-gradient-to-br from-indigo-50/80 to-slate-50 rounded-2xl border border-indigo-100/90 p-5 sm:p-6 shadow-2xs`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-xl bg-indigo-100 text-indigo-700 shrink-0 mt-0.5">
+                        <Info className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        {fieldLabel && (
+                          <h3 className="text-base font-bold text-slate-900 leading-snug">{fieldLabel}</h3>
+                        )}
+                        {fieldHelp && (
+                          <p className="text-xs sm:text-sm text-slate-600 mt-2 whitespace-pre-wrap leading-relaxed">
+                            {fieldHelp}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              // 3. Image / Poster / QR Code Field (No Input)
+              if (field.field_type === 'image') {
+                return (
+                  <div
+                    key={field.id}
+                    className={`${colSpanClass} bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-2xs`}
+                  >
+                    {fieldLabel && (
+                      <h3 className="text-base font-bold text-slate-900 mb-3">{fieldLabel}</h3>
                     )}
-                  </label>
-                  {fieldHelp && (
-                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">{fieldHelp}</p>
-                  )}
-                </div>
-
-                {/* Input Fields By Type */}
-                <div className="mt-2">
-                  {/* Single Line Text */}
-                  {field.field_type === 'text' && (
-                    <input
-                      type="text"
-                      value={answers[field.field_key] || ''}
-                      onChange={(e) => handleInputChange(field.field_key, e.target.value)}
-                      placeholder={fieldLabel}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white transition-all"
-                    />
-                  )}
-
-                  {/* Multiline Paragraph Textarea */}
-                  {field.field_type === 'textarea' && (
-                    <textarea
-                      rows={3}
-                      value={answers[field.field_key] || ''}
-                      onChange={(e) => handleInputChange(field.field_key, e.target.value)}
-                      placeholder={fieldLabel}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white transition-all resize-y"
-                    />
-                  )}
-
-                  {/* Number */}
-                  {field.field_type === 'number' && (
-                    <input
-                      type="number"
-                      value={answers[field.field_key] || ''}
-                      onChange={(e) => handleInputChange(field.field_key, e.target.value)}
-                      placeholder="0"
-                      className="w-full sm:w-60 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white transition-all"
-                    />
-                  )}
-
-                  {/* Radio Choice (Single select) */}
-                  {field.field_type === 'radio' && (
-                    <div className="space-y-2.5 pt-1">
-                      {(field.options || []).map((opt) => {
-                        const optLabel = getLocalized(opt.label);
-                        const isChecked = answers[field.field_key] === opt.value;
-                        return (
-                          <label
-                            key={opt.value}
-                            className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                              isChecked
-                                ? 'border-[#7B1C3E] bg-[#7B1C3E]/5 text-[#7B1C3E] font-medium'
-                                : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name={field.field_key}
-                              value={opt.value}
-                              checked={isChecked}
-                              onChange={() => handleInputChange(field.field_key, opt.value)}
-                              className="w-4 h-4 text-[#7B1C3E] focus:ring-[#7B1C3E] accent-[#7B1C3E]"
-                            />
-                            <span className="text-sm">{optLabel}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Checkbox (Multi select) */}
-                  {field.field_type === 'checkbox' && (
-                    <div className="space-y-2.5 pt-1">
-                      {(field.options || []).map((opt) => {
-                        const optLabel = getLocalized(opt.label);
-                        const selectedArr = (answers[field.field_key] as string[]) || [];
-                        const isChecked = selectedArr.includes(opt.value);
-                        return (
-                          <label
-                            key={opt.value}
-                            className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                              isChecked
-                                ? 'border-[#7B1C3E] bg-[#7B1C3E]/5 text-[#7B1C3E] font-medium'
-                                : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              value={opt.value}
-                              checked={isChecked}
-                              onChange={() => handleCheckboxToggle(field.field_key, opt.value)}
-                              className="w-4 h-4 rounded text-[#7B1C3E] focus:ring-[#7B1C3E] accent-[#7B1C3E]"
-                            />
-                            <span className="text-sm">{optLabel}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Dropdown Select */}
-                  {field.field_type === 'select' && (
-                    <select
-                      value={answers[field.field_key] || ''}
-                      onChange={(e) => handleInputChange(field.field_key, e.target.value)}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white transition-all text-slate-800"
-                    >
-                      <option value="">{t.selectPlaceholder}</option>
-                      {(field.options || []).map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {getLocalized(opt.label)}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-
-                  {/* Date */}
-                  {field.field_type === 'date' && (
-                    <input
-                      type="date"
-                      value={answers[field.field_key] || ''}
-                      onChange={(e) => handleInputChange(field.field_key, e.target.value)}
-                      className="w-full sm:w-64 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white transition-all"
-                    />
-                  )}
-
-                  {/* Time */}
-                  {field.field_type === 'time' && (
-                    <input
-                      type="time"
-                      value={answers[field.field_key] || ''}
-                      onChange={(e) => handleInputChange(field.field_key, e.target.value)}
-                      className="w-full sm:w-48 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white transition-all"
-                    />
-                  )}
-
-                  {/* Rating 1-5 Stars */}
-                  {field.field_type === 'rating' && (
-                    <div className="flex items-center gap-2 pt-1">
-                      {[1, 2, 3, 4, 5].map((star) => {
-                        const curRating = answers[field.field_key] || 0;
-                        const isFilled = star <= curRating;
-                        return (
-                          <button
-                            key={star}
-                            type="button"
-                            onClick={() => handleInputChange(field.field_key, star)}
-                            className="p-1 text-slate-300 hover:text-amber-400 focus:outline-none transition-colors"
-                          >
-                            <Star
-                              className={`w-8 h-8 ${
-                                isFilled
-                                  ? 'text-amber-400 fill-amber-400'
-                                  : 'text-slate-300'
-                              }`}
-                            />
-                          </button>
-                        );
-                      })}
-                      {answers[field.field_key] && (
-                        <span className="text-xs font-bold text-amber-600 ml-2">
-                          {answers[field.field_key]} / 5
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* File Upload / Slip */}
-                  {field.field_type === 'file_upload' && (
-                    <div className="space-y-3">
-                      <label className="border-2 border-dashed border-slate-200 hover:border-[#7B1C3E] bg-slate-50 hover:bg-[#7B1C3E]/5 rounded-2xl p-5 flex flex-col items-center justify-center cursor-pointer transition-all text-center">
-                        <Upload className="w-7 h-7 text-slate-400 mb-2" />
-                        <span className="text-xs font-semibold text-slate-700">
-                          {t.uploadButton}
-                        </span>
-                        <span className="text-[11px] text-slate-400 mt-0.5">
-                          รองรับรูปภาพ (JPG, PNG) และเอกสาร (PDF) ขนาดสูงสุด 10MB
-                        </span>
-                        <input
-                          type="file"
-                          accept="image/*,application/pdf"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleFileUpload(field.field_key, file);
-                          }}
-                          className="hidden"
+                    {field.image_url ? (
+                      <div className="rounded-xl overflow-hidden border border-slate-100 bg-slate-50/60 p-2 flex items-center justify-center">
+                        <img
+                          src={field.image_url}
+                          alt={fieldLabel || 'รูปภาพประกอบ'}
+                          className="max-h-96 w-auto object-contain rounded-lg shadow-2xs"
                         />
-                      </label>
+                      </div>
+                    ) : (
+                      <div className="p-6 text-center text-xs text-slate-400 bg-slate-50 rounded-xl">
+                        (ไม่มีรูปภาพ)
+                      </div>
+                    )}
+                    {fieldHelp && (
+                      <p className="text-xs text-slate-600 mt-2.5 whitespace-pre-wrap leading-relaxed">{fieldHelp}</p>
+                    )}
+                  </div>
+                );
+              }
 
-                      {uploadingField === field.field_key && (
-                        <div className="flex items-center gap-2 text-xs text-[#7B1C3E] font-medium">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>{t.uploading}</span>
-                        </div>
+              // 4. Interactive Input Questions
+              return (
+                <motion.div
+                  key={field.id}
+                  id={`field-${field.field_key}`}
+                  layout
+                  className={`${colSpanClass} bg-white rounded-2xl border p-5 sm:p-6 shadow-2xs transition-all ${
+                    isError
+                      ? 'border-rose-400 ring-2 ring-rose-100 bg-rose-50/10'
+                      : 'border-slate-200/90'
+                  }`}
+                >
+                  {/* Field Label & Required asterisk */}
+                  <div className="mb-3">
+                    <label className="block text-sm font-bold text-slate-900 leading-snug">
+                      {fieldLabel}
+                      {field.is_required && (
+                        <span className="text-rose-500 ml-1 text-base leading-none">*</span>
                       )}
+                    </label>
+                    {fieldHelp && (
+                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">{fieldHelp}</p>
+                    )}
+                  </div>
 
-                      {attachments[field.field_key] && (
-                        <div className="flex items-center justify-between p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800">
-                          <div className="flex items-center gap-2 truncate">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                            <span className="truncate">แนบไฟล์เรียบร้อยแล้ว</span>
+                  {/* Input Fields By Type */}
+                  <div className="mt-2">
+                    {/* Single Line Text */}
+                    {field.field_type === 'text' && (
+                      <input
+                        type="text"
+                        value={answers[field.field_key] || ''}
+                        onChange={(e) => handleInputChange(field.field_key, e.target.value)}
+                        placeholder={fieldLabel}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white transition-all"
+                      />
+                    )}
+
+                    {/* Multiline Paragraph Textarea */}
+                    {field.field_type === 'textarea' && (
+                      <textarea
+                        rows={3}
+                        value={answers[field.field_key] || ''}
+                        onChange={(e) => handleInputChange(field.field_key, e.target.value)}
+                        placeholder={fieldLabel}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white transition-all resize-y"
+                      />
+                    )}
+
+                    {/* Number */}
+                    {field.field_type === 'number' && (
+                      <input
+                        type="number"
+                        value={answers[field.field_key] || ''}
+                        onChange={(e) => handleInputChange(field.field_key, e.target.value)}
+                        placeholder="0"
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white transition-all"
+                      />
+                    )}
+
+                    {/* Radio Choice (Single select) */}
+                    {field.field_type === 'radio' && (
+                      <div className="space-y-2.5 pt-1">
+                        {(field.options || []).map((opt) => {
+                          const optLabel = getLocalized(opt.label);
+                          const isChecked = answers[field.field_key] === opt.value;
+                          return (
+                            <label
+                              key={opt.value}
+                              className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                                isChecked
+                                  ? 'border-[#7B1C3E] bg-[#7B1C3E]/5 text-[#7B1C3E] font-medium'
+                                  : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name={field.field_key}
+                                value={opt.value}
+                                checked={isChecked}
+                                onChange={() => handleInputChange(field.field_key, opt.value)}
+                                className="w-4 h-4 text-[#7B1C3E] focus:ring-[#7B1C3E] accent-[#7B1C3E]"
+                              />
+                              <span className="text-sm">{optLabel}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Checkbox (Multi select) */}
+                    {field.field_type === 'checkbox' && (
+                      <div className="space-y-2.5 pt-1">
+                        {(field.options || []).map((opt) => {
+                          const optLabel = getLocalized(opt.label);
+                          const selectedArr = (answers[field.field_key] as string[]) || [];
+                          const isChecked = selectedArr.includes(opt.value);
+                          return (
+                            <label
+                              key={opt.value}
+                              className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                                isChecked
+                                  ? 'border-[#7B1C3E] bg-[#7B1C3E]/5 text-[#7B1C3E] font-medium'
+                                  : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                value={opt.value}
+                                checked={isChecked}
+                                onChange={() => handleCheckboxToggle(field.field_key, opt.value)}
+                                className="w-4 h-4 rounded text-[#7B1C3E] focus:ring-[#7B1C3E] accent-[#7B1C3E]"
+                              />
+                              <span className="text-sm">{optLabel}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Dropdown Select */}
+                    {field.field_type === 'select' && (
+                      <select
+                        value={answers[field.field_key] || ''}
+                        onChange={(e) => handleInputChange(field.field_key, e.target.value)}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white transition-all text-slate-800"
+                      >
+                        <option value="">{t.selectPlaceholder}</option>
+                        {(field.options || []).map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {getLocalized(opt.label)}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+
+                    {/* Date */}
+                    {field.field_type === 'date' && (
+                      <input
+                        type="date"
+                        value={answers[field.field_key] || ''}
+                        onChange={(e) => handleInputChange(field.field_key, e.target.value)}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white transition-all"
+                      />
+                    )}
+
+                    {/* Time */}
+                    {field.field_type === 'time' && (
+                      <input
+                        type="time"
+                        value={answers[field.field_key] || ''}
+                        onChange={(e) => handleInputChange(field.field_key, e.target.value)}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white transition-all"
+                      />
+                    )}
+
+                    {/* Rating 1-5 Stars */}
+                    {field.field_type === 'rating' && (
+                      <div className="flex items-center gap-2 pt-1">
+                        {[1, 2, 3, 4, 5].map((star) => {
+                          const curRating = answers[field.field_key] || 0;
+                          const isFilled = star <= curRating;
+                          return (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => handleInputChange(field.field_key, star)}
+                              className="p-1 text-slate-300 hover:text-amber-400 focus:outline-none transition-colors"
+                            >
+                              <Star
+                                className={`w-8 h-8 ${
+                                  isFilled
+                                    ? 'text-amber-400 fill-amber-400'
+                                    : 'text-slate-300'
+                                }`}
+                              />
+                            </button>
+                          );
+                        })}
+                        {answers[field.field_key] && (
+                          <span className="text-xs font-bold text-amber-600 ml-2">
+                            {answers[field.field_key]} / 5
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* File Upload / Slip */}
+                    {field.field_type === 'file_upload' && (
+                      <div className="space-y-3">
+                        <label className="border-2 border-dashed border-slate-200 hover:border-[#7B1C3E] bg-slate-50 hover:bg-[#7B1C3E]/5 rounded-2xl p-5 flex flex-col items-center justify-center cursor-pointer transition-all text-center">
+                          <Upload className="w-7 h-7 text-slate-400 mb-2" />
+                          <span className="text-xs font-semibold text-slate-700">
+                            {t.uploadButton}
+                          </span>
+                          <span className="text-[11px] text-slate-400 mt-0.5">
+                            รองรับรูปภาพ (JPG, PNG) และเอกสาร (PDF) ขนาดสูงสุด 10MB
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*,application/pdf"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleFileUpload(field.field_key, file);
+                            }}
+                            className="hidden"
+                          />
+                        </label>
+
+                        {uploadingField === field.field_key && (
+                          <div className="flex items-center gap-2 text-xs text-[#7B1C3E] font-medium">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>{t.uploading}</span>
                           </div>
-                          <a
-                            href={attachments[field.field_key]}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-[11px] font-semibold text-emerald-700 underline shrink-0 ml-2"
-                          >
-                            เปิดดูไฟล์
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                        )}
 
-                {isError && (
-                  <p className="text-xs font-semibold text-rose-500 mt-2 flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5" />
-                    {t.requiredBadge}
-                  </p>
-                )}
-              </motion.div>
-            );
-          })}
+                        {attachments[field.field_key] && (
+                          <div className="flex items-center justify-between p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800">
+                            <div className="flex items-center gap-2 truncate">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                              <span className="truncate">แนบไฟล์เรียบร้อยแล้ว</span>
+                            </div>
+                            <a
+                              href={attachments[field.field_key]}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[11px] font-semibold text-emerald-700 underline shrink-0 ml-2"
+                            >
+                              เปิดดูไฟล์
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {isError && (
+                    <p className="text-xs font-semibold text-rose-500 mt-2 flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      {t.requiredBadge}
+                    </p>
+                  )}
+                </motion.div>
+              );
+            })}
+          </div>
 
           {/* Submit Button Bar */}
           <div className="pt-4 pb-12">

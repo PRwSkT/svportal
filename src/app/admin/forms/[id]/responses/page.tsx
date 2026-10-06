@@ -71,28 +71,36 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
       return;
     }
 
-    // 1. Build headers
+    // 1. Build headers (excluding layout/media blocks)
+    const nonInputTypes = ['section_header', 'image', 'info_text'];
+    const validFields = fields.filter(f => !nonInputTypes.includes(f.field_type));
+
     const headers = [
       'ลำดับ (No.)',
       'วันเวลาที่ส่ง (Timestamp)',
       'ภาษาที่ใช้ (Language)',
       'ผู้ส่ง (Respondent Email / Type)',
-      ...fields
-        .filter(f => f.field_type !== 'section_header')
-        .map(f => f.label?.th || f.field_key),
+      ...validFields.map(f => f.label?.th || f.field_key),
       'ลิงก์ไฟล์แนบ (Attachments)',
     ];
 
-    // 2. Build rows
+    // 2. Build rows with human-readable resolved labels
     const rows = responses.map((resp, idx) => {
-      const fieldAnswers = fields
-        .filter(f => f.field_type !== 'section_header')
-        .map(f => {
-          const val = resp.answers?.[f.field_key];
-          if (val === undefined || val === null) return '';
-          if (Array.isArray(val)) return val.join(', ');
-          return String(val);
-        });
+      const fieldAnswers = validFields.map(f => {
+        const val = resp.answers?.[f.field_key];
+        if (val === undefined || val === null || val === '') return '';
+        if (Array.isArray(val)) {
+          return val.map(v => {
+            const opt = f.options?.find(o => o.value === v);
+            return opt?.label?.th || v;
+          }).join(', ');
+        }
+        if (['radio', 'select'].includes(f.field_type) && f.options) {
+          const opt = f.options.find(o => o.value === val);
+          if (opt) return opt.label?.th || opt.value;
+        }
+        return String(val);
+      });
 
       const attachmentsStr = (resp.attachments || []).join(' ; ');
 
@@ -289,11 +297,18 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredResponses.map((resp, index) => {
-                    const firstField = fields.find(f => f.field_type !== 'section_header');
-                    const firstAnswer = firstField ? resp.answers?.[firstField.field_key] : null;
-                    const previewText = Array.isArray(firstAnswer)
-                      ? firstAnswer.join(', ')
-                      : String(firstAnswer || '-');
+                    const firstField = fields.find(f => !['section_header', 'image', 'info_text'].includes(f.field_type));
+                    const rawVal = firstField ? resp.answers?.[firstField.field_key] : null;
+                    let previewText = '-';
+                    if (rawVal !== null && rawVal !== undefined && rawVal !== '') {
+                      if (Array.isArray(rawVal)) {
+                        previewText = rawVal.map(v => firstField?.options?.find(o => o.value === v)?.label?.th || v).join(', ');
+                      } else if (firstField?.options) {
+                        previewText = firstField.options.find(o => o.value === rawVal)?.label?.th || String(rawVal);
+                      } else {
+                        previewText = String(rawVal);
+                      }
+                    }
 
                     const hasFiles = Array.isArray(resp.attachments) && resp.attachments.length > 0;
 
@@ -404,10 +419,20 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
               {/* Modal Body: Q&A list */}
               <div className="p-6 overflow-y-auto space-y-4 divide-y divide-slate-100">
                 {fields
-                  .filter(f => f.field_type !== 'section_header')
+                  .filter(f => !['section_header', 'image', 'info_text'].includes(f.field_type))
                   .map((field, idx) => {
-                    const ans = selectedResponse.answers?.[field.field_key];
+                    const rawAns = selectedResponse.answers?.[field.field_key];
                     const label = field.label?.th || field.field_key;
+                    let displayAns = '-';
+                    if (rawAns !== undefined && rawAns !== null && rawAns !== '') {
+                      if (Array.isArray(rawAns)) {
+                        displayAns = rawAns.map(v => field.options?.find(o => o.value === v)?.label?.th || v).join(', ');
+                      } else if (field.options) {
+                        displayAns = field.options.find(o => o.value === rawAns)?.label?.th || String(rawAns);
+                      } else {
+                        displayAns = String(rawAns);
+                      }
+                    }
 
                     return (
                       <div key={field.id} className={idx > 0 ? 'pt-4' : ''}>
@@ -415,13 +440,11 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
                           {idx + 1}. {label}
                         </div>
                         <div className="text-sm font-medium text-slate-900 bg-slate-50 p-3 rounded-xl">
-                          {ans === undefined || ans === null || ans === '' ? (
+                          {rawAns === undefined || rawAns === null || rawAns === '' ? (
                             <span className="text-slate-400 italic">ไม่มีข้อมูล</span>
-                          ) : Array.isArray(ans) ? (
-                            ans.join(', ')
-                          ) : typeof ans === 'string' && ans.startsWith('http') ? (
+                          ) : typeof rawAns === 'string' && rawAns.startsWith('http') ? (
                             <a
-                              href={ans}
+                              href={rawAns}
                               target="_blank"
                               rel="noreferrer"
                               className="text-[#7B1C3E] underline font-semibold flex items-center gap-1"
@@ -430,7 +453,7 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
                               เปิดดูไฟล์แนบ
                             </a>
                           ) : (
-                            String(ans)
+                            displayAns
                           )}
                         </div>
                       </div>

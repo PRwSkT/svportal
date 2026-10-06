@@ -330,7 +330,9 @@ export type FormFieldType =
   | 'time' 
   | 'file_upload' 
   | 'rating' 
-  | 'section_header';
+  | 'section_header'
+  | 'image'
+  | 'info_text';
 
 export type FormField = {
   id: string;
@@ -342,6 +344,7 @@ export type FormField = {
   is_required: boolean;
   options?: FormFieldOption[] | null;
   validation?: Record<string, any> | null;
+  image_url?: string | null;
   sort_order: number;
   width: 'full' | 'half';
   created_at?: string;

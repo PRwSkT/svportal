@@ -215,6 +215,7 @@ export async function saveFormStudio(
         is_required: Boolean(f.is_required),
         options: f.options || null,
         validation: f.validation || null,
+        image_url: f.image_url || null,
         sort_order: idx,
         width: f.width || 'full',
       }));
