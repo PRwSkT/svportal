@@ -171,6 +171,11 @@ export async function proxy(request: NextRequest) {
       requiredFeature = 'admin_users';
     } else if (path.startsWith('/admin/forms') || path.startsWith('/api/admin/forms')) {
       requiredFeature = 'admin_forms';
+    } else if (path.startsWith('/admin/kpi') || path.startsWith('/api/admin/kpi')) {
+      if (user.email?.endsWith('@somkidvittaya.ac.th') || assignedFeatures.includes('admin_kpi')) {
+        return response;
+      }
+      requiredFeature = 'admin_kpi';
     }
 
     if (requiredFeature && assignedFeatures.includes(requiredFeature)) {

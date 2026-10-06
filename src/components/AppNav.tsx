@@ -29,6 +29,7 @@ export function AppNav() {
     { id: 'admin_attendance', href: '/attendance', label: 'ลงเวลา' },
     { id: 'admin_website', href: '/admin/website', label: 'จัดการเว็บไซต์' },
     { id: 'admin_forms', href: '/admin/forms', label: 'แบบฟอร์ม' },
+    { id: 'admin_kpi', href: '/admin/kpi', label: 'ประเมิน KPI' },
     { id: 'qr_generator', href: '/qr-generator', label: 'สร้าง QR Code' },
     { id: 'admin_users', href: '/admin/users', label: 'จัดการผู้ใช้' },
   ];

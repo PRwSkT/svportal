@@ -18,7 +18,8 @@ import {
   MessageSquare,
   Radio,
   Globe,
-  Clock
+  Clock,
+  Award
 } from 'lucide-react';
 import { getRoleConfig } from '@/lib/constants/roles';
 
@@ -73,7 +74,8 @@ export default function HomeLaunchpad() {
       color: "border-purple-500/20 bg-purple-500/5",
       tools: [
         { id: "admin_users", name: "จัดการผู้ใช้งาน", href: "/admin/users", icon: <Users className="w-6 h-6" />, color: "bg-purple-500/20 text-purple-600" },
-        { id: "admin_attendance", name: "ข้อมูลการเข้างาน", href: "/admin/attendance", icon: <Clock className="w-6 h-6" />, color: "bg-purple-500/20 text-purple-600" }
+        { id: "admin_attendance", name: "ข้อมูลการเข้างาน", href: "/admin/attendance", icon: <Clock className="w-6 h-6" />, color: "bg-purple-500/20 text-purple-600" },
+        { id: "admin_kpi", name: "ประเมินบุคลากร (KPI)", href: "/admin/kpi", icon: <Award className="w-6 h-6" />, color: "bg-[#7B1C3E] text-white" }
       ]
     },
     {
