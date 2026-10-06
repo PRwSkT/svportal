@@ -26,7 +26,7 @@ export default function WebsiteAdminLayout({ children }: { children: React.React
     try {
       const res = await manualTriggerDeploy();
       if (res.success) {
-        toast.success('สั่ง Deploy สำเร็จ! 🚀 เว็บไซต์จะอัปเดตเวอร์ชันเต็มภายใน 1-2 นาที', { id: toastId });
+        toast.success('สั่ง Deploy สำเร็จ! เว็บไซต์จะอัปเดตเวอร์ชันเต็มภายใน 1-2 นาที', { id: toastId });
       } else {
         toast.info('บันทึกคำขอ Deploy แล้ว (หากยังไม่ได้ใส่ NETLIFY_BUILD_HOOK_URL ใน .env ข้อมูลยังแสดงบนเว็บแบบเรียลไทม์ได้ตามปกติ)', { id: toastId });
       }

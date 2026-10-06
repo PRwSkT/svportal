@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { CreditCard } from 'lucide-react'
 import { ManualCardEntry } from './ManualCardEntry'
 
 interface NFCTapPromptProps {
@@ -63,13 +64,7 @@ export function NFCTapPrompt({
         <div className="flex flex-col items-center gap-6">
           {/* Animated card icon */}
           <div className="flex h-28 w-28 items-center justify-center rounded-full bg-blue-50">
-            <span
-              className="animate-pulse text-6xl"
-              role="img"
-              aria-label="บัตร NFC"
-            >
-              💳
-            </span>
+            <CreditCard className="w-14 h-14 text-blue-600 animate-pulse" />
           </div>
 
           <p className="text-center text-2xl font-bold text-gray-800">

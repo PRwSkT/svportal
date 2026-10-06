@@ -413,7 +413,7 @@ export default function FormsAdminPage() {
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                👑 ของฉัน ({myFormsCount})
+                ของฉัน ({myFormsCount})
               </button>
               {sharedCount > 0 && (
                 <button
@@ -424,7 +424,7 @@ export default function FormsAdminPage() {
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  👥 ได้รับสิทธิ์ ({sharedCount})
+                  ได้รับสิทธิ์ ({sharedCount})
                 </button>
               )}
             </div>
@@ -538,16 +538,16 @@ export default function FormsAdminPage() {
 
                       {/* Ownership / Permission Badge */}
                       {form.is_owner ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200 shrink-0">
-                          👑 ผู้สร้าง
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200 shrink-0">
+                          ผู้สร้าง
                         </span>
                       ) : currentUserContext.isAdmin ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
-                          ⚡ แอดมิน
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+                          แอดมิน
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-800 border border-purple-200 shrink-0">
-                          👥 ได้รับสิทธิ์
+                          ได้รับสิทธิ์
                         </span>
                       )}
                     </div>
@@ -565,11 +565,11 @@ export default function FormsAdminPage() {
                     {/* Language badges */}
                     <div className="flex items-center gap-1.5 mt-3">
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
-                        🇹🇭 TH
+                        TH
                       </span>
                       {hasEn ? (
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">
-                          🇬🇧 EN
+                          EN
                         </span>
                       ) : (
                         <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-400">
@@ -578,7 +578,7 @@ export default function FormsAdminPage() {
                       )}
                       {hasZh ? (
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-800">
-                          🇨🇳 ZH
+                          ZH
                         </span>
                       ) : (
                         <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-400">
@@ -832,9 +832,9 @@ export default function FormsAdminPage() {
                       onChange={(e) => setNewAccessType(e.target.value as any)}
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#7B1C3E]"
                     >
-                      <option value="public">🌐 บุคคลภายนอก / ทั่วไป</option>
-                      <option value="internal_all">🔒 บุคลากรทุกคน (@somkidvittaya.ac.th)</option>
-                      <option value="internal_teacher">👨‍🏫 ครูผู้สอนเท่านั้น</option>
+                      <option value="public">บุคคลภายนอก / ทั่วไป</option>
+                      <option value="internal_all">บุคลากรทุกคน (@somkidvittaya.ac.th)</option>
+                      <option value="internal_teacher">ครูผู้สอนเท่านั้น</option>
                     </select>
                   </div>
                 </div>

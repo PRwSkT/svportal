@@ -472,7 +472,7 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
 
         setFields(data.fields);
         setHasUnsavedChanges(true);
-        toast.success('แปลภาษาอัตโนมัติสำเร็จ! ตรวจสอบที่แท็บ 🇬🇧 EN และ 🇨🇳 ZH ได้ทันที', { id: toastId });
+        toast.success('แปลภาษาอัตโนมัติสำเร็จ! ตรวจสอบที่แท็บ EN และ ZH ได้ทันที', { id: toastId });
       } else {
         throw new Error(data.error || 'เกิดข้อผิดพลาด');
       }
@@ -605,7 +605,7 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
               ) : (
                 <>
                   <Sparkles className="w-4 h-4 text-indigo-600" />
-                  ✨ แปล 3 ภาษาด้วย AI
+                  แปล 3 ภาษาด้วย AI
                 </>
               )}
             </button>
@@ -694,7 +694,7 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                🇹🇭 ไทย (TH)
+                ไทย (TH)
               </button>
               <button
                 onClick={() => setActiveLang('en')}
@@ -704,7 +704,7 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                🇬🇧 English (EN)
+                English (EN)
               </button>
               <button
                 onClick={() => setActiveLang('zh')}
@@ -714,7 +714,7 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                🇨🇳 中文 (ZH)
+                中文 (ZH)
               </button>
             </div>
           </div>
@@ -848,9 +848,9 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                   }}
                   className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#7B1C3E]"
                 >
-                  <option value="public">🌐 บุคคลภายนอก / ทั่วไป (ผู้ปกครอง, ประชาชน)</option>
-                  <option value="internal_all">🔒 บุคลากรทุกคน (@somkidvittaya.ac.th)</option>
-                  <option value="internal_teacher">👨‍🏫 ครูผู้สอนเท่านั้น</option>
+                  <option value="public">บุคคลภายนอก / ทั่วไป (ผู้ปกครอง, ประชาชน)</option>
+                  <option value="internal_all">บุคลากรทุกคน (@somkidvittaya.ac.th)</option>
+                  <option value="internal_teacher">ครูผู้สอนเท่านั้น</option>
                 </select>
               </div>
 
@@ -1366,7 +1366,7 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                             </label>
                           ) : (
                             <span className="text-xs text-indigo-700 font-medium">
-                              {isHeader ? '📌 หัวข้อแบ่งส่วน' : isInfoText ? 'ℹ️ กล่องข้อมูลชี้แจง' : '🖼️ รูปภาพประกอบ'} (ไม่บังคับตอบ)
+                              {isHeader ? 'หัวข้อแบ่งส่วน' : isInfoText ? 'กล่องข้อมูลชี้แจง' : 'รูปภาพประกอบ'} (ไม่บังคับตอบ)
                             </span>
                           )}
 
@@ -1433,19 +1433,19 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                       onClick={() => setPreviewLang('th')}
                       className={`px-2.5 py-1 rounded-lg ${previewLang === 'th' ? 'bg-white text-[#7B1C3E] shadow-xs' : 'text-slate-600'}`}
                     >
-                      🇹🇭 TH
+                      TH
                     </button>
                     <button
                       onClick={() => setPreviewLang('en')}
                       className={`px-2.5 py-1 rounded-lg ${previewLang === 'en' ? 'bg-white text-[#1B3A6B] shadow-xs' : 'text-slate-600'}`}
                     >
-                      🇬🇧 EN
+                      EN
                     </button>
                     <button
                       onClick={() => setPreviewLang('zh')}
                       className={`px-2.5 py-1 rounded-lg ${previewLang === 'zh' ? 'bg-white text-rose-700 shadow-xs' : 'text-slate-600'}`}
                     >
-                      🇨🇳 ZH
+                      ZH
                     </button>
                   </div>
 

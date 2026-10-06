@@ -617,7 +617,7 @@ export default function KpiDashboardPage() {
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    👔 ที่ฉันต้องประเมิน
+                    ที่ฉันต้องประเมิน
                   </button>
                   <button
                     onClick={() => setViewFilter('my_self')}
@@ -627,7 +627,7 @@ export default function KpiDashboardPage() {
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    👤 ของฉันเอง
+                    ของฉันเอง
                   </button>
                 </>
               )}
@@ -1041,7 +1041,7 @@ export default function KpiDashboardPage() {
                 </div>
 
                 <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-[11px] leading-relaxed">
-                  💡 ระบบจะทำการซิงค์รายชื่อบุคลากรทั้งหมด 28 ท่านเข้าสู่รอบใหม่นี้ให้อัตโนมัติทันที
+                  ระบบจะทำการซิงค์รายชื่อบุคลากรทั้งหมด 28 ท่านเข้าสู่รอบใหม่นี้ให้อัตโนมัติทันที
                 </div>
 
                 <div className="flex items-center gap-3 pt-2">
@@ -1109,7 +1109,7 @@ export default function KpiDashboardPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
                     <span className="font-bold text-purple-950 text-sm">
-                      ⚡ กำหนดผู้ประเมินหลักชุดเดียวกัน (Bulk Assign):
+                      กำหนดผู้ประเมินหลักชุดเดียวกัน (Bulk Assign):
                     </span>
                     <p className="text-purple-700 text-[11px] mt-0.5">
                       เลือกคณะกรรมการ (เลือกได้มากกว่า 1 ท่าน) แล้วกดปุ่มเพื่อปรับใช้กับทุกคนในตารางทันที

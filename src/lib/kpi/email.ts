@@ -76,7 +76,7 @@ export function generateAnonymousKpiEmailHtml(evaluation: KpiEvaluation): string
                 SOMKIDVITTAYA SCHOOL • HR PERFORMANCE EVALUATION
               </div>
               <div style="margin-top: 14px; display: inline-block; background-color: rgba(0,0,0,0.25); color: #FEE2E2; padding: 4px 14px; border-radius: 999px; font-size: 11px; font-weight: 600;">
-                🔒 รายงานผลการประเมินส่วนบุคคล (คะแนนถัวเฉลี่ยจากคณะกรรมการผู้ประเมิน โดยไม่เปิดเผยตัวตน)
+                รายงานผลการประเมินส่วนบุคคล (คะแนนถัวเฉลี่ยจากคณะกรรมการผู้ประเมิน โดยไม่เปิดเผยตัวตน)
               </div>
             </td>
           </tr>
@@ -126,7 +126,7 @@ export function generateAnonymousKpiEmailHtml(evaluation: KpiEvaluation): string
 
               <!-- Competency Breakdown Table -->
               <div style="font-size: 14px; font-weight: 700; color: #0F172A; margin-bottom: 10px; display: flex; align-items: center;">
-                📊 รายละเอียดผลคะแนนแยกตามหมวดสมรรถนะ
+                รายละเอียดผลคะแนนแยกตามหมวดสมรรถนะ
               </div>
               <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse: collapse; border: 1px solid #E2E8F0; border-radius: 14px; overflow: hidden; margin-bottom: 28px;">
                 <thead>
@@ -148,7 +148,7 @@ export function generateAnonymousKpiEmailHtml(evaluation: KpiEvaluation): string
                   ? `
               <div style="background-color: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 16px; padding: 18px; margin-bottom: 16px;">
                 <div style="font-size: 13px; font-weight: 700; color: #065F46; margin-bottom: 6px;">
-                  🌟 จุดเด่นและข้อชื่นชมจากคณะกรรมการประเมิน:
+                  จุดเด่นและข้อชื่นชมจากคณะกรรมการประเมิน:
                 </div>
                 <div style="font-size: 13px; color: #047857; line-height: 1.6; white-space: pre-wrap;">
 ${evaluation.supervisor_strengths}
@@ -162,7 +162,7 @@ ${evaluation.supervisor_strengths}
                   ? `
               <div style="background-color: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 16px; padding: 18px; margin-bottom: 16px;">
                 <div style="font-size: 13px; font-weight: 700; color: #1E40AF; margin-bottom: 6px;">
-                  💡 ข้อเสนอแนะเพื่อการพัฒนาและต่อยอด (Continuous Growth):
+                  ข้อเสนอแนะเพื่อการพัฒนาและต่อยอด (Continuous Growth):
                 </div>
                 <div style="font-size: 13px; color: #1D4ED8; line-height: 1.6; white-space: pre-wrap;">
 ${evaluation.supervisor_improvements}
@@ -176,7 +176,7 @@ ${evaluation.supervisor_improvements}
                   ? `
               <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 16px; padding: 18px; margin-bottom: 24px;">
                 <div style="font-size: 13px; font-weight: 700; color: #334155; margin-bottom: 6px;">
-                  📝 สรุปความเห็นภาพรวม:
+                  สรุปความเห็นภาพรวม:
                 </div>
                 <div style="font-size: 13px; color: #475569; line-height: 1.6; white-space: pre-wrap;">
 ${evaluation.supervisor_overall_comment}

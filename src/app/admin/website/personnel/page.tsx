@@ -568,7 +568,7 @@ export default function PersonnelManager() {
                         </div>
                         <p className="text-[11px] text-foreground/50">
                           {formData.user_id 
-                            ? '✅ เชื่อมโยงกับบัญชีผู้ใช้ในระบบแล้ว' 
+                            ? 'เชื่อมโยงกับบัญชีผู้ใช้ในระบบแล้ว' 
                             : 'ระบุอีเมลโรงเรียนเพื่อผูกประวัติบุคลากรเข้ากับบัญชีล็อกอิน'}
                         </p>
                       </div>

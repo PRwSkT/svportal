@@ -357,7 +357,7 @@ export default function FormViewerClient({
                 lang === 'th' ? 'bg-white text-[#7B1C3E] shadow-sm' : 'text-white/80 hover:text-white'
               }`}
             >
-              🇹🇭 ไทย
+              ไทย
             </button>
             <button
               type="button"
@@ -366,7 +366,7 @@ export default function FormViewerClient({
                 lang === 'en' ? 'bg-white text-[#1B3A6B] shadow-sm' : 'text-white/80 hover:text-white'
               }`}
             >
-              🇬🇧 EN
+              EN
             </button>
             <button
               type="button"
@@ -375,7 +375,7 @@ export default function FormViewerClient({
                 lang === 'zh' ? 'bg-white text-rose-800 shadow-sm' : 'text-white/80 hover:text-white'
               }`}
             >
-              🇨🇳 中文
+              中文
             </button>
           </div>
         </div>

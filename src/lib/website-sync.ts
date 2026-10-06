@@ -23,7 +23,7 @@ export async function triggerWebsiteRebuild(reason?: string): Promise<boolean> {
     });
 
     if (res.ok) {
-      console.log('[Website Sync] Netlify rebuild successfully queued! 🚀');
+      console.log('[Website Sync] Netlify rebuild successfully queued!');
       return true;
     } else {
       console.warn(`[Website Sync] Netlify build hook returned HTTP ${res.status}`);

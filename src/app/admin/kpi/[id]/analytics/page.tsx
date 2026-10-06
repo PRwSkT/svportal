@@ -248,7 +248,7 @@ export default function IndividualKpiAnalyticsPage({
                   )}
                   {evaluation.assigned_evaluators && evaluation.assigned_evaluators.length > 0 && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200 text-[11px] font-semibold">
-                      👥 คณะกรรมการ {evaluation.assigned_evaluators.length} ท่าน (ถัวเฉลี่ยคะแนนร่วมกัน)
+                      คณะกรรมการ {evaluation.assigned_evaluators.length} ท่าน (ถัวเฉลี่ยคะแนนร่วมกัน)
                     </span>
                   )}
                 </div>
@@ -495,7 +495,7 @@ export default function IndividualKpiAnalyticsPage({
         {evaluation.supervisor_overall_comment && (
           <div className="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-2xs">
             <h4 className="text-sm font-bold text-slate-900 mb-2">
-              📝 ความเห็นสะท้อนคิดภาพรวมจากคณะกรรมการ:
+              ความเห็นสะท้อนคิดภาพรวมจากคณะกรรมการ:
             </h4>
             <p className="text-xs sm:text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
               {evaluation.supervisor_overall_comment}

@@ -202,7 +202,7 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
             </div>
 
             <div className="bg-emerald-50/60 border border-emerald-200/60 rounded-2xl p-4">
-              <div className="text-xs font-medium text-emerald-800">🇹🇭 ภาษาไทย (TH)</div>
+              <div className="text-xs font-medium text-emerald-800">ภาษาไทย (TH)</div>
               <div className="text-2xl font-bold text-emerald-950 mt-1.5">
                 {thCount} <span className="text-xs font-normal text-emerald-700">({total > 0 ? Math.round((thCount / total) * 100) : 0}%)</span>
               </div>
@@ -210,7 +210,7 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
             </div>
 
             <div className="bg-blue-50/60 border border-blue-200/60 rounded-2xl p-4">
-              <div className="text-xs font-medium text-blue-800">🇬🇧 English (EN)</div>
+              <div className="text-xs font-medium text-blue-800">English (EN)</div>
               <div className="text-2xl font-bold text-blue-950 mt-1.5">
                 {enCount} <span className="text-xs font-normal text-blue-700">({total > 0 ? Math.round((enCount / total) * 100) : 0}%)</span>
               </div>
@@ -218,7 +218,7 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
             </div>
 
             <div className="bg-rose-50/60 border border-rose-200/60 rounded-2xl p-4">
-              <div className="text-xs font-medium text-rose-800">🇨🇳 中文 (ZH)</div>
+              <div className="text-xs font-medium text-rose-800">中文 (ZH)</div>
               <div className="text-2xl font-bold text-rose-950 mt-1.5">
                 {zhCount} <span className="text-xs font-normal text-rose-700">({total > 0 ? Math.round((zhCount / total) * 100) : 0}%)</span>
               </div>
@@ -254,19 +254,19 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
               onClick={() => setLangFilter('th')}
               className={`px-3 py-1.5 rounded-lg transition-all ${langFilter === 'th' ? 'bg-white shadow-xs text-emerald-800' : 'text-slate-600 hover:text-slate-900'}`}
             >
-              🇹🇭 TH ({thCount})
+              TH ({thCount})
             </button>
             <button
               onClick={() => setLangFilter('en')}
               className={`px-3 py-1.5 rounded-lg transition-all ${langFilter === 'en' ? 'bg-white shadow-xs text-blue-800' : 'text-slate-600 hover:text-slate-900'}`}
             >
-              🇬🇧 EN ({enCount})
+              EN ({enCount})
             </button>
             <button
               onClick={() => setLangFilter('zh')}
               className={`px-3 py-1.5 rounded-lg transition-all ${langFilter === 'zh' ? 'bg-white shadow-xs text-rose-800' : 'text-slate-600 hover:text-slate-900'}`}
             >
-              🇨🇳 ZH ({zhCount})
+              ZH ({zhCount})
             </button>
           </div>
         </div>

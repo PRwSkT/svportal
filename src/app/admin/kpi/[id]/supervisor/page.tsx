@@ -169,7 +169,7 @@ export default function SupervisorEvaluationPage({ params }: { params: Promise<{
 
     if (res.success) {
       if (res.allCompleted) {
-        toast.success('🎉 คณะกรรมการประเมินครบทุกคนแล้ว! ระบบได้คำนวณคะแนนถัวเฉลี่ยและส่งอีเมลแจ้งผลเรียบร้อยแล้ว ✉️');
+        toast.success('คณะกรรมการประเมินครบทุกคนแล้ว ระบบได้คำนวณคะแนนถัวเฉลี่ยและส่งอีเมลแจ้งผลเรียบร้อยแล้ว');
         router.push(`/admin/kpi/${evaluationId}/analytics`);
       } else {
         toast.success(
@@ -309,7 +309,7 @@ export default function SupervisorEvaluationPage({ params }: { params: Promise<{
                       {evaluation.assigned_evaluators.length} ท่านประเมินแล้ว)
                     </h3>
                     <p className="text-xs text-slate-500">
-                      เมื่อกรรมการทุกท่านประเมินครบแล้ว ระบบจะคำนวณคะแนนถัวเฉลี่ยและส่งอีเมลแจ้งผลอัตโนมัติ ✉️
+                      เมื่อกรรมการทุกท่านประเมินครบแล้ว ระบบจะคำนวณคะแนนถัวเฉลี่ยและส่งอีเมลแจ้งผลอัตโนมัติ
                     </p>
                   </div>
                 </div>
@@ -415,7 +415,7 @@ export default function SupervisorEvaluationPage({ params }: { params: Promise<{
                 {selfNote && (
                   <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 leading-relaxed">
                     <span className="font-bold text-slate-900 block mb-1">
-                      📁 ร่องรอยหลักฐานเชิงประจักษ์ที่บุคลากรระบุไว้:
+                      ร่องรอยหลักฐานเชิงประจักษ์ที่บุคลากรระบุไว้:
                     </span>
                     <p className="whitespace-pre-wrap">{selfNote}</p>
                   </div>
@@ -494,7 +494,7 @@ export default function SupervisorEvaluationPage({ params }: { params: Promise<{
                 {/* Section Constructive Feedback */}
                 <div className="pt-3 border-t border-slate-100">
                   <label className="block text-xs font-bold text-slate-700 mb-2">
-                    💬 ข้อเสนอแนะเชิงพัฒนาสำหรับหมวดนี้ (Section Feedback):
+                    ข้อเสนอแนะเชิงพัฒนาสำหรับหมวดนี้ (Section Feedback):
                   </label>
                   <textarea
                     rows={2}
@@ -518,7 +518,7 @@ export default function SupervisorEvaluationPage({ params }: { params: Promise<{
             {/* Strengths */}
             <div>
               <label className="block text-xs font-bold text-emerald-700 mb-2">
-                🌟 จุดเด่นและข้อชื่นชม (Key Strengths & Commendations):
+                จุดเด่นและข้อชื่นชม (Key Strengths & Commendations):
               </label>
               <textarea
                 rows={3}
@@ -532,7 +532,7 @@ export default function SupervisorEvaluationPage({ params }: { params: Promise<{
             {/* Improvements */}
             <div>
               <label className="block text-xs font-bold text-blue-700 mb-2">
-                💡 ข้อเสนอแนะเพื่อการพัฒนาและต่อยอด (Growth & Improvements):
+                ข้อเสนอแนะเพื่อการพัฒนาและต่อยอด (Growth & Improvements):
               </label>
               <textarea
                 rows={3}
@@ -546,7 +546,7 @@ export default function SupervisorEvaluationPage({ params }: { params: Promise<{
             {/* Overall Comment */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-2">
-                📝 ความเห็นภาพรวมจากหัวหน้างาน:
+                ความเห็นภาพรวมจากหัวหน้างาน:
               </label>
               <textarea
                 rows={3}

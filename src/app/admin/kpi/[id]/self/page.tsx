@@ -299,7 +299,7 @@ export default function SelfEvaluationPage({ params }: { params: Promise<{ id: s
                 {/* Section Evidence / Notes */}
                 <div className="pt-3 border-t border-slate-100">
                   <label className="block text-xs font-bold text-slate-700 mb-2">
-                    📁 ร่องรอยหลักฐานเชิงประจักษ์ / ผลงานในหมวดนี้ (Evidence & Reflection)
+                    ร่องรอยหลักฐานเชิงประจักษ์ / ผลงานในหมวดนี้ (Evidence & Reflection)
                   </label>
                   <textarea
                     rows={3}
@@ -316,7 +316,7 @@ export default function SelfEvaluationPage({ params }: { params: Promise<{ id: s
           {/* Overall Reflection Comment Card */}
           <div className="bg-white rounded-3xl border border-slate-200/90 p-6 sm:p-7 shadow-2xs">
             <h3 className="text-base font-bold text-slate-900 mb-2">
-              💭 ความเห็นภาพรวมและเป้าหมายการพัฒนาตนเอง
+              ความเห็นภาพรวมและเป้าหมายการพัฒนาตนเอง
             </h3>
             <p className="text-xs text-slate-500 mb-4 leading-relaxed">
               ระบุความรู้สึกต่อการทำงานในภาคเรียนนี้ อุปสรรคที่พบ และเป้าหมายที่ต้องการพัฒนาในระยะต่อไป
