@@ -66,7 +66,7 @@ const UI_TEXT: Record<SupportedLang, {
     validationError: 'Please fill in all required fields.',
   },
   zh: {
-    schoolName: '松吉威提雅学校 (Somkidvittaya School)',
+    schoolName: 'Somkidvittaya学校',
     subTitle: '泰国罗勇府',
     requiredBadge: '必填项',
     selectPlaceholder: '-- 请选择 --',
@@ -78,7 +78,7 @@ const UI_TEXT: Record<SupportedLang, {
     submitSuccessDesc: '我们已收到您的答复。感谢您的支持与配合！',
     submitAnother: '再提交一份答复',
     internalOnlyTitle: '仅限校内人员访问',
-    internalOnlyDesc: '本表单仅限松吉威提雅学校教职员工填写，请使用 @somkidvittaya.ac.th 账号登录。',
+    internalOnlyDesc: '本表单仅限Somkidvittaya学校教职员工填写，请使用 @somkidvittaya.ac.th 账号登录。',
     loginButton: '教职工登录',
     validationError: '请完整填写所有必填项目。',
   },

@@ -3,6 +3,18 @@
  * Translates Thai or English text to English and Chinese (Simplified)
  */
 
+function cleanTranslationResult(text: string, targetLang: 'en' | 'zh'): string {
+  let result = (text || '').trim();
+  if (targetLang === 'zh') {
+    result = result
+      .replace(/松吉威提雅学校/g, 'Somkidvittaya学校')
+      .replace(/松吉学校/g, 'Somkidvittaya学校')
+      .replace(/森吉威提雅学校/g, 'Somkidvittaya学校')
+      .replace(/森吉学校/g, 'Somkidvittaya学校');
+  }
+  return result;
+}
+
 async function translateSingle(text: string, targetLang: 'en' | 'zh'): Promise<string> {
   const trimmed = text?.trim();
   if (!trimmed) return '';
@@ -23,6 +35,7 @@ async function translateSingle(text: string, targetLang: 'en' | 'zh'): Promise<s
       const prompt = `You are a professional educational translator for Somkidvittaya School.
 Translate the following text to ${targetLang === 'zh' ? 'Simplified Chinese (中文)' : 'Professional English'}.
 Keep tone formal, friendly, clear, and suitable for school forms and announcements.
+${targetLang === 'zh' ? 'IMPORTANT: When translating or mentioning the school name "โรงเรียนสมคิดวิทยา" into Chinese, ALWAYS use "Somkidvittaya学校" exactly (do NOT transliterate as 松吉 or 森吉).' : ''}
 Return ONLY the translation without any quotes or explanations.
 
 Text:
@@ -51,7 +64,7 @@ ${trimmed}`;
           if (res.ok) {
             const data = await res.json();
             const translated = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-            if (translated) return translated;
+            if (translated) return cleanTranslationResult(translated, targetLang);
           }
         } catch {
           // Continue to next model if this one fails
@@ -70,7 +83,7 @@ ${trimmed}`;
       const data = await res.json();
       const translated = data?.responseData?.translatedText;
       if (translated && !translated.startsWith('MYMEMORY WARNING')) {
-        return translated.trim();
+        return cleanTranslationResult(translated, targetLang);
       }
     }
   } catch (err) {
@@ -97,7 +110,7 @@ ${trimmed}`;
         if (Array.isArray(data) && Array.isArray(data[0])) {
           const translatedParts = data[0].map((part: any) => part[0]).filter(Boolean);
           if (translatedParts.length > 0) {
-            return translatedParts.join('').trim();
+            return cleanTranslationResult(translatedParts.join(''), targetLang);
           }
         }
       }
@@ -107,7 +120,7 @@ ${trimmed}`;
   }
 
   // Fallback to original
-  return trimmed;
+  return cleanTranslationResult(trimmed, targetLang);
 }
 
 /**
