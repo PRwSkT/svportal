@@ -450,7 +450,29 @@ export default function FormViewerClient({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             {initialFields.map((field) => {
               const fieldLabel = getLocalized(field.label);
-              const fieldHelp = getLocalized(field.help_text);
+              const rawHelp = getLocalized(field.help_text);
+
+              // Helper: Check if help text is dummy placeholder text from template
+              const isDummyHelp = (text?: string | null) => {
+                if (!text) return true;
+                const t = text.trim();
+                if (!t) return true;
+                if (t === 'คำอธิบายเพิ่มเติมสำหรับส่วนนี้ (ถ้ามี)') return true;
+                if (t === 'Additional description for this section (optional)') return true;
+                if (t === '本节补充说明（可选）') return true;
+                if (t === 'คำอธิบายรูปภาพหรือคำแนะนำเพิ่มเติม (ถ้ามี)') return true;
+                if (t === 'Image caption or instructions (optional)') return true;
+                if (t === '图片说明或指引（可选）') return true;
+                if (t === 'ระบุเนื้อหา รายละเอียด กฎระเบียบ หรือข้อมูลสำคัญที่ต้องการแจ้งให้ผู้ตอบฟอร์มทราบโดยไม่ต้องให้ตอบคำถาม') return true;
+                if (t === 'Specify details, rules, or important information without requiring an answer') return true;
+                if (t === '注明需要告知填写者的具体内容或注意事项，无需作答') return true;
+                if (t.includes('(ถ้ามี)') && t.length <= 40) return true;
+                if (t.includes('(optional)') && t.length <= 50) return true;
+                if (t.includes('（可选）') && t.length <= 30) return true;
+                return false;
+              };
+
+              const fieldHelp = isDummyHelp(rawHelp) ? null : rawHelp;
               const isError = validationErrors[field.field_key];
               const colSpanClass = field.width === 'half' ? 'sm:col-span-1' : 'col-span-full';
 
@@ -469,6 +491,9 @@ export default function FormViewerClient({
 
               // 2. Informational Detail / Note Field (No Input)
               if (field.field_type === 'info_text') {
+                const isDummyTitle = fieldLabel === 'ข้อความชี้แจง / เงื่อนไขและรายละเอียด' || fieldLabel === 'Information & Guidelines' || fieldLabel === '须知与说明';
+                if (isDummyTitle && !fieldHelp) return null;
+
                 return (
                   <div
                     key={field.id}
@@ -479,11 +504,11 @@ export default function FormViewerClient({
                         <Info className="w-5 h-5" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        {fieldLabel && (
+                        {fieldLabel && !isDummyTitle && (
                           <h3 className="text-base font-bold text-slate-900 leading-snug">{fieldLabel}</h3>
                         )}
                         {fieldHelp && (
-                          <p className="text-xs sm:text-sm text-slate-600 mt-2 whitespace-pre-wrap leading-relaxed">
+                          <p className="text-xs sm:text-sm text-slate-600 mt-1 whitespace-pre-wrap leading-relaxed">
                             {fieldHelp}
                           </p>
                         )}
@@ -495,27 +520,28 @@ export default function FormViewerClient({
 
               // 3. Image / Poster / QR Code Field (No Input)
               if (field.field_type === 'image') {
+                // If no image uploaded, DO NOT render empty block on public form
+                if (!field.image_url) {
+                  return null;
+                }
+
+                const isDummyImageTitle = fieldLabel === 'รูปภาพประกอบ / โปสเตอร์กิจกรรม' || fieldLabel === 'Illustration / Event Poster' || fieldLabel === '活动海报 / 插图';
+
                 return (
                   <div
                     key={field.id}
                     className={`${colSpanClass} bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-2xs`}
                   >
-                    {fieldLabel && (
+                    {fieldLabel && !isDummyImageTitle && (
                       <h3 className="text-base font-bold text-slate-900 mb-3">{fieldLabel}</h3>
                     )}
-                    {field.image_url ? (
-                      <div className="rounded-xl overflow-hidden border border-slate-100 bg-slate-50/60 p-2 flex items-center justify-center">
-                        <img
-                          src={field.image_url}
-                          alt={fieldLabel || 'รูปภาพประกอบ'}
-                          className="max-h-96 w-auto object-contain rounded-lg shadow-2xs"
-                        />
-                      </div>
-                    ) : (
-                      <div className="p-6 text-center text-xs text-slate-400 bg-slate-50 rounded-xl">
-                        (ไม่มีรูปภาพ)
-                      </div>
-                    )}
+                    <div className="rounded-xl overflow-hidden border border-slate-100 bg-slate-50/60 p-2 flex items-center justify-center">
+                      <img
+                        src={field.image_url}
+                        alt={fieldLabel || 'รูปภาพประกอบ'}
+                        className="max-h-96 w-auto object-contain rounded-lg shadow-2xs"
+                      />
+                    </div>
                     {fieldHelp && (
                       <p className="text-xs text-slate-600 mt-2.5 whitespace-pre-wrap leading-relaxed">{fieldHelp}</p>
                     )}

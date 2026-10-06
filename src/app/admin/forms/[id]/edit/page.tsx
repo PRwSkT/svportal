@@ -42,24 +42,21 @@ const FIELD_TEMPLATES: {
     title: 'หัวข้อแบ่งส่วน (Section Header)',
     category: 'layout',
     icon: Heading,
-    defaultLabel: { th: 'ส่วนที่: ข้อมูลเพิ่มเติม', en: 'Section: Additional Information', zh: '部分：补充信息' },
-    defaultHelp: { th: 'คำอธิบายเพิ่มเติมสำหรับส่วนนี้ (ถ้ามี)', en: 'Additional description for this section (optional)', zh: '本节补充说明（可选）' }
+    defaultLabel: { th: 'ส่วนที่: ข้อมูลเพิ่มเติม', en: 'Section: Additional Information', zh: '部分：补充信息' }
   },
   {
     type: 'info_text',
     title: 'ข้อความชี้แจง / รายละเอียดเฉยๆ (Note)',
     category: 'layout',
     icon: Info,
-    defaultLabel: { th: 'ข้อความชี้แจง / เงื่อนไขและรายละเอียด', en: 'Information & Guidelines', zh: '须知与说明' },
-    defaultHelp: { th: 'ระบุเนื้อหา รายละเอียด กฎระเบียบ หรือข้อมูลสำคัญที่ต้องการแจ้งให้ผู้ตอบฟอร์มทราบโดยไม่ต้องให้ตอบคำถาม', en: 'Specify details, rules, or important information without requiring an answer', zh: '注明需要告知填写者的具体内容或注意事项，无需作答' }
+    defaultLabel: { th: 'ข้อความชี้แจง', en: 'Information & Guidelines', zh: '须知与说明' }
   },
   {
     type: 'image',
     title: 'รูปภาพ / โปสเตอร์ / QR ชำระเงิน',
     category: 'layout',
     icon: ImageIcon,
-    defaultLabel: { th: 'รูปภาพประกอบ / โปสเตอร์กิจกรรม', en: 'Illustration / Event Poster', zh: '活动海报 / 插图' },
-    defaultHelp: { th: 'คำอธิบายรูปภาพหรือคำแนะนำเพิ่มเติม (ถ้ามี)', en: 'Image caption or instructions (optional)', zh: '图片说明或指引（可选）' }
+    defaultLabel: { th: 'รูปภาพประกอบ', en: 'Illustration / Image', zh: '插图 / 图片' }
   },
   // --- Input Questions ---
   {
@@ -191,7 +188,32 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
 
       if (res.success && res.data) {
         setForm(res.data.form);
-        setFields(res.data.fields);
+        const isDummy = (txt?: string | null) => {
+          if (!txt) return false;
+          const t = txt.trim();
+          return (
+            t === 'คำอธิบายเพิ่มเติมสำหรับส่วนนี้ (ถ้ามี)' ||
+            t === 'Additional description for this section (optional)' ||
+            t === '本节补充说明（可选）' ||
+            t === 'คำอธิบายรูปภาพหรือคำแนะนำเพิ่มเติม (ถ้ามี)' ||
+            t === 'Image caption or instructions (optional)' ||
+            t === '图片说明或指引（可选）' ||
+            t === 'ระบุเนื้อหา รายละเอียด กฎระเบียบ หรือข้อมูลสำคัญที่ต้องการแจ้งให้ผู้ตอบฟอร์มทราบโดยไม่ต้องให้ตอบคำถาม' ||
+            (t.includes('(ถ้ามี)') && t.length <= 40) ||
+            (t.includes('(optional)') && t.length <= 50) ||
+            (t.includes('（可选）') && t.length <= 30)
+          );
+        };
+        const sanitizedFields = (res.data.fields || []).map((f: FormField) => {
+          if (f.help_text && (isDummy(f.help_text.th) || isDummy(f.help_text.en) || isDummy(f.help_text.zh))) {
+            return {
+              ...f,
+              help_text: { th: '', en: '', zh: '' },
+            };
+          }
+          return f;
+        });
+        setFields(sanitizedFields);
         setSelectedCollaboratorIds(res.data.form.collaborator_ids || []);
       } else {
         toast.error('ไม่สามารถเปิดแบบฟอร์มได้', { description: res.error });
@@ -233,7 +255,7 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
       form_id: form.id,
       field_key: newFieldKey,
       label: { ...template.defaultLabel },
-      help_text: template.defaultHelp ? { ...template.defaultHelp } : { th: '', en: '', zh: '' },
+      help_text: { th: '', en: '', zh: '' },
       field_type: template.type,
       is_required: !isNonInput,
       image_url: null,
@@ -1322,6 +1344,9 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                             ) : (
                               <div className="border-2 border-dashed border-slate-200 hover:border-[#7B1C3E] rounded-2xl p-5 text-center bg-slate-50/50">
                                 <ImageIcon className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                                <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200/80 rounded-lg px-2.5 py-1 mb-3 inline-block font-medium">
+                                  ยังไม่ได้อัปโหลดรูปภาพ (ช่องนี้จะไม่แสดงในหน้าฟอร์มจริงจนกว่าจะอัปโหลดภาพ)
+                                </div>
                                 <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
                                   <label className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#7B1C3E] hover:bg-[#631430] text-white rounded-xl text-xs font-semibold cursor-pointer shadow-2xs transition-colors">
                                     <Upload className="w-3.5 h-3.5" />
@@ -1591,25 +1616,45 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {fields.map((field) => {
                         const lbl = field.label?.[previewLang] || field.label?.th;
-                        const hlp = field.help_text?.[previewLang] || field.help_text?.th;
+                        const rawHlp = field.help_text?.[previewLang] || field.help_text?.th;
+                        const isDummy = (txt?: string | null) => {
+                          if (!txt) return false;
+                          const t = txt.trim();
+                          return (
+                            t === 'คำอธิบายเพิ่มเติมสำหรับส่วนนี้ (ถ้ามี)' ||
+                            t === 'Additional description for this section (optional)' ||
+                            t === '本节补充说明（可选）' ||
+                            t === 'คำอธิบายรูปภาพหรือคำแนะนำเพิ่มเติม (ถ้ามี)' ||
+                            t === 'Image caption or instructions (optional)' ||
+                            t === '图片说明或指引（可选）' ||
+                            t === 'ระบุเนื้อหา รายละเอียด กฎระเบียบ หรือข้อมูลสำคัญที่ต้องการแจ้งให้ผู้ตอบฟอร์มทราบโดยไม่ต้องให้ตอบคำถาม' ||
+                            (t.includes('(ถ้ามี)') && t.length <= 40) ||
+                            (t.includes('(optional)') && t.length <= 50) ||
+                            (t.includes('（可选）') && t.length <= 30)
+                          );
+                        };
+                        const hlp = isDummy(rawHlp) ? '' : rawHlp;
                         const colClass = field.width === 'half' ? 'sm:col-span-1' : 'col-span-full';
 
                         if (field.field_type === 'section_header') {
                           return (
                             <div key={field.id} className="col-span-full bg-[#1B3A6B] text-white p-4 rounded-xl border-l-4 border-l-[#7B1C3E]">
                               <h3 className="text-base font-bold">{lbl}</h3>
-                              {hlp && <p className="text-xs text-white/80 mt-0.5">{hlp}</p>}
+                              {hlp && <p className="text-xs text-white/80 mt-1">{hlp}</p>}
                             </div>
                           );
                         }
 
                         if (field.field_type === 'info_text') {
+                          const isDummyTitle = lbl === 'ข้อความชี้แจง / เงื่อนไขและรายละเอียด' || lbl === 'Information & Guidelines' || lbl === '须知与说明' || lbl === 'ข้อความชี้แจง';
+                          if (isDummyTitle && !hlp) return null;
+
                           return (
                             <div key={field.id} className={`${colClass} bg-indigo-50/60 border border-indigo-100 p-4 rounded-xl`}>
                               <div className="flex items-start gap-2.5">
                                 <Info className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
                                 <div>
-                                  <h4 className="text-sm font-bold text-slate-900">{lbl}</h4>
+                                  {lbl && !isDummyTitle && <h4 className="text-sm font-bold text-slate-900">{lbl}</h4>}
                                   {hlp && <p className="text-xs text-slate-600 mt-1 whitespace-pre-wrap leading-relaxed">{hlp}</p>}
                                 </div>
                               </div>
@@ -1618,14 +1663,18 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                         }
 
                         if (field.field_type === 'image') {
+                          if (!field.image_url) {
+                            return (
+                              <div key={field.id} className={`${colClass} bg-amber-50/70 border border-dashed border-amber-300 p-3 rounded-xl text-center text-xs text-amber-800`}>
+                                ช่องรูปภาพยังไม่ได้อัปโหลดภาพ (จะไม่แสดงในหน้าฟอร์มจริง)
+                              </div>
+                            );
+                          }
+                          const isDummyTitle = lbl === 'รูปภาพประกอบ / โปสเตอร์กิจกรรม' || lbl === 'Illustration / Event Poster' || lbl === '活动海报 / 插图' || lbl === 'รูปภาพประกอบ';
                           return (
                             <div key={field.id} className={`${colClass} bg-white border border-slate-200 p-4 rounded-xl`}>
-                              {lbl && <h4 className="text-sm font-bold text-slate-900 mb-2">{lbl}</h4>}
-                              {field.image_url ? (
-                                <img src={field.image_url} alt="Image" className="max-h-60 w-auto mx-auto object-contain rounded-lg" />
-                              ) : (
-                                <div className="p-6 text-center text-xs text-slate-400 bg-slate-50 rounded-lg">รูปภาพตัวอย่าง</div>
-                              )}
+                              {lbl && !isDummyTitle && <h4 className="text-sm font-bold text-slate-900 mb-2">{lbl}</h4>}
+                              <img src={field.image_url} alt="Image" className="max-h-60 w-auto mx-auto object-contain rounded-lg" />
                               {hlp && <p className="text-xs text-slate-500 mt-2">{hlp}</p>}
                             </div>
                           );

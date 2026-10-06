@@ -424,19 +424,46 @@ export async function saveFormStudio(
     if (delErr) throw delErr;
 
     if (fields.length > 0) {
-      const fieldsToInsert = fields.map((f, idx) => ({
-        form_id: formId,
-        field_key: f.field_key || `field_${idx + 1}`,
-        label: f.label || { th: 'คำถามที่ ' + (idx + 1) },
-        help_text: f.help_text || null,
-        field_type: f.field_type || 'text',
-        is_required: Boolean(f.is_required),
-        options: f.options || null,
-        validation: f.validation || null,
-        image_url: f.image_url || null,
-        sort_order: idx,
-        width: f.width || 'full',
-      }));
+      const isDummyHelp = (text?: string | null) => {
+        if (!text) return true;
+        const t = text.trim();
+        if (!t) return true;
+        return (
+          t === 'คำอธิบายเพิ่มเติมสำหรับส่วนนี้ (ถ้ามี)' ||
+          t === 'Additional description for this section (optional)' ||
+          t === '本节补充说明（可选）' ||
+          t === 'คำอธิบายรูปภาพหรือคำแนะนำเพิ่มเติม (ถ้ามี)' ||
+          t === 'Image caption or instructions (optional)' ||
+          t === '图片说明或指引（可选）' ||
+          t === 'ระบุเนื้อหา รายละเอียด กฎระเบียบ หรือข้อมูลสำคัญที่ต้องการแจ้งให้ผู้ตอบฟอร์มทราบโดยไม่ต้องให้ตอบคำถาม' ||
+          (t.includes('(ถ้ามี)') && t.length <= 40) ||
+          (t.includes('(optional)') && t.length <= 50) ||
+          (t.includes('（可选）') && t.length <= 30)
+        );
+      };
+
+      const fieldsToInsert = fields.map((f, idx) => {
+        let cleanHelp = f.help_text;
+        if (cleanHelp && isDummyHelp(cleanHelp.th) && isDummyHelp(cleanHelp.en) && isDummyHelp(cleanHelp.zh)) {
+          cleanHelp = null;
+        } else if (cleanHelp && !cleanHelp.th?.trim() && !cleanHelp.en?.trim() && !cleanHelp.zh?.trim()) {
+          cleanHelp = null;
+        }
+
+        return {
+          form_id: formId,
+          field_key: f.field_key || `field_${idx + 1}`,
+          label: f.label || { th: 'คำถามที่ ' + (idx + 1) },
+          help_text: cleanHelp || null,
+          field_type: f.field_type || 'text',
+          is_required: Boolean(f.is_required),
+          options: f.options || null,
+          validation: f.validation || null,
+          image_url: f.image_url || null,
+          sort_order: idx,
+          width: f.width || 'full',
+        };
+      });
 
       const { error: insErr } = await supabase
         .from('form_fields')
