@@ -33,7 +33,6 @@ ${trimmed}`;
         'gemma-4-31b-it',
         'gemma-4-26b-a4b-it',
         'gemini-3.1-flash-lite',
-        'gemini-1.5-flash',
       ]) {
         try {
           const res = await fetch(
