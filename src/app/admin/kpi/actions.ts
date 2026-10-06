@@ -17,6 +17,60 @@ function getAdminClient() {
 }
 
 /**
+ * Shared helper to accurately resolve user role, admin status, and personnel ID
+ */
+async function resolveUserContext(supabase: any): Promise<{
+  userId: string | null;
+  personnelId: string | null;
+  isAdmin: boolean;
+}> {
+  try {
+    const currentUser = await getServerUser();
+    let isAdmin = false;
+    let currentPersonnelId: string | null = null;
+
+    if (currentUser) {
+      if (isSystemAdmin(currentUser.email) || currentUser.user_metadata?.role === 'admin') {
+        isAdmin = true;
+      }
+
+      const { data: appUser } = await supabase
+        .from('app_users')
+        .select('role, personnel_id')
+        .eq('id', currentUser.id)
+        .maybeSingle();
+
+      if (appUser) {
+        if (appUser.role === 'admin' || appUser.role === 'executive') {
+          isAdmin = true;
+        }
+        if (appUser.personnel_id) {
+          currentPersonnelId = appUser.personnel_id;
+        }
+      }
+
+      if (!currentPersonnelId && currentUser.email) {
+        const { data: pData } = await supabase
+          .from('personnel')
+          .select('id')
+          .eq('email', currentUser.email)
+          .maybeSingle();
+        currentPersonnelId = pData?.id || null;
+      }
+    }
+
+    return {
+      userId: currentUser?.id || null,
+      personnelId: currentPersonnelId,
+      isAdmin,
+    };
+  } catch (err) {
+    console.error('resolveUserContext error:', err);
+    return { userId: null, personnelId: null, isAdmin: false };
+  }
+}
+
+/**
  * Fetch all evaluation cycles
  */
 export async function getKpiCycles(): Promise<{ success: boolean; data?: KpiCycle[]; error?: string }> {
@@ -152,20 +206,7 @@ export async function getKpiEvaluations(cycleId: string): Promise<{
 }> {
   try {
     const supabase = getAdminClient();
-    const currentUser = await getServerUser();
-    const isAdmin = Boolean(
-      currentUser && (isSystemAdmin(currentUser.email) || currentUser.user_metadata?.role === 'admin')
-    );
-
-    let currentPersonnelId: string | null = null;
-    if (currentUser?.email) {
-      const { data: pData } = await supabase
-        .from('personnel')
-        .select('id')
-        .eq('email', currentUser.email)
-        .maybeSingle();
-      currentPersonnelId = pData?.id || null;
-    }
+    const currentUserContext = await resolveUserContext(supabase);
 
     // 1. Fetch raw evaluations
     const { data, error } = await supabase
@@ -256,11 +297,7 @@ export async function getKpiEvaluations(cycleId: string): Promise<{
         completed: completedCount,
         avgScore,
       },
-      currentUserContext: {
-        userId: currentUser?.id || null,
-        personnelId: currentPersonnelId,
-        isAdmin,
-      },
+      currentUserContext,
     };
   } catch (err: any) {
     console.error('getKpiEvaluations error:', err);
@@ -274,7 +311,12 @@ export async function getKpiEvaluations(cycleId: string): Promise<{
 export async function assignEvaluators(
   evaluationId: string,
   evaluatorPersonnelIds: string[]
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{
+  success: boolean;
+  assigned_evaluators?: any[];
+  assigned_evaluator_ids?: string[];
+  error?: string;
+}> {
   try {
     const supabase = getAdminClient();
     const primaryId = evaluatorPersonnelIds[0] || null;
@@ -288,7 +330,21 @@ export async function assignEvaluators(
       .eq('id', evaluationId);
 
     if (error) throw error;
-    return { success: true };
+
+    let assigned_evaluators: any[] = [];
+    if (evaluatorPersonnelIds.length > 0) {
+      const { data: pList } = await supabase
+        .from('personnel')
+        .select('id, name_th, name_en, position_th, category, email, image_url')
+        .in('id', evaluatorPersonnelIds);
+      assigned_evaluators = pList || [];
+    }
+
+    return {
+      success: true,
+      assigned_evaluators,
+      assigned_evaluator_ids: evaluatorPersonnelIds,
+    };
   } catch (err: any) {
     console.error('assignEvaluators error:', err);
     return { success: false, error: err.message };
@@ -354,20 +410,9 @@ export async function getEvaluationDetail(evaluationId: string): Promise<{
 }> {
   try {
     const supabase = getAdminClient();
-    const currentUser = await getServerUser();
-    const isAdmin = Boolean(
-      currentUser && (isSystemAdmin(currentUser.email) || currentUser.user_metadata?.role === 'admin')
-    );
-
-    let currentPersonnelId: string | null = null;
-    if (currentUser?.email) {
-      const { data: pData } = await supabase
-        .from('personnel')
-        .select('id')
-        .eq('email', currentUser.email)
-        .maybeSingle();
-      currentPersonnelId = pData?.id || null;
-    }
+    const currentUserContext = await resolveUserContext(supabase);
+    const isAdmin = currentUserContext.isAdmin;
+    const currentPersonnelId = currentUserContext.personnelId;
 
     const { data, error } = await supabase
       .from('kpi_evaluations')
@@ -420,11 +465,7 @@ export async function getEvaluationDetail(evaluationId: string): Promise<{
     return {
       success: true,
       data: evaluationWithReviews,
-      currentUserContext: {
-        userId: currentUser?.id || null,
-        personnelId: currentPersonnelId,
-        isAdmin,
-      },
+      currentUserContext,
       myReview,
     };
   } catch (err: any) {
@@ -515,7 +556,7 @@ export async function submitSupervisorEvaluation(
 }> {
   try {
     const supabase = getAdminClient();
-    const currentUser = await getServerUser();
+    const currentUserContext = await resolveUserContext(supabase);
 
     // 1. Get current evaluation with template
     const { data: evaluation, error: fetchErr } = await supabase
@@ -527,15 +568,7 @@ export async function submitSupervisorEvaluation(
     if (fetchErr || !evaluation) throw new Error('ไม่พบข้อมูลการประเมิน');
 
     // 2. Identify the active evaluator
-    let currentPersonnelId: string | null = asEvaluatorId || null;
-    if (!currentPersonnelId && currentUser?.email) {
-      const { data: pData } = await supabase
-        .from('personnel')
-        .select('id')
-        .eq('email', currentUser.email)
-        .maybeSingle();
-      currentPersonnelId = pData?.id || null;
-    }
+    let currentPersonnelId: string | null = asEvaluatorId || currentUserContext.personnelId || null;
 
     // Fallback if admin has no personnel link: pick first assigned evaluator or default director
     if (!currentPersonnelId) {

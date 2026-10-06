@@ -17,6 +17,7 @@ import {
   syncPersonnelForCycle,
   createQuarterlyCycle,
   assignEvaluator,
+  assignEvaluators,
   bulkAssignEvaluators,
   getEvaluatorCandidates,
 } from './actions';
@@ -49,6 +50,7 @@ import {
   Settings2,
   Save,
   Check,
+  Info,
 } from 'lucide-react';
 
 export default function KpiDashboardPage() {
@@ -114,6 +116,12 @@ export default function KpiDashboardPage() {
   const [bulkSupervisorChoices, setBulkSupervisorChoices] = useState<string[]>([
     '3da9e72c-e913-4606-9b33-46aa9427ff43',
   ]);
+
+  // Individual Person Evaluator Assignment Modal
+  const [personAssignModalEval, setPersonAssignModalEval] = useState<KpiEvaluation | null>(null);
+  const [personSelectedEvaluatorIds, setPersonSelectedEvaluatorIds] = useState<string[]>([]);
+  const [isSavingPersonAssignment, setIsSavingPersonAssignment] = useState(false);
+  const [evaluatorSearchQuery, setEvaluatorSearchQuery] = useState('');
 
   // 1. Initial Load of Cycles & Evaluators
   const loadCyclesAndCandidates = async () => {
@@ -299,6 +307,65 @@ export default function KpiDashboardPage() {
     }
   };
 
+  // Open individual person assign modal
+  const handleOpenPersonAssignModal = (evaluation: KpiEvaluation) => {
+    const ids =
+      evaluation.assigned_evaluator_ids && evaluation.assigned_evaluator_ids.length > 0
+        ? [...evaluation.assigned_evaluator_ids]
+        : evaluation.assigned_evaluator_id
+        ? [evaluation.assigned_evaluator_id]
+        : [];
+    setPersonSelectedEvaluatorIds(ids);
+    setPersonAssignModalEval(evaluation);
+    setEvaluatorSearchQuery('');
+  };
+
+  // Toggle individual evaluator
+  const handleTogglePersonEvaluator = (evaluatorId: string) => {
+    setPersonSelectedEvaluatorIds((prev) =>
+      prev.includes(evaluatorId) ? prev.filter((id) => id !== evaluatorId) : [...prev, evaluatorId]
+    );
+  };
+
+  // Save individual person assignment
+  const handleSavePersonAssignment = async () => {
+    if (!personAssignModalEval) return;
+    setIsSavingPersonAssignment(true);
+    const res = await assignEvaluators(personAssignModalEval.id, personSelectedEvaluatorIds);
+    setIsSavingPersonAssignment(false);
+
+    if (res.success) {
+      toast.success(
+        `บันทึกผู้ประเมิน (${personSelectedEvaluatorIds.length} ท่าน) ให้ ${personAssignModalEval.personnel?.name_th} เรียบร้อยแล้ว`
+      );
+
+      const updatedEvaluators = evaluators.filter((ev) => personSelectedEvaluatorIds.includes(ev.id));
+      setEvaluations((prev) =>
+        prev.map((item) => {
+          if (item.id === personAssignModalEval.id) {
+            return {
+              ...item,
+              assigned_evaluator_ids: personSelectedEvaluatorIds,
+              assigned_evaluator_id: personSelectedEvaluatorIds[0] || null,
+              assigned_evaluators: updatedEvaluators,
+            };
+          }
+          return item;
+        })
+      );
+
+      // Also sync into assignmentsDraft
+      setAssignmentsDraft((prev) => ({
+        ...prev,
+        [personAssignModalEval.id]: personSelectedEvaluatorIds,
+      }));
+
+      setPersonAssignModalEval(null);
+    } else {
+      toast.error('บันทึกสิทธิ์ไม่สำเร็จ', { description: res.error });
+    }
+  };
+
   // Send anonymous email
   const handleSendEmail = async (evaluation: KpiEvaluation) => {
     if (!evaluation.personnel?.email) {
@@ -399,10 +466,10 @@ export default function KpiDashboardPage() {
               <button
                 onClick={() => setShowAssignModal(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold shadow-2xs transition-colors"
-                title="กำหนดสิทธิ์ผู้ประเมินสำหรับบุคลากรแต่ละคน"
+                title="กำหนดสิทธิ์ผู้ประเมินพร้อมกันหลายคนหรือภาพรวมทั้งตาราง (Bulk Assign)"
               >
                 <Settings2 className="w-3.5 h-3.5 text-purple-600" />
-                <span>กำหนดสิทธิ์ผู้ประเมิน</span>
+                <span>กำหนดสิทธิ์ภาพรวม / Bulk</span>
               </button>
             )}
 
@@ -732,11 +799,12 @@ export default function KpiDashboardPage() {
                             {currentUserContext.isAdmin && (
                               <button
                                 type="button"
-                                onClick={() => setShowAssignModal(true)}
-                                className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 hover:text-purple-900 hover:underline pt-0.5 cursor-pointer"
+                                onClick={() => handleOpenPersonAssignModal(e)}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                                title={`กำหนดผู้ประเมินรายคนให้ ${p?.name_th}`}
                               >
-                                <Settings2 className="w-3 h-3" />
-                                <span>กำหนดสิทธิ์ ({e.assigned_evaluators?.length || 0} ท่าน)</span>
+                                <Settings2 className="w-3.5 h-3.5 text-purple-600" />
+                                <span>กำหนดผู้ประเมิน ({e.assigned_evaluator_ids?.length || 0} ท่าน)</span>
                               </button>
                             )}
                           </div>
@@ -1190,6 +1258,208 @@ export default function KpiDashboardPage() {
                     <>
                       <Save className="w-4 h-4" />
                       <span>บันทึกสิทธิ์ทั้งหมด</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 2.5 Modal: Individual Person Evaluator Assignment (กำหนดผู้ประเมินรายบุคคล) */}
+      <AnimatePresence>
+        {personAssignModalEval && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] p-6 sm:p-7 shadow-2xl border border-slate-200 flex flex-col relative text-slate-800"
+            >
+              <button
+                type="button"
+                onClick={() => setPersonAssignModalEval(null)}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {/* Header */}
+              <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+                <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                  <UserCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">
+                    กำหนดผู้มีสิทธิ์ประเมินรายบุคคล
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    รอบ: {selectedCycle?.title} [{selectedCycle?.quarter || 'Q1'}]
+                  </p>
+                </div>
+              </div>
+
+              {/* Target Personnel Box */}
+              <div className="bg-gradient-to-r from-purple-50/90 via-indigo-50/60 to-slate-50 rounded-2xl p-4 my-3.5 border border-purple-100 flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-full overflow-hidden bg-white border-2 border-purple-200 shrink-0 flex items-center justify-center">
+                  {personAssignModalEval.personnel?.image_url ? (
+                    <img
+                      src={personAssignModalEval.personnel.image_url}
+                      alt={personAssignModalEval.personnel.name_th}
+                      className="w-full h-full object-cover object-top"
+                    />
+                  ) : (
+                    <User className="w-6 h-6 text-purple-400" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-extrabold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+                    <span className="truncate">{personAssignModalEval.personnel?.name_th}</span>
+                    <span className="text-[11px] font-semibold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full shrink-0">
+                      ผู้รับการประเมิน
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-600 mt-0.5 truncate">
+                    {personAssignModalEval.personnel?.position_th || 'บุคลากร'}
+                    {personAssignModalEval.personnel?.email && (
+                      <span className="ml-2 font-mono text-purple-700 font-medium">
+                        ({personAssignModalEval.personnel.email})
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Explanatory Info Card */}
+              <div className="bg-blue-50/80 border border-blue-200/90 rounded-xl p-3 mb-3 text-xs text-blue-900 flex items-start gap-2.5">
+                <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                <div className="leading-relaxed text-[11px]">
+                  <strong>สามารถเลือกผู้ประเมินได้มากกว่า 1 ท่าน:</strong> บุคลากรผู้ประเมินที่ถูกเลือกจะมีสิทธิ์ตรวจและให้คะแนนท่านนี้ และเมื่อผู้ประเมินทุกคนให้คะแนนครบ ระบบจะ<strong>นำคะแนนเฉลี่ยรวมกัน</strong>และส่งแจ้งผลอัตโนมัติ
+                </div>
+              </div>
+
+              {/* Filter & Selection Counter */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-2 mb-3">
+                <div className="relative w-full sm:w-64">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="ค้นหาชื่อผู้ประเมิน..."
+                    value={evaluatorSearchQuery}
+                    onChange={(e) => setEvaluatorSearchQuery(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-purple-400 focus:bg-white transition-all"
+                  />
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                  <span className="text-xs font-bold text-purple-900 bg-purple-100 px-2.5 py-1 rounded-lg">
+                    เลือกแล้ว {personSelectedEvaluatorIds.length} ท่าน
+                  </span>
+                  <div className="flex items-center gap-1 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setPersonSelectedEvaluatorIds(evaluators.map((ev) => ev.id))}
+                      className="px-2 py-1 text-purple-700 hover:bg-purple-50 rounded font-semibold cursor-pointer"
+                    >
+                      เลือกทั้งหมด
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setPersonSelectedEvaluatorIds([])}
+                      className="px-2 py-1 text-slate-500 hover:bg-slate-100 rounded font-semibold cursor-pointer"
+                    >
+                      ล้างค่า
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Evaluators Checklist */}
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[42vh]">
+                {evaluators
+                  .filter((c) => {
+                    const q = evaluatorSearchQuery.toLowerCase();
+                    return (
+                      !q ||
+                      c.name_th?.toLowerCase().includes(q) ||
+                      c.name_en?.toLowerCase().includes(q) ||
+                      c.position_th?.toLowerCase().includes(q)
+                    );
+                  })
+                  .map((c) => {
+                    const isSelected = personSelectedEvaluatorIds.includes(c.id);
+                    return (
+                      <div
+                        key={c.id}
+                        onClick={() => handleTogglePersonEvaluator(c.id)}
+                        className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                          isSelected
+                            ? 'bg-purple-50/90 border-purple-300 ring-1 ring-purple-400 shadow-2xs'
+                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0 flex items-center justify-center">
+                            {c.image_url ? (
+                              <img
+                                src={c.image_url}
+                                alt={c.name_th}
+                                className="w-full h-full object-cover object-top"
+                              />
+                            ) : (
+                              <User className="w-5 h-5 text-slate-400" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                              {c.name_th}
+                            </div>
+                            <div className="text-[11px] text-slate-500 truncate">{c.position_th}</div>
+                            {c.email && (
+                              <div className="text-[10px] text-purple-700 font-mono truncate">{c.email}</div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 pr-1">
+                          {isSelected ? (
+                            <div className="w-6 h-6 rounded-lg bg-purple-600 text-white flex items-center justify-center shadow-xs">
+                              <Check className="w-4 h-4" />
+                            </div>
+                          ) : (
+                            <div className="w-6 h-6 rounded-lg border-2 border-slate-300 flex items-center justify-center bg-white" />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              {/* Bottom Actions */}
+              <div className="pt-4 mt-3 border-t border-slate-100 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPersonAssignModalEval(null)}
+                  className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  disabled={isSavingPersonAssignment}
+                  onClick={handleSavePersonAssignment}
+                  className="py-2.5 px-6 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                >
+                  {isSavingPersonAssignment ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>กำลังบันทึกสิทธิ์...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>บันทึกผู้มีสิทธิ์ประเมิน ({personSelectedEvaluatorIds.length} ท่าน)</span>
                     </>
                   )}
                 </button>
