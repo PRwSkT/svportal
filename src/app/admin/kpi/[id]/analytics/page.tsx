@@ -241,10 +241,15 @@ export default function IndividualKpiAnalyticsPage({
                 <h2 className="text-2xl font-extrabold text-slate-900 mt-0.5">
                   {p?.name_th}
                 </h2>
-                <div className="text-xs text-slate-500 mt-1 flex flex-wrap gap-2">
+                <div className="text-xs text-slate-500 mt-1 flex flex-wrap gap-2 items-center">
                   <span>ตำแหน่ง: <strong>{p?.position_th}</strong></span>
                   {p?.email && (
                     <span className="text-indigo-600 font-mono">• {p.email}</span>
+                  )}
+                  {evaluation.assigned_evaluators && evaluation.assigned_evaluators.length > 0 && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200 text-[11px] font-semibold">
+                      👥 คณะกรรมการ {evaluation.assigned_evaluators.length} ท่าน (ถัวเฉลี่ยคะแนนร่วมกัน)
+                    </span>
                   )}
                 </div>
                 {evaluation.email_notified_status === 'sent' && (
@@ -314,7 +319,7 @@ export default function IndividualKpiAnalyticsPage({
                     fillOpacity={0.25}
                   />
                   <Radar
-                    name="หัวหน้างาน (Supervisor)"
+                    name="คะแนนเฉลี่ยกรรมการ (Committee Avg)"
                     dataKey="หัวหน้างาน"
                     stroke="#7B1C3E"
                     fill="#7B1C3E"

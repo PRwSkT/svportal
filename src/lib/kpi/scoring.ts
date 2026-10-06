@@ -142,7 +142,7 @@ export function generateAnonymousKpiEmailHtml(evaluation: KpiEvaluation): string
                 SOMKIDVITTAYA SCHOOL • HR PERFORMANCE EVALUATION
               </div>
               <div style="margin-top: 14px; display: inline-block; background-color: rgba(0,0,0,0.25); color: #FEE2E2; padding: 4px 14px; border-radius: 999px; font-size: 11px; font-weight: 600;">
-                🔒 รายงานผลการประเมินส่วนบุคคล (ไม่เปิดเผยตัวตนผู้ประเมิน)
+                🔒 รายงานผลการประเมินส่วนบุคคล (คะแนนถัวเฉลี่ยจากคณะกรรมการผู้ประเมิน โดยไม่เปิดเผยตัวตน)
               </div>
             </td>
           </tr>

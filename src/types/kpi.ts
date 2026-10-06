@@ -55,10 +55,11 @@ export interface KpiEvaluation {
   self_total_score: number | null;
   self_submitted_at: string | null;
 
-  // Supervisor assignment & assessment
+  // Supervisor assignment & assessment (Supports multiple evaluators)
   assigned_evaluator_id: string | null;
+  assigned_evaluator_ids?: string[];
   supervisor_id: string | null;
-  supervisor_scores: Record<string, number>; // { [itemId]: 1-5 }
+  supervisor_scores: Record<string, number>; // { [itemId]: 1-5 } (Averaged across all evaluators)
   supervisor_feedback: Record<string, string>; // { [sectionId]: feedback text }
   supervisor_overall_comment: string | null;
   supervisor_strengths: string | null;
@@ -96,8 +97,47 @@ export interface KpiEvaluation {
   // Joined template details
   template?: KpiTemplate;
 
-  // Joined assigned evaluator details
+  // Joined assigned evaluator details (legacy single)
   assigned_evaluator?: {
+    id: string;
+    name_th: string;
+    name_en?: string;
+    position_th: string;
+    category?: string;
+    email?: string | null;
+    image_url?: string | null;
+  };
+
+  // Joined assigned evaluators (multiple)
+  assigned_evaluators?: {
+    id: string;
+    name_th: string;
+    name_en?: string;
+    position_th: string;
+    category?: string;
+    email?: string | null;
+    image_url?: string | null;
+  }[];
+
+  // Individual evaluator reviews
+  reviews?: KpiEvaluatorReview[];
+}
+
+export interface KpiEvaluatorReview {
+  id: string;
+  evaluation_id: string;
+  evaluator_id: string;
+  status: 'draft' | 'submitted';
+  scores: Record<string, number>;
+  feedback: Record<string, string>;
+  overall_comment: string | null;
+  strengths: string | null;
+  improvements: string | null;
+  total_score: number | null;
+  submitted_at: string | null;
+  created_at: string;
+  updated_at: string;
+  evaluator?: {
     id: string;
     name_th: string;
     name_en?: string;

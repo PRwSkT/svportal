@@ -107,11 +107,13 @@ export default function KpiDashboardPage() {
   const [newYear, setNewYear] = useState('2568');
   const [newTitle, setNewTitle] = useState('');
 
-  // Assign Evaluator Permission Modal State
+  // Assign Evaluator Permission Modal State (Multi-Evaluators Support)
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [isSavingAssignments, setIsSavingAssignments] = useState(false);
-  const [assignmentsDraft, setAssignmentsDraft] = useState<Record<string, string>>({});
-  const [bulkSupervisorChoice, setBulkSupervisorChoice] = useState('');
+  const [assignmentsDraft, setAssignmentsDraft] = useState<Record<string, string[]>>({});
+  const [bulkSupervisorChoices, setBulkSupervisorChoices] = useState<string[]>([
+    '3da9e72c-e913-4606-9b33-46aa9427ff43',
+  ]);
 
   // 1. Initial Load of Cycles & Evaluators
   const loadCyclesAndCandidates = async () => {
@@ -145,12 +147,16 @@ export default function KpiDashboardPage() {
       if (res.stats) setStats(res.stats);
       if (res.currentUserContext) setCurrentUserContext(res.currentUserContext);
 
-      // Pre-fill assignments draft
-      const draft: Record<string, string> = {};
+      // Pre-fill assignments draft with multi-evaluators
+      const draft: Record<string, string[]> = {};
       res.data.forEach((e) => {
-        if (e.assigned_evaluator_id) {
-          draft[e.id] = e.assigned_evaluator_id;
-        }
+        const ids =
+          e.assigned_evaluator_ids && e.assigned_evaluator_ids.length > 0
+            ? e.assigned_evaluator_ids
+            : e.assigned_evaluator_id
+            ? [e.assigned_evaluator_id]
+            : [];
+        draft[e.id] = ids;
       });
       setAssignmentsDraft(draft);
     } else {
@@ -222,34 +228,63 @@ export default function KpiDashboardPage() {
     }
   };
 
-  // Single Quick Evaluator Assignment
-  const handleQuickAssignEvaluator = async (evaluationId: string, evaluatorId: string) => {
-    const val = evaluatorId || null;
-    const res = await assignEvaluator(evaluationId, val);
-    if (res.success) {
-      toast.success('บันทึกผู้ประเมินเรียบร้อย');
-      setEvaluations((prev) =>
-        prev.map((item) =>
-          item.id === evaluationId
-            ? {
-                ...item,
-                assigned_evaluator_id: val,
-                assigned_evaluator: evaluators.find((c) => c.id === val),
-              }
-            : item
-        )
-      );
-    } else {
-      toast.error('บันทึกผู้ประเมินไม่สำเร็จ');
+  // Add an evaluator to draft for a person
+  const handleAddEvaluatorToDraft = (evaluationId: string, evaluatorId: string) => {
+    if (!evaluatorId) return;
+    setAssignmentsDraft((prev) => {
+      const current = prev[evaluationId] || [];
+      if (current.includes(evaluatorId)) return prev;
+      return {
+        ...prev,
+        [evaluationId]: [...current, evaluatorId],
+      };
+    });
+  };
+
+  // Remove an evaluator from draft for a person
+  const handleRemoveEvaluatorFromDraft = (evaluationId: string, evaluatorId: string) => {
+    setAssignmentsDraft((prev) => {
+      const current = prev[evaluationId] || [];
+      return {
+        ...prev,
+        [evaluationId]: current.filter((id) => id !== evaluatorId),
+      };
+    });
+  };
+
+  // Toggle evaluator in bulk choice set
+  const handleToggleBulkChoice = (evaluatorId: string) => {
+    setBulkSupervisorChoices((prev) => {
+      if (prev.includes(evaluatorId)) {
+        return prev.filter((id) => id !== evaluatorId);
+      } else {
+        return [...prev, evaluatorId];
+      }
+    });
+  };
+
+  // Apply bulk choices to all in modal draft
+  const handleApplyBulkSupervisor = () => {
+    if (bulkSupervisorChoices.length === 0) {
+      toast.warning('กรุณาเลือกผู้ประเมินหลักอย่างน้อย 1 ท่านในแถบมอบหมายด่วน');
+      return;
     }
+    const updated: Record<string, string[]> = {};
+    evaluations.forEach((e) => {
+      updated[e.id] = [...bulkSupervisorChoices];
+    });
+    setAssignmentsDraft(updated);
+    toast.info(
+      `ปรับใช้คณะกรรมการ (${bulkSupervisorChoices.length} ท่าน) กับทุกคนในตารางแล้ว (กด "บันทึกสิทธิ์ทั้งหมด" เพื่อยืนยัน)`
+    );
   };
 
   // Bulk Save Evaluator Assignments
   const handleSaveAllAssignments = async () => {
     setIsSavingAssignments(true);
-    const list = Object.entries(assignmentsDraft).map(([evaluationId, evaluatorPersonnelId]) => ({
+    const list = Object.entries(assignmentsDraft).map(([evaluationId, evaluatorPersonnelIds]) => ({
       evaluationId,
-      evaluatorPersonnelId: evaluatorPersonnelId || null,
+      evaluatorPersonnelIds: evaluatorPersonnelIds || [],
     }));
 
     const res = await bulkAssignEvaluators(list);
@@ -262,17 +297,6 @@ export default function KpiDashboardPage() {
     } else {
       toast.error('บันทึกสิทธิ์ไม่สำเร็จ', { description: res.error });
     }
-  };
-
-  // Apply bulk choice to all in modal draft
-  const handleApplyBulkSupervisor = () => {
-    if (!bulkSupervisorChoice) return;
-    const updated: Record<string, string> = {};
-    evaluations.forEach((e) => {
-      updated[e.id] = bulkSupervisorChoice;
-    });
-    setAssignmentsDraft(updated);
-    toast.info('ปรับใช้ผู้ประเมินกับทุกท่านแล้ว (กดบันทึกเพื่อยืนยัน)');
   };
 
   // Send anonymous email
@@ -301,18 +325,24 @@ export default function KpiDashboardPage() {
   // Filtered List
   const filteredList = evaluations.filter((e) => {
     const p = e.personnel;
+    const q = searchQuery.toLowerCase();
     const matchSearch =
       !searchQuery ||
-      p?.name_th?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p?.name_en?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p?.position_th?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p?.email?.toLowerCase().includes(searchQuery.toLowerCase());
+      p?.name_th?.toLowerCase().includes(q) ||
+      p?.name_en?.toLowerCase().includes(q) ||
+      p?.position_th?.toLowerCase().includes(q) ||
+      p?.email?.toLowerCase().includes(q) ||
+      (e.assigned_evaluators || []).some((ev) => ev.name_th?.toLowerCase().includes(q));
 
     const matchStatus = statusFilter === 'all' || e.status === statusFilter;
 
     let matchView = true;
     if (viewFilter === 'assigned_to_me') {
-      matchView = e.assigned_evaluator_id === currentUserContext.personnelId;
+      matchView = Boolean(
+        currentUserContext.personnelId &&
+          (e.assigned_evaluator_ids?.includes(currentUserContext.personnelId) ||
+            e.assigned_evaluator_id === currentUserContext.personnelId)
+      );
     } else if (viewFilter === 'my_self') {
       matchView = e.personnel_id === currentUserContext.personnelId;
     }
@@ -607,14 +637,26 @@ export default function KpiDashboardPage() {
                     const assignedSup = e.assigned_evaluator;
                     const hasEmail = Boolean(p?.email);
 
-                    // Check if current user is the assigned supervisor or admin
+                    // Check if current user is one of the assigned supervisors or admin
                     const canSupervise =
                       currentUserContext.isAdmin ||
-                      e.assigned_evaluator_id === currentUserContext.personnelId;
+                      Boolean(
+                        currentUserContext.personnelId &&
+                          (e.assigned_evaluator_ids?.includes(currentUserContext.personnelId) ||
+                            e.assigned_evaluator_id === currentUserContext.personnelId)
+                      );
+
+                    // Check if current user has already submitted their review
+                    const myReview = (e.reviews || []).find(
+                      (r) => r.evaluator_id === currentUserContext.personnelId && r.status === 'submitted'
+                    );
 
                     // Check if current user is this personnel
-                    const isSelf =
-                      currentUserContext.personnelId === e.personnel_id;
+                    const isSelf = currentUserContext.personnelId === e.personnel_id;
+
+                    // Evaluator submission progress
+                    const submittedReviewCount = e.reviews?.filter((r) => r.status === 'submitted').length || 0;
+                    const assignedReviewCount = e.assigned_evaluator_ids?.length || (e.assigned_evaluator_id ? 1 : 0);
 
                     return (
                       <tr key={e.id} className="hover:bg-slate-50/60 transition-colors">
@@ -653,34 +695,51 @@ export default function KpiDashboardPage() {
                           </div>
                         </td>
 
-                        {/* Assigned Evaluator / Supervisor Column */}
+                        {/* Assigned Evaluators (Committee) Column */}
                         <td className="py-4 px-4">
-                          {currentUserContext.isAdmin ? (
-                            <select
-                              value={e.assigned_evaluator_id || ''}
-                              onChange={(evt) =>
-                                handleQuickAssignEvaluator(e.id, evt.target.value)
-                              }
-                              className="text-xs font-semibold py-1 px-2 border border-slate-200 rounded-lg bg-slate-50 hover:bg-white focus:outline-none focus:ring-2 focus:ring-purple-400 text-slate-700 max-w-[180px] truncate cursor-pointer"
-                            >
-                              <option value="">-- ยังไม่กำหนด --</option>
-                              {evaluators.map((cand) => (
-                                <option key={cand.id} value={cand.id}>
-                                  {cand.name_th} ({cand.position_th})
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <div className="text-xs font-semibold text-slate-700 truncate max-w-[170px]">
-                              {assignedSup ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200">
-                                  <span>👔 {assignedSup.name_th}</span>
-                                </span>
-                              ) : (
-                                <span className="text-slate-400 italic">ยังไม่กำหนดผู้ประเมิน</span>
-                              )}
-                            </div>
-                          )}
+                          <div className="space-y-1.5 min-w-[190px]">
+                            {e.assigned_evaluators && e.assigned_evaluators.length > 0 ? (
+                              <div className="flex flex-col gap-1">
+                                {e.assigned_evaluators.map((ev) => {
+                                  const review = (e.reviews || []).find(
+                                    (r) => r.evaluator_id === ev.id && r.status === 'submitted'
+                                  );
+                                  const isSubmitted = Boolean(review);
+                                  return (
+                                    <div
+                                      key={ev.id}
+                                      className="flex items-center justify-between gap-1.5 text-[11px] font-semibold py-0.5 px-2 bg-purple-50/70 border border-purple-200/80 rounded-lg text-purple-950"
+                                    >
+                                      <span className="truncate max-w-[130px]">{ev.name_th}</span>
+                                      {isSubmitted ? (
+                                        <span className="inline-flex items-center text-[10px] text-emerald-700 font-bold shrink-0">
+                                          <CheckCircle2 className="w-3 h-3 text-emerald-600 mr-0.5" />
+                                          {review?.total_score ? `${review.total_score}%` : 'ประเมินแล้ว'}
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center text-[10px] text-amber-600 font-medium shrink-0">
+                                          <Clock className="w-3 h-3 text-amber-500 mr-0.5" /> รอ
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-slate-400 italic">ยังไม่กำหนดผู้ประเมิน</span>
+                            )}
+
+                            {currentUserContext.isAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => setShowAssignModal(true)}
+                                className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 hover:text-purple-900 hover:underline pt-0.5 cursor-pointer"
+                              >
+                                <Settings2 className="w-3 h-3" />
+                                <span>กำหนดสิทธิ์ ({e.assigned_evaluators?.length || 0} ท่าน)</span>
+                              </button>
+                            )}
+                          </div>
                         </td>
 
                         {/* Status Column */}
@@ -694,13 +753,13 @@ export default function KpiDashboardPage() {
                           {e.status === 'self_submitted' && (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/80">
                               <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                              รอหัวหน้างาน
+                              รอผู้ประเมิน ({submittedReviewCount}/{assignedReviewCount} คน)
                             </span>
                           )}
                           {e.status === 'completed' && (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                              เสร็จสิ้น
+                              ประเมินครบแล้ว
                             </span>
                           )}
                         </td>
@@ -733,7 +792,7 @@ export default function KpiDashboardPage() {
                             <span
                               className={`inline-block px-2.5 py-0.5 rounded-lg text-xs font-black text-white shadow-2xs ${
                                 e.final_grade === 'A'
-                                  ? 'bg-emerald-600'
+                                    ? 'bg-emerald-600'
                                   : e.final_grade === 'B+'
                                   ? 'bg-blue-600'
                                   : e.final_grade === 'B'
@@ -767,16 +826,22 @@ export default function KpiDashboardPage() {
                             {canSupervise ? (
                               <Link
                                 href={`/admin/kpi/${e.id}/supervisor`}
-                                title="หัวหน้างานประเมิน (Supervisor Evaluation)"
-                                className="px-2.5 py-1.5 rounded-xl bg-[#1B3A6B] hover:bg-[#122748] text-white text-xs font-bold transition-colors flex items-center gap-1 shadow-2xs"
+                                title="ตรวจประเมินผลการปฏิบัติงาน"
+                                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-colors flex items-center gap-1 shadow-2xs ${
+                                  myReview
+                                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200'
+                                    : 'bg-[#1B3A6B] hover:bg-[#122748] text-white'
+                                }`}
                               >
                                 <UserCheck className="w-3.5 h-3.5" />
-                                <span className="hidden sm:inline">ตรวจประเมิน</span>
+                                <span className="hidden sm:inline">
+                                  {myReview ? 'แก้ไขคะแนน' : 'ตรวจประเมิน'}
+                                </span>
                               </Link>
                             ) : (
                               <button
                                 disabled
-                                title={`สงวนสิทธิ์เฉพาะ ${assignedSup?.name_th || 'ผู้ที่ได้รับมอบหมาย'} และผู้ดูแลระบบ`}
+                                title={`สงวนสิทธิ์เฉพาะผู้ได้รับมอบหมายและผู้ดูแลระบบ`}
                                 className="px-2.5 py-1.5 rounded-xl bg-slate-100 text-slate-400 text-xs font-medium cursor-not-allowed opacity-60 flex items-center gap-1"
                               >
                                 <UserCheck className="w-3.5 h-3.5" />
@@ -972,43 +1037,64 @@ export default function KpiDashboardPage() {
               </div>
 
               {/* Bulk Quick Assign Bar */}
-              <div className="bg-purple-50/70 border border-purple-200 rounded-2xl p-3.5 my-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-purple-900">มอบหมายด่วน:</span>
-                  <select
-                    value={bulkSupervisorChoice}
-                    onChange={(e) => setBulkSupervisorChoice(e.target.value)}
-                    className="py-1 px-3 bg-white border border-purple-300 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-400"
+              <div className="bg-purple-50/70 border border-purple-200 rounded-2xl p-4 my-4 flex flex-col gap-3 text-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <span className="font-bold text-purple-950 text-sm">
+                      ⚡ กำหนดผู้ประเมินหลักชุดเดียวกัน (Bulk Assign):
+                    </span>
+                    <p className="text-purple-700 text-[11px] mt-0.5">
+                      เลือกคณะกรรมการ (เลือกได้มากกว่า 1 ท่าน) แล้วกดปุ่มเพื่อปรับใช้กับทุกคนในตารางทันที
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleApplyBulkSupervisor}
+                    disabled={bulkSupervisorChoices.length === 0}
+                    className="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-xl font-bold shadow-xs transition-colors shrink-0 disabled:opacity-40"
                   >
-                    <option value="">-- เลือกผู้ประเมินหลัก --</option>
-                    {evaluators.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name_th} ({c.position_th})
-                      </option>
-                    ))}
-                  </select>
+                    ปรับใช้ชุดนี้ ({bulkSupervisorChoices.length} ท่าน) กับทุกคน
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleApplyBulkSupervisor}
-                  disabled={!bulkSupervisorChoice}
-                  className="px-3.5 py-1.5 bg-purple-700 hover:bg-purple-800 text-white rounded-xl font-bold shadow-xs transition-colors disabled:opacity-40"
-                >
-                  ปรับใช้กับทุกคนในตาราง
-                </button>
+
+                {/* Chips of chosen bulk evaluators */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  {evaluators.map((c) => {
+                    const isSelected = bulkSupervisorChoices.includes(c.id);
+                    return (
+                      <button
+                        type="button"
+                        key={c.id}
+                        onClick={() => handleToggleBulkChoice(c.id)}
+                        className={`px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1 cursor-pointer ${
+                          isSelected
+                            ? 'bg-purple-700 text-white border-purple-700 shadow-2xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:border-purple-300'
+                        }`}
+                      >
+                        {isSelected ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3 text-slate-400" />}
+                        <span>{c.name_th}</span>
+                        <span className="text-[10px] opacity-75">({c.position_th})</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Personnel Assignment List */}
               <div className="flex-1 overflow-y-auto divide-y divide-slate-100 pr-1">
                 {evaluations.map((item) => {
                   const p = item.personnel;
+                  const assignedIds = assignmentsDraft[item.id] || [];
+                  const availableCandidates = evaluators.filter((c) => !assignedIds.includes(c.id));
+
                   return (
                     <div
                       key={item.id}
-                      className="py-3 px-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-50 rounded-xl transition-colors"
+                      className="py-3 px-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50 rounded-xl transition-colors"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
+                        <div className="w-9 h-9 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
                           {p?.image_url ? (
                             <img
                               src={p.image_url}
@@ -1025,26 +1111,55 @@ export default function KpiDashboardPage() {
                         </div>
                       </div>
 
-                      {/* Dropdown for Evaluator */}
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-slate-400 sm:hidden">ผู้ประเมิน:</span>
-                        <select
-                          value={assignmentsDraft[item.id] || ''}
-                          onChange={(e) =>
-                            setAssignmentsDraft((prev) => ({
-                              ...prev,
-                              [item.id]: e.target.value,
-                            }))
-                          }
-                          className="py-1.5 px-3 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-400 w-full sm:w-64"
-                        >
-                          <option value="">-- ไม่ระบุผู้ประเมิน --</option>
-                          {evaluators.map((cand) => (
-                            <option key={cand.id} value={cand.id}>
-                              {cand.name_th} ({cand.position_th})
-                            </option>
-                          ))}
-                        </select>
+                      {/* Multi-evaluators badges and selector */}
+                      <div className="flex flex-col sm:items-end gap-1.5 min-w-[280px]">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {assignedIds.length > 0 ? (
+                            assignedIds.map((candId) => {
+                              const cand = evaluators.find((c) => c.id === candId);
+                              return (
+                                <span
+                                  key={candId}
+                                  className="inline-flex items-center gap-1 py-0.5 px-2 bg-purple-100 text-purple-900 border border-purple-200 rounded-lg text-xs font-medium"
+                                >
+                                  <span>{cand?.name_th || 'ผู้ประเมิน'}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveEvaluatorFromDraft(item.id, candId)}
+                                    className="text-purple-400 hover:text-rose-600 transition-colors ml-0.5 cursor-pointer"
+                                    title="ลบผู้ประเมินท่านนี้"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </span>
+                              );
+                            })
+                          ) : (
+                            <span className="text-xs text-slate-400 italic">ยังไม่ได้กำหนดผู้ประเมิน</span>
+                          )}
+                        </div>
+
+                        {/* Add more evaluator dropdown */}
+                        {availableCandidates.length > 0 && (
+                          <div className="flex items-center gap-1">
+                            <select
+                              value=""
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  handleAddEvaluatorToDraft(item.id, e.target.value);
+                                }
+                              }}
+                              className="py-1 px-2.5 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-[11px] font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-400 cursor-pointer"
+                            >
+                              <option value="">+ เพิ่มผู้ประเมินท่านอื่น...</option>
+                              {availableCandidates.map((cand) => (
+                                <option key={cand.id} value={cand.id}>
+                                  + {cand.name_th} ({cand.position_th})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

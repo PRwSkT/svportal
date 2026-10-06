@@ -22,6 +22,8 @@ import {
   AlertCircle,
   FileText,
   TrendingUp,
+  Clock,
+  Users,
 } from 'lucide-react';
 
 const RATING_LABELS: Record<number, { label: string; color: string }> = {
@@ -38,6 +40,13 @@ export default function SupervisorEvaluationPage({ params }: { params: Promise<{
   const router = useRouter();
 
   const [evaluation, setEvaluation] = useState<KpiEvaluation | null>(null);
+  const [currentUserContext, setCurrentUserContext] = useState<{
+    userId: string | null;
+    personnelId: string | null;
+    isAdmin: boolean;
+  } | null>(null);
+  const [activeEvaluatorId, setActiveEvaluatorId] = useState<string>('');
+
   const [scores, setScores] = useState<Record<string, number>>({});
   const [feedback, setFeedback] = useState<Record<string, string>>({});
   const [overallComment, setOverallComment] = useState('');
@@ -53,11 +62,36 @@ export default function SupervisorEvaluationPage({ params }: { params: Promise<{
       const res = await getEvaluationDetail(evaluationId);
       if (res.success && res.data) {
         setEvaluation(res.data);
-        setScores(res.data.supervisor_scores || {});
-        setFeedback(res.data.supervisor_feedback || {});
-        setOverallComment(res.data.supervisor_overall_comment || '');
-        setStrengths(res.data.supervisor_strengths || '');
-        setImprovements(res.data.supervisor_improvements || '');
+        setCurrentUserContext(res.currentUserContext || null);
+
+        const assigned = res.data.assigned_evaluators || [];
+        const myPId = res.currentUserContext?.personnelId;
+        const defaultEvalId =
+          assigned.find((a) => a.id === myPId)?.id ||
+          assigned[0]?.id ||
+          myPId ||
+          '3da9e72c-e913-4606-9b33-46aa9427ff43';
+
+        setActiveEvaluatorId(defaultEvalId);
+
+        // Pre-fill from review if exists
+        const initialReview =
+          res.myReview ||
+          (res.data.reviews || []).find((r) => r.evaluator_id === defaultEvalId);
+
+        if (initialReview && Object.keys(initialReview.scores || {}).length > 0) {
+          setScores(initialReview.scores || {});
+          setFeedback(initialReview.feedback || {});
+          setOverallComment(initialReview.overall_comment || '');
+          setStrengths(initialReview.strengths || '');
+          setImprovements(initialReview.improvements || '');
+        } else if (res.data.status === 'completed' && res.data.supervisor_scores) {
+          setScores(res.data.supervisor_scores);
+          setFeedback(res.data.supervisor_feedback || {});
+          setOverallComment(res.data.supervisor_overall_comment || '');
+          setStrengths(res.data.supervisor_strengths || '');
+          setImprovements(res.data.supervisor_improvements || '');
+        }
       } else {
         toast.error('ไม่สามารถโหลดข้อมูลการประเมินได้', { description: res.error });
       }
@@ -65,6 +99,25 @@ export default function SupervisorEvaluationPage({ params }: { params: Promise<{
     }
     loadData();
   }, [evaluationId]);
+
+  const handleSwitchEvaluator = (evalId: string) => {
+    setActiveEvaluatorId(evalId);
+    if (!evaluation) return;
+    const review = (evaluation.reviews || []).find((r) => r.evaluator_id === evalId);
+    if (review && Object.keys(review.scores || {}).length > 0) {
+      setScores(review.scores || {});
+      setFeedback(review.feedback || {});
+      setOverallComment(review.overall_comment || '');
+      setStrengths(review.strengths || '');
+      setImprovements(review.improvements || '');
+    } else {
+      setScores({});
+      setFeedback({});
+      setOverallComment('');
+      setStrengths('');
+      setImprovements('');
+    }
+  };
 
   const handleScoreChange = (itemId: string, score: number) => {
     setScores((prev) => ({ ...prev, [itemId]: score }));
@@ -101,18 +154,29 @@ export default function SupervisorEvaluationPage({ params }: { params: Promise<{
     }
 
     setIsSubmitting(true);
-    const res = await submitSupervisorEvaluation(evaluationId, {
-      supervisor_scores: scores,
-      supervisor_feedback: feedback,
-      supervisor_overall_comment: overallComment,
-      supervisor_strengths: strengths,
-      supervisor_improvements: improvements,
-    });
+    const res = await submitSupervisorEvaluation(
+      evaluationId,
+      {
+        supervisor_scores: scores,
+        supervisor_feedback: feedback,
+        supervisor_overall_comment: overallComment,
+        supervisor_strengths: strengths,
+        supervisor_improvements: improvements,
+      },
+      activeEvaluatorId
+    );
     setIsSubmitting(false);
 
     if (res.success) {
-      toast.success('บันทึกผลการประเมินโดยหัวหน้างานเรียบร้อยแล้ว!');
-      router.push(`/admin/kpi/${evaluationId}/analytics`);
+      if (res.allCompleted) {
+        toast.success('🎉 คณะกรรมการประเมินครบทุกคนแล้ว! ระบบได้คำนวณคะแนนถัวเฉลี่ยและส่งอีเมลแจ้งผลเรียบร้อยแล้ว ✉️');
+        router.push(`/admin/kpi/${evaluationId}/analytics`);
+      } else {
+        toast.success(
+          `บันทึกผลการประเมินเรียบร้อยแล้ว! (ประเมินแล้ว ${res.submittedCount}/${res.totalAssigned} ท่าน — รอคณะกรรมการที่เหลือเพื่อเฉลี่ยคะแนนและส่งอีเมลอัตโนมัติ)`
+        );
+        router.push('/admin/kpi');
+      }
     } else {
       toast.error('บันทึกไม่สำเร็จ', { description: res.error });
     }
@@ -230,6 +294,100 @@ export default function SupervisorEvaluationPage({ params }: { params: Promise<{
               </div>
             )}
           </div>
+
+          {/* Committee Review Progress Box */}
+          {evaluation.assigned_evaluators && evaluation.assigned_evaluators.length > 0 && (
+            <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-2xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold shrink-0">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      คณะกรรมการผู้มีสิทธิ์ประเมิน ({evaluation.reviews?.filter((r) => r.status === 'submitted').length || 0}/
+                      {evaluation.assigned_evaluators.length} ท่านประเมินแล้ว)
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      เมื่อกรรมการทุกท่านประเมินครบแล้ว ระบบจะคำนวณคะแนนถัวเฉลี่ยและส่งอีเมลแจ้งผลอัตโนมัติ ✉️
+                    </p>
+                  </div>
+                </div>
+
+                {/* Admin Evaluator Switcher */}
+                {currentUserContext?.isAdmin && evaluation.assigned_evaluators.length > 1 && (
+                  <div className="flex items-center gap-2 bg-purple-50/60 p-1.5 px-3 rounded-2xl border border-purple-200/80">
+                    <span className="text-xs text-purple-900 font-bold shrink-0">กำลังบันทึกในนาม:</span>
+                    <select
+                      value={activeEvaluatorId}
+                      onChange={(e) => handleSwitchEvaluator(e.target.value)}
+                      className="text-xs font-semibold py-1 px-2.5 bg-white border border-purple-200 rounded-xl text-purple-950 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                    >
+                      {evaluation.assigned_evaluators.map((ev) => (
+                        <option key={ev.id} value={ev.id}>
+                          {ev.name_th} ({ev.position_th})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Evaluator Chips */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-4">
+                {evaluation.assigned_evaluators.map((ev) => {
+                  const review = (evaluation.reviews || []).find(
+                    (r) => r.evaluator_id === ev.id && r.status === 'submitted'
+                  );
+                  const isDone = Boolean(review);
+                  const isCurrentActive = ev.id === activeEvaluatorId;
+
+                  return (
+                    <div
+                      key={ev.id}
+                      className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${
+                        isCurrentActive
+                          ? 'border-purple-300 bg-purple-50/50 ring-2 ring-purple-200'
+                          : 'border-slate-200/80 bg-slate-50/60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-200 shrink-0">
+                          {ev.image_url ? (
+                            <img
+                              src={ev.image_url}
+                              alt={ev.name_th}
+                              className="w-full h-full object-cover object-top"
+                            />
+                          ) : (
+                            <User className="w-4 h-4 text-slate-400 m-auto mt-2" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-slate-800 truncate">{ev.name_th}</div>
+                          <div className="text-[11px] text-slate-400 truncate">{ev.position_th}</div>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 ml-2">
+                        {isDone ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            ประเมินแล้ว
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                            <Clock className="w-3 h-3 text-amber-500" />
+                            รอประเมิน
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Render Sections */}
           {template?.sections.map((section, sIdx) => {

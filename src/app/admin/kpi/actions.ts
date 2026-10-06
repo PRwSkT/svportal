@@ -3,7 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { getServerUser } from '@/lib/auth';
 import { isSystemAdmin } from '@/lib/constants/auth';
-import { KpiCycle, KpiEvaluation, KpiTemplate, KpiQuarter } from '@/types/kpi';
+import { KpiCycle, KpiEvaluation, KpiTemplate, KpiQuarter, KpiEvaluatorReview } from '@/types/kpi';
 import { calculateKpiScoreSummaries } from '@/lib/kpi/scoring';
 import { sendAnonymousKpiEmail } from '@/lib/kpi/email';
 
@@ -131,7 +131,7 @@ export async function getEvaluatorCandidates(): Promise<{
 }
 
 /**
- * Fetch all evaluations for a specific cycle with user role awareness
+ * Fetch all evaluations for a specific cycle with user role awareness and multi-evaluators
  */
 export async function getKpiEvaluations(cycleId: string): Promise<{
   success: boolean;
@@ -167,6 +167,7 @@ export async function getKpiEvaluations(cycleId: string): Promise<{
       currentPersonnelId = pData?.id || null;
     }
 
+    // 1. Fetch raw evaluations
     const { data, error } = await supabase
       .from('kpi_evaluations')
       .select(`
@@ -181,7 +182,53 @@ export async function getKpiEvaluations(cycleId: string): Promise<{
 
     if (error) throw error;
 
-    const evaluations = (data || []) as KpiEvaluation[];
+    const rawEvaluations = data || [];
+    const evalIds = rawEvaluations.map((e) => e.id);
+
+    // 2. Fetch all personnel to map assigned_evaluator_ids
+    const { data: allPersonnel } = await supabase
+      .from('personnel')
+      .select('id, name_th, name_en, position_th, category, email, image_url')
+      .eq('is_active', true);
+
+    const personnelMap = new Map((allPersonnel || []).map((p) => [p.id, p]));
+
+    // 3. Fetch all reviews for these evaluations
+    const reviewsByEval: Record<string, any[]> = {};
+    if (evalIds.length > 0) {
+      const { data: revData } = await supabase
+        .from('kpi_evaluator_reviews')
+        .select(`*, evaluator:evaluator_id(id, name_th, name_en, position_th, category, email, image_url)`)
+        .in('evaluation_id', evalIds);
+
+      (revData || []).forEach((r) => {
+        if (!reviewsByEval[r.evaluation_id]) reviewsByEval[r.evaluation_id] = [];
+        reviewsByEval[r.evaluation_id].push(r);
+      });
+    }
+
+    // 4. Construct enriched evaluations
+    const evaluations: KpiEvaluation[] = rawEvaluations.map((e) => {
+      const ids: string[] =
+        e.assigned_evaluator_ids && e.assigned_evaluator_ids.length > 0
+          ? e.assigned_evaluator_ids
+          : e.assigned_evaluator_id
+          ? [e.assigned_evaluator_id]
+          : [];
+
+      const assigned_evaluators = ids
+        .map((id) => personnelMap.get(id))
+        .filter(Boolean) as any[];
+
+      const evalReviews = reviewsByEval[e.id] || [];
+
+      return {
+        ...e,
+        assigned_evaluator_ids: ids,
+        assigned_evaluators,
+        reviews: evalReviews,
+      };
+    });
 
     let totalScoreSum = 0;
     let completedCount = 0;
@@ -222,18 +269,20 @@ export async function getKpiEvaluations(cycleId: string): Promise<{
 }
 
 /**
- * Assign Evaluator (Supervisor) to an Evaluation
+ * Assign Multiple Evaluators to an Evaluation
  */
-export async function assignEvaluator(
+export async function assignEvaluators(
   evaluationId: string,
-  evaluatorPersonnelId: string | null
+  evaluatorPersonnelIds: string[]
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = getAdminClient();
+    const primaryId = evaluatorPersonnelIds[0] || null;
     const { error } = await supabase
       .from('kpi_evaluations')
       .update({
-        assigned_evaluator_id: evaluatorPersonnelId,
+        assigned_evaluator_ids: evaluatorPersonnelIds,
+        assigned_evaluator_id: primaryId,
         updated_at: new Date().toISOString(),
       })
       .eq('id', evaluationId);
@@ -241,25 +290,42 @@ export async function assignEvaluator(
     if (error) throw error;
     return { success: true };
   } catch (err: any) {
-    console.error('assignEvaluator error:', err);
+    console.error('assignEvaluators error:', err);
     return { success: false, error: err.message };
   }
 }
 
 /**
- * Bulk Assign Evaluators
+ * Backward compatibility alias for single/multiple assignment
+ */
+export async function assignEvaluator(
+  evaluationId: string,
+  evaluatorPersonnelIdOrIds: string | string[] | null
+): Promise<{ success: boolean; error?: string }> {
+  const ids = Array.isArray(evaluatorPersonnelIdOrIds)
+    ? evaluatorPersonnelIdOrIds
+    : evaluatorPersonnelIdOrIds
+    ? [evaluatorPersonnelIdOrIds]
+    : [];
+  return assignEvaluators(evaluationId, ids);
+}
+
+/**
+ * Bulk Assign Evaluators with multi-selection support
  */
 export async function bulkAssignEvaluators(
-  assignments: { evaluationId: string; evaluatorPersonnelId: string | null }[]
+  assignments: { evaluationId: string; evaluatorPersonnelIds: string[] }[]
 ): Promise<{ success: boolean; count: number; error?: string }> {
   try {
     const supabase = getAdminClient();
     let count = 0;
     for (const item of assignments) {
+      const primaryId = item.evaluatorPersonnelIds[0] || null;
       const { error } = await supabase
         .from('kpi_evaluations')
         .update({
-          assigned_evaluator_id: item.evaluatorPersonnelId,
+          assigned_evaluator_ids: item.evaluatorPersonnelIds,
+          assigned_evaluator_id: primaryId,
           updated_at: new Date().toISOString(),
         })
         .eq('id', item.evaluationId);
@@ -273,7 +339,7 @@ export async function bulkAssignEvaluators(
 }
 
 /**
- * Fetch a single evaluation detail with personnel, cycle, template, and assigned evaluator
+ * Fetch a single evaluation detail with personnel, cycle, template, assigned evaluators, and reviews
  */
 export async function getEvaluationDetail(evaluationId: string): Promise<{
   success: boolean;
@@ -283,6 +349,7 @@ export async function getEvaluationDetail(evaluationId: string): Promise<{
     personnelId: string | null;
     isAdmin: boolean;
   };
+  myReview?: KpiEvaluatorReview | null;
   error?: string;
 }> {
   try {
@@ -315,14 +382,50 @@ export async function getEvaluationDetail(evaluationId: string): Promise<{
       .single();
 
     if (error) throw error;
+
+    // Resolve assigned_evaluators
+    const ids: string[] =
+      data.assigned_evaluator_ids && data.assigned_evaluator_ids.length > 0
+        ? data.assigned_evaluator_ids
+        : data.assigned_evaluator_id
+        ? [data.assigned_evaluator_id]
+        : [];
+
+    let assigned_evaluators: any[] = [];
+    if (ids.length > 0) {
+      const { data: pList } = await supabase
+        .from('personnel')
+        .select('id, name_th, name_en, position_th, category, email, image_url')
+        .in('id', ids);
+      assigned_evaluators = pList || [];
+    }
+
+    // Fetch all reviews for this evaluation
+    const { data: reviews } = await supabase
+      .from('kpi_evaluator_reviews')
+      .select(`*, evaluator:evaluator_id(id, name_th, name_en, position_th, category, email, image_url)`)
+      .eq('evaluation_id', evaluationId);
+
+    const evaluationWithReviews: KpiEvaluation = {
+      ...data,
+      assigned_evaluator_ids: ids,
+      assigned_evaluators,
+      reviews: (reviews || []) as KpiEvaluatorReview[],
+    };
+
+    const myReview = currentPersonnelId
+      ? ((reviews || []).find((r: any) => r.evaluator_id === currentPersonnelId) as KpiEvaluatorReview) || null
+      : null;
+
     return {
       success: true,
-      data: data as KpiEvaluation,
+      data: evaluationWithReviews,
       currentUserContext: {
         userId: currentUser?.id || null,
         personnelId: currentPersonnelId,
         isAdmin,
       },
+      myReview,
     };
   } catch (err: any) {
     console.error('getEvaluationDetail error:', err);
@@ -388,6 +491,8 @@ export async function submitSelfEvaluation(
 
 /**
  * Submit Supervisor Evaluation (การประเมินโดยหัวหน้างาน/ผู้บริหาร)
+ * Supports multiple evaluators, individual review tracking, score averaging across all evaluators,
+ * and automatic anonymous email dispatch upon full completion.
  */
 export async function submitSupervisorEvaluation(
   evaluationId: string,
@@ -397,8 +502,17 @@ export async function submitSupervisorEvaluation(
     supervisor_overall_comment: string;
     supervisor_strengths: string;
     supervisor_improvements: string;
-  }
-): Promise<{ success: boolean; data?: KpiEvaluation; error?: string }> {
+  },
+  asEvaluatorId?: string
+): Promise<{
+  success: boolean;
+  data?: KpiEvaluation;
+  allCompleted?: boolean;
+  emailSent?: boolean;
+  submittedCount?: number;
+  totalAssigned?: number;
+  error?: string;
+}> {
   try {
     const supabase = getAdminClient();
     const currentUser = await getServerUser();
@@ -412,38 +526,183 @@ export async function submitSupervisorEvaluation(
 
     if (fetchErr || !evaluation) throw new Error('ไม่พบข้อมูลการประเมิน');
 
-    // 2. Compute supervisor score and grade based on template
+    // 2. Identify the active evaluator
+    let currentPersonnelId: string | null = asEvaluatorId || null;
+    if (!currentPersonnelId && currentUser?.email) {
+      const { data: pData } = await supabase
+        .from('personnel')
+        .select('id')
+        .eq('email', currentUser.email)
+        .maybeSingle();
+      currentPersonnelId = pData?.id || null;
+    }
+
+    // Fallback if admin has no personnel link: pick first assigned evaluator or default director
+    if (!currentPersonnelId) {
+      const assigned = evaluation.assigned_evaluator_ids || [];
+      currentPersonnelId = assigned[0] || evaluation.assigned_evaluator_id || '3da9e72c-e913-4606-9b33-46aa9427ff43';
+    }
+
+    // 3. Compute single review score
     const draftEval: KpiEvaluation = {
       ...(evaluation as KpiEvaluation),
       supervisor_scores: payload.supervisor_scores,
       supervisor_feedback: payload.supervisor_feedback,
     };
-    const { supervisorTotal, finalGrade } = calculateKpiScoreSummaries(draftEval);
+    const { supervisorTotal: myReviewTotal } = calculateKpiScoreSummaries(draftEval);
 
-    // 3. Update evaluation
-    const { data: updated, error: updateErr } = await supabase
-      .from('kpi_evaluations')
-      .update({
-        supervisor_id: currentUser?.id || null,
-        supervisor_scores: payload.supervisor_scores,
-        supervisor_feedback: payload.supervisor_feedback,
-        supervisor_overall_comment: payload.supervisor_overall_comment,
-        supervisor_strengths: payload.supervisor_strengths,
-        supervisor_improvements: payload.supervisor_improvements,
-        supervisor_total_score: supervisorTotal,
-        final_score: supervisorTotal,
-        final_grade: finalGrade,
-        supervisor_submitted_at: new Date().toISOString(),
-        status: 'completed',
+    // 4. Upsert this evaluator's review into kpi_evaluator_reviews
+    const { error: reviewErr } = await supabase.from('kpi_evaluator_reviews').upsert(
+      {
+        evaluation_id: evaluationId,
+        evaluator_id: currentPersonnelId,
+        status: 'submitted',
+        scores: payload.supervisor_scores,
+        feedback: payload.supervisor_feedback,
+        overall_comment: payload.supervisor_overall_comment,
+        strengths: payload.supervisor_strengths,
+        improvements: payload.supervisor_improvements,
+        total_score: myReviewTotal,
+        submitted_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      })
-      .eq('id', evaluationId)
-      .select(`*, personnel:personnel_id(*), assigned_evaluator:assigned_evaluator_id(*), cycle:cycle_id(*), template:template_id(*)`)
-      .single();
+      },
+      { onConflict: 'evaluation_id,evaluator_id' }
+    );
 
-    if (updateErr) throw updateErr;
+    if (reviewErr) throw reviewErr;
 
-    return { success: true, data: updated as KpiEvaluation };
+    // 5. Check all submitted reviews for this evaluation
+    const { data: allReviews, error: reviewsErr } = await supabase
+      .from('kpi_evaluator_reviews')
+      .select('*')
+      .eq('evaluation_id', evaluationId);
+
+    if (reviewsErr) throw reviewsErr;
+
+    const submittedReviews = (allReviews || []).filter((r) => r.status === 'submitted');
+    const assignedIds: string[] =
+      evaluation.assigned_evaluator_ids && evaluation.assigned_evaluator_ids.length > 0
+        ? evaluation.assigned_evaluator_ids
+        : evaluation.assigned_evaluator_id
+        ? [evaluation.assigned_evaluator_id]
+        : [];
+
+    const totalAssigned = Math.max(assignedIds.length, 1);
+    const submittedCount = submittedReviews.length;
+
+    // Check if ALL assigned evaluators have submitted
+    const allAssignedDone =
+      assignedIds.length > 0
+        ? assignedIds.every((id) => submittedReviews.some((r) => r.evaluator_id === id))
+        : submittedCount > 0;
+
+    if (allAssignedDone) {
+      // 6. Score Averaging across all submitted reviews!
+      const avgScores: Record<string, number> = {};
+      const sections = evaluation.template?.sections || [];
+      const allItems = sections.flatMap((s: any) => s.items);
+
+      allItems.forEach((item: any) => {
+        const itemVals = submittedReviews
+          .map((r: any) => Number(r.scores?.[item.id] || 0))
+          .filter((v: number) => v > 0);
+        if (itemVals.length > 0) {
+          const sum = itemVals.reduce((a: number, b: number) => a + b, 0);
+          avgScores[item.id] = Number((sum / itemVals.length).toFixed(2));
+        } else {
+          avgScores[item.id] = 0;
+        }
+      });
+
+      // Combine feedbacks per section
+      const combinedFeedback: Record<string, string> = {};
+      sections.forEach((sec: any) => {
+        const fList = submittedReviews
+          .map((r: any) => r.feedback?.[sec.id]?.trim())
+          .filter(Boolean);
+        if (fList.length > 0) {
+          combinedFeedback[sec.id] = fList.join('\n\n---\n\n');
+        }
+      });
+
+      // Combine strengths & improvements into bullet points (anonymously)
+      const combinedStrengths = submittedReviews
+        .map((r: any) => r.strengths?.trim())
+        .filter(Boolean)
+        .join('\n• ');
+      const combinedImprovements = submittedReviews
+        .map((r: any) => r.improvements?.trim())
+        .filter(Boolean)
+        .join('\n• ');
+      const combinedOverallComment = submittedReviews
+        .map((r: any) => r.overall_comment?.trim())
+        .filter(Boolean)
+        .join('\n\n');
+
+      // Compute final averaged score and final grade
+      const averagedEval: KpiEvaluation = {
+        ...(evaluation as KpiEvaluation),
+        supervisor_scores: avgScores,
+        supervisor_feedback: combinedFeedback,
+      };
+      const { supervisorTotal: finalAveragedScore, finalGrade } = calculateKpiScoreSummaries(averagedEval);
+
+      // 7. Update kpi_evaluations to 'completed'
+      const { data: updatedEval, error: updateErr } = await supabase
+        .from('kpi_evaluations')
+        .update({
+          supervisor_scores: avgScores,
+          supervisor_feedback: combinedFeedback,
+          supervisor_overall_comment: combinedOverallComment || null,
+          supervisor_strengths: combinedStrengths ? `• ${combinedStrengths}` : null,
+          supervisor_improvements: combinedImprovements ? `• ${combinedImprovements}` : null,
+          supervisor_total_score: finalAveragedScore,
+          final_score: finalAveragedScore,
+          final_grade: finalGrade,
+          supervisor_submitted_at: new Date().toISOString(),
+          status: 'completed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', evaluationId)
+        .select(`*, personnel:personnel_id(*), cycle:cycle_id(*), template:template_id(*)`)
+        .single();
+
+      if (updateErr) throw updateErr;
+
+      // 8. AUTOMATIC ANONYMOUS GMAIL DISPATCH
+      let emailSent = false;
+      try {
+        await sendAnonymousKpiEmail(updatedEval as KpiEvaluation);
+        await supabase
+          .from('kpi_evaluations')
+          .update({
+            email_notified_at: new Date().toISOString(),
+            email_notified_status: 'sent',
+          })
+          .eq('id', evaluationId);
+        emailSent = true;
+      } catch (mailErr) {
+        console.error('Auto dispatch email error:', mailErr);
+      }
+
+      return {
+        success: true,
+        data: updatedEval as KpiEvaluation,
+        allCompleted: true,
+        emailSent,
+        submittedCount,
+        totalAssigned,
+      };
+    } else {
+      // Partial completion: some evaluators have submitted, but waiting for the rest
+      return {
+        success: true,
+        allCompleted: false,
+        emailSent: false,
+        submittedCount,
+        totalAssigned,
+      };
+    }
   } catch (err: any) {
     console.error('submitSupervisorEvaluation error:', err);
     return { success: false, error: err.message };
@@ -536,6 +795,7 @@ export async function syncPersonnelForCycle(cycleId: string, templateId?: string
       return { success: true, insertedCount: 0 };
     }
 
+    const defaultEvaluatorId = '3da9e72c-e913-4606-9b33-46aa9427ff43';
     let inserted = 0;
     for (const p of personnelList) {
       const { error } = await supabase
@@ -545,6 +805,8 @@ export async function syncPersonnelForCycle(cycleId: string, templateId?: string
             cycle_id: cycleId,
             personnel_id: p.id,
             template_id: activeTemplateId || null,
+            assigned_evaluator_id: defaultEvaluatorId,
+            assigned_evaluator_ids: [defaultEvaluatorId],
             status: 'pending_self',
           },
         ])
