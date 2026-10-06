@@ -11,8 +11,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Download, Search, Filter, Trash2, Eye,
   BarChart2, FileText, CheckCircle2, Calendar, Globe,
-  Loader2, ExternalLink, X, Image as ImageIcon, AlertCircle
+  Loader2, ExternalLink, X, Image as ImageIcon, AlertCircle, QrCode
 } from 'lucide-react';
+import { FormQRCodeModal } from '@/components/forms/FormQRCodeModal';
 
 export default function FormResponsesPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -30,6 +31,7 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
 
   // Modal for detail view
   const [selectedResponse, setSelectedResponse] = useState<FormResponse | null>(null);
+  const [showQrModal, setShowQrModal] = useState(false);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -175,6 +177,16 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
             </div>
 
             <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowQrModal(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                title="สร้างและดาวน์โหลด QR Code ตามดีไซน์ SV Portal"
+              >
+                <QrCode className="w-4 h-4 text-[#6E0D22]" />
+                <span>QR Code</span>
+              </button>
+
               <Link
                 href={`/admin/forms/${form.id}/edit`}
                 className="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
@@ -505,6 +517,14 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
           </div>
         )}
       </AnimatePresence>
+
+      {/* Form QR Code Modal (SV Portal Style) */}
+      <FormQRCodeModal
+        isOpen={showQrModal}
+        onClose={() => setShowQrModal(false)}
+        formTitle={form.title?.th || 'แบบฟอร์ม'}
+        formSlug={form.slug}
+      />
     </div>
   );
 }

@@ -44,6 +44,7 @@ import {
   Save,
   Info,
 } from 'lucide-react';
+import { FormQRCodeModal } from '@/components/forms/FormQRCodeModal';
 
 const CATEGORIES = [
   { id: 'all', label: 'ทั้งหมด' },
@@ -1064,77 +1065,13 @@ export default function FormsAdminPage() {
         )}
       </AnimatePresence>
 
-      {/* 3. Modal: QR Code Generator & Sharing */}
-      <AnimatePresence>
-        {qrModalForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center relative"
-            >
-              <button
-                onClick={() => setQrModalForm(null)}
-                className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
-              <div className="w-12 h-12 rounded-2xl bg-[#7B1C3E]/10 text-[#7B1C3E] flex items-center justify-center mx-auto mb-3">
-                <QrCode className="w-6 h-6" />
-              </div>
-
-              <h3 className="text-base font-bold text-slate-900 leading-snug">
-                {qrModalForm.title?.th || 'QR Code สำหรับเข้าถึงฟอร์ม'}
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">สแกนด้วยสมาร์ทโฟนเพื่อเปิดแบบฟอร์มทันที</p>
-
-              {/* QR Code Container */}
-              <div className="mt-5 p-4 bg-white border border-slate-200 rounded-2xl shadow-inner inline-block">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(
-                    typeof window !== 'undefined'
-                      ? `${window.location.origin}/forms/${qrModalForm.slug}`
-                      : ''
-                  )}&color=7B1C3E`}
-                  alt="QR Code"
-                  className="w-48 h-48 mx-auto rounded-lg"
-                />
-              </div>
-
-              <div className="text-xs font-mono text-slate-500 mt-3 break-all">
-                /forms/{qrModalForm.slug}
-              </div>
-
-              <div className="flex flex-col gap-2 mt-5">
-                <button
-                  onClick={() => copyFormLink(qrModalForm.slug)}
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
-                >
-                  <Copy className="w-4 h-4" />
-                  {copiedSlug === qrModalForm.slug ? 'คัดลอกลิงก์เรียบร้อยแล้ว!' : 'คัดลอกลิงก์ (Copy URL)'}
-                </button>
-
-                <a
-                  href={`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(
-                    typeof window !== 'undefined'
-                      ? `${window.location.origin}/forms/${qrModalForm.slug}`
-                      : ''
-                  )}&color=7B1C3E`}
-                  download={`qr-${qrModalForm.slug}.png`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#7B1C3E] hover:bg-[#631430] text-white rounded-xl text-xs font-semibold transition-colors"
-                >
-                  <Download className="w-4 h-4" />
-                  ดาวน์โหลด QR Code ภาพคมชัด (PNG)
-                </a>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      {/* 3. Modal: QR Code Generator & Sharing with SV Portal Design */}
+      <FormQRCodeModal
+        isOpen={!!qrModalForm}
+        onClose={() => setQrModalForm(null)}
+        formTitle={qrModalForm?.title?.th || ''}
+        formSlug={qrModalForm?.slug || ''}
+      />
     </div>
   );
 }

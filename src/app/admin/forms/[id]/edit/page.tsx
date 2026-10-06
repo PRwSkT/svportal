@@ -23,8 +23,9 @@ import {
   FileText, AlignLeft, Hash, CheckSquare, CircleDot, ChevronDownSquare,
   Calendar, Clock, Upload, Star, Heading, Loader2, ExternalLink,
   ShieldCheck, AlertCircle, RefreshCw, X, LayoutTemplate,
-  Image as ImageIcon, Info, Smartphone, Monitor, User, Users, UserCheck, Search
+  Image as ImageIcon, Info, Smartphone, Monitor, User, Users, UserCheck, Search, QrCode
 } from 'lucide-react';
+import { FormQRCodeModal } from '@/components/forms/FormQRCodeModal';
 
 const FIELD_TEMPLATES: {
   type: FormFieldType;
@@ -168,6 +169,7 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [previewLang, setPreviewLang] = useState<SupportedLang>('th');
+  const [showQrModal, setShowQrModal] = useState(false);
 
   // Collaborator States
   const [collaboratorCandidates, setCollaboratorCandidates] = useState<any[]>([]);
@@ -620,6 +622,16 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
             >
               <Eye className="w-4 h-4" />
               ดูตัวอย่างฟอร์ม
+            </button>
+
+            {/* QR Code Sharing */}
+            <button
+              onClick={() => setShowQrModal(true)}
+              title="สร้าง QR Code ตามดีไซน์ SV Portal"
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+            >
+              <QrCode className="w-4 h-4 text-[#6E0D22]" />
+              <span>QR Code</span>
             </button>
 
             {/* External Live Link */}
@@ -1742,6 +1754,14 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
           </div>
         )}
       </AnimatePresence>
+
+      {/* Form QR Code Modal (SV Portal Style) */}
+      <FormQRCodeModal
+        isOpen={showQrModal}
+        onClose={() => setShowQrModal(false)}
+        formTitle={form.title[activeLang] || form.title.th || 'แบบฟอร์ม'}
+        formSlug={form.slug}
+      />
     </div>
   );
 }
