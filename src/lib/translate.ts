@@ -16,7 +16,7 @@ async function translateSingle(text: string, targetLang: 'en' | 'zh'): Promise<s
     return trimmed;
   }
 
-  // 1. Try Gemini API if key is available
+  // 1. Try Gemini API if key is available (Primary: gemini-3.5-flash-lite)
   const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (geminiKey) {
     try {
@@ -28,23 +28,29 @@ Return ONLY the translation without any quotes or explanations.
 Text:
 ${trimmed}`;
 
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.2 },
-          }),
-          signal: AbortSignal.timeout(6000),
-        }
-      );
+      for (const model of ['gemini-3.5-flash-lite', 'gemini-1.5-flash']) {
+        try {
+          const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                generationConfig: { temperature: 0.2 },
+              }),
+              signal: AbortSignal.timeout(6000),
+            }
+          );
 
-      if (res.ok) {
-        const data = await res.json();
-        const translated = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-        if (translated) return translated;
+          if (res.ok) {
+            const data = await res.json();
+            const translated = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+            if (translated) return translated;
+          }
+        } catch {
+          // Continue to next model if this one fails
+        }
       }
     } catch {
       // Fall through to next provider
