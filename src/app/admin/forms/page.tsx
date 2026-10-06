@@ -516,6 +516,15 @@ export default function FormsAdminPage() {
                   key={form.id}
                   className="bg-white rounded-3xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all flex flex-col justify-between overflow-hidden group"
                 >
+                  {form.banner_url !== 'none' && (
+                    <div className="w-full h-24 overflow-hidden border-b border-slate-100 bg-[#E6E6D7]/40 relative">
+                      <img
+                        src={form.banner_url || '/images/default-form-banner.png'}
+                        alt={form.title?.th || 'Banner'}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
+                  )}
                   <div className="p-5">
                     {/* Top Badges: Category, Access type & Ownership Badge */}
                     <div className="flex items-center justify-between gap-2 mb-3">
@@ -851,6 +860,18 @@ export default function FormsAdminPage() {
                     onChange={(e) => setNewDesc(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white resize-none"
                   />
+                </div>
+
+                {/* Default Banner Info */}
+                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 flex items-center gap-3">
+                  <img
+                    src="/images/default-form-banner.png"
+                    alt="Standard Banner"
+                    className="w-24 h-7 object-cover rounded-lg border border-slate-200 shrink-0"
+                  />
+                  <div className="text-[11px] text-slate-500 leading-tight">
+                    <strong className="text-slate-700">แบนเนอร์มาตรฐานของโรงเรียน</strong> จะถูกกำหนดเป็นค่าเริ่มต้นอัตโนมัติ (สามารถเปลี่ยนหรือนำออกได้ในหน้าแก้ไขฟอร์ม)
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">

@@ -747,62 +747,131 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
 
             {/* Banner Image Uploader */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                ภาพแบนเนอร์ส่วนหัวของฟอร์ม (Header Banner Image)
-              </label>
-              {form.banner_url ? (
-                <div className="relative rounded-2xl overflow-hidden border border-slate-200 mb-3 group">
-                  <img
-                    src={form.banner_url}
-                    alt="Form Banner"
-                    className="w-full h-44 object-cover object-center"
-                  />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                    <label className="px-3.5 py-1.5 bg-white text-slate-800 rounded-xl text-xs font-semibold cursor-pointer shadow-sm hover:bg-slate-100 transition-colors">
-                      เปลี่ยนภาพแบนเนอร์
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleBannerUpload(file);
-                        }}
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setForm({ ...form, banner_url: null });
-                        notifyChange();
-                      }}
-                      className="px-3.5 py-1.5 bg-rose-600 text-white rounded-xl text-xs font-semibold shadow-sm hover:bg-rose-700 transition-colors"
-                    >
-                      ลบภาพแบนเนอร์
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <label className="border-2 border-dashed border-slate-200 hover:border-[#7B1C3E] bg-slate-50 hover:bg-[#7B1C3E]/5 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all text-center">
-                  <ImageIcon className="w-8 h-8 text-slate-400 mb-2" />
-                  <span className="text-xs font-semibold text-slate-700">
-                    {isUploadingBanner ? 'กำลังอัปโหลดแบนเนอร์...' : 'คลิกเพื่ออัปโหลดภาพแบนเนอร์หัวฟอร์ม'}
-                  </span>
-                  <span className="text-[11px] text-slate-400 mt-0.5">
-                    รองรับไฟล์ JPG, PNG, WebP (ขนาดแนะนำ 1200 x 400 พิกเซล)
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    disabled={isUploadingBanner}
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleBannerUpload(file);
-                    }}
-                  />
-                </label>
-              )}
+              {(() => {
+                const bannerVal = form.banner_url || '/images/default-form-banner.png';
+                const isHidden = form.banner_url === 'none';
+                const isDefault = !isHidden && (bannerVal === '/images/default-form-banner.png' || bannerVal.includes('default-form-banner.png'));
+
+                return (
+                  <>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-xs font-semibold text-slate-700">
+                        ภาพแบนเนอร์ส่วนหัวของฟอร์ม (Header Banner Image)
+                      </label>
+                      {!isHidden ? (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          isDefault
+                            ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                            : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                        }`}>
+                          {isDefault ? 'แบนเนอร์มาตรฐานโรงเรียน' : 'แบนเนอร์กำหนดเอง'}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                          ปิดการแสดงแบนเนอร์
+                        </span>
+                      )}
+                    </div>
+
+                    {!isHidden ? (
+                      <div className="relative rounded-2xl overflow-hidden border border-slate-200 mb-3 group bg-[#E6E6D7]/40">
+                        <img
+                          src={bannerVal}
+                          alt="Form Banner"
+                          className="w-full h-44 object-cover object-center"
+                        />
+                        <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-wrap items-center justify-center gap-2.5 p-4">
+                          <label className="px-3.5 py-1.5 bg-white text-slate-800 rounded-xl text-xs font-semibold cursor-pointer shadow-sm hover:bg-slate-100 transition-colors flex items-center gap-1.5">
+                            <Upload className="w-3.5 h-3.5 text-slate-600" />
+                            <span>{isDefault ? 'อัปโหลดภาพแบนเนอร์ของคุณ' : 'เปลี่ยนภาพแบนเนอร์'}</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              disabled={isUploadingBanner}
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleBannerUpload(file);
+                              }}
+                            />
+                          </label>
+
+                          {!isDefault && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setForm({ ...form, banner_url: '/images/default-form-banner.png' });
+                                notifyChange();
+                                toast.success('คืนค่าเป็นแบนเนอร์มาตรฐานของโรงเรียนเรียบร้อย');
+                              }}
+                              className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-amber-950 rounded-xl text-xs font-semibold shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" />
+                              <span>ใช้แบนเนอร์มาตรฐาน</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setForm({ ...form, banner_url: 'none' });
+                              notifyChange();
+                            }}
+                            className="px-3.5 py-1.5 bg-rose-600 text-white rounded-xl text-xs font-semibold shadow-sm hover:bg-rose-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>ไม่ใช้ภาพแบนเนอร์</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="border-2 border-dashed border-slate-200 rounded-2xl p-5 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-3 text-center sm:text-left">
+                          <div className="w-10 h-10 rounded-xl bg-slate-200/80 flex items-center justify-center shrink-0">
+                            <ImageIcon className="w-5 h-5 text-slate-500" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold text-slate-700">
+                              ไม่ได้เปิดใช้ภาพแบนเนอร์ส่วนหัว
+                            </p>
+                            <p className="text-[11px] text-slate-400">
+                              แบบฟอร์มนี้จะไม่แสดงภาพแบนเนอร์ด้านบน
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setForm({ ...form, banner_url: '/images/default-form-banner.png' });
+                              notifyChange();
+                              toast.success('เลือกใช้แบนเนอร์มาตรฐานของโรงเรียนแล้ว');
+                            }}
+                            className="px-3 py-1.5 bg-[#7B1C3E] text-white hover:bg-[#631430] rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                          >
+                            ใช้แบนเนอร์มาตรฐาน
+                          </button>
+
+                          <label className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-semibold cursor-pointer shadow-xs transition-colors">
+                            อัปโหลดภาพใหม่
+                            <input
+                              type="file"
+                              accept="image/*"
+                              disabled={isUploadingBanner}
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleBannerUpload(file);
+                              }}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
 
             {/* URL Slug & Category */}
@@ -1072,9 +1141,13 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
             <div className="lg:col-span-8 space-y-4">
               {/* Header card preview with inline editing */}
               <div className="bg-white rounded-2xl border-t-4 border-t-[#7B1C3E] border border-slate-200 p-6 shadow-xs relative overflow-hidden">
-                {form.banner_url && (
-                  <div className="mb-4 rounded-xl overflow-hidden border border-slate-200 max-h-48">
-                    <img src={form.banner_url} alt="Banner" className="w-full h-36 object-cover" />
+                {form.banner_url !== 'none' && (
+                  <div className="mb-4 rounded-xl overflow-hidden border border-slate-200 max-h-48 bg-[#E6E6D7]/30">
+                    <img
+                      src={form.banner_url || '/images/default-form-banner.png'}
+                      alt="Banner"
+                      className="w-full h-36 object-cover object-center"
+                    />
                   </div>
                 )}
 
@@ -1492,9 +1565,13 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                   {/* Form Container */}
                   <div className="p-5 sm:p-6 space-y-5 bg-[#F5F4F2]">
                     {/* Header Banner */}
-                    {form.banner_url && (
-                      <div className="w-full rounded-2xl overflow-hidden border border-slate-200">
-                        <img src={form.banner_url} alt="Banner" className="w-full max-h-48 object-cover" />
+                    {form.banner_url !== 'none' && (
+                      <div className="w-full rounded-2xl overflow-hidden border border-slate-200 bg-[#E6E6D7]/30">
+                        <img
+                          src={form.banner_url || '/images/default-form-banner.png'}
+                          alt="Banner"
+                          className="w-full max-h-48 object-cover object-center"
+                        />
                       </div>
                     )}
 

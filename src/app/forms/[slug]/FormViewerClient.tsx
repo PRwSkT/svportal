@@ -407,11 +407,11 @@ export default function FormViewerClient({
       {/* Main Form Container */}
       <main className="max-w-3xl mx-auto px-4 sm:px-6 pt-6">
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Form Header Banner (if uploaded) */}
-          {initialForm.banner_url && (
+          {/* Form Header Banner (Default school banner or custom uploaded banner) */}
+          {initialForm.banner_url !== 'none' && (
             <div className="w-full rounded-3xl overflow-hidden border border-slate-200/80 shadow-xs">
               <img
-                src={initialForm.banner_url}
+                src={initialForm.banner_url || '/images/default-form-banner.png'}
                 alt={formTitle}
                 className="w-full max-h-72 object-cover object-center"
               />

@@ -312,6 +312,7 @@ export async function createForm(payload: {
       slug: cleanSlug,
       title: { th: payload.title_th.trim() },
       description: payload.description_th ? { th: payload.description_th.trim() } : null,
+      banner_url: '/images/default-form-banner.png',
       category: payload.category || 'general',
       access_type: payload.access_type || 'public',
       is_published: false,
