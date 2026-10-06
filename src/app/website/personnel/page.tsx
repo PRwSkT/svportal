@@ -82,6 +82,16 @@ export default async function WebsitePersonnelPage() {
                     <span className="mt-2 text-xs font-bold px-3 py-1 rounded-full bg-primary/10 text-primary">
                       {person.position_th}
                     </span>
+                    {person.email && (
+                      <a
+                        href={`mailto:${person.email}`}
+                        className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+                        title={person.email}
+                      >
+                        <Mail className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate max-w-[200px]">{person.email}</span>
+                      </a>
+                    )}
                     {person.bio_th && (
                       <p className="text-xs text-foreground/60 mt-3 line-clamp-3">
                         {person.bio_th}
@@ -137,6 +147,16 @@ export default async function WebsitePersonnelPage() {
                     <span className="mt-2 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-foreground/5 text-foreground/70">
                       {person.position_th}
                     </span>
+                    {person.email && (
+                      <a
+                        href={`mailto:${person.email}`}
+                        className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+                        title={person.email}
+                      >
+                        <Mail className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate max-w-[180px]">{person.email}</span>
+                      </a>
+                    )}
                   </div>
                 ))}
               </div>
@@ -182,6 +202,16 @@ export default async function WebsitePersonnelPage() {
                     <span className="mt-2 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-foreground/5 text-foreground/70">
                       {person.position_th}
                     </span>
+                    {person.email && (
+                      <a
+                        href={`mailto:${person.email}`}
+                        className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+                        title={person.email}
+                      >
+                        <Mail className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate max-w-[180px]">{person.email}</span>
+                      </a>
+                    )}
                   </div>
                 ))}
               </div>

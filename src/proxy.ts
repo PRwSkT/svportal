@@ -87,6 +87,8 @@ export async function proxy(request: NextRequest) {
   if (
     request.nextUrl.pathname === '/' ||
     request.nextUrl.pathname.startsWith('/website') ||
+    request.nextUrl.pathname.startsWith('/forms') ||
+    request.nextUrl.pathname.startsWith('/api/forms') ||
     request.nextUrl.pathname.startsWith('/auth') ||
     request.nextUrl.pathname.startsWith('/api/auth') ||
     request.nextUrl.pathname.startsWith('/api/cron') ||

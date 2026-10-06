@@ -43,11 +43,31 @@ export async function insertRecord(table: string, payload: any): Promise<ActionR
       return { success: false, error: auth.error };
     }
     const supabase = getAdminClient();
+
+    // If inserting personnel with email, try auto-resolving user_id
+    if (table === 'personnel' && payload.email) {
+      const email = payload.email.toLowerCase().trim();
+      const { data: { users } } = await supabase.auth.admin.listUsers();
+      const matched = users?.find(u => (u.email || '').toLowerCase().trim() === email);
+      if (matched) {
+        payload.user_id = matched.id;
+      }
+    }
+
     const { data, error } = await supabase.from(table).insert([payload]).select();
     if (error) {
       console.error(`Database error inserting into ${table}:`, error);
       return { success: false, error: error.message };
     }
+
+    // Sync app_users if personnel record was created with user_id
+    if (table === 'personnel' && data && data[0]?.user_id) {
+      await supabase.from('app_users').update({
+        personnel_id: data[0].id,
+        full_name: data[0].name_th
+      }).eq('id', data[0].user_id);
+    }
+
     return { success: true, data };
   } catch (err: any) {
     console.error(`Server error inserting into ${table}:`, err);
@@ -62,11 +82,37 @@ export async function updateRecord(table: string, id: string, payload: any): Pro
       return { success: false, error: auth.error };
     }
     const supabase = getAdminClient();
+
+    // If updating personnel with email, try auto-resolving user_id if missing
+    if (table === 'personnel' && payload.email !== undefined) {
+      if (payload.email) {
+        const email = payload.email.toLowerCase().trim();
+        const { data: { users } } = await supabase.auth.admin.listUsers();
+        const matched = users?.find(u => (u.email || '').toLowerCase().trim() === email);
+        if (matched) {
+          payload.user_id = matched.id;
+        }
+      } else {
+        payload.user_id = null;
+      }
+    }
+
     const { data, error } = await supabase.from(table).update(payload).eq('id', id).select();
     if (error) {
       console.error(`Database error updating ${table} id=${id}:`, error);
       return { success: false, error: error.message };
     }
+
+    // Sync app_users
+    if (table === 'personnel' && data && data[0]) {
+      if (data[0].user_id) {
+        await supabase.from('app_users').update({
+          personnel_id: data[0].id,
+          full_name: data[0].name_th
+        }).eq('id', data[0].user_id);
+      }
+    }
+
     return { success: true, data };
   } catch (err: any) {
     console.error(`Server error updating ${table}:`, err);
@@ -126,5 +172,46 @@ export async function manualTriggerDeploy(): Promise<ActionResult> {
     return { success };
   } catch (err: any) {
     return { success: false, error: err?.message || 'เกิดข้อผิดพลาดในการทริกเกอร์ deploy' };
+  }
+}
+
+/**
+ * 1-Click Sync: Re-sync all personnel with corresponding auth.users/app_users accounts by email.
+ */
+export async function autoLinkAllPersonnelUsers(): Promise<ActionResult<{ count: number }>> {
+  try {
+    const auth = await verifyAdmin();
+    if (!auth.authorized) {
+      return { success: false, error: auth.error };
+    }
+    const supabase = getAdminClient();
+    const { data: personnelList, error: pErr } = await supabase.from('personnel').select('*');
+    if (pErr) throw pErr;
+
+    const { data: { users: authUsers }, error: aErr } = await supabase.auth.admin.listUsers();
+    if (aErr) throw aErr;
+
+    let linkedCount = 0;
+    for (const p of (personnelList || [])) {
+      if (!p.email) continue;
+      const targetEmail = p.email.toLowerCase().trim();
+      const matchedAuth = authUsers.find(u => (u.email || '').toLowerCase().trim() === targetEmail);
+
+      if (matchedAuth) {
+        if (p.user_id !== matchedAuth.id) {
+          await supabase.from('personnel').update({ user_id: matchedAuth.id }).eq('id', p.id);
+        }
+        await supabase.from('app_users').update({
+          personnel_id: p.id,
+          full_name: p.name_th
+        }).eq('id', matchedAuth.id);
+
+        linkedCount++;
+      }
+    }
+
+    return { success: true, data: { count: linkedCount } };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'การเชื่อมโยงข้อมูลล้มเหลว' };
   }
 }

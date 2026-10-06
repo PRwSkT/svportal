@@ -148,6 +148,9 @@ export type AppUser = {
   is_active: boolean;
   assigned_features: string[];
   created_at: string;
+  personnel_id?: string | null;
+  personnel?: Personnel | null;
+  auth_users?: { email?: string };
 };
 
 export type AuditLog = {
@@ -230,10 +233,13 @@ export type Personnel = {
   image_url: string;
   bio_th: string | null;
   bio_en: string | null;
+  email?: string | null;
+  user_id?: string | null;
   sort_order: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  app_user?: AppUser | null;
 };
 
 export type News = {
@@ -295,3 +301,84 @@ export type Document = {
   created_at: string;
   updated_at: string;
 };
+
+// ==========================================
+// SV-Forms Builder & Multilingual System
+// ==========================================
+
+export type SupportedLang = 'th' | 'en' | 'zh';
+
+export type MultiLangText = {
+  th: string;
+  en?: string;
+  zh?: string;
+};
+
+export type FormFieldOption = {
+  value: string;
+  label: MultiLangText;
+};
+
+export type FormFieldType = 
+  | 'text' 
+  | 'textarea' 
+  | 'number' 
+  | 'radio' 
+  | 'checkbox' 
+  | 'select' 
+  | 'date' 
+  | 'time' 
+  | 'file_upload' 
+  | 'rating' 
+  | 'section_header';
+
+export type FormField = {
+  id: string;
+  form_id: string;
+  field_key: string;
+  label: MultiLangText;
+  help_text?: MultiLangText | null;
+  field_type: FormFieldType;
+  is_required: boolean;
+  options?: FormFieldOption[] | null;
+  validation?: Record<string, any> | null;
+  sort_order: number;
+  width: 'full' | 'half';
+  created_at?: string;
+};
+
+export type FormDefinition = {
+  id: string;
+  slug: string;
+  title: MultiLangText;
+  description?: MultiLangText | null;
+  banner_url?: string | null;
+  category: string;
+  access_type: 'public' | 'internal_all' | 'internal_teacher';
+  is_published: boolean;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  max_responses?: number | null;
+  response_count: number;
+  allow_multiple: boolean;
+  thank_you_title?: MultiLangText | null;
+  thank_you_message?: MultiLangText | null;
+  notify_emails?: string[] | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+  fields?: FormField[];
+};
+
+export type FormResponse = {
+  id: string;
+  form_id: string;
+  respondent_id?: string | null;
+  respondent_email?: string | null;
+  respondent_ip?: string | null;
+  submission_lang: SupportedLang;
+  answers: Record<string, any>;
+  attachments?: string[] | null;
+  submitted_at: string;
+};
+

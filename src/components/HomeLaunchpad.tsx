@@ -82,6 +82,7 @@ export default function HomeLaunchpad() {
       color: "border-rose-500/20 bg-rose-500/5",
       tools: [
         { id: "admin_website", name: "จัดการเว็บไซต์", href: "/admin/website", icon: <Globe className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
+        { id: "admin_forms", name: "ระบบแบบฟอร์ม (SV-Forms)", href: "/admin/forms", icon: <FileText className="w-6 h-6" />, color: "bg-[#7B1C3E]/20 text-[#7B1C3E]" },
         { id: "post_assistant", name: "Post Assistance", href: "/post-assistant.html", icon: <MessageSquare className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
         { id: "audio_remote", name: "Audio Remote", href: "/audio-remote.html", icon: <Radio className="w-6 h-6" />, color: "bg-rose-500 text-white" },
         { id: "qr_generator", name: "สร้าง QR Code", href: "/qr-generator", icon: <QrCode className="w-6 h-6" />, color: "bg-rose-500 text-white" }
@@ -105,12 +106,6 @@ export default function HomeLaunchpad() {
     }
   ];
 
-  // Filter departments based on assigned features
-  // If the user has 'admin' role, maybe show everything? 
-  // "ถ้าทำเป็นroleเลยอาจจะไม่เวิร์คเพราะหลายคนทำหลายจ็อบ ให้adminเป็นคนassignฟีเจอร์แต่ละหมวดให้แต่ละยูสเซอร์"
-  // This implies even admins should be filtered by assigned_features if we want it truly individualized,
-  // but let's assume if assigned_features is empty and they are admin, maybe we show nothing until assigned.
-  // We'll strictly rely on assigned_features, but for fallback (e.g. before migration), we can fallback to all if admin.
   const adminEmails = ['admin@somkidvittaya.ac.th', 'peerawat@somkidvittaya.ac.th', 'media@somkidvittaya.ac.th', 'admin@svportal.com'];
   const isAdmin = appUser?.role === 'admin' || role === 'admin' || (user?.email ? adminEmails.includes(user.email.toLowerCase()) : false);
   const assignedFeatures = appUser?.assigned_features || [];
@@ -119,7 +114,7 @@ export default function HomeLaunchpad() {
   const filteredDepartments = allDepartments.map(dept => {
     return {
       ...dept,
-      tools: dept.tools.filter(tool => showAll || assignedFeatures.includes(tool.id) || (isAdmin && assignedFeatures.length === 0))
+      tools: dept.tools.filter(tool => isAdmin || showAll || assignedFeatures.includes(tool.id))
     };
   }).filter(dept => dept.tools.length > 0);
 
