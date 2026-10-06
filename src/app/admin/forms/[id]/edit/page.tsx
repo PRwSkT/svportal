@@ -6,7 +6,13 @@ import { useRouter } from 'next/navigation';
 import {
   FormDefinition, FormField, FormFieldType, FormFieldOption, SupportedLang
 } from '@/types';
-import { getFormWithFields, saveFormStudio, toggleFormPublish } from '@/app/admin/forms/actions';
+import {
+  getFormWithFields,
+  saveFormStudio,
+  toggleFormPublish,
+  getFormCollaboratorCandidates,
+  updateFormCollaborators,
+} from '@/app/admin/forms/actions';
 import { createClient } from '@/lib/supabase/client';
 import { compressImage } from '@/lib/image-compression';
 import { toast } from 'sonner';
@@ -17,7 +23,7 @@ import {
   FileText, AlignLeft, Hash, CheckSquare, CircleDot, ChevronDownSquare,
   Calendar, Clock, Upload, Star, Heading, Loader2, ExternalLink,
   ShieldCheck, AlertCircle, RefreshCw, X, LayoutTemplate,
-  Image as ImageIcon, Info, Smartphone, Monitor
+  Image as ImageIcon, Info, Smartphone, Monitor, User, Users, UserCheck, Search
 } from 'lucide-react';
 
 const FIELD_TEMPLATES: {
@@ -163,20 +169,37 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [previewLang, setPreviewLang] = useState<SupportedLang>('th');
 
+  // Collaborator States
+  const [collaboratorCandidates, setCollaboratorCandidates] = useState<any[]>([]);
+  const [showCollaboratorModal, setShowCollaboratorModal] = useState(false);
+  const [selectedCollaboratorIds, setSelectedCollaboratorIds] = useState<string[]>([]);
+  const [isSavingCollaborators, setIsSavingCollaborators] = useState(false);
+  const [collaboratorSearchQuery, setCollaboratorSearchQuery] = useState('');
+
   const supabase = createClient();
 
-  // Load Form Data
+  // Load Form Data & Collaborators
   useEffect(() => {
     async function load() {
       setIsLoading(true);
-      const res = await getFormWithFields(formId);
+      const [res, candRes] = await Promise.all([
+        getFormWithFields(formId),
+        getFormCollaboratorCandidates(),
+      ]);
+
       if (res.success && res.data) {
         setForm(res.data.form);
         setFields(res.data.fields);
+        setSelectedCollaboratorIds(res.data.form.collaborator_ids || []);
       } else {
         toast.error('ไม่สามารถเปิดแบบฟอร์มได้', { description: res.error });
         router.push('/admin/forms');
       }
+
+      if (candRes.success && candRes.data) {
+        setCollaboratorCandidates(candRes.data);
+      }
+
       setIsLoading(false);
     }
     load();
@@ -471,6 +494,27 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
     } else {
       toast.error('เปลี่ยนสถานะไม่สำเร็จ', { description: res.error });
       setForm({ ...form, is_published: form.is_published });
+    }
+  };
+
+  // Collaborator Handlers
+  const handleToggleCollaborator = (id: string) => {
+    setSelectedCollaboratorIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSaveCollaborators = async () => {
+    if (!form) return;
+    setIsSavingCollaborators(true);
+    const res = await updateFormCollaborators(form.id, selectedCollaboratorIds);
+    setIsSavingCollaborators(false);
+    if (res.success) {
+      toast.success(`บันทึกสิทธิ์ผู้ร่วมจัดการ (${selectedCollaboratorIds.length} ท่าน) เรียบร้อยแล้ว`);
+      setForm({ ...form, collaborator_ids: selectedCollaboratorIds });
+      setShowCollaboratorModal(false);
+    } else {
+      toast.error('บันทึกสิทธิ์ไม่สำเร็จ', { description: res.error });
     }
   };
 
@@ -873,6 +917,59 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                   placeholder="เช่น โรงเรียนสมคิดวิทยาได้รับข้อมูลของท่านเรียบร้อยแล้ว"
                 />
               </div>
+            </div>
+
+            {/* Form Collaborators & Permission Controls */}
+            <div className="border-t border-slate-100 pt-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-purple-700" />
+                    <span>สิทธิ์ผู้ร่วมจัดการแบบฟอร์ม (Form Collaborators)</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    เฉพาะผู้สร้างและแอดมินเท่านั้นที่จะเห็นฟอร์มนี้เป็นค่าเริ่มต้น คุณสามารถมอบสิทธิ์ให้ครู/บุคลากรท่านอื่นร่วมดูแลได้
+                  </p>
+                </div>
+                {form.can_manage_permissions && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCollaboratorIds(form.collaborator_ids || []);
+                      setShowCollaboratorModal(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold shadow-2xs transition-colors shrink-0 cursor-pointer"
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    <span>จัดการสิทธิ์ ({selectedCollaboratorIds.length} ท่าน)</span>
+                  </button>
+                )}
+              </div>
+
+              {selectedCollaboratorIds.length > 0 ? (
+                <div className="p-4 bg-purple-50/60 border border-purple-200/80 rounded-2xl flex flex-wrap gap-2">
+                  {collaboratorCandidates
+                    .filter(
+                      (c) =>
+                        selectedCollaboratorIds.includes(c.user_id || c.id) ||
+                        selectedCollaboratorIds.includes(c.id)
+                    )
+                    .map((c) => (
+                      <span
+                        key={c.id}
+                        className="inline-flex items-center gap-1.5 py-1 px-2.5 bg-white border border-purple-200 rounded-xl text-xs font-medium text-purple-950 shadow-2xs"
+                      >
+                        <span className="w-2 h-2 rounded-full bg-purple-500" />
+                        <span>{c.name_th}</span>
+                        <span className="text-[10px] text-purple-600">({c.position_th})</span>
+                      </span>
+                    ))}
+                </div>
+              ) : (
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-500 text-center">
+                  ยังไม่มีการมอบสิทธิ์ให้ผู้อื่น (มีเฉพาะคุณในฐานะผู้สร้างและผู้ดูแลระบบเท่านั้นที่เข้าถึงฟอร์มนี้ได้)
+                </div>
+              )}
             </div>
 
             {/* Save Button */}
@@ -1460,6 +1557,186 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                     </div>
                   </div>
                 </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal: Collaborator Assignment */}
+      <AnimatePresence>
+        {showCollaboratorModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] p-6 sm:p-7 shadow-2xl border border-slate-100 flex flex-col relative text-slate-800"
+            >
+              <button
+                type="button"
+                onClick={() => setShowCollaboratorModal(false)}
+                className="absolute right-5 top-5 text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {/* Header */}
+              <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+                <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                  <Users className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">
+                    กำหนดสิทธิ์ผู้ร่วมจัดการแบบฟอร์ม
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    ฟอร์ม: {form.title?.th || form.slug}
+                  </p>
+                </div>
+              </div>
+
+              {/* Guidance Info Card */}
+              <div className="bg-purple-50/80 border border-purple-200/90 rounded-2xl p-3.5 my-3.5 text-xs text-purple-950 flex items-start gap-2.5">
+                <Info className="w-4 h-4 text-purple-700 shrink-0 mt-0.5" />
+                <div className="leading-relaxed text-[11px]">
+                  <strong>ความปลอดภัยของข้อมูล:</strong> ตามค่าเริ่มต้น ฟอร์มจะแสดงเฉพาะ<strong>ผู้สร้างและแอดมิน</strong>เท่านั้น คุณสามารถเลือกครูหรือบุคลากรท่านอื่นเพื่อให้สิทธิ์<strong>มองเห็นแบบฟอร์มนี้ในระบบ ตรวจสอบผลการตอบกลับ และร่วมแก้ไขฟอร์มได้</strong>
+                </div>
+              </div>
+
+              {/* Search & Actions Bar */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-2 mb-3">
+                <div className="relative w-full sm:w-64">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="ค้นหาชื่อครู, ตำแหน่ง, อีเมล..."
+                    value={collaboratorSearchQuery}
+                    onChange={(e) => setCollaboratorSearchQuery(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-purple-400 focus:bg-white transition-all"
+                  />
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                  <span className="text-xs font-bold text-purple-900 bg-purple-100 px-2.5 py-1 rounded-lg">
+                    เลือกแล้ว {selectedCollaboratorIds.length} ท่าน
+                  </span>
+                  <div className="flex items-center gap-1 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedCollaboratorIds(
+                          collaboratorCandidates.map((c) => c.user_id || c.id)
+                        )
+                      }
+                      className="px-2 py-1 text-purple-700 hover:bg-purple-50 rounded font-semibold cursor-pointer"
+                    >
+                      เลือกทั้งหมด
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCollaboratorIds([])}
+                      className="px-2 py-1 text-slate-500 hover:bg-slate-100 rounded font-semibold cursor-pointer"
+                    >
+                      ล้างค่า
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Candidates Checklist */}
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[44vh]">
+                {collaboratorCandidates
+                  .filter((c) => {
+                    const q = collaboratorSearchQuery.toLowerCase();
+                    return (
+                      !q ||
+                      c.name_th?.toLowerCase().includes(q) ||
+                      c.name_en?.toLowerCase().includes(q) ||
+                      c.position_th?.toLowerCase().includes(q) ||
+                      c.email?.toLowerCase().includes(q)
+                    );
+                  })
+                  .map((c) => {
+                    const lookupKey = c.user_id || c.id;
+                    const isSelected =
+                      selectedCollaboratorIds.includes(lookupKey) ||
+                      selectedCollaboratorIds.includes(c.id);
+
+                    return (
+                      <div
+                        key={c.id}
+                        onClick={() => handleToggleCollaborator(lookupKey)}
+                        className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                          isSelected
+                            ? 'bg-purple-50/90 border-purple-300 ring-1 ring-purple-400 shadow-2xs'
+                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0 flex items-center justify-center">
+                            {c.image_url ? (
+                              <img
+                                src={c.image_url}
+                                alt={c.name_th}
+                                className="w-full h-full object-cover object-top"
+                              />
+                            ) : (
+                              <User className="w-5 h-5 text-slate-400" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                              {c.name_th}
+                            </div>
+                            <div className="text-[11px] text-slate-500 truncate">{c.position_th}</div>
+                            {c.email && (
+                              <div className="text-[10px] text-purple-700 font-mono truncate">{c.email}</div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 pr-1">
+                          {isSelected ? (
+                            <div className="w-6 h-6 rounded-lg bg-purple-600 text-white flex items-center justify-center shadow-xs">
+                              <Check className="w-4 h-4" />
+                            </div>
+                          ) : (
+                            <div className="w-6 h-6 rounded-lg border-2 border-slate-300 flex items-center justify-center bg-white" />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              {/* Bottom Actions */}
+              <div className="pt-4 mt-3 border-t border-slate-100 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCollaboratorModal(false)}
+                  className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  disabled={isSavingCollaborators}
+                  onClick={handleSaveCollaborators}
+                  className="py-2.5 px-6 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                >
+                  {isSavingCollaborators ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>กำลังบันทึกสิทธิ์...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>บันทึกสิทธิ์ ({selectedCollaboratorIds.length} ท่าน)</span>
+                    </>
+                  )}
+                </button>
               </div>
             </motion.div>
           </div>

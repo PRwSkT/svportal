@@ -170,6 +170,9 @@ export async function proxy(request: NextRequest) {
     } else if (path.startsWith('/admin/users') || path.startsWith('/api/admin/users')) {
       requiredFeature = 'admin_users';
     } else if (path.startsWith('/admin/forms') || path.startsWith('/api/admin/forms')) {
+      if (user.email?.endsWith('@somkidvittaya.ac.th') || assignedFeatures.includes('admin_forms')) {
+        return response;
+      }
       requiredFeature = 'admin_forms';
     } else if (path.startsWith('/admin/kpi') || path.startsWith('/api/admin/kpi')) {
       if (user.email?.endsWith('@somkidvittaya.ac.th') || assignedFeatures.includes('admin_kpi')) {

@@ -368,6 +368,24 @@ export type FormDefinition = {
   thank_you_message?: MultiLangText | null;
   notify_emails?: string[] | null;
   created_by?: string | null;
+  collaborator_ids?: string[] | null;
+  creator?: {
+    id: string;
+    name_th: string;
+    position_th?: string;
+    email?: string | null;
+    image_url?: string | null;
+  } | null;
+  collaborators?: {
+    id: string;
+    name_th: string;
+    position_th?: string;
+    email?: string | null;
+    image_url?: string | null;
+  }[] | null;
+  is_owner?: boolean;
+  can_manage_permissions?: boolean;
+  can_edit?: boolean;
   created_at: string;
   updated_at: string;
   fields?: FormField[];
