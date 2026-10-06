@@ -28,7 +28,12 @@ Return ONLY the translation without any quotes or explanations.
 Text:
 ${trimmed}`;
 
-      for (const model of ['gemini-3.5-flash-lite', 'gemini-1.5-flash']) {
+      for (const model of [
+        'gemini-3.5-flash-lite',
+        'gemma-4-31b-it',
+        'gemma-4-26b-a4b-it',
+        'gemini-1.5-flash',
+      ]) {
         try {
           const res = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
