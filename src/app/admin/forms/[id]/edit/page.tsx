@@ -24,7 +24,8 @@ import {
   FileText, AlignLeft, Hash, CheckSquare, CircleDot, ChevronDownSquare,
   Calendar, Clock, Upload, Star, Heading, Loader2, ExternalLink,
   ShieldCheck, AlertCircle, RefreshCw, X, LayoutTemplate,
-  Image as ImageIcon, Info, Smartphone, Monitor, User, Users, UserCheck, Search, QrCode, Bot, BarChart2
+  Image as ImageIcon, Info, Smartphone, Monitor, User, Users, UserCheck, Search, QrCode, Bot, BarChart2,
+  Award, ShieldAlert
 } from 'lucide-react';
 import { FormQRCodeModal } from '@/components/forms/FormQRCodeModal';
 import { NongFahStudioModal } from '@/components/forms/NongFahStudioModal';
@@ -156,7 +157,7 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
   const [form, setForm] = useState<FormDefinition | null>(null);
   const [fields, setFields] = useState<FormField[]>([]);
   const [activeLang, setActiveLang] = useState<SupportedLang>('th');
-  const [activeTab, setActiveTab] = useState<'fields' | 'settings'>('fields');
+  const [activeTab, setActiveTab] = useState<'fields' | 'settings' | 'quiz'>('fields');
   const [mobileStudioTab, setMobileStudioTab] = useState<'canvas' | 'toolbox'>('canvas');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -835,6 +836,20 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
               โครงสร้างฟอร์ม ({fields.length} ช่อง)
             </button>
             <button
+              onClick={() => setActiveTab('quiz')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all shrink-0 cursor-pointer ${
+                activeTab === 'quiz'
+                  ? 'bg-white text-amber-900 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Award className="w-3.5 h-3.5 text-amber-600" />
+              <span>โหมดข้อสอบ & ป้องกันทุจริต</span>
+              {form?.quiz_settings?.is_quiz && (
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse ml-0.5" />
+              )}
+            </button>
+            <button
               onClick={() => setActiveTab('settings')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all shrink-0 cursor-pointer ${
                 activeTab === 'settings'
@@ -888,7 +903,395 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
 
       {/* Workspace Area */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex-1 w-full">
-        {activeTab === 'settings' ? (
+        {activeTab === 'quiz' ? (
+          /* Quiz & Anti-Cheat Settings View */
+          <div className="max-w-3xl mx-auto bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
+            <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <Award className="w-5 h-5 text-amber-600" />
+                  <span>โหมดข้อสอบออนไลน์ & ป้องกันการทุจริต (Online Quiz & Anti-Cheating)</span>
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  เปลี่ยนแบบฟอร์มเป็นข้อสอบ มีระบบจับเวลานับถอยหลัง ตรวจข้อสอบอัตโนมัติ และระบบคุมสอบตรวจจับการสลับจอ
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.quiz_settings?.is_quiz ?? false}
+                  onChange={(e) => {
+                    const isQ = e.target.checked;
+                    setForm({
+                      ...form,
+                      quiz_settings: {
+                        is_quiz: isQ,
+                        time_limit_minutes: form.quiz_settings?.time_limit_minutes ?? 30,
+                        passing_score_percentage: form.quiz_settings?.passing_score_percentage ?? 60,
+                        shuffle_questions: form.quiz_settings?.shuffle_questions ?? false,
+                        shuffle_options: form.quiz_settings?.shuffle_options ?? false,
+                        show_score_immediately: form.quiz_settings?.show_score_immediately ?? true,
+                        show_correct_answers: form.quiz_settings?.show_correct_answers ?? true,
+                        anti_cheat: {
+                          enforce_fullscreen: form.quiz_settings?.anti_cheat?.enforce_fullscreen ?? true,
+                          detect_tab_switch: form.quiz_settings?.anti_cheat?.detect_tab_switch ?? true,
+                          max_tab_switches: form.quiz_settings?.anti_cheat?.max_tab_switches ?? 3,
+                          block_clipboard: form.quiz_settings?.anti_cheat?.block_clipboard ?? true,
+                          block_right_click: form.quiz_settings?.anti_cheat?.block_right_click ?? true,
+                          block_keyboard_shortcuts: form.quiz_settings?.anti_cheat?.block_keyboard_shortcuts ?? true,
+                          auto_submit_on_violation: form.quiz_settings?.anti_cheat?.auto_submit_on_violation ?? true,
+                        },
+                      },
+                    });
+                    notifyChange();
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:width-5 after:transition-all peer-checked:bg-emerald-600"></div>
+              </label>
+            </div>
+
+            {!form.quiz_settings?.is_quiz ? (
+              <div className="text-center py-12 bg-amber-50/40 rounded-2xl border border-amber-200 p-6">
+                <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto mb-3">
+                  <Award className="w-6 h-6" />
+                </div>
+                <h4 className="text-sm font-bold text-slate-800">โหมดข้อสอบยังไม่ได้เปิดใช้งาน</h4>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4 leading-relaxed">
+                  เปิดสวิตช์ด้านบนเพื่อแปลงฟอร์มนี้เป็นข้อสอบออนไลน์ พร้อมระบบคำนวณคะแนนอัตโนมัติและระบบคุมสอบตรวจจับทุจริต
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForm({
+                      ...form,
+                      quiz_settings: {
+                        is_quiz: true,
+                        time_limit_minutes: 30,
+                        passing_score_percentage: 60,
+                        shuffle_questions: false,
+                        shuffle_options: false,
+                        show_score_immediately: true,
+                        show_correct_answers: true,
+                        anti_cheat: {
+                          enforce_fullscreen: true,
+                          detect_tab_switch: true,
+                          max_tab_switches: 3,
+                          block_clipboard: true,
+                          block_right_click: true,
+                          block_keyboard_shortcuts: true,
+                          auto_submit_on_violation: true,
+                        },
+                      },
+                    });
+                    notifyChange();
+                  }}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
+                >
+                  เปิดใช้งานโหมดข้อสอบตอนนี้
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Basic Exam Controls */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      เวลาในการทำข้อสอบ (นาที)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={0}
+                        max={360}
+                        value={form.quiz_settings?.time_limit_minutes ?? 30}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 0;
+                          setForm({
+                            ...form,
+                            quiz_settings: {
+                              ...form.quiz_settings!,
+                              time_limit_minutes: val,
+                            },
+                          });
+                          notifyChange();
+                        }}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#7B1C3E]"
+                        placeholder="0 = ไม่จำกัดเวลา"
+                      />
+                      <Clock className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
+                    </div>
+                    <span className="text-[10px] text-slate-400 mt-1 block">
+                      ระบุ 0 หรือเว้นว่างหากไม่ต้องการจำกัดเวลา
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      เกณฑ์คะแนนผ่าน (%)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={form.quiz_settings?.passing_score_percentage ?? 60}
+                        onChange={(e) => {
+                          const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                          setForm({
+                            ...form,
+                            quiz_settings: {
+                              ...form.quiz_settings!,
+                              passing_score_percentage: val,
+                            },
+                          });
+                          notifyChange();
+                        }}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#7B1C3E]"
+                      />
+                      <span className="text-xs font-bold text-slate-400 absolute right-3 top-2.5">%</span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 mt-1 block">
+                      เกณฑ์เริ่มต้น 60% สำหรับสถานะสอบผ่าน
+                    </span>
+                  </div>
+                </div>
+
+                {/* Score and Answer Review Display */}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                  <div className="text-xs font-bold text-slate-800">การแสดงผลคะแนนและเฉลย</div>
+                  <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={form.quiz_settings?.show_score_immediately ?? true}
+                      onChange={(e) => {
+                        setForm({
+                          ...form,
+                          quiz_settings: {
+                            ...form.quiz_settings!,
+                            show_score_immediately: e.target.checked,
+                          },
+                        });
+                        notifyChange();
+                      }}
+                      className="rounded text-[#7B1C3E] focus:ring-[#7B1C3E] w-4 h-4"
+                    />
+                    <span>แสดงคะแนนสอบทันทีที่ผู้เรียนกดส่งข้อสอบ</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={form.quiz_settings?.show_correct_answers ?? true}
+                      onChange={(e) => {
+                        setForm({
+                          ...form,
+                          quiz_settings: {
+                            ...form.quiz_settings!,
+                            show_correct_answers: e.target.checked,
+                          },
+                        });
+                        notifyChange();
+                      }}
+                      className="rounded text-[#7B1C3E] focus:ring-[#7B1C3E] w-4 h-4"
+                    />
+                    <span>แสดงเฉลยข้อที่ถูกต้องและคำอธิบายหลังส่งข้อสอบ</span>
+                  </label>
+                </div>
+
+                {/* Anti-Cheating System Settings */}
+                <div className="p-5 bg-gradient-to-br from-indigo-50/70 to-slate-50 border border-indigo-200/80 rounded-2xl space-y-4">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-indigo-700" />
+                    <div>
+                      <h3 className="text-sm font-bold text-indigo-950">
+                        ระบบป้องกันการทุจริตและการคุมสอบ (Anti-Cheating & Proctoring)
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        ระบบจะตรวจจับการกระทำของผู้สอบและบันทึกลงในรายงานความซื่อสัตย์
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-2">
+                    <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={form.quiz_settings?.anti_cheat?.enforce_fullscreen ?? true}
+                        onChange={(e) => {
+                          setForm({
+                            ...form,
+                            quiz_settings: {
+                              ...form.quiz_settings!,
+                              anti_cheat: {
+                                ...(form.quiz_settings?.anti_cheat || {}),
+                                enforce_fullscreen: e.target.checked,
+                              },
+                            },
+                          });
+                          notifyChange();
+                        }}
+                        className="rounded text-indigo-600 focus:ring-indigo-600 w-4 h-4 mt-0.5"
+                      />
+                      <div>
+                        <span className="font-semibold text-slate-900 block">
+                          บังคับเปิดแบบเต็มหน้าจอ (Enforce Fullscreen)
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          ผู้เรียนต้องทำข้อสอบในโหมดเต็มหน้าจอ และจะถูกแจ้งเตือนหากพยายามย่อจอ
+                        </span>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={form.quiz_settings?.anti_cheat?.detect_tab_switch ?? true}
+                        onChange={(e) => {
+                          setForm({
+                            ...form,
+                            quiz_settings: {
+                              ...form.quiz_settings!,
+                              anti_cheat: {
+                                ...(form.quiz_settings?.anti_cheat || {}),
+                                detect_tab_switch: e.target.checked,
+                              },
+                            },
+                          });
+                          notifyChange();
+                        }}
+                        className="rounded text-indigo-600 focus:ring-indigo-600 w-4 h-4 mt-0.5"
+                      />
+                      <div>
+                        <span className="font-semibold text-slate-900 block">
+                          ตรวจจับการสลับแท็บ / ยุบหน้าต่างเบราว์เซอร์ (Detect Tab Switch)
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          บันทึกประวัติและจำนวนครั้งที่ออกจากหน้าจอข้อสอบ
+                        </span>
+                      </div>
+                    </label>
+
+                    {form.quiz_settings?.anti_cheat?.detect_tab_switch && (
+                      <div className="ml-6 pl-2 border-l-2 border-indigo-200 flex items-center gap-3">
+                        <span className="text-xs text-slate-600">อนุญาตให้สลับหน้าจอได้สูงสุด:</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={form.quiz_settings?.anti_cheat?.max_tab_switches ?? 3}
+                          onChange={(e) => {
+                            const val = Math.max(1, parseInt(e.target.value) || 3);
+                            setForm({
+                              ...form,
+                              quiz_settings: {
+                                ...form.quiz_settings!,
+                                anti_cheat: {
+                                  ...(form.quiz_settings?.anti_cheat || {}),
+                                  max_tab_switches: val,
+                                },
+                              },
+                            });
+                            notifyChange();
+                          }}
+                          className="w-16 px-2 py-1 bg-white border border-indigo-300 rounded-lg text-xs font-bold text-center"
+                        />
+                        <span className="text-xs text-slate-500">ครั้ง</span>
+                      </div>
+                    )}
+
+                    <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={form.quiz_settings?.anti_cheat?.block_clipboard ?? true}
+                        onChange={(e) => {
+                          setForm({
+                            ...form,
+                            quiz_settings: {
+                              ...form.quiz_settings!,
+                              anti_cheat: {
+                                ...(form.quiz_settings?.anti_cheat || {}),
+                                block_clipboard: e.target.checked,
+                              },
+                            },
+                          });
+                          notifyChange();
+                        }}
+                        className="rounded text-indigo-600 focus:ring-indigo-600 w-4 h-4 mt-0.5"
+                      />
+                      <div>
+                        <span className="font-semibold text-slate-900 block">
+                          ปิดกั้นคลิปบอร์ดและการเลือกข้อความ (Block Copy, Cut & Paste)
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          ไม่อนุญาตให้คัดลอกโจทย์หรือวางคำตอบจากภายนอก
+                        </span>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={form.quiz_settings?.anti_cheat?.block_right_click ?? true}
+                        onChange={(e) => {
+                          setForm({
+                            ...form,
+                            quiz_settings: {
+                              ...form.quiz_settings!,
+                              anti_cheat: {
+                                ...(form.quiz_settings?.anti_cheat || {}),
+                                block_right_click: e.target.checked,
+                              },
+                            },
+                          });
+                          notifyChange();
+                        }}
+                        className="rounded text-indigo-600 focus:ring-indigo-600 w-4 h-4 mt-0.5"
+                      />
+                      <div>
+                        <span className="font-semibold text-slate-900 block">
+                          ปิดกั้นคลิกขวา (Block Right Click)
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          ไม่อนุญาตให้เปิด Context Menu เพื่อค้นหาข้อความ
+                        </span>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={form.quiz_settings?.anti_cheat?.auto_submit_on_violation ?? true}
+                        onChange={(e) => {
+                          setForm({
+                            ...form,
+                            quiz_settings: {
+                              ...form.quiz_settings!,
+                              anti_cheat: {
+                                ...(form.quiz_settings?.anti_cheat || {}),
+                                auto_submit_on_violation: e.target.checked,
+                              },
+                            },
+                          });
+                          notifyChange();
+                        }}
+                        className="rounded text-indigo-600 focus:ring-indigo-600 w-4 h-4 mt-0.5"
+                      />
+                      <div>
+                        <span className="font-semibold text-slate-900 block">
+                          ส่งข้อสอบทันทีเมื่อทำผิดกฎเกินจำนวนครั้ง (Auto-Submit on Violation)
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          หากผู้เรียนสลับหน้าจอเกินจำนวนที่กำหนด ระบบจะทำการตัดคะแนนและส่งข้อสอบอัตโนมัติ
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : activeTab === 'settings' ? (
           /* Form Settings View */
           <div className="max-w-3xl mx-auto bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
             <div className="border-b border-slate-100 pb-4">
@@ -1686,6 +2089,134 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                             </select>
                           </div>
                         </div>
+
+                        {/* Answer Key & Scoring for Quiz Mode */}
+                        {form.quiz_settings?.is_quiz && !isNonInput && (
+                          <div className="mt-4 pt-3 border-t border-amber-200/80 bg-amber-50/50 rounded-xl p-3.5 border text-xs space-y-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-bold text-amber-900 flex items-center gap-1.5">
+                                <Award className="w-4 h-4 text-amber-600" />
+                                <span>เฉลยคำตอบและกำหนดคะแนน (Answer Key & Scoring)</span>
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-slate-600 font-medium">คะแนน:</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={100}
+                                  value={field.quiz_config?.points ?? 1}
+                                  onChange={(e) => {
+                                    const pts = Math.max(0, parseInt(e.target.value) || 0);
+                                    updateField(index, {
+                                      quiz_config: {
+                                        ...(field.quiz_config || {}),
+                                        points: pts,
+                                      },
+                                    });
+                                  }}
+                                  className="w-16 px-2 py-1 bg-white border border-amber-300 rounded-lg text-xs font-bold text-amber-900 text-center focus:ring-1 focus:ring-amber-500"
+                                />
+                                <span className="text-slate-500">คะแนน</span>
+                              </div>
+                            </div>
+
+                            {/* Select / Radio / Checkbox: Choose correct option */}
+                            {hasOptions && field.options && (
+                              <div className="space-y-1.5">
+                                <div className="text-[11px] font-semibold text-slate-700">
+                                  เลือกคำตอบที่ถูกต้อง ({field.field_type === 'checkbox' ? 'เลือกได้หลายข้อ' : 'เลือกข้อที่ถูกต้อง 1 ข้อ'}):
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                  {field.options.map((opt) => {
+                                    const isCorrect = (field.quiz_config?.correct_answers || []).includes(opt.value);
+                                    return (
+                                      <button
+                                        key={opt.value}
+                                        type="button"
+                                        onClick={() => {
+                                          const cur = field.quiz_config?.correct_answers || [];
+                                          let updated: string[];
+                                          if (field.field_type === 'checkbox') {
+                                            updated = isCorrect ? cur.filter((v) => v !== opt.value) : [...cur, opt.value];
+                                          } else {
+                                            updated = [opt.value];
+                                          }
+                                          updateField(index, {
+                                            quiz_config: {
+                                              ...(field.quiz_config || {}),
+                                              correct_answers: updated,
+                                            },
+                                          });
+                                        }}
+                                        className={`flex items-center justify-between p-2 rounded-lg border text-left transition-all ${
+                                          isCorrect
+                                            ? 'bg-emerald-100 border-emerald-400 text-emerald-950 font-bold shadow-2xs'
+                                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                                        }`}
+                                      >
+                                        <span className="truncate">{opt.label[activeLang] || opt.label.th}</span>
+                                        {isCorrect ? (
+                                          <Check className="w-4 h-4 text-emerald-700 shrink-0 ml-1" />
+                                        ) : (
+                                          <span className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0 ml-1" />
+                                        )}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Text / Number: Exact Match Answer Input */}
+                            {(field.field_type === 'text' || field.field_type === 'number') && (
+                              <div className="space-y-1">
+                                <div className="text-[11px] font-semibold text-slate-700">
+                                  คำตอบที่ถูกต้อง (ระบุข้อความหรือตัวเลขที่ถูกต้อง คั่นด้วยเครื่องหมายจุลภาค , หากมีหลายคำตอบ):
+                                </div>
+                                <input
+                                  type="text"
+                                  value={(field.quiz_config?.correct_answers || []).join(', ')}
+                                  onChange={(e) => {
+                                    const raw = e.target.value;
+                                    const arr = raw.split(',').map((s) => s.trim()).filter(Boolean);
+                                    updateField(index, {
+                                      quiz_config: {
+                                        ...(field.quiz_config || {}),
+                                        correct_answers: arr,
+                                      },
+                                    });
+                                  }}
+                                  placeholder="เช่น คำตอบที่ 1, คำตอบที่ 2"
+                                  className="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-xs text-slate-900 focus:ring-1 focus:ring-amber-500"
+                                />
+                              </div>
+                            )}
+
+                            {/* Explanation / Rationale */}
+                            <div className="space-y-1">
+                              <div className="text-[11px] font-semibold text-slate-700">
+                                คำอธิบายเฉลย / ข้อคิดเห็น (แสดงให้ผู้เรียนดูหลังส่งข้อสอบ):
+                              </div>
+                              <input
+                                type="text"
+                                value={field.quiz_config?.explanation?.[activeLang] || ''}
+                                onChange={(e) => {
+                                  updateField(index, {
+                                    quiz_config: {
+                                      ...(field.quiz_config || {}),
+                                      explanation: {
+                                        ...(field.quiz_config?.explanation || { th: '' }),
+                                        [activeLang]: e.target.value,
+                                      },
+                                    },
+                                  });
+                                }}
+                                placeholder={`คำอธิบายเฉลยภาษา ${activeLang.toUpperCase()}...`}
+                                className="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-xs text-slate-900 focus:ring-1 focus:ring-amber-500"
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </motion.div>
                   );

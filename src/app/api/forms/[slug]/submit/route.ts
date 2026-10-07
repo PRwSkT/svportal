@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getServerUser } from '@/lib/auth';
 import { isSystemAdmin } from '@/lib/constants/auth';
+import { gradeQuizSubmission, evaluateIntegrityStatus } from '@/lib/quiz/grading';
+import { FormDefinition, FormField } from '@/types';
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -19,7 +21,7 @@ export async function POST(
   try {
     const { slug } = await params;
     const body = await req.json();
-    const { answers, attachments, lang = 'th' } = body;
+    const { answers, attachments, lang = 'th', proctorLog, timeSpentSeconds } = body;
 
     const supabase = getAdminClient();
 
@@ -98,7 +100,33 @@ export async function POST(
       req.headers.get('x-real-ip') ||
       null;
 
-    // 6. Insert response
+    // 6. Evaluate Quiz & Anti-Cheat Proctoring (if enabled)
+    let quizScore = null;
+    let finalProctorLog = null;
+
+    if (form.quiz_settings?.is_quiz) {
+      const { data: fields } = await supabase
+        .from('form_fields')
+        .select('*')
+        .eq('form_id', form.id);
+
+      quizScore = gradeQuizSubmission(
+        form as FormDefinition,
+        (fields || []) as FormField[],
+        answers || {},
+        Number(timeSpentSeconds) || 0
+      );
+
+      if (proctorLog) {
+        const integrityStatus = evaluateIntegrityStatus(proctorLog);
+        finalProctorLog = {
+          ...proctorLog,
+          integrity_status: integrityStatus,
+        };
+      }
+    }
+
+    // 7. Insert response
     const { data: responseData, error: respErr } = await supabase
       .from('form_responses')
       .insert([
@@ -110,6 +138,8 @@ export async function POST(
           submission_lang: lang,
           answers: answers || {},
           attachments: attachments || [],
+          quiz_score: quizScore,
+          proctor_log: finalProctorLog,
           submitted_at: new Date().toISOString(),
         },
       ])
@@ -124,7 +154,7 @@ export async function POST(
       );
     }
 
-    // 7. Increment response count
+    // 8. Increment response count
     await supabase
       .from('forms')
       .update({
@@ -133,9 +163,34 @@ export async function POST(
       })
       .eq('id', form.id);
 
+    // 9. Prepare score payload for respondent (if permitted)
+    let returnedScore = null;
+    if (quizScore && form.quiz_settings?.show_score_immediately) {
+      if (form.quiz_settings?.show_correct_answers) {
+        returnedScore = quizScore;
+      } else {
+        // Strip correct_answers and explanation from client view
+        const safeBreakdown: Record<string, any> = {};
+        for (const [key, item] of Object.entries(quizScore.breakdown)) {
+          safeBreakdown[key] = {
+            field_key: item.field_key,
+            points_awarded: item.points_awarded,
+            max_points: item.max_points,
+            is_correct: item.is_correct,
+            student_answer: item.student_answer,
+          };
+        }
+        returnedScore = {
+          ...quizScore,
+          breakdown: safeBreakdown,
+        };
+      }
+    }
+
     return NextResponse.json({
       success: true,
       response_id: responseData.id,
+      quiz_score: returnedScore,
     });
   } catch (error: any) {
     console.error('Submit API error:', error);

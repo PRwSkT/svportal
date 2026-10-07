@@ -344,11 +344,42 @@ export type FormField = {
   is_required: boolean;
   options?: FormFieldOption[] | null;
   validation?: Record<string, any> | null;
+  quiz_config?: QuestionQuizConfig | null;
   image_url?: string | null;
   sort_order: number;
   width: 'full' | 'half';
   created_at?: string;
 };
+
+export interface QuestionQuizConfig {
+  points?: number; // คะแนนของข้อนี้ (เช่น 1, 2)
+  correct_answers?: string[]; // คำตอบที่ถูกต้อง (เช่น opt_1 หรือข้อความคำตอบ)
+  explanation?: MultiLangText | null; // คำอธิบายเฉลย
+}
+
+export interface AntiCheatConfig {
+  enabled?: boolean; // เปิดระบบป้องกันการทุจริต
+  enforce_fullscreen?: boolean; // บังคับเต็มหน้าจอ
+  detect_tab_switch?: boolean; // ตรวจจับการสลับแท็บ/หน้าต่าง
+  max_tab_switches?: number; // สลับหน้าจอได้สูงสุดกี่ครั้ง
+  block_clipboard?: boolean; // ปิดกั้น Copy / Cut / Paste
+  block_right_click?: boolean; // ปิดกั้นคลิกขวา
+  block_keyboard_shortcuts?: boolean; // ปิดกั้นคีย์ลัดตรวจสอบและคัดลอก
+  prevent_text_selection?: boolean; // ป้องกันการไฮไลต์ข้อความ
+  auto_submit_on_violation?: boolean; // ส่งข้อสอบอัตโนมัติเมื่อทำผิดกฎเกินกำหนด
+}
+
+export interface QuizSettings {
+  is_quiz: boolean; // เปิดโหมดข้อสอบ
+  time_limit_minutes?: number | null; // เวลาทำข้อสอบ (นาที, null = ไม่จำกัด)
+  passing_score_percentage?: number; // เกณฑ์ผ่าน (%)
+  shuffle_questions?: boolean; // สลับลำดับข้อสอบ
+  shuffle_options?: boolean; // สลับชอยส์
+  show_score_immediately?: boolean; // แจ้งคะแนนหลังส่งทันที
+  show_correct_answers?: boolean; // แสดงเฉลยหลังส่ง
+  max_attempts?: number; // จำนวนครั้งที่อนุญาตให้ทำ
+  anti_cheat: AntiCheatConfig; // การตั้งค่าระบบป้องกันการทุจริต
+}
 
 export type FormDefinition = {
   id: string;
@@ -367,6 +398,7 @@ export type FormDefinition = {
   thank_you_title?: MultiLangText | null;
   thank_you_message?: MultiLangText | null;
   notify_emails?: string[] | null;
+  quiz_settings?: QuizSettings | null;
   created_by?: string | null;
   collaborator_ids?: string[] | null;
   creator?: {
@@ -391,6 +423,47 @@ export type FormDefinition = {
   fields?: FormField[];
 };
 
+export interface ProctorViolationItem {
+  type: 'tab_switch' | 'fullscreen_exit' | 'copy_attempt' | 'paste_attempt' | 'context_menu' | 'shortcut_attempt' | 'window_blur' | 'dev_tools';
+  timestamp: string;
+  details?: string;
+}
+
+export interface ProctoringLog {
+  integrity_status?: 'clean' | 'suspicious' | 'flagged'; // 🟢 ปลอดภัย, 🟡 มีข้อสงสัย, 🔴 น่าสงสัยสูง
+  tab_switch_count: number;
+  fullscreen_exit_count: number;
+  copy_attempt_count: number;
+  total_away_seconds: number;
+  violations: ProctorViolationItem[];
+  started_at: string;
+  ended_at?: string;
+  submitted_at?: string;
+  device_info?: {
+    user_agent?: string;
+    screen_resolution?: string;
+    is_mobile?: boolean;
+  };
+}
+
+export interface QuizSubmissionScore {
+  total_score: number;
+  max_score: number;
+  percentage: number;
+  passed: boolean;
+  time_spent_seconds: number;
+  submitted_at: string;
+  breakdown: Record<string, {
+    field_key: string;
+    points_awarded: number;
+    max_points: number;
+    is_correct: boolean;
+    student_answer: any;
+    correct_answers?: string[];
+    explanation?: string;
+  }>;
+}
+
 export type FormResponse = {
   id: string;
   form_id: string;
@@ -400,6 +473,8 @@ export type FormResponse = {
   submission_lang: SupportedLang;
   answers: Record<string, any>;
   attachments?: string[] | null;
+  quiz_score?: QuizSubmissionScore | null;
+  proctor_log?: ProctoringLog | null;
   submitted_at: string;
 };
 

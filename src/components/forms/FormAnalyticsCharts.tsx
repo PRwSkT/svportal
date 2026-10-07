@@ -33,6 +33,10 @@ import {
   Download,
   Hash,
   ExternalLink,
+  Award,
+  ShieldCheck,
+  ShieldAlert,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface FormAnalyticsChartsProps {
@@ -111,6 +115,62 @@ export function FormAnalyticsCharts({ form, fields, responses }: FormAnalyticsCh
     ].filter((item) => item.count > 0);
   }, [responses]);
 
+  // Quiz Specific Analytics
+  const isQuiz = Boolean(form.quiz_settings?.is_quiz);
+
+  const quizAnalytics = useMemo(() => {
+    if (!isQuiz) return null;
+    const scored = responses.filter((r) => Boolean(r.quiz_score));
+    if (!scored.length) return null;
+
+    const brackets = [
+      { range: '80-100%', count: 0, label: 'ดีเยี่ยม (80-100%)', color: '#059669' },
+      { range: '60-79%', count: 0, label: 'ผ่านเกณฑ์ (60-79%)', color: '#1B3A6B' },
+      { range: '40-59%', count: 0, label: 'พอใช้ (40-59%)', color: '#D97706' },
+      { range: '0-39%', count: 0, label: 'ต้องปรับปรุง (0-39%)', color: '#DC2626' },
+    ];
+
+    let passedCount = 0;
+    let failedCount = 0;
+    let cleanProctor = 0;
+    let suspiciousProctor = 0;
+    let flaggedProctor = 0;
+
+    scored.forEach((r) => {
+      const pct = r.quiz_score?.percentage ?? 0;
+      if (pct >= 80) brackets[0].count++;
+      else if (pct >= 60) brackets[1].count++;
+      else if (pct >= 40) brackets[2].count++;
+      else brackets[3].count++;
+
+      if (r.quiz_score?.passed) passedCount++;
+      else failedCount++;
+
+      const pStatus = r.proctor_log?.integrity_status;
+      if (pStatus === 'flagged') flaggedProctor++;
+      else if (pStatus === 'suspicious') suspiciousProctor++;
+      else cleanProctor++;
+    });
+
+    const passFailData = [
+      { name: 'สอบผ่าน', count: passedCount, color: '#059669' },
+      { name: 'ไม่ผ่าน', count: failedCount, color: '#DC2626' },
+    ].filter((item) => item.count > 0);
+
+    const proctorData = [
+      { name: 'ปกติ (สะอาด)', count: cleanProctor, color: '#059669' },
+      { name: 'มีข้อสงสัย', count: suspiciousProctor, color: '#D97706' },
+      { name: 'น่าสงสัยสูง', count: flaggedProctor, color: '#DC2626' },
+    ].filter((item) => item.count > 0);
+
+    return {
+      scoredCount: scored.length,
+      brackets,
+      passFailData,
+      proctorData,
+    };
+  }, [isQuiz, responses]);
+
   if (!responses.length) {
     return (
       <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-12 text-center">
@@ -125,6 +185,125 @@ export function FormAnalyticsCharts({ form, fields, responses }: FormAnalyticsCh
 
   return (
     <div className="space-y-6">
+      {/* ── Quiz Analytics Section (if in quiz mode) ── */}
+      {quizAnalytics && (
+        <div className="bg-gradient-to-br from-indigo-50/50 via-slate-50 to-white rounded-2xl border border-indigo-200/90 p-5 shadow-xs space-y-5">
+          <div className="flex items-center justify-between pb-3 border-b border-indigo-100">
+            <div className="flex items-center gap-2">
+              <Award className="w-5 h-5 text-indigo-700" />
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  สถิติคะแนนสอบและการกระจายตัว (Exam Score Distribution)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  วิเคราะห์ผลคะแนนจากการสอบออนไลน์ {quizAnalytics.scoredCount} ชุด
+                </p>
+              </div>
+            </div>
+            <span className="text-xs font-bold px-3 py-1 rounded-full bg-indigo-100 text-indigo-800">
+              โหมดข้อสอบ
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Score Brackets Bar Chart */}
+            <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200/80 p-4">
+              <div className="text-xs font-bold text-slate-800 mb-1">
+                การแจกแจงช่วงคะแนนของผู้เข้าสอบ
+              </div>
+              <p className="text-[11px] text-slate-500 mb-3">จำนวนผู้สอบในแต่ละช่วงคะแนน</p>
+              <div className="h-48 w-full">
+                {isMounted ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={quizAnalytics.brackets} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                      <XAxis dataKey="range" tick={{ fontSize: 11, fill: '#64748B' }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748B' }} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#1E293B',
+                          borderRadius: '10px',
+                          color: '#FFF',
+                          fontSize: '12px',
+                          border: 'none',
+                        }}
+                        formatter={(val: any) => [`${val} คน`, 'จำนวนผู้เข้าสอบ']}
+                      />
+                      <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                        {quizAnalytics.brackets.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Pass vs Fail & Proctoring Pie Charts */}
+            <div className="bg-white rounded-xl border border-slate-200/80 p-4 space-y-4">
+              <div>
+                <div className="text-xs font-bold text-slate-800 mb-1">
+                  สัดส่วนการสอบผ่าน / ไม่ผ่าน
+                </div>
+                <div className="h-32 w-full">
+                  {isMounted && quizAnalytics.passFailData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={quizAnalytics.passFailData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={25}
+                          outerRadius={45}
+                          paddingAngle={3}
+                          dataKey="count"
+                        >
+                          {quizAnalytics.passFailData.map((entry, index) => (
+                            <Cell key={`pf-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(val: any) => [`${val} คน`, 'จำนวน']} />
+                        <Legend wrapperStyle={{ fontSize: '11px' }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100">
+                <div className="text-xs font-bold text-slate-800 mb-1">
+                  ดัชนีความซื่อสัตย์ (Proctoring Health)
+                </div>
+                <div className="h-28 w-full">
+                  {isMounted && quizAnalytics.proctorData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={quizAnalytics.proctorData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={20}
+                          outerRadius={40}
+                          paddingAngle={3}
+                          dataKey="count"
+                        >
+                          {quizAnalytics.proctorData.map((entry, index) => (
+                            <Cell key={`proc-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(val: any) => [`${val} คน`, 'จำนวน']} />
+                        <Legend wrapperStyle={{ fontSize: '11px' }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Top Overview: Timeline & Language Charts ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Timeline Chart */}

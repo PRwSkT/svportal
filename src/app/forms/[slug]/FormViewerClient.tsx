@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { FormDefinition, FormField, SupportedLang } from '@/types';
+import { FormDefinition, FormField, SupportedLang, QuizSubmissionScore, ProctoringLog, ProctorViolationItem } from '@/types';
 import { createClient } from '@/lib/supabase/client';
 import { compressImage } from '@/lib/image-compression';
 import { toast } from 'sonner';
@@ -11,7 +11,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle2, AlertCircle, Upload, Star, Check, Globe,
   Lock, ArrowRight, Loader2, RefreshCw, FileText, ChevronRight,
-  Info, Image as ImageIcon, Search, UserCheck
+  Info, Image as ImageIcon, Search, UserCheck, Shield, ShieldAlert,
+  ShieldCheck, Timer, AlertOctagon, Maximize2, Minimize2, Award,
+  XCircle, Clock, AlertTriangle, Eye, CheckCircle
 } from 'lucide-react';
 
 const UI_TEXT: Record<SupportedLang, {
@@ -104,6 +106,70 @@ export default function FormViewerClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
+
+  // Quiz & Anti-Cheat Proctoring States
+  const isQuiz = Boolean(initialForm.quiz_settings?.is_quiz);
+  const antiCheat = initialForm.quiz_settings?.anti_cheat;
+  const [examStarted, setExamStarted] = useState(!isQuiz);
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(
+    initialForm.quiz_settings?.time_limit_minutes
+      ? initialForm.quiz_settings.time_limit_minutes * 60
+      : null
+  );
+  const [timeSpentSeconds, setTimeSpentSeconds] = useState<number>(0);
+  const [isInFullscreen, setIsInFullscreen] = useState(false);
+  const [tabSwitchCount, setTabSwitchCount] = useState<number>(0);
+  const [copyAttemptCount, setCopyAttemptCount] = useState<number>(0);
+  const [fullscreenExitCount, setFullscreenExitCount] = useState<number>(0);
+  const [showWarningModal, setShowWarningModal] = useState<boolean>(false);
+  const [warningModalReason, setWarningModalReason] = useState<string>('');
+  const [quizScoreResult, setQuizScoreResult] = useState<QuizSubmissionScore | null>(null);
+
+  const proctorLogRef = useRef<ProctoringLog>({
+    tab_switch_count: 0,
+    copy_attempt_count: 0,
+    fullscreen_exit_count: 0,
+    started_at: new Date().toISOString(),
+    submitted_at: '',
+    total_away_seconds: 0,
+    violations: [],
+  });
+
+  const recordViolation = useCallback((type: ProctorViolationItem['type'], details?: string) => {
+    const item: ProctorViolationItem = {
+      type,
+      timestamp: new Date().toISOString(),
+      details,
+    };
+    proctorLogRef.current.violations.push(item);
+    if (type === 'tab_switch' || type === 'window_blur') {
+      proctorLogRef.current.tab_switch_count += 1;
+      setTabSwitchCount(proctorLogRef.current.tab_switch_count);
+    } else if (type === 'copy_attempt' || type === 'paste_attempt') {
+      proctorLogRef.current.copy_attempt_count += 1;
+      setCopyAttemptCount(proctorLogRef.current.copy_attempt_count);
+    } else if (type === 'fullscreen_exit') {
+      proctorLogRef.current.fullscreen_exit_count += 1;
+      setFullscreenExitCount(proctorLogRef.current.fullscreen_exit_count);
+    }
+  }, []);
+
+  const enterFullscreen = async () => {
+    try {
+      if (document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen();
+        setIsInFullscreen(true);
+      }
+    } catch (err) {
+      console.warn('Fullscreen request blocked or not supported', err);
+    }
+  };
+
+  const formatTimer = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
 
   // Student Suggestion & Autofill States
   const [studentSuggestions, setStudentSuggestions] = useState<Array<{ id: string; name: string; first_name: string; last_name: string; grade: string }>>([]);
@@ -283,46 +349,206 @@ export default function FormViewerClient({
     }
   };
 
-  // Form Submission
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Timer Effect for Quiz Countdown
+  useEffect(() => {
+    if (!isQuiz || !examStarted || isSubmitted) return;
 
-    // 1. Validation check (skip non-input fields)
-    const nonInputTypes = ['section_header', 'image', 'info_text'];
-    const errors: Record<string, boolean> = {};
-    let hasError = false;
+    const timer = setInterval(() => {
+      setTimeSpentSeconds((prev) => prev + 1);
 
-    for (const field of initialFields) {
-      if (field.is_required && !nonInputTypes.includes(field.field_type)) {
-        const val = answers[field.field_key];
-        const isEmpty =
-          val === undefined ||
-          val === null ||
-          val === '' ||
-          (Array.isArray(val) && val.length === 0);
+      setRemainingSeconds((prev) => {
+        if (prev === null) return null;
+        if (prev <= 1) {
+          clearInterval(timer);
+          toast.warning('หมดเวลาการสอบ! ระบบกำลังส่งคำตอบอัตโนมัติ');
+          handleAutoSubmit('หมดเวลาการสอบ (Time Expired)');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
-        if (isEmpty) {
-          errors[field.field_key] = true;
-          hasError = true;
+    return () => clearInterval(timer);
+  }, [isQuiz, examStarted, isSubmitted]);
+
+  // Fullscreen state listener
+  useEffect(() => {
+    const handleFsChange = () => {
+      const isFs = Boolean(document.fullscreenElement);
+      setIsInFullscreen(isFs);
+      if (!isFs && isQuiz && examStarted && !isSubmitted && antiCheat?.enforce_fullscreen) {
+        recordViolation('fullscreen_exit', 'ออกจากโหมดเต็มหน้าจอ');
+        setWarningModalReason('คุณออกจากโหมดเต็มหน้าจอ กรุณากลับเข้าสู่โหมดเต็มหน้าจอเพื่อทำข้อสอบต่อตามระเบียบการสอบ');
+        setShowWarningModal(true);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, [isQuiz, examStarted, isSubmitted, antiCheat?.enforce_fullscreen, recordViolation]);
+
+  // Anti-Cheat Proctoring Event Listeners
+  useEffect(() => {
+    if (!isQuiz || !examStarted || isSubmitted) return;
+
+    let awayStart: number | null = null;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        awayStart = Date.now();
+        recordViolation('tab_switch', 'สลับหน้าต่างหรือแท็บเบราว์เซอร์');
+
+        const currentSwitches = proctorLogRef.current.tab_switch_count;
+        const maxSwitches = antiCheat?.max_tab_switches ?? 3;
+
+        if (antiCheat?.auto_submit_on_violation && currentSwitches >= maxSwitches) {
+          handleAutoSubmit(`สลับหน้าต่างเกินจำนวนที่อนุญาต (${maxSwitches} ครั้ง)`);
+        } else if (antiCheat?.detect_tab_switch) {
+          setWarningModalReason(`ตรวจพบการสลับหน้าต่างหรือแท็บ! (ครั้งที่ ${currentSwitches} จาก ${maxSwitches} ครั้งที่อนุญาต) หากเกินกำหนดระบบจะส่งข้อสอบทันที`);
+          setShowWarningModal(true);
+        }
+      } else if (document.visibilityState === 'visible' && awayStart) {
+        const awaySec = Math.round((Date.now() - awayStart) / 1000);
+        proctorLogRef.current.total_away_seconds += awaySec;
+        awayStart = null;
+      }
+    };
+
+    const handleWindowBlur = () => {
+      if (document.visibilityState === 'visible') {
+        recordViolation('window_blur', 'หน้าต่างเบราว์เซอร์สูญเสียโฟกัส');
+      }
+    };
+
+    const handleCopyCut = (e: ClipboardEvent) => {
+      if (antiCheat?.block_clipboard) {
+        e.preventDefault();
+        recordViolation('copy_attempt', 'พยายามคัดลอกข้อความ');
+        toast.error('ไม่อนุญาตให้คัดลอกข้อความในขณะสอบ');
+      }
+    };
+
+    const handlePaste = (e: ClipboardEvent) => {
+      if (antiCheat?.block_clipboard) {
+        e.preventDefault();
+        recordViolation('paste_attempt', 'พยายามวางข้อความ');
+        toast.error('ไม่อนุญาตให้วางข้อความในขณะสอบ');
+      }
+    };
+
+    const handleContextMenu = (e: MouseEvent) => {
+      if (antiCheat?.block_right_click) {
+        e.preventDefault();
+        toast.warning('ไม่อนุญาตให้คลิกขวาในโหมดข้อสอบ');
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!antiCheat?.block_keyboard_shortcuts) return;
+
+      if (e.key === 'F12' || e.key === 'PrintScreen') {
+        e.preventDefault();
+        recordViolation('dev_tools', `กดปุ่ม ${e.key}`);
+        toast.error(`ไม่อนุญาตให้ใช้ปุ่ม ${e.key} ขณะสอบ`);
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && ['i', 'I', 'c', 'C', 'j', 'J'].includes(e.key)) {
+        e.preventDefault();
+        recordViolation('dev_tools', 'พยายามเปิด DevTools');
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'u' || e.key === 'U')) {
+        e.preventDefault();
+        return;
+      }
+
+      if (antiCheat?.block_clipboard && (e.ctrlKey || e.metaKey) && ['c', 'x', 'a'].includes(e.key.toLowerCase())) {
+        e.preventDefault();
+        toast.error('ไม่อนุญาตให้ใช้คีย์ลัดคัดลอกข้อความ');
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('copy', handleCopyCut);
+    window.addEventListener('cut', handleCopyCut);
+    window.addEventListener('paste', handlePaste);
+    window.addEventListener('contextmenu', handleContextMenu);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleWindowBlur);
+      window.removeEventListener('copy', handleCopyCut);
+      window.removeEventListener('cut', handleCopyCut);
+      window.removeEventListener('paste', handlePaste);
+      window.removeEventListener('contextmenu', handleContextMenu);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isQuiz, examStarted, isSubmitted, antiCheat, recordViolation]);
+
+  // Start Exam Handler
+  const handleStartExam = async () => {
+    if (antiCheat?.enforce_fullscreen) {
+      await enterFullscreen();
+    }
+    proctorLogRef.current.started_at = new Date().toISOString();
+    setExamStarted(true);
+    toast.success('เริ่มทำข้อสอบ ขอให้ตั้งใจทำข้อสอบอย่างเต็มที่');
+  };
+
+  // Form Submission Execution
+  const executeSubmit = async (isForced: boolean = false, forcedReason?: string) => {
+    if (isSubmitting) return;
+
+    // 1. Validation check (skip if forced submission e.g. auto submit on time out or cheating strike)
+    if (!isForced) {
+      const nonInputTypes = ['section_header', 'image', 'info_text'];
+      const errors: Record<string, boolean> = {};
+      let hasError = false;
+
+      for (const field of initialFields) {
+        if (field.is_required && !nonInputTypes.includes(field.field_type)) {
+          const val = answers[field.field_key];
+          const isEmpty =
+            val === undefined ||
+            val === null ||
+            val === '' ||
+            (Array.isArray(val) && val.length === 0);
+
+          if (isEmpty) {
+            errors[field.field_key] = true;
+            hasError = true;
+          }
         }
       }
-    }
 
-    if (hasError) {
-      setValidationErrors(errors);
-      toast.error(t.validationError);
-      // Scroll to first error
-      const firstErrorKey = Object.keys(errors)[0];
-      const el = document.getElementById(`field-${firstErrorKey}`);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (hasError) {
+        setValidationErrors(errors);
+        toast.error(t.validationError);
+        const firstErrorKey = Object.keys(errors)[0];
+        const el = document.getElementById(`field-${firstErrorKey}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        return;
       }
-      return;
     }
 
     // 2. Submit to API
     setIsSubmitting(true);
     try {
+      proctorLogRef.current.submitted_at = new Date().toISOString();
+      if (forcedReason) {
+        proctorLogRef.current.violations.push({
+          type: 'tab_switch',
+          timestamp: new Date().toISOString(),
+          details: `ระบบส่งข้อสอบอัตโนมัติ: ${forcedReason}`,
+        });
+      }
+
       const res = await fetch(`/api/forms/${initialForm.slug}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -330,6 +556,8 @@ export default function FormViewerClient({
           answers,
           attachments: Object.values(attachments),
           lang,
+          proctorLog: isQuiz ? proctorLogRef.current : undefined,
+          timeSpentSeconds: isQuiz ? timeSpentSeconds : undefined,
         }),
       });
 
@@ -338,7 +566,19 @@ export default function FormViewerClient({
         throw new Error(data.error || 'Submission failed');
       }
 
+      if (data.quiz_score) {
+        setQuizScoreResult(data.quiz_score);
+      }
+
       setIsSubmitted(true);
+      setShowWarningModal(false);
+
+      if (document.fullscreenElement) {
+        try {
+          await document.exitFullscreen();
+        } catch (_) {}
+      }
+
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
       console.error('Submission error:', err);
@@ -348,7 +588,312 @@ export default function FormViewerClient({
     }
   };
 
-  // Thank You / Success View
+  const handleAutoSubmit = (reason: string) => {
+    executeSubmit(true, reason);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await executeSubmit(false);
+  };
+
+  // Exam Lobby / Briefing View before starting test
+  if (isQuiz && !examStarted && !isSubmitted) {
+    const formTitle = getLocalized(initialForm.title);
+    const formDesc = getLocalized(initialForm.description);
+    const totalQuestions = initialFields.filter(
+      (f) => !['section_header', 'image', 'info_text'].includes(f.field_type)
+    ).length;
+    const totalPossiblePoints = initialFields
+      .filter((f) => !['section_header', 'image', 'info_text'].includes(f.field_type))
+      .reduce((sum, f) => sum + (f.quiz_config?.points ?? 1), 0);
+
+    return (
+      <div className="min-h-screen bg-[#F5F4F2] py-12 px-4 sm:px-6 flex items-center justify-center font-sans">
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-3xl max-w-xl w-full p-8 sm:p-10 shadow-xl border border-slate-200 text-left relative overflow-hidden"
+        >
+          {/* Top Brand Strip */}
+          <div className="h-3 bg-[#7B1C3E] absolute top-0 left-0 right-0" />
+
+          {/* School Emblem & Header */}
+          <div className="flex items-center justify-between gap-3 mb-6 mt-2">
+            <div className="flex items-center gap-3">
+              <Image
+                src="/logo2.png"
+                alt="School Logo"
+                width={120}
+                height={60}
+                className="h-10 w-auto object-contain"
+              />
+              <div className="border-l border-slate-200 pl-3">
+                <span className="text-xs font-bold text-[#7B1C3E] block">
+                  {t.schoolName}
+                </span>
+                <span className="text-[11px] text-slate-500">ระบบสอบออนไลน์มาตรฐาน</span>
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
+              <Award className="w-3.5 h-3.5 text-amber-600" />
+              <span>โหมดข้อสอบ</span>
+            </span>
+          </div>
+
+          <h1 className="text-2xl font-black text-slate-900 leading-snug mb-3">
+            {formTitle}
+          </h1>
+
+          {formDesc && (
+            <p className="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed mb-6">
+              {formDesc}
+            </p>
+          )}
+
+          {/* Exam Specs Grid */}
+          <div className="grid grid-cols-3 gap-3 mb-6">
+            <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl text-center">
+              <Timer className="w-5 h-5 text-indigo-600 mx-auto mb-1" />
+              <div className="text-[11px] text-slate-500 font-medium">เวลาทำข้อสอบ</div>
+              <div className="text-sm font-bold text-slate-900 mt-0.5">
+                {initialForm.quiz_settings?.time_limit_minutes
+                  ? `${initialForm.quiz_settings.time_limit_minutes} นาที`
+                  : 'ไม่จำกัดเวลา'}
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl text-center">
+              <FileText className="w-5 h-5 text-blue-600 mx-auto mb-1" />
+              <div className="text-[11px] text-slate-500 font-medium">จำนวนข้อสอบ</div>
+              <div className="text-sm font-bold text-slate-900 mt-0.5">
+                {totalQuestions} ข้อ ({totalPossiblePoints} คะแนน)
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl text-center">
+              <Award className="w-5 h-5 text-emerald-600 mx-auto mb-1" />
+              <div className="text-[11px] text-slate-500 font-medium">เกณฑ์ผ่าน</div>
+              <div className="text-sm font-bold text-emerald-700 mt-0.5">
+                {initialForm.quiz_settings?.passing_score_percentage ?? 60}%
+              </div>
+            </div>
+          </div>
+
+          {/* Anti-Cheating Rules Notice */}
+          <div className="bg-gradient-to-br from-amber-50/70 to-orange-50/40 border border-amber-200/90 rounded-2xl p-4 sm:p-5 mb-8">
+            <div className="flex items-center gap-2 text-amber-900 font-bold text-sm mb-3">
+              <ShieldAlert className="w-4 h-4 text-amber-600" />
+              <span>กฎระเบียบและระบบตรวจจับการทุจริต (Online Proctoring)</span>
+            </div>
+            <ul className="text-xs text-amber-950/80 space-y-2 leading-relaxed">
+              {antiCheat?.enforce_fullscreen && (
+                <li className="flex items-start gap-2">
+                  <span className="text-amber-600 font-bold">•</span>
+                  <span><strong>บังคับเต็มหน้าจอ:</strong> ระบบจะขยายหน้าต่างเป็นแบบเต็มหน้าจอ (Fullscreen) ตลอดระยะเวลาทำข้อสอบ</span>
+                </li>
+              )}
+              {antiCheat?.detect_tab_switch && (
+                <li className="flex items-start gap-2">
+                  <span className="text-amber-600 font-bold">•</span>
+                  <span><strong>ตรวจจับการสลับหน้าจอ:</strong> ห้ามสลับแท็บหรือเปิดโปรแกรมอื่น อนุญาตให้เกิดข้อผิดพลาดได้ไม่เกิน <strong>{antiCheat.max_tab_switches ?? 3} ครั้ง</strong> หากเกินระบบจะส่งข้อสอบทันที</span>
+                </li>
+              )}
+              {antiCheat?.block_clipboard && (
+                <li className="flex items-start gap-2">
+                  <span className="text-amber-600 font-bold">•</span>
+                  <span><strong>ปิดกั้นคลิปบอร์ด:</strong> ไม่อนุญาตให้ Copy, Cut หรือ Paste ข้อความ</span>
+                </li>
+              )}
+              {antiCheat?.block_right_click && (
+                <li className="flex items-start gap-2">
+                  <span className="text-amber-600 font-bold">•</span>
+                  <span><strong>ปิดกั้นคลิกขวา:</strong> ไม่อนุญาตให้เปิด Context Menu</span>
+                </li>
+              )}
+              <li className="flex items-start gap-2">
+                <span className="text-amber-600 font-bold">•</span>
+                <span><strong>ส่งข้อสอบอัตโนมัติ:</strong> เมื่อหมดเวลา หรือเมื่อระบบตรวจพบการละเมิดกฎ ระบบจะส่งคะแนนทันที</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* Start Exam Button */}
+          <button
+            onClick={handleStartExam}
+            className="w-full flex items-center justify-center gap-2.5 py-4 px-6 bg-[#7B1C3E] hover:bg-[#631430] active:scale-[0.99] text-white rounded-2xl font-bold text-base shadow-lg hover:shadow-xl transition-all"
+          >
+            <Maximize2 className="w-5 h-5" />
+            <span>เข้าสู่โหมดทำข้อสอบ (เริ่มทำข้อสอบ)</span>
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Quiz Results View
+  if (isSubmitted && isQuiz && quizScoreResult) {
+    const passed = quizScoreResult.passed;
+    const formTitle = getLocalized(initialForm.title);
+
+    return (
+      <div className="min-h-screen bg-[#F5F4F2] py-12 px-4 sm:px-6 flex items-center justify-center font-sans">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white rounded-3xl max-w-2xl w-full p-8 sm:p-10 shadow-xl border border-slate-200 text-center relative overflow-hidden"
+        >
+          {/* Top Brand Strip */}
+          <div
+            className={`h-3 absolute top-0 left-0 right-0 ${
+              passed ? 'bg-emerald-500' : 'bg-rose-500'
+            }`}
+          />
+
+          {/* Logo */}
+          <div className="mb-4 mt-2">
+            <Image
+              src="/logo2.png"
+              alt="School Logo"
+              width={140}
+              height={70}
+              className="h-12 w-auto mx-auto object-contain"
+            />
+          </div>
+
+          {/* Pass/Fail Icon */}
+          <div
+            className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${
+              passed
+                ? 'bg-emerald-50 border-2 border-emerald-300 text-emerald-600'
+                : 'bg-rose-50 border-2 border-rose-300 text-rose-600'
+            }`}
+          >
+            {passed ? <CheckCircle className="w-10 h-10" /> : <XCircle className="w-10 h-10" />}
+          </div>
+
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mb-1">
+            {passed ? 'ยินดีด้วย! คุณสอบผ่านเกณฑ์' : 'ยังไม่ผ่านเกณฑ์การทดสอบ'}
+          </h2>
+          <p className="text-sm text-slate-500 mb-6">
+            แบบทดสอบ: {formTitle}
+          </p>
+
+          {/* Score Banner */}
+          <div className="bg-slate-50 border border-slate-200/90 rounded-3xl p-6 mb-6">
+            <div className="text-xs uppercase tracking-wider font-bold text-slate-400 mb-1">
+              คะแนนที่ได้รับ (Your Score)
+            </div>
+            <div className="flex items-baseline justify-center gap-2">
+              <span className="text-4xl sm:text-5xl font-black text-slate-900">
+                {quizScoreResult.total_score}
+              </span>
+              <span className="text-xl font-bold text-slate-400">
+                / {quizScoreResult.max_score}
+              </span>
+            </div>
+            <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-white border border-slate-200 text-slate-700 shadow-2xs">
+              <span>{quizScoreResult.percentage}%</span>
+              <span>•</span>
+              <span>เกณฑ์ผ่าน {initialForm.quiz_settings?.passing_score_percentage ?? 60}%</span>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-slate-200/80 grid grid-cols-2 gap-4 text-xs text-slate-600">
+              <div>
+                <span className="text-slate-400 block mb-0.5">เวลาที่ใช้</span>
+                <span className="font-semibold text-slate-800">
+                  {Math.floor(quizScoreResult.time_spent_seconds / 60)} นาที {quizScoreResult.time_spent_seconds % 60} วินาที
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block mb-0.5">การตรวจสอบความซื่อสัตย์</span>
+                <span className="font-semibold inline-flex items-center gap-1">
+                  {tabSwitchCount === 0 && copyAttemptCount === 0 ? (
+                    <span className="text-emerald-600">🟢 สมบูรณ์ (ไม่พบข้อสงสัย)</span>
+                  ) : (
+                    <span className="text-amber-600">⚠️ สลับจอ {tabSwitchCount} ครั้ง</span>
+                  )}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Question Breakdown Review (if show_correct_answers) */}
+          {initialForm.quiz_settings?.show_correct_answers && quizScoreResult.breakdown && (
+            <div className="text-left mb-6">
+              <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                <FileText className="w-4 h-4 text-indigo-600" />
+                <span>เฉลยคำตอบและคำอธิบาย (Question Review)</span>
+              </h3>
+              <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                {initialFields
+                  .filter((f) => !['section_header', 'image', 'info_text'].includes(f.field_type))
+                  .map((field, idx) => {
+                    const item = quizScoreResult.breakdown[field.field_key];
+                    if (!item) return null;
+                    return (
+                      <div
+                        key={field.id}
+                        className={`p-4 rounded-2xl border text-xs leading-relaxed ${
+                          item.is_correct
+                            ? 'bg-emerald-50/40 border-emerald-200'
+                            : 'bg-rose-50/40 border-rose-200'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <span className="font-bold text-slate-800">
+                            ข้อที่ {idx + 1}. {getLocalized(field.label)}
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-md font-bold text-[11px] shrink-0 ${
+                              item.is_correct
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-rose-100 text-rose-800'
+                            }`}
+                          >
+                            {item.points_awarded} / {item.max_points} คะแนน
+                          </span>
+                        </div>
+                        <div className="space-y-1 text-slate-600">
+                          <div>
+                            <span className="text-slate-400">คำตอบของคุณ: </span>
+                            <span className="font-medium text-slate-800">
+                              {Array.isArray(item.student_answer)
+                                ? item.student_answer.join(', ')
+                                : String(item.student_answer || '-')}
+                            </span>
+                          </div>
+                          {item.correct_answers && item.correct_answers.length > 0 && (
+                            <div>
+                              <span className="text-emerald-600 font-semibold">คำตอบที่ถูกต้อง: </span>
+                              <span className="font-bold text-emerald-800">
+                                {item.correct_answers.join(', ')}
+                              </span>
+                            </div>
+                          )}
+                          {item.explanation && (
+                            <div className="mt-2 pt-2 border-t border-slate-200/60 text-slate-500 italic">
+                              💡 {item.explanation}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
+          <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs text-slate-500 mb-6">
+            <div className="font-semibold text-slate-700 mb-1">{t.schoolName}</div>
+            <div>บันทึกผลการสอบและรายงานความซื่อสัตย์เข้าสู่ระบบบุคลากรเรียบร้อยแล้ว</div>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Regular Thank You / Success View
   if (isSubmitted) {
     const thankTitle = getLocalized(initialForm.thank_you_title, t.submitSuccessTitle);
     const thankMsg = getLocalized(initialForm.thank_you_message, t.submitSuccessDesc);
@@ -486,8 +1031,104 @@ export default function FormViewerClient({
         </div>
       )}
 
+      {/* Quiz Proctoring Top Bar */}
+      {isQuiz && examStarted && (
+        <div className="bg-slate-900 text-white sticky top-[60px] z-20 shadow-md border-b border-slate-800 px-4 py-2.5">
+          <div className="max-w-3xl mx-auto flex items-center justify-between text-xs gap-3">
+            {/* Countdown Timer */}
+            <div className="flex items-center gap-2">
+              <Clock
+                className={`w-4 h-4 ${
+                  remainingSeconds !== null && remainingSeconds < 300
+                    ? 'text-rose-400 animate-pulse'
+                    : 'text-amber-400'
+                }`}
+              />
+              <span className="text-slate-300">เวลาที่เหลือ:</span>
+              <span
+                className={`font-mono text-sm font-bold ${
+                  remainingSeconds !== null && remainingSeconds < 300
+                    ? 'text-rose-400 animate-pulse'
+                    : 'text-white'
+                }`}
+              >
+                {remainingSeconds !== null ? formatTimer(remainingSeconds) : 'ไม่จำกัด'}
+              </span>
+            </div>
+
+            {/* Proctoring Status */}
+            <div className="hidden sm:flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span className="text-slate-300 text-[11px]">ระบบคุมสอบกำลังทำงาน</span>
+            </div>
+
+            {/* Tab Switch Strike Counter */}
+            {antiCheat?.detect_tab_switch && (
+              <div className="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700">
+                <AlertTriangle
+                  className={`w-3.5 h-3.5 ${
+                    tabSwitchCount > 0 ? 'text-amber-400' : 'text-slate-400'
+                  }`}
+                />
+                <span className="text-[11px] text-slate-300">
+                  สลับจอ: <strong className={tabSwitchCount > 0 ? 'text-amber-400' : 'text-white'}>{tabSwitchCount}</strong> / {antiCheat.max_tab_switches ?? 3}
+                </span>
+              </div>
+            )}
+
+            {/* Fullscreen Button */}
+            {!isInFullscreen && antiCheat?.enforce_fullscreen && (
+              <button
+                type="button"
+                onClick={enterFullscreen}
+                className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold rounded-lg text-[11px] flex items-center gap-1 transition-colors"
+              >
+                <Maximize2 className="w-3 h-3" />
+                <span>ขยายเต็มจอ</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Anti-Cheat Violation Warning Modal */}
+      {showWarningModal && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 text-center shadow-2xl border-4 border-amber-400"
+          >
+            <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-4">
+              <AlertOctagon className="w-9 h-9" />
+            </div>
+            <h3 className="text-xl font-black text-slate-900 mb-2">
+              คำเตือนการสอบ (Proctor Warning)
+            </h3>
+            <p className="text-sm text-slate-700 leading-relaxed mb-6">
+              {warningModalReason}
+            </p>
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 mb-6">
+              การกระทำทั้งหมดถูกบันทึกในรายงานความซื่อสัตย์ประจำตัวผู้สอบ
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                setShowWarningModal(false);
+                if (antiCheat?.enforce_fullscreen) {
+                  await enterFullscreen();
+                }
+              }}
+              className="w-full py-3 px-5 bg-[#7B1C3E] hover:bg-[#631430] text-white font-bold rounded-xl text-sm transition-all shadow-md"
+            >
+              รับทราบและกลับสู่การสอบ
+            </button>
+          </motion.div>
+        </div>
+      )}
+
       {/* Main Form Container */}
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 pt-6">
+      <main className={`max-w-3xl mx-auto px-4 sm:px-6 pt-6 ${antiCheat?.block_clipboard ? 'select-none' : ''}`}>
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Form Header Banner (Default school banner or custom uploaded banner) */}
           {initialForm.banner_url !== 'none' && (
@@ -643,16 +1284,24 @@ export default function FormViewerClient({
                       : 'border-slate-200/90'
                   }`}
                 >
-                  {/* Field Label & Required asterisk */}
-                  <div className="mb-3">
-                    <label className="block text-sm font-bold text-slate-900 leading-snug">
-                      {fieldLabel}
-                      {field.is_required && (
-                        <span className="text-rose-500 ml-1 text-base leading-none">*</span>
+                  {/* Field Label & Required asterisk & Points badge */}
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-900 leading-snug">
+                        {fieldLabel}
+                        {field.is_required && (
+                          <span className="text-rose-500 ml-1 text-base leading-none">*</span>
+                        )}
+                      </label>
+                      {fieldHelp && (
+                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">{fieldHelp}</p>
                       )}
-                    </label>
-                    {fieldHelp && (
-                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">{fieldHelp}</p>
+                    </div>
+                    {isQuiz && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0 shadow-2xs">
+                        <Award className="w-3.5 h-3.5 text-amber-600" />
+                        <span>{field.quiz_config?.points ?? 1} คะแนน</span>
+                      </span>
                     )}
                   </div>
 
@@ -947,22 +1596,27 @@ export default function FormViewerClient({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full flex items-center justify-center gap-2 py-3.5 px-6 bg-[#7B1C3E] hover:bg-[#631430] active:scale-[0.99] text-white rounded-2xl font-bold text-base shadow-md hover:shadow-lg transition-all disabled:opacity-50"
+              className={`w-full flex items-center justify-center gap-2 py-3.5 px-6 active:scale-[0.99] text-white rounded-2xl font-bold text-base shadow-md hover:shadow-lg transition-all disabled:opacity-50 ${
+                isQuiz
+                  ? 'bg-[#1B3A6B] hover:bg-[#122849]'
+                  : 'bg-[#7B1C3E] hover:bg-[#631430]'
+              }`}
             >
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>{t.submitting}</span>
+                  <span>{isQuiz ? 'กำลังส่งและประมวลผลคะแนน...' : t.submitting}</span>
                 </>
               ) : (
                 <>
-                  <span>{t.submitButton}</span>
-                  <ChevronRight className="w-5 h-5" />
+                  {isQuiz ? <Award className="w-5 h-5" /> : null}
+                  <span>{isQuiz ? 'ส่งข้อสอบ (Submit Exam)' : t.submitButton}</span>
+                  {!isQuiz && <ChevronRight className="w-5 h-5" />}
                 </>
               )}
             </button>
             <div className="text-center text-xs text-slate-400 mt-4">
-              {t.schoolName} • ระบบแบบฟอร์มอิเล็กทรอนิกส์มาตรฐานความปลอดภัย
+              {t.schoolName} • ระบบแบบฟอร์มและข้อสอบอิเล็กทรอนิกส์มาตรฐานความปลอดภัย
             </div>
           </div>
         </form>

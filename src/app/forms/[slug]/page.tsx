@@ -48,7 +48,7 @@ export default async function FormViewerPage({ params }: { params: Promise<{ slu
   }
 
   // 2. Fetch fields
-  const { data: fields } = await supabase
+  const { data: rawFields } = await supabase
     .from('form_fields')
     .select('*')
     .eq('form_id', form.id)
@@ -60,6 +60,21 @@ export default async function FormViewerPage({ params }: { params: Promise<{ slu
     (isSystemAdmin(currentUser.email) ||
       Boolean(currentUser.email?.endsWith('@somkidvittaya.ac.th')));
 
+  // Sanitize fields for quiz taker: hide correct answers and explanations so they cannot be inspected in browser props
+  const fields = ((rawFields || []) as FormField[]).map((field) => {
+    if (!form.quiz_settings?.is_quiz || isStaffOrAdmin) {
+      return field;
+    }
+    if (field.quiz_config) {
+      const { correct_answers, explanation, ...restConfig } = field.quiz_config;
+      return {
+        ...field,
+        quiz_config: restConfig,
+      };
+    }
+    return field;
+  });
+
   // 3. Draft Mode Handling
   if (!form.is_published) {
     if (isStaffOrAdmin) {
@@ -67,7 +82,7 @@ export default async function FormViewerPage({ params }: { params: Promise<{ slu
       return (
         <FormViewerClient
           initialForm={form as FormDefinition}
-          initialFields={(fields || []) as FormField[]}
+          initialFields={fields as FormField[]}
           currentUser={currentUser ? { id: currentUser.id, email: currentUser.email || '' } : null}
           isDraftPreview={true}
         />

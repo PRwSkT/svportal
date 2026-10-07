@@ -12,7 +12,8 @@ import {
   ArrowLeft, Download, Search, Filter, Trash2, Eye,
   BarChart2, FileText, CheckCircle2, Calendar, Globe,
   Loader2, ExternalLink, X, Image as ImageIcon, AlertCircle, QrCode,
-  PieChart, HelpCircle, List, Sparkles, Bot
+  PieChart, HelpCircle, List, Sparkles, Bot,
+  Award, ShieldCheck, ShieldAlert, AlertTriangle, Clock, Timer, CheckCircle, XCircle
 } from 'lucide-react';
 import { FormQRCodeModal } from '@/components/forms/FormQRCodeModal';
 import { NongFahResponsesInsights } from '@/components/forms/NongFahResponsesInsights';
@@ -175,6 +176,18 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
   const enCount = responses.filter(r => r.submission_lang === 'en').length;
   const zhCount = responses.filter(r => r.submission_lang === 'zh').length;
 
+  // Quiz Specific Analytics
+  const isQuiz = Boolean(form?.quiz_settings?.is_quiz);
+  const quizResponses = responses.filter(r => Boolean(r.quiz_score));
+  const scoredCount = quizResponses.length;
+  const passedCount = quizResponses.filter(r => r.quiz_score?.passed).length;
+  const passRate = scoredCount > 0 ? Math.round((passedCount / scoredCount) * 100) : 0;
+  const avgScore = scoredCount > 0
+    ? (quizResponses.reduce((sum, r) => sum + (r.quiz_score?.total_score || 0), 0) / scoredCount).toFixed(1)
+    : '0';
+  const maxPossibleScore = quizResponses[0]?.quiz_score?.max_score || fields.reduce((sum, f) => sum + (f.quiz_config?.points ?? 1), 0);
+  const suspiciousCount = responses.filter(r => r.proctor_log?.integrity_status === 'suspicious' || r.proctor_log?.integrity_status === 'flagged').length;
+
   if (isLoading || !form) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -202,8 +215,10 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
               </Link>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#7B1C3E]/10 text-[#7B1C3E]">
-                    การตอบกลับ (Responses)
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                    isQuiz ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-[#7B1C3E]/10 text-[#7B1C3E]'
+                  }`}>
+                    {isQuiz ? 'ข้อสอบออนไลน์ (Online Quiz)' : 'การตอบกลับ (Responses)'}
                   </span>
                   <span className="text-xs text-slate-400 font-mono">/forms/{form.slug}</span>
                 </div>
@@ -253,37 +268,91 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
           </div>
 
           {/* Quick Metrics */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4">
-              <div className="text-xs font-medium text-slate-500">การตอบกลับทั้งหมด</div>
-              <div className="text-2xl font-bold text-slate-900 mt-1.5">{total}</div>
-              <div className="text-xs text-slate-400 mt-0.5">ชุดข้อมูลที่บันทึกแล้ว</div>
-            </div>
-
-            <div className="bg-emerald-50/60 border border-emerald-200/60 rounded-2xl p-4">
-              <div className="text-xs font-medium text-emerald-800">ภาษาไทย (TH)</div>
-              <div className="text-2xl font-bold text-emerald-950 mt-1.5">
-                {thCount} <span className="text-xs font-normal text-emerald-700">({total > 0 ? Math.round((thCount / total) * 100) : 0}%)</span>
+          {isQuiz ? (
+            /* Quiz Metrics Cards */
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4">
+                <div className="text-xs font-medium text-slate-500">จำนวนผู้เข้าสอบ</div>
+                <div className="text-2xl font-black text-slate-900 mt-1.5">{scoredCount} <span className="text-xs font-normal text-slate-500">คน</span></div>
+                <div className="text-xs text-slate-400 mt-0.5">จากคำตอบทั้งหมด {total} ชุด</div>
               </div>
-              <div className="text-xs text-emerald-700/80 mt-0.5">ตอบด้วยภาษาไทย</div>
-            </div>
 
-            <div className="bg-blue-50/60 border border-blue-200/60 rounded-2xl p-4">
-              <div className="text-xs font-medium text-blue-800">English (EN)</div>
-              <div className="text-2xl font-bold text-blue-950 mt-1.5">
-                {enCount} <span className="text-xs font-normal text-blue-700">({total > 0 ? Math.round((enCount / total) * 100) : 0}%)</span>
+              <div className="bg-amber-50/60 border border-amber-200/70 rounded-2xl p-4">
+                <div className="text-xs font-medium text-amber-800">คะแนนเฉลี่ย</div>
+                <div className="text-2xl font-black text-amber-950 mt-1.5">
+                  {avgScore} <span className="text-xs font-normal text-amber-700">/ {maxPossibleScore}</span>
+                </div>
+                <div className="text-xs text-amber-700/80 mt-0.5">
+                  คิดเป็น {maxPossibleScore > 0 ? Math.round((Number(avgScore) / maxPossibleScore) * 100) : 0}%
+                </div>
               </div>
-              <div className="text-xs text-blue-700/80 mt-0.5">ตอบด้วยภาษาอังกฤษ</div>
-            </div>
 
-            <div className="bg-rose-50/60 border border-rose-200/60 rounded-2xl p-4">
-              <div className="text-xs font-medium text-rose-800">中文 (ZH)</div>
-              <div className="text-2xl font-bold text-rose-950 mt-1.5">
-                {zhCount} <span className="text-xs font-normal text-rose-700">({total > 0 ? Math.round((zhCount / total) * 100) : 0}%)</span>
+              <div className="bg-emerald-50/60 border border-emerald-200/70 rounded-2xl p-4">
+                <div className="text-xs font-medium text-emerald-800">อัตราการสอบผ่าน</div>
+                <div className="text-2xl font-black text-emerald-950 mt-1.5">
+                  {passRate}% <span className="text-xs font-normal text-emerald-700">({passedCount}/{scoredCount})</span>
+                </div>
+                <div className="text-xs text-emerald-700/80 mt-0.5">
+                  เกณฑ์ผ่าน {form.quiz_settings?.passing_score_percentage ?? 60}%
+                </div>
               </div>
-              <div className="text-xs text-rose-700/80 mt-0.5">ตอบด้วยภาษาจีน</div>
+
+              <div className={`border rounded-2xl p-4 ${
+                suspiciousCount > 0
+                  ? 'bg-rose-50/60 border-rose-200 text-rose-950'
+                  : 'bg-indigo-50/60 border-indigo-200 text-indigo-950'
+              }`}>
+                <div className="text-xs font-medium">ความซื่อสัตย์ในการสอบ</div>
+                <div className="text-xl font-black mt-1.5 flex items-center gap-1.5">
+                  {suspiciousCount > 0 ? (
+                    <>
+                      <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+                      <span>พบข้อสงสัย {suspiciousCount} คน</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+                      <span>สะอาด 100%</span>
+                    </>
+                  )}
+                </div>
+                <div className="text-xs opacity-75 mt-0.5">ระบบคุมสอบออนไลน์อัตโนมัติ</div>
+              </div>
             </div>
-          </div>
+          ) : (
+            /* Regular Form Metrics */
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4">
+                <div className="text-xs font-medium text-slate-500">การตอบกลับทั้งหมด</div>
+                <div className="text-2xl font-bold text-slate-900 mt-1.5">{total}</div>
+                <div className="text-xs text-slate-400 mt-0.5">ชุดข้อมูลที่บันทึกแล้ว</div>
+              </div>
+
+              <div className="bg-emerald-50/60 border border-emerald-200/60 rounded-2xl p-4">
+                <div className="text-xs font-medium text-emerald-800">ภาษาไทย (TH)</div>
+                <div className="text-2xl font-bold text-emerald-950 mt-1.5">
+                  {thCount} <span className="text-xs font-normal text-emerald-700">({total > 0 ? Math.round((thCount / total) * 100) : 0}%)</span>
+                </div>
+                <div className="text-xs text-emerald-700/80 mt-0.5">ตอบด้วยภาษาไทย</div>
+              </div>
+
+              <div className="bg-blue-50/60 border border-blue-200/60 rounded-2xl p-4">
+                <div className="text-xs font-medium text-blue-800">English (EN)</div>
+                <div className="text-2xl font-bold text-blue-950 mt-1.5">
+                  {enCount} <span className="text-xs font-normal text-blue-700">({total > 0 ? Math.round((enCount / total) * 100) : 0}%)</span>
+                </div>
+                <div className="text-xs text-blue-700/80 mt-0.5">ตอบด้วยภาษาอังกฤษ</div>
+              </div>
+
+              <div className="bg-rose-50/60 border border-rose-200/60 rounded-2xl p-4">
+                <div className="text-xs font-medium text-rose-800">中文 (ZH)</div>
+                <div className="text-2xl font-bold text-rose-950 mt-1.5">
+                  {zhCount} <span className="text-xs font-normal text-rose-700">({total > 0 ? Math.round((zhCount / total) * 100) : 0}%)</span>
+                </div>
+                <div className="text-xs text-rose-700/80 mt-0.5">ตอบด้วยภาษาจีน</div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -441,12 +510,18 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
                     <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold uppercase text-[11px] tracking-wider">
                       <tr>
                         <th className="py-3.5 px-4 w-12 text-center">#</th>
-                        <th className="py-3.5 px-4 w-40">วันเวลาที่ส่ง</th>
-                        <th className="py-3.5 px-4 w-28">ภาษา</th>
-                        <th className="py-3.5 px-4 w-48">ผู้ตอบฟอร์ม</th>
+                        <th className="py-3.5 px-4 w-36">วันเวลาที่ส่ง</th>
+                        <th className="py-3.5 px-4 w-20">ภาษา</th>
+                        <th className="py-3.5 px-4 w-44">ผู้ตอบ / ผู้เข้าสอบ</th>
+                        {isQuiz && (
+                          <>
+                            <th className="py-3.5 px-4 w-32">คะแนนสอบ</th>
+                            <th className="py-3.5 px-4 w-40">การคุมสอบ / ความซื่อสัตย์</th>
+                          </>
+                        )}
                         <th className="py-3.5 px-4">ตัวอย่างคำตอบแรก</th>
-                        <th className="py-3.5 px-4 w-24 text-center">ไฟล์แนบ</th>
-                        <th className="py-3.5 px-4 w-32 text-right">การจัดการ</th>
+                        <th className="py-3.5 px-4 w-20 text-center">ไฟล์แนบ</th>
+                        <th className="py-3.5 px-4 w-28 text-right">การจัดการ</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -493,6 +568,54 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
                             <td className="py-3.5 px-4 font-medium text-slate-900 truncate max-w-[180px]">
                               {resp.respondent_email || 'บุคคลภายนอก (Public)'}
                             </td>
+                            {isQuiz && (
+                              <>
+                                <td className="py-3.5 px-4">
+                                  {resp.quiz_score ? (
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-bold text-slate-900">
+                                        {resp.quiz_score.total_score} / {resp.quiz_score.max_score}
+                                      </span>
+                                      <span
+                                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                          resp.quiz_score.passed
+                                            ? 'bg-emerald-100 text-emerald-800'
+                                            : 'bg-rose-100 text-rose-800'
+                                        }`}
+                                      >
+                                        {resp.quiz_score.passed ? 'ผ่าน' : 'ไม่ผ่าน'}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-300">-</span>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  {resp.proctor_log ? (
+                                    <div>
+                                      {resp.proctor_log.integrity_status === 'flagged' ? (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                                          <ShieldAlert className="w-3 h-3 text-rose-600" />
+                                          <span>น่าสงสัยสูง ({resp.proctor_log.tab_switch_count} ครั้ง)</span>
+                                        </span>
+                                      ) : resp.proctor_log.integrity_status === 'suspicious' ? (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                          <AlertTriangle className="w-3 h-3 text-amber-600" />
+                                          <span>มีข้อสงสัย ({resp.proctor_log.tab_switch_count} ครั้ง)</span>
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                          <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                                          <span>สะอาด</span>
+                                        </span>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-300">-</span>
+                                  )}
+                                </td>
+                              </>
+                            )}
                             <td className="py-3.5 px-4 truncate max-w-xs text-slate-600">
                               <span className="font-semibold text-slate-800 mr-1.5">
                                 {firstField?.label?.th}:
@@ -635,6 +758,108 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
 
               {/* Modal Body: Q&A list */}
               <div className="p-6 overflow-y-auto space-y-4 divide-y divide-slate-100">
+                {/* Quiz & Proctoring Audit Report Section */}
+                {(selectedResponse.quiz_score || selectedResponse.proctor_log) && (
+                  <div className="bg-gradient-to-br from-slate-50 to-indigo-50/40 border border-slate-200 rounded-2xl p-4 sm:p-5 mb-4 space-y-4 shadow-2xs">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
+                      <div className="flex items-center gap-2">
+                        <Award className="w-5 h-5 text-amber-600" />
+                        <span className="font-bold text-slate-900 text-sm">
+                          รายงานผลการสอบและความซื่อสัตย์ (Exam & Proctoring Audit)
+                        </span>
+                      </div>
+                      {selectedResponse.quiz_score && (
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                            selectedResponse.quiz_score.passed
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : 'bg-rose-100 text-rose-800 border border-rose-300'
+                          }`}
+                        >
+                          {selectedResponse.quiz_score.passed ? '🎉 สอบผ่านเกณฑ์' : '❌ ไม่ผ่านเกณฑ์'}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Score summary grid */}
+                    {selectedResponse.quiz_score && (
+                      <div className="grid grid-cols-3 gap-3 text-center">
+                        <div className="p-3 bg-white border border-slate-200 rounded-xl">
+                          <div className="text-[11px] text-slate-500 font-medium">คะแนนที่ได้</div>
+                          <div className="text-lg font-black text-slate-900 mt-0.5">
+                            {selectedResponse.quiz_score.total_score} / {selectedResponse.quiz_score.max_score}
+                          </div>
+                        </div>
+                        <div className="p-3 bg-white border border-slate-200 rounded-xl">
+                          <div className="text-[11px] text-slate-500 font-medium">คิดเป็นร้อยละ</div>
+                          <div className="text-lg font-black text-indigo-700 mt-0.5">
+                            {selectedResponse.quiz_score.percentage}%
+                          </div>
+                        </div>
+                        <div className="p-3 bg-white border border-slate-200 rounded-xl">
+                          <div className="text-[11px] text-slate-500 font-medium">เวลาที่ใช้</div>
+                          <div className="text-sm font-bold text-slate-800 mt-1">
+                            {Math.floor(selectedResponse.quiz_score.time_spent_seconds / 60)} น. {selectedResponse.quiz_score.time_spent_seconds % 60} ว.
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Proctoring Log Report */}
+                    {selectedResponse.proctor_log && (
+                      <div className="pt-2 border-t border-slate-200/80">
+                        <div className="text-xs font-bold text-slate-700 mb-2 flex items-center gap-1.5">
+                          <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                          <span>บันทึกการตรวจจับพฤติกรรม (Anti-Cheat Proctoring Log)</span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                          <div className="p-2 bg-white rounded-lg border border-slate-200">
+                            <span className="text-slate-400 block text-[10px]">สลับหน้าจอ/แท็บ</span>
+                            <span className={`font-bold text-sm ${selectedResponse.proctor_log.tab_switch_count > 0 ? 'text-amber-600' : 'text-slate-800'}`}>
+                              {selectedResponse.proctor_log.tab_switch_count} ครั้ง
+                            </span>
+                          </div>
+                          <div className="p-2 bg-white rounded-lg border border-slate-200">
+                            <span className="text-slate-400 block text-[10px]">พยายามคัดลอก/วาง</span>
+                            <span className={`font-bold text-sm ${selectedResponse.proctor_log.copy_attempt_count > 0 ? 'text-rose-600' : 'text-slate-800'}`}>
+                              {selectedResponse.proctor_log.copy_attempt_count} ครั้ง
+                            </span>
+                          </div>
+                          <div className="p-2 bg-white rounded-lg border border-slate-200">
+                            <span className="text-slate-400 block text-[10px]">ย่อเต็มหน้าจอ</span>
+                            <span className={`font-bold text-sm ${selectedResponse.proctor_log.fullscreen_exit_count > 0 ? 'text-amber-600' : 'text-slate-800'}`}>
+                              {selectedResponse.proctor_log.fullscreen_exit_count} ครั้ง
+                            </span>
+                          </div>
+                          <div className="p-2 bg-white rounded-lg border border-slate-200">
+                            <span className="text-slate-400 block text-[10px]">อยู่นอกหน้ารวม</span>
+                            <span className="font-bold text-sm text-slate-800">
+                              {selectedResponse.proctor_log.total_away_seconds} วินาที
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Chronological violation audit items */}
+                        {selectedResponse.proctor_log.violations && selectedResponse.proctor_log.violations.length > 0 && (
+                          <div className="mt-3 space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                            <div className="text-[11px] font-semibold text-slate-600">ประวัติการละเมิดกฎอย่างละเอียด:</div>
+                            {selectedResponse.proctor_log.violations.map((violation, vIdx) => (
+                              <div
+                                key={vIdx}
+                                className="p-2 rounded-lg bg-rose-50/70 border border-rose-200 text-[11px] text-rose-900 flex items-center justify-between"
+                              >
+                                <span className="font-medium">{violation.details || violation.type}</span>
+                                <span className="font-mono text-[10px] text-rose-600 shrink-0 ml-2">
+                                  {new Date(violation.timestamp).toLocaleTimeString('th-TH')}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {fields
                   .filter(f => !['section_header', 'image', 'info_text'].includes(f.field_type))
                   .map((field, idx) => {
