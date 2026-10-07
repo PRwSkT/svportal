@@ -10,8 +10,6 @@ const GEMMA_MODELS = [
   'gemini-2.5-flash-lite',
   'gemini-3.5-flash-lite',
   'gemini-3.1-flash-lite',
-  'gemma-4-26b-a4b-it',
-  'gemma-4-31b-it',
 ];
 
 interface GemmaCallOptions {
@@ -69,7 +67,7 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
           'X-Goog-Api-Client': 'svportal-forms/1.0',
         },
         body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(12000),
+        signal: AbortSignal.timeout(15000),
       });
 
       if (!res.ok) {
@@ -184,7 +182,7 @@ Design a complete, comprehensive form structure for this requirement. Return str
     systemPrompt,
     userPrompt,
     temperature: 0.2,
-    maxTokens: 4000,
+    maxTokens: 6000,
     responseMimeType: 'application/json',
   });
 
@@ -341,6 +339,7 @@ Strict rules to follow:
    - In "reply": Give a warm, polite Thai response explaining what form you designed, what fields were included, and how it matches the school's context.
    - In "generatedForm": Return a complete form definition conforming to the GeneratedFormDefinition schema (title in th/en/zh, description, category, and complete fields array with localized th/en/zh, field_key, field_type, label, help_text, is_required, width, options).
    - Somkidvittaya School grades are Kindergarten 1 to Primary 6 (อ.1 - ป.6).
+   - Design around 6 to 8 essential fields with 3-5 choice options max, keeping the structure focused and easy to fill out.
 6. If the user message is a general question, greeting, advice on forms, PDPA guidelines, or inquiry:
    - Set "actionType": "chat"
    - In "reply": Answer warmly, politely, and informatively in Thai.
@@ -391,7 +390,7 @@ Analyze the message and return strictly JSON.`;
     systemPrompt,
     userPrompt,
     temperature: 0.2,
-    maxTokens: 4000,
+    maxTokens: 6000,
     responseMimeType: 'application/json',
   });
 

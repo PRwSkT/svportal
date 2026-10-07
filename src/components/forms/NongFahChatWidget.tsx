@@ -143,6 +143,7 @@ export function NongFahChatWidget({
         id: 'msg-err-' + Date.now(),
         role: 'assistant',
         content: err?.message || 'ขออภัยค่ะ น้องฟ้าไม่สามารถประมวลผลคำสั่งได้ในขณะนี้ กรุณาลองใหม่อีกครั้งนะคะ',
+        suggestions: ['กดส่งคำสั่งลองใหม่อีกครั้ง', text],
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMsg]);
