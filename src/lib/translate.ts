@@ -28,8 +28,8 @@ async function translateSingle(text: string, targetLang: 'en' | 'zh'): Promise<s
     return trimmed;
   }
 
-  // 1. Try Gemini API if key is available (Primary: gemini-3.5-flash-lite)
-  const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  // 1. Try Gemini API if key is available (Primary: gemini-2.5-flash-lite)
+  const geminiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
   if (geminiKey) {
     try {
       const prompt = `You are a professional educational translator for Somkidvittaya School.
@@ -42,10 +42,11 @@ Text:
 ${trimmed}`;
 
       for (const model of [
+        'gemini-2.5-flash-lite',
         'gemini-3.5-flash-lite',
-        'gemma-4-31b-it',
-        'gemma-4-26b-a4b-it',
         'gemini-3.1-flash-lite',
+        'gemma-4-26b-a4b-it',
+        'gemma-4-31b-it',
       ]) {
         try {
           const res = await fetch(

@@ -7,11 +7,11 @@ import { FormField } from '@/types';
 import { SanitizedFormAnalysisPayload } from './pdpa-sanitizer';
 
 const GEMMA_MODELS = [
-  'gemini-3.5-flash-lite',
-  'gemma-4-26b-a4b-it',
   'gemini-2.5-flash-lite',
-  'gemma-4-31b-it',
+  'gemini-3.5-flash-lite',
   'gemini-3.1-flash-lite',
+  'gemma-4-26b-a4b-it',
+  'gemma-4-31b-it',
 ];
 
 interface GemmaCallOptions {
@@ -26,9 +26,9 @@ interface GemmaCallOptions {
  * Low-level caller to Gemma / Google Generative AI API with fallback hierarchy
  */
 export async function callGemma(options: GemmaCallOptions): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  const apiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
   if (!apiKey) {
-    throw new Error('ยังไม่ได้กำหนด GEMINI_API_KEY หรือ GOOGLE_API_KEY ในระบบ');
+    throw new Error('ยังไม่ได้กำหนด GEMINI_API_KEY หรือ GOOGLE_API_KEY ในระบบ Netlify Environment Variables');
   }
 
   const {
@@ -69,12 +69,13 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
           'X-Goog-Api-Client': 'svportal-forms/1.0',
         },
         body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(8000),
       });
 
       if (!res.ok) {
         const errorText = await res.text();
         console.warn(`Model ${model} returned error ${res.status}:`, errorText.slice(0, 150));
+        lastError = new Error(`AI Model (${model}) สถานะ ${res.status}: ${errorText.slice(0, 100)}`);
         continue;
       }
 
@@ -144,7 +145,7 @@ Design a complete, comprehensive form structure for this requirement. Return str
     systemPrompt,
     userPrompt,
     temperature: 0.2,
-    maxTokens: 3000,
+    maxTokens: 1800,
     responseMimeType: 'application/json',
   });
 
