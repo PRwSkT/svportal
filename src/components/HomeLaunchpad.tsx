@@ -21,7 +21,8 @@ import {
   Radio,
   Globe,
   Clock,
-  Award
+  Award,
+  Bell
 } from 'lucide-react';
 import { getRoleConfig } from '@/lib/constants/roles';
 
@@ -86,6 +87,7 @@ export default function HomeLaunchpad() {
       icon: <Megaphone className="w-5 h-5 text-rose-500" />,
       color: "border-rose-500/20 bg-rose-500/5",
       tools: [
+        { id: "admin_notifications", name: language === 'th' ? "ระบบแจ้งเตือน AI" : "AI Notifications", href: "/admin/notifications", icon: <Bell className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
         { id: "admin_website", name: dict.nav.adminWebsite, href: "/admin/website", icon: <Globe className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
         { id: "admin_forms", name: dict.nav.adminForms, href: "/admin/forms", icon: <FileText className="w-6 h-6" />, color: "bg-[#7B1C3E]/20 text-[#7B1C3E]" },
         { id: "post_assistant", name: dict.nav.postAssistant, href: "/post-assistant", icon: <MessageSquare className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
@@ -111,7 +113,7 @@ export default function HomeLaunchpad() {
     }
   ];
 
-  const adminEmails = ['admin@somkidvittaya.ac.th', 'peerawat@somkidvittaya.ac.th', 'media@somkidvittaya.ac.th', 'admin@svportal.com'];
+  const adminEmails = ['admin@somkidvittaya.ac.th', 'peerawat@somkidvittaya.ac.th', 'media@somkidvittaya.ac.th'];
   const isAdmin = appUser?.role === 'admin' || role === 'admin' || (user?.email ? adminEmails.includes(user.email.toLowerCase()) : false);
   const assignedFeatures = appUser?.assigned_features || [];
   const showAll = isAdmin && assignedFeatures.length === 0;

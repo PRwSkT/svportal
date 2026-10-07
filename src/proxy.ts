@@ -86,11 +86,14 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect('https://somkidvittaya.ac.th', { status: 307 });
   }
 
-  // Bypass auth for the root page (welcome menu), forms, webhooks/cron, auth callbacks
+  // Bypass auth for the root page (welcome menu), forms, webhooks/cron, auth callbacks, PWA sw & subscribe
   if (
     request.nextUrl.pathname === '/' ||
+    request.nextUrl.pathname === '/sw.js' ||
+    request.nextUrl.pathname === '/manifest.json' ||
     request.nextUrl.pathname.startsWith('/forms') ||
     request.nextUrl.pathname.startsWith('/api/forms') ||
+    request.nextUrl.pathname.startsWith('/api/notifications/subscribe') ||
     request.nextUrl.pathname.startsWith('/auth') ||
     request.nextUrl.pathname.startsWith('/api/auth') ||
     request.nextUrl.pathname.startsWith('/api/cron') ||

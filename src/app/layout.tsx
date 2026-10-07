@@ -17,6 +17,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "SV-Portal | โรงเรียนสมคิดวิทยา",
   description: "ระบบบริหารจัดการโรงเรียนสมคิดวิทยา",
+  manifest: "/manifest.json",
   icons: {
     icon: "/favicon.ico",
     apple: "/logo2.png",

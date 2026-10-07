@@ -32,7 +32,9 @@ import {
   Menu,
   X,
   User as UserIcon,
+  Bell,
 } from 'lucide-react';
+import { NotificationBell } from '@/components/NotificationBell';
 
 interface NavModule {
   id: string;
@@ -85,7 +87,8 @@ export function AppNav() {
     { id: 'admin_kpi', href: '/admin/kpi', label: dict.nav.adminKpi, category: dict.nav.hrAdmin, icon: Award, colorClass: 'text-[#7B1C3E] bg-[#7B1C3E]/10 border-[#7B1C3E]/20' },
     { id: 'admin_attendance', href: '/attendance', label: dict.nav.adminAttendance, category: dict.nav.hrAdmin, icon: Clock, colorClass: 'text-purple-600 bg-purple-50 border-purple-200' },
     { id: 'admin_users', href: '/admin/users', label: dict.nav.adminUsers, category: dict.nav.hrAdmin, icon: Users, colorClass: 'text-violet-600 bg-violet-50 border-violet-200' },
-    // PR
+    // PR & Communications
+    { id: 'admin_notifications', href: '/admin/notifications', label: 'ระบบแจ้งเตือน AI', category: dict.nav.pr, icon: Bell, colorClass: 'text-rose-600 bg-rose-50 border-rose-200' },
     { id: 'admin_website', href: '/admin/website', label: dict.nav.adminWebsite, category: dict.nav.pr, icon: Globe, colorClass: 'text-sky-600 bg-sky-50 border-sky-200' },
     { id: 'post_assistant', href: '/post-assistant', label: dict.nav.postAssistant, category: dict.nav.pr, icon: Sparkles, colorClass: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
     { id: 'audio_remote', href: '/audio-remote', label: dict.nav.audioRemote, category: dict.nav.pr, icon: Radio, colorClass: 'text-amber-600 bg-amber-50 border-amber-200' },
@@ -248,6 +251,9 @@ export function AppNav() {
 
           {/* Right Controls (Desktop Profile & Sign Out) */}
           <div className="hidden md:flex items-center gap-3">
+            {/* Notification Bell */}
+            <NotificationBell />
+
             {/* Language Switcher */}
             <LanguageSwitcher size="sm" showIcon />
 
@@ -279,8 +285,9 @@ export function AppNav() {
             </button>
           </div>
 
-          {/* Mobile Right Controls: Language Switcher + Hamburger */}
+          {/* Mobile Right Controls: Notification Bell + Language Switcher + Hamburger */}
           <div className="flex md:hidden items-center gap-2">
+            <NotificationBell />
             <LanguageSwitcher size="sm" />
             <button
               type="button"
