@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getAdminClient } from '@/lib/supabase/admin';
 import { requireAuth } from '@/lib/auth';
 
 export async function GET(request: Request) {
@@ -20,13 +20,13 @@ export async function GET(request: Request) {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    const supabase = await createClient();
+    const supabase = getAdminClient();
 
     const includeDetails = searchParams.get('includeDetails') === 'true';
 
     const baseQuery = includeDetails
       ? supabase.from('students').select('*, student_addresses(*), student_parents(*)')
-      : supabase.from('students').select('id, name, prefix, first_name, last_name, grade, status, wallet_balance, updated_at, created_at, photo_url, gender, birthdate');
+      : supabase.from('students').select('id, name, prefix, first_name, last_name, grade, status, wallet_balance, updated_at, created_at, gender, birth_date, citizen_id');
 
     let query: any = baseQuery.limit(10000);
 
