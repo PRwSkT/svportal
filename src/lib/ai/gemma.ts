@@ -330,7 +330,10 @@ export interface NongFahChatMessageItem {
 
 export interface NongFahChatContext {
   page?: string;
+  formId?: string;
   formTitle?: string;
+  totalResponses?: number;
+  responsesSummary?: SanitizedFormAnalysisPayload;
   currentFields?: Array<{
     field_key: string;
     field_type: string;
@@ -392,7 +395,21 @@ Strict rules to follow:
      - In "reply": Answer warmly, politely, and informatively in Thai.
      - Set "generatedForm": null
      - Set "modifiedFields": null
-9. In "suggestions": Provide 2-4 short, helpful follow-up phrases that the user can click.
+10. Form Response Analytics & Custom Data Inquiries (when context.responsesSummary or context.page === 'responses' is provided):
+    - You are the Chief Educational Data Analyst and School Assistant for Somkidvittaya School.
+    - You have direct access to the actual responses dataset and field aggregates provided in "REAL FORM RESPONSES DATA".
+    - When the user asks you to summarize, analyze, investigate, compare, or explain data from specific perspectives:
+      - Set "actionType": "chat"
+      - Provide a well-structured, insightful, and professional Thai analysis.
+      - Use clear formatting with headers, numbered points, or bullet lists to make the report clear and actionable.
+      - Quote real numbers, percentages, and recurring patterns from the dataset faithfully.
+      - If asked for specific viewpoints (e.g. SWOT analysis, urgent improvement areas, executive briefing, student welfare issues, financial/registration considerations, parent sentiment), thoroughly analyze from that exact angle.
+      - If the user asks for suggestions or solutions, propose practical, school-appropriate action steps.
+      - Maintain a respectful, encouraging, and polite tone (addressed as "หนูฟ้า" or "น้องฟ้า"), ending sentences with "ค่ะ" or "นะคะ".
+      - Strictly NO emojis in your response.
+      - Set "generatedForm": null
+      - Set "modifiedFields": null
+11. In "suggestions": Provide 2-4 short, helpful follow-up phrases that the user can click.
 
 JSON schema:
 {
@@ -438,14 +455,28 @@ JSON schema:
     .map(h => `${h.role === 'user' ? 'User' : 'น้องฟ้า'}: ${h.content}`)
     .join('\n');
   const contextNote = context?.formTitle
-    ? `\nCurrent Context: Editing form "${context.formTitle}" (Page: ${context.page || 'editor'})`
+    ? `\nCurrent Context: Form "${context.formTitle}" (Page Context: ${context.page || 'editor'})`
     : '';
 
   const fieldsSummary = context?.currentFields && context.currentFields.length > 0
     ? `\nCurrently Existing Form Fields (${context.currentFields.length} fields):\n${JSON.stringify(context.currentFields, null, 2)}`
     : '';
 
-  const userPrompt = `${contextNote}${fieldsSummary}
+  const responsesDataText = context?.responsesSummary
+    ? `\n=== REAL FORM RESPONSES DATA (Total Submissions: ${context.responsesSummary.totalResponses}) ===
+Form Title: ${context.responsesSummary.formTitle}
+Total Submissions: ${context.responsesSummary.totalResponses}
+Question-by-Question Statistics & Samples:
+${JSON.stringify(context.responsesSummary.fieldsSummary, null, 2)}
+${
+  context.responsesSummary.pseudonymizedStudentCases && context.responsesSummary.pseudonymizedStudentCases.length > 0
+    ? `\nSpecial Notes / Attention Cases:\n${JSON.stringify(context.responsesSummary.pseudonymizedStudentCases, null, 2)}`
+    : ''
+}
+=== END OF FORM RESPONSES DATA ===\n`
+    : '';
+
+  const userPrompt = `${contextNote}${fieldsSummary}${responsesDataText}
 Conversation History:
 ${conversationHistoryText || '(No previous history)'}
 

@@ -40,6 +40,7 @@ interface NongFahChatWidgetProps {
   onApplyModifiedFields?: (newFields: FormField[]) => void;
   onOpenStudio?: () => void;
   currentFields?: FormField[];
+  formId?: string;
   formTitle?: string;
   pageContext?: 'editor' | 'list' | 'responses';
   defaultOpen?: boolean;
@@ -53,9 +54,12 @@ const CONTEXT_SUGGESTIONS: Record<string, string[]> = {
     'เพิ่มช่องแนบหลักฐานการชำระเงิน (สลิปโอนเงิน)',
   ],
   responses: [
-    'สรุปภาพรวมผลการตอบฟอร์มนี้',
-    'วิเคราะห์ความพึงพอใจและข้อเสนอแนะ',
-    'มีนักเรียนคนไหนที่ต้องติดตามเป็นพิเศษไหม',
+    'สรุปจุดเด่นและจุดที่ควรปรับปรุงเร่งด่วน',
+    'จัดกลุ่มข้อเสนอแนะและเสียงสะท้อนของผู้ตอบ',
+    'สรุปรายงานสำหรับนำเสนอที่ประชุมผู้บริหาร',
+    'วิเคราะห์คะแนนความพึงพอใจและแนวโน้ม',
+    'มีนักเรียนที่มีเรื่องเร่งด่วนหรือแพ้อาหารไหม',
+    'ช่วยเสนอแนวทางแก้ไขปัญหาตามข้อเสนอแนะ',
   ],
   list: [
     'ช่วยสร้างฟอร์มลงทะเบียนเรียนพิเศษ ซัมเมอร์(ตุลาคม)',
@@ -71,6 +75,7 @@ export function NongFahChatWidget({
   onApplyModifiedFields,
   onOpenStudio,
   currentFields,
+  formId,
   formTitle,
   pageContext = 'list',
   defaultOpen = false,
@@ -92,6 +97,8 @@ export function NongFahChatWidget({
       content:
         pageContext === 'editor'
           ? 'สวัสดีค่ะ หนูฟ้ายินดีให้บริการนะคะ หนูฟ้าพร้อมช่วยคุณครูปรับแต่งฟอร์ม ตรวจสุขภาพฟอร์ม หรือเพิ่ม/แก้ไขคำถามในหน้านี้ได้ทันทีค่ะ สามารถพิมพ์บอกหนูฟ้าได้เลยนะคะ'
+          : pageContext === 'responses'
+          ? 'สวัสดีค่ะ หนูฟ้ายินดีให้บริการนะคะ หนูฟ้าได้อ่านข้อมูลผลการตอบกลับและสถิติของฟอร์มนี้เรียบร้อยแล้วค่ะ คุณครูสามารถสั่งให้หนูฟ้าสรุปข้อมูลตามคำสั่ง วิเคราะห์แนวโน้ม คัดกรองข้อเสนอแนะ หรือร่างรายงานสำหรับนำเสนอได้ทันทีเลยนะคะ'
           : 'สวัสดีค่ะ หนูฟ้ายินดีให้บริการนะคะ หนูฟ้าพร้อมช่วยออกแบบฟอร์ม สรุปผลข้อมูล หรือตอบคำถามการจัดสร้างแบบฟอร์มของโรงเรียนสมคิดวิทยาค่ะ คุณครูสามารถพิมพ์บอกรายละเอียดที่ต้องการ หรือกดเลือกหัวข้อแนะนำด้านล่างได้เลยนะคะ',
       suggestions: activeDefaultSuggestions,
       timestamp: new Date(),
@@ -113,6 +120,21 @@ export function NongFahChatWidget({
       }, 200);
     }
   }, [isOpen, messages, isLoading]);
+
+  // Listen for global open-nongfah-chat custom event
+  useEffect(() => {
+    const handleOpenEvent = (e: any) => {
+      setIsOpen(true);
+      const prompt = e?.detail?.prompt;
+      if (prompt) {
+        setTimeout(() => {
+          handleSendMessage(prompt);
+        }, 200);
+      }
+    };
+    window.addEventListener('open-nongfah-chat', handleOpenEvent);
+    return () => window.removeEventListener('open-nongfah-chat', handleOpenEvent);
+  }, []);
 
   const handleSendMessage = async (textToSend?: string) => {
     const text = (textToSend || inputMessage).trim();
@@ -144,6 +166,7 @@ export function NongFahChatWidget({
           history: historyPayload,
           context: {
             page: pageContext,
+            formId: formId || undefined,
             formTitle: formTitle || undefined,
             currentFields: currentFields?.map((f) => ({
               field_key: f.field_key,
@@ -727,4 +750,10 @@ export function NongFahChatWidget({
       </AnimatePresence>
     </>
   );
+}
+
+export function triggerNongFahPrompt(prompt?: string) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('open-nongfah-chat', { detail: { prompt } }));
+  }
 }

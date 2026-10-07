@@ -12,12 +12,12 @@ import {
   ArrowLeft, Download, Search, Filter, Trash2, Eye,
   BarChart2, FileText, CheckCircle2, Calendar, Globe,
   Loader2, ExternalLink, X, Image as ImageIcon, AlertCircle, QrCode,
-  PieChart, HelpCircle, List, Sparkles
+  PieChart, HelpCircle, List, Sparkles, Bot
 } from 'lucide-react';
 import { FormQRCodeModal } from '@/components/forms/FormQRCodeModal';
 import { NongFahResponsesInsights } from '@/components/forms/NongFahResponsesInsights';
 import { StudentDbSyncSection } from '@/components/forms/StudentDbSyncSection';
-import { NongFahChatWidget } from '@/components/forms/NongFahChatWidget';
+import { NongFahChatWidget, triggerNongFahPrompt } from '@/components/forms/NongFahChatWidget';
 import { FormAnalyticsCharts } from '@/components/forms/FormAnalyticsCharts';
 import { FormQuestionBreakdown } from '@/components/forms/FormQuestionBreakdown';
 import { GeneratedFormDefinition } from '@/lib/ai/gemma';
@@ -214,6 +214,16 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => triggerNongFahPrompt()}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-900 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                title="เปิดแชทกับน้องฟ้า AI เพื่อช่วยวิเคราะห์ผลหรือสั่งการ"
+              >
+                <Sparkles className="w-4 h-4 text-purple-600" />
+                <span>แชทวิเคราะห์กับน้องฟ้า</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setShowQrModal(true)}
@@ -531,6 +541,54 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
         {/* TAB 4: Nong Fah AI & Student DB Sync */}
         {activeTab === 'ai' && (
           <div className="space-y-6">
+            {/* Interactive Custom Analytics Prompts with Nong Fah */}
+            <div className="bg-gradient-to-br from-purple-50 via-indigo-50/50 to-white rounded-2xl border border-purple-200/80 p-5 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-purple-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      สั่งให้น้องฟ้า AI สรุปและวิเคราะห์ผลแบบกำหนดเอง (Custom Analytics)
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      คลิกคำสั่งสำเร็จรูปด้านล่าง หรือพิมพ์คำสั่งเจาะลึกที่ต้องการในแชท น้องฟ้าจะอ่านข้อมูลผลลัพธ์จริงแล้ววิเคราะห์ให้ทันที
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => triggerNongFahPrompt()}
+                  className="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-bold shadow-xs transition-colors shrink-0 inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Bot className="w-4 h-4" />
+                  <span>เปิดหน้าต่างแชท</span>
+                </button>
+              </div>
+
+              {/* Quick Action Chips */}
+              <div className="mt-3 flex flex-wrap gap-2">
+                {[
+                  { label: '📌 สรุปจุดเด่น & จุดที่ต้องปรับปรุงเร่งด่วน', prompt: 'สรุปจุดเด่นและจุดที่ควรปรับปรุงเร่งด่วนจากผลการตอบฟอร์มนี้' },
+                  { label: '👔 สรุปรายงานนำเสนอผู้บริหาร', prompt: 'ช่วยสรุปผลการสำรวจนี้ให้เป็นรายงานเชิงบริหารสำหรับนำเสนอที่ประชุมผู้บริหารโรงเรียน' },
+                  { label: '⚠️ ตรวจสอบเคสด่วน / สุขภาพนักเรียน', prompt: 'มีกรณีที่ต้องติดตามเร่งด่วน เช่น ปัญหาสุขภาพ การแพ้อาหาร หรือความเดือดร้อนไหม' },
+                  { label: '🎯 จัดกลุ่มข้อเสนอแนะตามประเด็น', prompt: 'ช่วยจัดกลุ่มข้อคิดเห็นและข้อเสนอแนะของผู้ตอบออกเป็นประเด็นสำคัญ พร้อมสถิติ' },
+                  { label: '📊 วิเคราะห์ความพึงพอใจและแนวโน้ม', prompt: 'วิเคราะห์คะแนนความพึงพอใจและการแจกแจงคำตอบในภาพรวมพร้อมแนวโน้ม' },
+                  { label: '💡 ร่างแนวทางแก้ไขตามเสียงสะท้อน', prompt: 'จากผลสำรวจทั้งหมด ช่วยเสนอแนะ Action Plan และแนวทางแก้ไขปัญหาที่ทำได้จริงให้โรงเรียน' },
+                ].map((chip, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => triggerNongFahPrompt(chip.prompt)}
+                    className="px-3 py-1.5 bg-white hover:bg-purple-100/70 border border-purple-200 text-purple-900 rounded-xl text-xs font-semibold transition-all hover:scale-[1.02] shadow-2xs text-left cursor-pointer"
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <NongFahResponsesInsights
               formId={form.id}
               totalResponses={total}
@@ -675,7 +733,9 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
 
       {/* Interactive Bottom-Right Nong Fah Chat Widget */}
       <NongFahChatWidget
+        formId={form.id}
         formTitle={form.title?.th || 'แบบฟอร์ม'}
+        currentFields={fields}
         pageContext="responses"
         onCreateFromTemplate={handleCreateNewFormFromTemplate}
       />
