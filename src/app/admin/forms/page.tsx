@@ -46,6 +46,7 @@ import {
 } from 'lucide-react';
 import { FormQRCodeModal } from '@/components/forms/FormQRCodeModal';
 import { NongFahChatWidget } from '@/components/forms/NongFahChatWidget';
+import { GeneratedFormDefinition } from '@/lib/ai/gemma';
 
 const CATEGORIES = [
   { id: 'all', label: 'ทั้งหมด' },
@@ -83,6 +84,7 @@ export default function FormsAdminPage() {
   const [newCategory, setNewCategory] = useState('general');
   const [newAccessType, setNewAccessType] = useState<'public' | 'internal_all' | 'internal_teacher'>('public');
   const [newDesc, setNewDesc] = useState('');
+  const [pendingTemplate, setPendingTemplate] = useState<GeneratedFormDefinition | null>(null);
 
   // Modal states: Collaborator Assignment
   const [collaboratorCandidates, setCollaboratorCandidates] = useState<any[]>([]);
@@ -130,6 +132,14 @@ export default function FormsAdminPage() {
     }
   };
 
+  const handleCloseCreateModal = () => {
+    setShowCreateModal(false);
+    setPendingTemplate(null);
+    setNewTitle('');
+    setNewSlug('');
+    setNewDesc('');
+  };
+
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) {
@@ -144,16 +154,25 @@ export default function FormsAdminPage() {
     setIsSubmitting(true);
     const res = await createForm({
       title_th: newTitle,
+      title: pendingTemplate?.title || { th: newTitle },
+      description_th: newDesc,
+      description: pendingTemplate?.description || (newDesc ? { th: newDesc } : undefined),
       slug: newSlug,
       category: newCategory,
       access_type: newAccessType,
-      description_th: newDesc,
+      initial_fields: pendingTemplate?.fields || [],
     });
     setIsSubmitting(false);
 
     if (res.success && res.data) {
-      toast.success('สร้างฟอร์มสำเร็จ! กำลังเปิดหน้าสตูดิโอออกแบบ...');
+      const fieldCount = pendingTemplate?.fields?.length || 0;
+      toast.success(
+        fieldCount > 0
+          ? `สร้างฟอร์มสำเร็จพร้อมใส่ ${fieldCount} ช่องคำถามจากน้องฟ้า AI เรียบร้อย!`
+          : 'สร้างฟอร์มสำเร็จ! กำลังเปิดหน้าสตูดิโอออกแบบ...'
+      );
       setShowCreateModal(false);
+      setPendingTemplate(null);
       router.push(`/admin/forms/${res.data.id}/edit`);
     } else {
       toast.error('สร้างฟอร์มไม่สำเร็จ', { description: res.error });
@@ -765,7 +784,7 @@ export default function FormsAdminPage() {
               className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-100 relative text-slate-800"
             >
               <button
-                onClick={() => setShowCreateModal(false)}
+                onClick={handleCloseCreateModal}
                 className="absolute right-5 top-5 text-slate-400 hover:text-slate-600 p-1 rounded-xl hover:bg-slate-100"
               >
                 <X className="w-5 h-5" />
@@ -776,12 +795,38 @@ export default function FormsAdminPage() {
                   <Sparkles className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900">สร้างแบบฟอร์มออนไลน์ใหม่</h3>
+                  <h3 className="text-lg font-bold text-slate-900">
+                    {pendingTemplate ? 'สร้างแบบฟอร์มจากโครงสร้างน้องฟ้า AI' : 'สร้างแบบฟอร์มออนไลน์ใหม่'}
+                  </h3>
                   <p className="text-xs text-slate-500">
-                    กำหนดชื่อและ URL สำหรับฟอร์มของคุณ (คุณจะเป็นเจ้าของฟอร์มนี้)
+                    {pendingTemplate
+                      ? `ตรวจทานรายละเอียดก่อนเปิดระบบ (${pendingTemplate.fields?.length || 0} ช่องคำถาม)`
+                      : 'กำหนดชื่อและ URL สำหรับฟอร์มของคุณ (คุณจะเป็นเจ้าของฟอร์มนี้)'}
                   </p>
                 </div>
               </div>
+
+              {/* Nong Fah Template Banner */}
+              {pendingTemplate && (
+                <div className="mb-4 bg-gradient-to-r from-purple-50 via-pink-50/50 to-white border border-purple-200/90 rounded-2xl p-3.5 flex items-start gap-3 shadow-xs">
+                  <div className="w-8 h-8 rounded-xl bg-[#7B1C3E] text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                    <Sparkles className="w-4 h-4 text-amber-200" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-[#7B1C3E]">
+                        มีโครงสร้างจากน้องฟ้า AI
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800">
+                        {pendingTemplate.fields?.length || 0} ช่องคำถาม
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
+                      ระบบจะนำเข้าชื่อฟอร์ม คำอธิบาย และคำถามทั้งหมด {pendingTemplate.fields?.length || 0} ช่อง ลงในฟอร์มใหม่อัตโนมัติทันที
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <form onSubmit={handleCreateSubmit} className="space-y-4">
                 <div>
@@ -878,7 +923,7 @@ export default function FormsAdminPage() {
                 <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => setShowCreateModal(false)}
+                    onClick={handleCloseCreateModal}
                     className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
                   >
                     ยกเลิก
@@ -1099,8 +1144,13 @@ export default function FormsAdminPage() {
       <NongFahChatWidget
         pageContext="list"
         onCreateFromTemplate={(formDef) => {
+          setPendingTemplate(formDef);
           setNewTitle(formDef.title?.th || '');
+          setNewDesc(formDef.description?.th || '');
           if (formDef.category) setNewCategory(formDef.category);
+          const randomSuffix = Math.random().toString(36).substring(2, 7);
+          const categorySlug = (formDef.category || 'form').toLowerCase().replace(/[^a-z0-9]/g, '-');
+          setNewSlug(`sv-${categorySlug}-${randomSuffix}`);
           setShowCreateModal(true);
         }}
       />

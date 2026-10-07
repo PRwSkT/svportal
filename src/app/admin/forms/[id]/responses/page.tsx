@@ -4,7 +4,7 @@ import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormDefinition, FormField, FormResponse } from '@/types';
-import { getFormResponses, deleteResponse } from '@/app/admin/forms/actions';
+import { getFormResponses, deleteResponse, createForm } from '@/app/admin/forms/actions';
 import { exportToCSV } from '@/lib/export';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -17,6 +17,7 @@ import { FormQRCodeModal } from '@/components/forms/FormQRCodeModal';
 import { NongFahResponsesInsights } from '@/components/forms/NongFahResponsesInsights';
 import { StudentDbSyncSection } from '@/components/forms/StudentDbSyncSection';
 import { NongFahChatWidget } from '@/components/forms/NongFahChatWidget';
+import { GeneratedFormDefinition } from '@/lib/ai/gemma';
 
 export default function FormResponsesPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -66,6 +67,33 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
       }
     } else {
       toast.error('ลบไม่สำเร็จ', { description: res.error });
+    }
+  };
+
+  const handleCreateNewFormFromTemplate = async (template: GeneratedFormDefinition) => {
+    try {
+      const randomSuffix = Math.random().toString(36).substring(2, 7);
+      const categorySlug = (template.category || 'form').toLowerCase().replace(/[^a-z0-9]/g, '-');
+      const toastId = toast.loading('กำลังสร้างฟอร์มใหม่จากโครงสร้างน้องฟ้า AI...');
+      const res = await createForm({
+        title_th: template.title?.th || 'แบบฟอร์มใหม่',
+        title: template.title,
+        description_th: template.description?.th,
+        description: template.description,
+        slug: `sv-${categorySlug}-${randomSuffix}`,
+        category: template.category || 'general',
+        access_type: 'public',
+        initial_fields: template.fields || [],
+      });
+      toast.dismiss(toastId);
+      if (res.success && res.data) {
+        toast.success(`สร้างฟอร์มใหม่เรียบร้อยพร้อม ${template.fields?.length || 0} ช่องคำถาม!`);
+        router.push(`/admin/forms/${res.data.id}/edit`);
+      } else {
+        toast.error('ไม่สามารถสร้างฟอร์มใหม่ได้', { description: res.error });
+      }
+    } catch (err: any) {
+      toast.error('เกิดข้อผิดพลาดในการสร้างฟอร์ม', { description: err.message });
     }
   };
 
@@ -544,6 +572,7 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
       <NongFahChatWidget
         formTitle={form.title?.th || 'แบบฟอร์ม'}
         pageContext="responses"
+        onCreateFromTemplate={handleCreateNewFormFromTemplate}
       />
     </div>
   );

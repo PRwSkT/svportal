@@ -3,7 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { getServerUser } from '@/lib/auth';
 import { isSystemAdmin } from '@/lib/constants/auth';
-import { FormDefinition, FormField, FormResponse } from '@/types';
+import { FormDefinition, FormField, FormResponse, MultiLangText } from '@/types';
 
 export interface ActionResult<T = any> {
   success: boolean;
@@ -279,8 +279,27 @@ export async function getFormWithFields(formId: string): Promise<ActionResult<{ 
   }
 }
 
+function isDummyHelp(text?: string | null): boolean {
+  if (!text) return true;
+  const t = text.trim();
+  if (!t) return true;
+  return (
+    t === 'คำอธิบายเพิ่มเติมสำหรับส่วนนี้ (ถ้ามี)' ||
+    t === 'Additional description for this section (optional)' ||
+    t === '本节补充说明（可选）' ||
+    t === 'คำอธิบายรูปภาพหรือคำแนะนำเพิ่มเติม (ถ้ามี)' ||
+    t === 'Image caption or instructions (optional)' ||
+    t === '图片说明或指引（可选）' ||
+    t === 'ระบุเนื้อหา รายละเอียด กฎระเบียบ หรือข้อมูลสำคัญที่ต้องการแจ้งให้ผู้ตอบฟอร์มทราบโดยไม่ต้องให้ตอบคำถาม' ||
+    (t.includes('(ถ้ามี)') && t.length <= 40) ||
+    (t.includes('(optional)') && t.length <= 50) ||
+    (t.includes('（可选）') && t.length <= 30)
+  );
+}
+
 /**
  * Create a new form (sets current user as creator/owner)
+ * Supports initial fields from Nong Fah AI template
  */
 export async function createForm(payload: {
   title_th: string;
@@ -288,6 +307,9 @@ export async function createForm(payload: {
   category: string;
   access_type: 'public' | 'internal_all' | 'internal_teacher';
   description_th?: string;
+  title?: MultiLangText;
+  description?: MultiLangText | null;
+  initial_fields?: FormField[] | any[];
 }): Promise<ActionResult<FormDefinition>> {
   try {
     const auth = await verifyFormAuth();
@@ -296,8 +318,12 @@ export async function createForm(payload: {
     const { context } = auth;
     const supabase = getAdminClient();
 
-    // Check slug uniqueness
-    const cleanSlug = payload.slug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+    // Check slug uniqueness & sanitize
+    let cleanSlug = payload.slug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+    if (!cleanSlug) {
+      cleanSlug = `sv-form-${Math.random().toString(36).substring(2, 8)}`;
+    }
+
     const { data: existing } = await supabase
       .from('forms')
       .select('id')
@@ -305,13 +331,23 @@ export async function createForm(payload: {
       .maybeSingle();
 
     if (existing) {
-      return { success: false, error: 'Slug (URL) นี้ถูกใช้งานแล้ว กรุณาระบุชื่อ URL อื่น' };
+      cleanSlug = `${cleanSlug}-${Math.random().toString(36).substring(2, 6)}`;
     }
+
+    const formTitle = payload.title?.th
+      ? payload.title
+      : { th: payload.title_th.trim() };
+
+    const formDesc = payload.description?.th
+      ? payload.description
+      : payload.description_th
+      ? { th: payload.description_th.trim() }
+      : null;
 
     const newForm = {
       slug: cleanSlug,
-      title: { th: payload.title_th.trim() },
-      description: payload.description_th ? { th: payload.description_th.trim() } : null,
+      title: formTitle,
+      description: formDesc,
       banner_url: '/images/default-form-banner.png',
       category: payload.category || 'general',
       access_type: payload.access_type || 'public',
@@ -332,6 +368,40 @@ export async function createForm(payload: {
       .single();
 
     if (error) throw error;
+
+    // Insert initial fields if provided (e.g. from Nong Fah AI generator)
+    if (payload.initial_fields && Array.isArray(payload.initial_fields) && payload.initial_fields.length > 0) {
+      const fieldsToInsert = payload.initial_fields.map((f: any, idx: number) => {
+        let cleanHelp = f.help_text;
+        if (cleanHelp && isDummyHelp(cleanHelp.th) && isDummyHelp(cleanHelp.en) && isDummyHelp(cleanHelp.zh)) {
+          cleanHelp = null;
+        } else if (cleanHelp && !cleanHelp.th?.trim() && !cleanHelp.en?.trim() && !cleanHelp.zh?.trim()) {
+          cleanHelp = null;
+        }
+
+        return {
+          form_id: data.id,
+          field_key: f.field_key || `field_${Date.now().toString(36)}_${idx}`,
+          label: f.label || { th: 'คำถามที่ ' + (idx + 1) },
+          help_text: cleanHelp || null,
+          field_type: f.field_type || 'text',
+          is_required: f.is_required !== undefined ? Boolean(f.is_required) : true,
+          options: f.options ? (Array.isArray(f.options) ? f.options : null) : null,
+          validation: f.validation || null,
+          image_url: f.image_url || null,
+          sort_order: idx,
+          width: f.width || 'full',
+        };
+      });
+
+      const { error: fieldsErr } = await supabase
+        .from('form_fields')
+        .insert(fieldsToInsert);
+
+      if (fieldsErr) {
+        console.error('Error inserting initial form fields from Nong Fah AI:', fieldsErr);
+      }
+    }
 
     return {
       success: true,

@@ -17,6 +17,7 @@ import {
   Copy,
   Loader2,
   ListPlus,
+  Plus,
 } from 'lucide-react';
 import { GeneratedFormDefinition } from '@/lib/ai/gemma';
 
@@ -459,15 +460,19 @@ export function NongFahChatWidget({
                               </button>
                             )}
 
-                            {/* Option B: If on Forms List page */}
-                            {onCreateFromTemplate && !onApplyForm && (
+                            {/* Option B: Create new form from template */}
+                            {onCreateFromTemplate && (
                               <button
                                 type="button"
                                 onClick={() => handleCreateFromTemplateClick(msg.generatedForm!)}
-                                className="flex-1 min-w-[140px] inline-flex items-center justify-center gap-1.5 py-2 px-3 bg-gradient-to-r from-[#7B1C3E] to-indigo-800 hover:opacity-95 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow transition-all cursor-pointer"
+                                className={`flex-1 min-w-[140px] inline-flex items-center justify-center gap-1.5 py-2 px-3 ${
+                                  onApplyForm
+                                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                                    : 'bg-gradient-to-r from-[#7B1C3E] to-indigo-800 hover:opacity-95 text-white'
+                                } rounded-xl text-xs font-bold shadow-xs hover:shadow transition-all cursor-pointer`}
                               >
-                                <ListPlus className="w-4 h-4" />
-                                <span>สร้างฟอร์มใหม่จากโครงสร้างนี้</span>
+                                <Plus className="w-4 h-4" />
+                                <span>{onApplyForm ? 'หรือสร้างเป็นฟอร์มใหม่' : 'สร้างฟอร์มใหม่จากโครงสร้างนี้'}</span>
                               </button>
                             )}
 

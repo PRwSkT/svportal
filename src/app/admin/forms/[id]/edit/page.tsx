@@ -12,6 +12,7 @@ import {
   toggleFormPublish,
   getFormCollaboratorCandidates,
   updateFormCollaborators,
+  createForm,
 } from '@/app/admin/forms/actions';
 import { createClient } from '@/lib/supabase/client';
 import { compressImage } from '@/lib/image-compression';
@@ -387,10 +388,11 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
   ) => {
     if (!form) return;
 
-    const baseIndex = mode === 'replace' ? 0 : fields.length;
+    const isReplacing = mode === 'replace' || fields.length === 0;
+    const baseIndex = isReplacing ? 0 : fields.length;
     const preparedFields: FormField[] = (generated.fields || []).map((f, idx) => ({
       ...f,
-      id: crypto.randomUUID(),
+      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `f_${Date.now()}_${idx}`,
       form_id: form.id,
       field_key: f.field_key || `field_${Date.now().toString(36)}_${idx}`,
       sort_order: baseIndex + idx,
@@ -401,7 +403,7 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
       options: f.options ? JSON.parse(JSON.stringify(f.options)) : null,
     }));
 
-    if (mode === 'replace') {
+    if (isReplacing) {
       setForm(prev => prev ? ({
         ...prev,
         title: generated.title || prev.title,
@@ -409,10 +411,44 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
         category: generated.category || prev.category,
       }) : null);
       setFields(preparedFields);
+      toast.success(`นำเข้าโครงสร้างจากน้องฟ้า AI สำเร็จ (${preparedFields.length} ช่องคำถาม)`, {
+        description: 'กรุณากดปุ่ม "บันทึกข้อมูล" ที่มุมขวาบนเพื่อบันทึกการเปลี่ยนแปลงลงฐานข้อมูล',
+      });
     } else {
       setFields(prev => [...prev, ...preparedFields]);
+      toast.success(`เพิ่มช่องคำถามจากน้องฟ้า AI (+${preparedFields.length} ช่อง) ต่อท้ายเรียบร้อย`, {
+        description: 'กรุณากดปุ่ม "บันทึกข้อมูล" ที่มุมขวาบนเพื่อบันทึกการเปลี่ยนแปลง',
+      });
     }
     notifyChange();
+  };
+
+  // Create brand-new form from Nong Fah template
+  const handleCreateNewFormFromTemplate = async (template: GeneratedFormDefinition) => {
+    try {
+      const randomSuffix = Math.random().toString(36).substring(2, 7);
+      const categorySlug = (template.category || 'form').toLowerCase().replace(/[^a-z0-9]/g, '-');
+      const toastId = toast.loading('กำลังสร้างฟอร์มใหม่จากโครงสร้างน้องฟ้า AI...');
+      const res = await createForm({
+        title_th: template.title?.th || 'แบบฟอร์มใหม่',
+        title: template.title,
+        description_th: template.description?.th,
+        description: template.description,
+        slug: `sv-${categorySlug}-${randomSuffix}`,
+        category: template.category || 'general',
+        access_type: 'public',
+        initial_fields: template.fields || [],
+      });
+      toast.dismiss(toastId);
+      if (res.success && res.data) {
+        toast.success(`สร้างฟอร์มใหม่เรียบร้อยพร้อม ${template.fields?.length || 0} ช่องคำถาม!`);
+        router.push(`/admin/forms/${res.data.id}/edit`);
+      } else {
+        toast.error('ไม่สามารถสร้างฟอร์มใหม่ได้', { description: res.error });
+      }
+    } catch (err: any) {
+      toast.error('เกิดข้อผิดพลาดในการสร้างฟอร์ม', { description: err.message });
+    }
   };
 
   // Image Upload for image fields
@@ -2031,6 +2067,7 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
         formTitle={form.title[activeLang] || form.title.th}
         pageContext="editor"
         onApplyForm={handleApplyNongFahForm}
+        onCreateFromTemplate={handleCreateNewFormFromTemplate}
         onOpenStudio={() => setShowNongFahModal(true)}
       />
     </div>
