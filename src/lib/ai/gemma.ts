@@ -69,7 +69,7 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
           'X-Goog-Api-Client': 'svportal-forms/1.0',
         },
         body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(25000),
       });
 
       if (!res.ok) {
@@ -157,7 +157,15 @@ Strict requirements:
 5. Field types can be: 'section_header', 'text', 'textarea', 'number', 'radio', 'checkbox', 'select', 'date', 'time', 'file_upload', 'rating'.
 6. For choices (radio, checkbox, select), provide clear options with values like 'opt_1', 'opt_2' and localized labels.
 7. Remember the school grades are Nursery to Grade 6: อ.1 - ป.6.
-8. Design a focused, complete set of questions (around 6-10 fields) suitable for school parents and teachers.
+8. Design a thorough, detailed, and production-ready school form structure. Do NOT limit or truncate fields to a small number. Include all realistic fields needed for real school operations:
+   - Logical Section Headers ('section_header') dividing the form into clear parts (e.g., Student Profile, Parent/Guardian Contact, Course/Activity Specifics, Health/Allergies/Dietary Care, Transportation/Logistics, Payment Slip & Attachment, Terms & Consent).
+   - Student Identification & Details (e.g. student ID, full name, grade/room, student nickname).
+   - Parent / Guardian Information (e.g. guardian name, relationship, emergency telephone number, LINE ID).
+   - Detailed activity/survey/request specific fields with appropriate selection options, notes, or quantities.
+   - Medical & Special Care details when applicable (allergies, congenital disease, emergency hospital preference).
+   - Document upload / Payment slip attachment ('file_upload') if financial or official documents are involved.
+   - Parent consent checkbox or agreement confirmation.
+   Typically design 14 to 24 comprehensive, high-quality fields suitable for complete school administrative workflows.
 
 JSON Schema to follow:
 {
@@ -167,7 +175,7 @@ JSON Schema to follow:
   "fields": [
     {
       "field_key": "field_...",
-      "field_type": "section_header" | "text" | "radio" | "checkbox" | "select" | "number" | "file_upload" | "date",
+      "field_type": "section_header" | "text" | "textarea" | "radio" | "checkbox" | "select" | "number" | "file_upload" | "date" | "time" | "rating",
       "label": { "th": "...", "en": "...", "zh": "..." },
       "help_text": { "th": "", "en": "", "zh": "" },
       "is_required": boolean,
@@ -180,13 +188,13 @@ JSON Schema to follow:
 }`;
 
   const userPrompt = `User Prompt: "${userRequirement.trim()}"
-Design a complete, comprehensive form structure for this requirement. Return strictly JSON.`;
+Design a complete, comprehensive, and detailed form structure for this requirement covering all necessary sections and questions. Return strictly JSON.`;
 
   const rawJson = await callGemma({
     systemPrompt,
     userPrompt,
     temperature: 0.2,
-    maxTokens: 6000,
+    maxTokens: 8192,
     responseMimeType: 'application/json',
   });
 
@@ -343,7 +351,7 @@ Strict rules to follow:
    - In "reply": Give a warm, polite Thai response explaining what form you designed, what fields were included, and how it matches the school's context.
    - In "generatedForm": Return a complete form definition conforming to the GeneratedFormDefinition schema (title in th/en/zh, description, category, and complete fields array with localized th/en/zh, field_key, field_type, label, help_text, is_required, width, options).
    - Somkidvittaya School grades are Kindergarten 1 to Primary 6 (อ.1 - ป.6).
-   - Design around 6 to 8 essential fields with 3-5 choice options max, keeping the structure focused and easy to fill out.
+   - Design a thorough and detailed form (typically 12-22 fields) with logical section headers ('section_header') dividing the form into clear parts: Student Information, Parent/Guardian Contacts, Specific Choices/Details, Health/Medical, Payment/File Uploads if needed, and Parent Agreement/Consent. Do NOT artificially cap or restrict questions.
 6. If the user message is a general question, greeting, advice on forms, PDPA guidelines, or inquiry:
    - Set "actionType": "chat"
    - In "reply": Answer warmly, politely, and informatively in Thai.
@@ -394,7 +402,7 @@ Analyze the message and return strictly JSON.`;
     systemPrompt,
     userPrompt,
     temperature: 0.2,
-    maxTokens: 6000,
+    maxTokens: 8192,
     responseMimeType: 'application/json',
   });
 
