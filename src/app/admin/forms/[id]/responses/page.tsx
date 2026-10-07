@@ -14,6 +14,7 @@ import {
   Loader2, ExternalLink, X, Image as ImageIcon, AlertCircle, QrCode
 } from 'lucide-react';
 import { FormQRCodeModal } from '@/components/forms/FormQRCodeModal';
+import { NongFahResponsesInsights } from '@/components/forms/NongFahResponsesInsights';
 
 export default function FormResponsesPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -242,6 +243,12 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
 
       {/* Main Content Area */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+        {/* Nong Fah AI Executive Insights */}
+        <NongFahResponsesInsights
+          formId={form.id}
+          totalResponses={total}
+        />
+
         {/* Filters Bar */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs mb-6 flex flex-col sm:flex-row gap-4 justify-between items-center">
           <div className="relative w-full sm:w-80">

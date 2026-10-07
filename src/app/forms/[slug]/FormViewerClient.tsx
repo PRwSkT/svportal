@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { FormDefinition, FormField, SupportedLang } from '@/types';
@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle2, AlertCircle, Upload, Star, Check, Globe,
   Lock, ArrowRight, Loader2, RefreshCw, FileText, ChevronRight,
-  Info, Image as ImageIcon
+  Info, Image as ImageIcon, Search, UserCheck
 } from 'lucide-react';
 
 const UI_TEXT: Record<SupportedLang, {
@@ -104,6 +104,88 @@ export default function FormViewerClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
+
+  // Student Suggestion & Autofill States
+  const [studentSuggestions, setStudentSuggestions] = useState<Array<{ id: string; name: string; first_name: string; last_name: string; grade: string }>>([]);
+  const [activeSuggestFieldKey, setActiveSuggestFieldKey] = useState<string | null>(null);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const suggestTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Helper: Detect if field asks for student name or student ID
+  const isStudentLookupField = (lbl?: string | null) => {
+    if (!lbl) return false;
+    const l = lbl.toLowerCase();
+    return (
+      l.includes('นักเรียน') ||
+      l.includes('ผู้เรียน') ||
+      l.includes('ชื่อ-สกุล') ||
+      l.includes('ชื่อ-นามสกุล') ||
+      l.includes('ชื่อ - นามสกุล') ||
+      (l.includes('student') && (l.includes('name') || l.includes('id')))
+    );
+  };
+
+  const fetchStudentSuggestions = (query: string, fieldKey: string) => {
+    if (suggestTimeoutRef.current) clearTimeout(suggestTimeoutRef.current);
+    const trimmed = query.trim();
+    if (trimmed.length < 3) {
+      setStudentSuggestions([]);
+      setActiveSuggestFieldKey(null);
+      return;
+    }
+
+    setActiveSuggestFieldKey(fieldKey);
+    setIsLoadingSuggestions(true);
+
+    suggestTimeoutRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/forms/students/suggest?q=${encodeURIComponent(trimmed)}`);
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          setStudentSuggestions(json.data);
+        } else {
+          setStudentSuggestions([]);
+        }
+      } catch (err) {
+        console.error('Failed to fetch student suggestions:', err);
+        setStudentSuggestions([]);
+      } finally {
+        setIsLoadingSuggestions(false);
+      }
+    }, 250);
+  };
+
+  const handleSelectStudentSuggestion = (
+    student: { id: string; name: string; grade: string },
+    currentFieldKey: string
+  ) => {
+    // 1. Set current student name
+    const newAnswers: Record<string, any> = { ...answers, [currentFieldKey]: student.name };
+
+    // 2. Intelligent Auto-fill for related fields (Grade, Classroom, Student ID)
+    initialFields.forEach((f) => {
+      const lbl = (f.label?.[lang] || f.label?.th || '').toLowerCase();
+      // If there is a grade / room field
+      if (
+        f.field_key !== currentFieldKey &&
+        (lbl.includes('ระดับชั้น') || lbl.includes('ชั้นเรียน') || lbl.includes('ห้องเรียน') || lbl.includes('ชั้น/ห้อง') || lbl.includes('grade'))
+      ) {
+        newAnswers[f.field_key] = student.grade;
+      }
+      // If there is a student ID field
+      if (
+        f.field_key !== currentFieldKey &&
+        (lbl.includes('รหัสนักเรียน') || lbl.includes('เลขประจำตัวนักเรียน') || (lbl.includes('student') && lbl.includes('id')))
+      ) {
+        newAnswers[f.field_key] = student.id;
+      }
+    });
+
+    setAnswers(newAnswers);
+    setStudentSuggestions([]);
+    setActiveSuggestFieldKey(null);
+    toast.success(`ดึงข้อมูล ${student.name} (${student.grade}) เรียบร้อยแล้ว`);
+  };
 
   const supabase = createClient();
   const t = UI_TEXT[lang];
@@ -578,13 +660,77 @@ export default function FormViewerClient({
                   <div className="mt-2">
                     {/* Single Line Text */}
                     {field.field_type === 'text' && (
-                      <input
-                        type="text"
-                        value={answers[field.field_key] || ''}
-                        onChange={(e) => handleInputChange(field.field_key, e.target.value)}
-                        placeholder={fieldLabel}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white transition-all"
-                      />
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={answers[field.field_key] || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            handleInputChange(field.field_key, val);
+                            if (isStudentLookupField(fieldLabel)) {
+                              fetchStudentSuggestions(val, field.field_key);
+                            }
+                          }}
+                          onBlur={() => {
+                            setTimeout(() => {
+                              setActiveSuggestFieldKey(null);
+                            }, 250);
+                          }}
+                          placeholder={
+                            isStudentLookupField(fieldLabel)
+                              ? `${fieldLabel} (พิมพ์อย่างน้อย 3 ตัวอักษรเพื่อค้นหา)`
+                              : fieldLabel
+                          }
+                          className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white transition-all"
+                        />
+
+                        {/* Student Suggestion Dropdown */}
+                        {activeSuggestFieldKey === field.field_key && (
+                          <div className="absolute top-full left-0 right-0 z-40 mt-1.5 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
+                            <div className="bg-slate-50/90 px-3.5 py-2 text-[11px] font-semibold text-slate-500 flex items-center justify-between">
+                              <span className="flex items-center gap-1.5 text-slate-700">
+                                <Search className="w-3.5 h-3.5 text-[#7B1C3E]" />
+                                <span>รายชื่อนักเรียนที่ตรงกัน (คลิกเพื่อเติมข้อมูลอัตโนมัติ)</span>
+                              </span>
+                              {isLoadingSuggestions && (
+                                <span className="text-[10px] text-[#7B1C3E] flex items-center gap-1">
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                  กำลังค้นหา...
+                                </span>
+                              )}
+                            </div>
+                            {studentSuggestions.map((s) => (
+                              <button
+                                key={s.id}
+                                type="button"
+                                onMouseDown={(e) => {
+                                  // Use onMouseDown so it fires before input blur
+                                  e.preventDefault();
+                                  handleSelectStudentSuggestion(s, field.field_key);
+                                }}
+                                className="w-full text-left px-4 py-2.5 hover:bg-[#7B1C3E]/5 flex items-center justify-between gap-3 transition-colors cursor-pointer group"
+                              >
+                                <div>
+                                  <div className="text-xs sm:text-sm font-bold text-slate-800 group-hover:text-[#7B1C3E] transition-colors">
+                                    {s.name}
+                                  </div>
+                                  <div className="text-[11px] text-slate-400">
+                                    รหัสนักเรียน: {s.id}
+                                  </div>
+                                </div>
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#7B1C3E]/10 text-[#7B1C3E] shrink-0 border border-[#7B1C3E]/20">
+                                  {s.grade}
+                                </span>
+                              </button>
+                            ))}
+                            {studentSuggestions.length === 0 && !isLoadingSuggestions && (
+                              <div className="px-4 py-3 text-xs text-slate-400 text-center">
+                                ไม่พบข้อมูลนักเรียนที่ตรงกับคำค้นหานี้
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     )}
 
                     {/* Multiline Paragraph Textarea */}

@@ -23,9 +23,11 @@ import {
   FileText, AlignLeft, Hash, CheckSquare, CircleDot, ChevronDownSquare,
   Calendar, Clock, Upload, Star, Heading, Loader2, ExternalLink,
   ShieldCheck, AlertCircle, RefreshCw, X, LayoutTemplate,
-  Image as ImageIcon, Info, Smartphone, Monitor, User, Users, UserCheck, Search, QrCode
+  Image as ImageIcon, Info, Smartphone, Monitor, User, Users, UserCheck, Search, QrCode, Bot
 } from 'lucide-react';
 import { FormQRCodeModal } from '@/components/forms/FormQRCodeModal';
+import { NongFahStudioModal } from '@/components/forms/NongFahStudioModal';
+import { GeneratedFormDefinition } from '@/lib/ai/gemma';
 
 const FIELD_TEMPLATES: {
   type: FormFieldType;
@@ -167,6 +169,7 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [previewLang, setPreviewLang] = useState<SupportedLang>('th');
   const [showQrModal, setShowQrModal] = useState(false);
+  const [showNongFahModal, setShowNongFahModal] = useState(false);
 
   // Collaborator States
   const [collaboratorCandidates, setCollaboratorCandidates] = useState<any[]>([]);
@@ -371,6 +374,41 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
       copy[fieldIndex].options = curOpts;
       return copy;
     });
+    notifyChange();
+  };
+
+  // Apply Nong Fah AI Generated Form
+  const handleApplyNongFahForm = (
+    generated: GeneratedFormDefinition,
+    mode: 'replace' | 'append'
+  ) => {
+    if (!form) return;
+
+    const baseIndex = mode === 'replace' ? 0 : fields.length;
+    const preparedFields: FormField[] = (generated.fields || []).map((f, idx) => ({
+      ...f,
+      id: crypto.randomUUID(),
+      form_id: form.id,
+      field_key: f.field_key || `field_${Date.now().toString(36)}_${idx}`,
+      sort_order: baseIndex + idx,
+      label: f.label || { th: 'คำถาม', en: 'Question', zh: '问题' },
+      help_text: f.help_text || { th: '', en: '', zh: '' },
+      is_required: f.is_required ?? true,
+      width: f.width || 'full',
+      options: f.options ? JSON.parse(JSON.stringify(f.options)) : null,
+    }));
+
+    if (mode === 'replace') {
+      setForm(prev => prev ? ({
+        ...prev,
+        title: generated.title || prev.title,
+        description: generated.description || prev.description,
+        category: generated.category || prev.category,
+      }) : null);
+      setFields(preparedFields);
+    } else {
+      setFields(prev => [...prev, ...preparedFields]);
+    }
     notifyChange();
   };
 
@@ -615,6 +653,17 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
 
           {/* Right: Actions */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* Nong Fah AI Assistant */}
+            <button
+              type="button"
+              onClick={() => setShowNongFahModal(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-sky-50 to-indigo-50 hover:from-sky-100 hover:to-indigo-100 text-sky-800 border border-sky-200 rounded-xl text-xs font-bold shadow-2xs transition-all cursor-pointer"
+              title="ให้น้องฟ้าออกแบบโครงร่างฟอร์มให้คุณอัตโนมัติด้วย AI"
+            >
+              <Bot className="w-4 h-4 text-sky-600" />
+              <span>น้องฟ้าช่วยสร้างฟอร์ม</span>
+            </button>
+
             {/* AI Translate Button */}
             <button
               onClick={handleAITranslate}
@@ -1101,6 +1150,27 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
               </p>
 
               <div className="space-y-4 max-h-[calc(100vh-270px)] overflow-y-auto pr-1">
+                {/* Nong Fah AI Form Generator Card */}
+                <div className="p-3.5 bg-gradient-to-br from-sky-50 to-indigo-50/60 border border-sky-200/90 rounded-2xl shadow-2xs">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className="w-6 h-6 rounded-lg bg-sky-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                      <Sparkles className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-xs font-bold text-sky-950">น้องฟ้าช่วยสร้างฟอร์ม</span>
+                  </div>
+                  <p className="text-[11px] text-sky-800/80 leading-relaxed mb-2.5">
+                    ระบุความต้องการ ให้น้องฟ้า AI วางโครงสร้างคำถามให้คุณทันที
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowNongFahModal(true)}
+                    className="w-full py-1.5 px-3 bg-white hover:bg-sky-100/70 text-sky-800 border border-sky-300 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Bot className="w-3.5 h-3.5 text-sky-600" />
+                    <span>เปิดผู้ช่วยน้องฟ้า</span>
+                  </button>
+                </div>
+
                 {/* Category 1: Layout & Information Elements */}
                 <div>
                   <div className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider mb-2 flex items-center gap-1">
@@ -1214,13 +1284,21 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
               {/* Empty state */}
               {fields.length === 0 ? (
                 <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300 p-8">
-                  <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto text-slate-400 mb-3">
-                    <Plus className="w-6 h-6" />
+                  <div className="w-12 h-12 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center mx-auto text-sky-600 mb-3 shadow-2xs">
+                    <Sparkles className="w-6 h-6" />
                   </div>
                   <h4 className="text-sm font-bold text-slate-800">ยังไม่มีองค์ประกอบในฟอร์ม</h4>
-                  <p className="text-xs text-slate-500 max-w-xs mx-auto mt-1">
-                    คลิกเลือกองค์ประกอบหรือช่องคำถามจากกล่องเครื่องมือด้านซ้ายเพื่อเริ่มสร้างฟอร์ม
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-5">
+                    คลิกเลือกเครื่องมือด้านซ้าย หรือให้น้องฟ้า AI ช่วยวางโครงร่างแบบฟอร์มให้คุณอย่างรวดเร็ว
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowNongFahModal(true)}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>ให้น้องฟ้าช่วยสร้างฟอร์ม</span>
+                  </button>
                 </div>
               ) : (
                 /* Fields list */
@@ -1887,6 +1965,13 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
         onClose={() => setShowQrModal(false)}
         formTitle={form.title[activeLang] || form.title.th || 'แบบฟอร์ม'}
         formSlug={form.slug}
+      />
+
+      {/* Nong Fah AI Form Studio Modal */}
+      <NongFahStudioModal
+        isOpen={showNongFahModal}
+        onClose={() => setShowNongFahModal(false)}
+        onApplyForm={handleApplyNongFahForm}
       />
     </div>
   );
