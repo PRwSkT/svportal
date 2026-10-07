@@ -45,6 +45,8 @@ ${trimmed}`;
         'gemini-3.5-flash-lite',
         'gemini-3.1-flash-lite',
         'gemini-2.5-flash-lite',
+        'gemma-4-26b-a4b-it',
+        'gemma-4-31b-it',
       ]) {
         try {
           const res = await fetch(
@@ -62,7 +64,9 @@ ${trimmed}`;
 
           if (res.ok) {
             const data = await res.json();
-            const translated = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+            const parts = data?.candidates?.[0]?.content?.parts || [];
+            const answerPart = parts.find((p: any) => !p.thought) || parts[parts.length - 1];
+            const translated = answerPart?.text?.trim();
             if (translated) return cleanTranslationResult(translated, targetLang);
           }
         } catch {

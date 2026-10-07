@@ -10,6 +10,8 @@ const GEMMA_MODELS = [
   'gemini-3.5-flash-lite',
   'gemini-3.1-flash-lite',
   'gemini-2.5-flash-lite',
+  'gemma-4-26b-a4b-it',
+  'gemma-4-31b-it',
 ];
 
 interface GemmaCallOptions {
@@ -78,7 +80,9 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
       }
 
       const data = await res.json();
-      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      const parts = data?.candidates?.[0]?.content?.parts || [];
+      const answerPart = parts.find((p: any) => !p.thought) || parts[parts.length - 1];
+      const rawText = answerPart?.text?.trim();
       if (rawText) {
         return rawText;
       }
