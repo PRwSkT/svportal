@@ -19,7 +19,7 @@ self.addEventListener('push', (event) => {
     title: 'โรงเรียนสมคิดวิทยา (SV Portal)',
     body: 'มีการแจ้งเตือนใหม่จากระบบ',
     icon: '/images/nongfah/nongfah-avatar.png',
-    badge: '/logo2.png',
+    badge: '/icons/badge-96.png',
     data: { url: '/home' },
   };
 
@@ -35,7 +35,7 @@ self.addEventListener('push', (event) => {
   const options = {
     body: data.body,
     icon: data.icon || '/images/nongfah/nongfah-avatar.png',
-    badge: data.badge || '/logo2.png',
+    badge: data.badge || '/icons/badge-96.png',
     tag: data.tag || 'svportal-notification',
     data: data.data || { url: '/home' },
     renotify: true,

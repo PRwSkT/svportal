@@ -75,7 +75,7 @@ export async function sendPushNotification(
     title: payload.title,
     body: payload.body,
     icon: payload.icon || '/images/nongfah/nongfah-avatar.png',
-    badge: payload.badge || '/logo2.png',
+    badge: payload.badge || '/icons/badge-96.png',
     tag: payload.tag || 'svportal-notification',
     data: {
       url: payload.url || '/home',
