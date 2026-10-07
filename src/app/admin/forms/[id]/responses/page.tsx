@@ -11,12 +11,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Download, Search, Filter, Trash2, Eye,
   BarChart2, FileText, CheckCircle2, Calendar, Globe,
-  Loader2, ExternalLink, X, Image as ImageIcon, AlertCircle, QrCode
+  Loader2, ExternalLink, X, Image as ImageIcon, AlertCircle, QrCode,
+  PieChart, HelpCircle, List, Sparkles
 } from 'lucide-react';
 import { FormQRCodeModal } from '@/components/forms/FormQRCodeModal';
 import { NongFahResponsesInsights } from '@/components/forms/NongFahResponsesInsights';
 import { StudentDbSyncSection } from '@/components/forms/StudentDbSyncSection';
 import { NongFahChatWidget } from '@/components/forms/NongFahChatWidget';
+import { FormAnalyticsCharts } from '@/components/forms/FormAnalyticsCharts';
+import { FormQuestionBreakdown } from '@/components/forms/FormQuestionBreakdown';
 import { GeneratedFormDefinition } from '@/lib/ai/gemma';
 
 export default function FormResponsesPage({ params }: { params: Promise<{ id: string }> }) {
@@ -28,6 +31,9 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
   const [fields, setFields] = useState<FormField[]>([]);
   const [responses, setResponses] = useState<FormResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // View Mode: 'charts' (Summary & Charts), 'questions' (By Question), 'individual' (Submissions Table), 'ai' (AI Insights & Sync)
+  const [activeTab, setActiveTab] = useState<'charts' | 'questions' | 'individual' | 'ai'>('charts');
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -271,168 +277,267 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
-        {/* Nong Fah AI Executive Insights */}
-        <NongFahResponsesInsights
-          formId={form.id}
-          totalResponses={total}
-        />
-
-        {/* Student Database Sync & Update Section */}
-        <StudentDbSyncSection
-          formId={form.id}
-        />
-
-        {/* Filters Bar */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs mb-6 flex flex-col sm:flex-row gap-4 justify-between items-center">
-          <div className="relative w-full sm:w-80">
-            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="ค้นหาข้อความคำตอบ หรืออีเมล..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white"
-            />
-          </div>
-
-          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+      {/* Navigation Tabs Bar */}
+      <div className="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-2 overflow-x-auto py-2.5">
             <button
-              onClick={() => setLangFilter('all')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${langFilter === 'all' ? 'bg-white shadow-xs text-slate-900' : 'text-slate-600 hover:text-slate-900'}`}
+              type="button"
+              onClick={() => setActiveTab('charts')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                activeTab === 'charts'
+                  ? 'bg-[#7B1C3E] text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
             >
-              ทุกภาษา ({total})
+              <BarChart2 className="w-4 h-4" />
+              <span>สรุปและกราฟสถิติ (Summary & Charts)</span>
             </button>
+
             <button
-              onClick={() => setLangFilter('th')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${langFilter === 'th' ? 'bg-white shadow-xs text-emerald-800' : 'text-slate-600 hover:text-slate-900'}`}
+              type="button"
+              onClick={() => setActiveTab('questions')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                activeTab === 'questions'
+                  ? 'bg-[#7B1C3E] text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
             >
-              TH ({thCount})
+              <HelpCircle className="w-4 h-4" />
+              <span>แยกรายคำถาม (By Question)</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                  activeTab === 'questions' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                }`}
+              >
+                {fields.filter(f => !['section_header', 'image', 'info_text'].includes(f.field_type)).length}
+              </span>
             </button>
+
             <button
-              onClick={() => setLangFilter('en')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${langFilter === 'en' ? 'bg-white shadow-xs text-blue-800' : 'text-slate-600 hover:text-slate-900'}`}
+              type="button"
+              onClick={() => setActiveTab('individual')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                activeTab === 'individual'
+                  ? 'bg-[#7B1C3E] text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
             >
-              EN ({enCount})
+              <List className="w-4 h-4" />
+              <span>ข้อมูลรายบุคคล (Individual Submissions)</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                  activeTab === 'individual' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                }`}
+              >
+                {total}
+              </span>
             </button>
+
             <button
-              onClick={() => setLangFilter('zh')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${langFilter === 'zh' ? 'bg-white shadow-xs text-rose-800' : 'text-slate-600 hover:text-slate-900'}`}
+              type="button"
+              onClick={() => setActiveTab('ai')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                activeTab === 'ai'
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm'
+                  : 'text-purple-700 hover:bg-purple-50'
+              }`}
             >
-              ZH ({zhCount})
+              <Sparkles className="w-4 h-4" />
+              <span>น้องฟ้า AI & ซิงค์ฐานข้อมูล</span>
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Responses Table */}
-        {filteredResponses.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300 p-8">
-            <FileText className="w-10 h-10 text-slate-400 mx-auto mb-2" />
-            <h3 className="text-base font-bold text-slate-800">ยังไม่มีข้อมูลการตอบกลับ</h3>
-            <p className="text-xs text-slate-500 mt-1">
-              เมื่อมีผู้ตอบกรอกแบบฟอร์ม ข้อมูลและไฟล์แนบจะปรากฏที่หน้านี้แบบเรียลไทม์
-            </p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[750px] text-left text-xs text-slate-600">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold uppercase text-[11px] tracking-wider">
-                  <tr>
-                    <th className="py-3.5 px-4 w-12 text-center">#</th>
-                    <th className="py-3.5 px-4 w-40">วันเวลาที่ส่ง</th>
-                    <th className="py-3.5 px-4 w-28">ภาษา</th>
-                    <th className="py-3.5 px-4 w-48">ผู้ตอบฟอร์ม</th>
-                    <th className="py-3.5 px-4">ตัวอย่างคำตอบแรก</th>
-                    <th className="py-3.5 px-4 w-24 text-center">ไฟล์แนบ</th>
-                    <th className="py-3.5 px-4 w-32 text-right">การจัดการ</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredResponses.map((resp, index) => {
-                    const firstField = fields.find(f => !['section_header', 'image', 'info_text'].includes(f.field_type));
-                    const rawVal = firstField ? resp.answers?.[firstField.field_key] : null;
-                    let previewText = '-';
-                    if (rawVal !== null && rawVal !== undefined && rawVal !== '') {
-                      if (Array.isArray(rawVal)) {
-                        previewText = rawVal.map(v => firstField?.options?.find(o => o.value === v)?.label?.th || v).join(', ');
-                      } else if (firstField?.options) {
-                        previewText = firstField.options.find(o => o.value === rawVal)?.label?.th || String(rawVal);
-                      } else {
-                        previewText = String(rawVal);
-                      }
-                    }
+      {/* Main Content Area */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+        {/* TAB 1: Visual Charts & Analytics */}
+        {activeTab === 'charts' && (
+          <FormAnalyticsCharts
+            form={form}
+            fields={fields}
+            responses={responses}
+          />
+        )}
 
-                    const hasFiles = Array.isArray(resp.attachments) && resp.attachments.length > 0;
+        {/* TAB 2: Question-by-Question Breakdown */}
+        {activeTab === 'questions' && (
+          <FormQuestionBreakdown
+            form={form}
+            fields={fields}
+            responses={responses}
+            onSelectResponse={(resp) => setSelectedResponse(resp)}
+          />
+        )}
 
-                    return (
-                      <tr key={resp.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-3.5 px-4 text-center font-mono text-slate-400">
-                          {index + 1}
-                        </td>
-                        <td className="py-3.5 px-4 font-mono text-slate-700">
-                          {new Date(resp.submitted_at).toLocaleString('th-TH', {
-                            dateStyle: 'short',
-                            timeStyle: 'short',
-                          })}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                              resp.submission_lang === 'th'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : resp.submission_lang === 'en'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-rose-100 text-rose-800'
-                            }`}
-                          >
-                            {resp.submission_lang?.toUpperCase() || 'TH'}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 font-medium text-slate-900 truncate max-w-[180px]">
-                          {resp.respondent_email || 'บุคคลภายนอก (Public)'}
-                        </td>
-                        <td className="py-3.5 px-4 truncate max-w-xs text-slate-600">
-                          <span className="font-semibold text-slate-800 mr-1.5">
-                            {firstField?.label?.th}:
-                          </span>
-                          <span>{previewText}</span>
-                        </td>
-                        <td className="py-3.5 px-4 text-center">
-                          {hasFiles ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">
-                              <ImageIcon className="w-3 h-3" />
-                              {resp.attachments!.length} ไฟล์
-                            </span>
-                          ) : (
-                            <span className="text-slate-300">-</span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              onClick={() => setSelectedResponse(resp)}
-                              className="p-1.5 text-slate-500 hover:text-[#7B1C3E] hover:bg-slate-100 rounded-lg transition-colors"
-                              title="ดูรายละเอียดฉบับเต็ม"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteResponse(resp.id)}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                              title="ลบรายการนี้"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+        {/* TAB 3: Individual Submissions Table */}
+        {activeTab === 'individual' && (
+          <div>
+            {/* Filters Bar */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs mb-6 flex flex-col sm:flex-row gap-4 justify-between items-center">
+              <div className="relative w-full sm:w-80">
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="ค้นหาข้อความคำตอบ หรืออีเมล..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white"
+                />
+              </div>
+
+              <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+                <button
+                  onClick={() => setLangFilter('all')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${langFilter === 'all' ? 'bg-white shadow-xs text-slate-900' : 'text-slate-600 hover:text-slate-900'}`}
+                >
+                  ทุกภาษา ({total})
+                </button>
+                <button
+                  onClick={() => setLangFilter('th')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${langFilter === 'th' ? 'bg-white shadow-xs text-emerald-800' : 'text-slate-600 hover:text-slate-900'}`}
+                >
+                  TH ({thCount})
+                </button>
+                <button
+                  onClick={() => setLangFilter('en')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${langFilter === 'en' ? 'bg-white shadow-xs text-blue-800' : 'text-slate-600 hover:text-slate-900'}`}
+                >
+                  EN ({enCount})
+                </button>
+                <button
+                  onClick={() => setLangFilter('zh')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${langFilter === 'zh' ? 'bg-white shadow-xs text-rose-800' : 'text-slate-600 hover:text-slate-900'}`}
+                >
+                  ZH ({zhCount})
+                </button>
+              </div>
             </div>
+
+            {/* Responses Table */}
+            {filteredResponses.length === 0 ? (
+              <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300 p-8">
+                <FileText className="w-10 h-10 text-slate-400 mx-auto mb-2" />
+                <h3 className="text-base font-bold text-slate-800">ยังไม่มีข้อมูลการตอบกลับ</h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  เมื่อมีผู้ตอบกรอกแบบฟอร์ม ข้อมูลและไฟล์แนบจะปรากฏที่หน้านี้แบบเรียลไทม์
+                </p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[750px] text-left text-xs text-slate-600">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold uppercase text-[11px] tracking-wider">
+                      <tr>
+                        <th className="py-3.5 px-4 w-12 text-center">#</th>
+                        <th className="py-3.5 px-4 w-40">วันเวลาที่ส่ง</th>
+                        <th className="py-3.5 px-4 w-28">ภาษา</th>
+                        <th className="py-3.5 px-4 w-48">ผู้ตอบฟอร์ม</th>
+                        <th className="py-3.5 px-4">ตัวอย่างคำตอบแรก</th>
+                        <th className="py-3.5 px-4 w-24 text-center">ไฟล์แนบ</th>
+                        <th className="py-3.5 px-4 w-32 text-right">การจัดการ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredResponses.map((resp, index) => {
+                        const firstField = fields.find(f => !['section_header', 'image', 'info_text'].includes(f.field_type));
+                        const rawVal = firstField ? resp.answers?.[firstField.field_key] : null;
+                        let previewText = '-';
+                        if (rawVal !== null && rawVal !== undefined && rawVal !== '') {
+                          if (Array.isArray(rawVal)) {
+                            previewText = rawVal.map(v => firstField?.options?.find(o => o.value === v)?.label?.th || v).join(', ');
+                          } else if (firstField?.options) {
+                            previewText = firstField.options.find(o => o.value === rawVal)?.label?.th || String(rawVal);
+                          } else {
+                            previewText = String(rawVal);
+                          }
+                        }
+
+                        const hasFiles = Array.isArray(resp.attachments) && resp.attachments.length > 0;
+
+                        return (
+                          <tr key={resp.id} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="py-3.5 px-4 text-center font-mono text-slate-400">
+                              {index + 1}
+                            </td>
+                            <td className="py-3.5 px-4 font-mono text-slate-700">
+                              {new Date(resp.submitted_at).toLocaleString('th-TH', {
+                                dateStyle: 'short',
+                                timeStyle: 'short',
+                              })}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span
+                                className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  resp.submission_lang === 'th'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : resp.submission_lang === 'en'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : 'bg-rose-100 text-rose-800'
+                                }`}
+                              >
+                                {resp.submission_lang?.toUpperCase() || 'TH'}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 font-medium text-slate-900 truncate max-w-[180px]">
+                              {resp.respondent_email || 'บุคคลภายนอก (Public)'}
+                            </td>
+                            <td className="py-3.5 px-4 truncate max-w-xs text-slate-600">
+                              <span className="font-semibold text-slate-800 mr-1.5">
+                                {firstField?.label?.th}:
+                              </span>
+                              <span>{previewText}</span>
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              {hasFiles ? (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">
+                                  <ImageIcon className="w-3 h-3" />
+                                  {resp.attachments!.length} ไฟล์
+                                </span>
+                              ) : (
+                                <span className="text-slate-300">-</span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  onClick={() => setSelectedResponse(resp)}
+                                  className="p-1.5 text-slate-500 hover:text-[#7B1C3E] hover:bg-slate-100 rounded-lg transition-colors"
+                                  title="ดูรายละเอียดฉบับเต็ม"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteResponse(resp.id)}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                  title="ลบรายการนี้"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 4: Nong Fah AI & Student DB Sync */}
+        {activeTab === 'ai' && (
+          <div className="space-y-6">
+            <NongFahResponsesInsights
+              formId={form.id}
+              totalResponses={total}
+            />
+            <StudentDbSyncSection
+              formId={form.id}
+            />
           </div>
         )}
       </div>
