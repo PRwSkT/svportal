@@ -423,6 +423,32 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
     notifyChange();
   };
 
+  // Apply Interactive Modified Fields from Nong Fah Chat
+  const handleApplyModifiedFields = (modifiedFields: FormField[]) => {
+    if (!form) return;
+    const preparedFields: FormField[] = modifiedFields.map((f, idx) => {
+      const existing = fields.find(old => old.id === f.id || (old.field_key && old.field_key === f.field_key));
+      return {
+        ...f,
+        id: existing?.id || f.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `f_${Date.now()}_${idx}`),
+        form_id: form.id,
+        field_key: f.field_key || existing?.field_key || `field_${Date.now().toString(36)}_${idx}`,
+        sort_order: idx,
+        label: f.label || { th: 'คำถาม', en: 'Question', zh: '问题' },
+        help_text: f.help_text || { th: '', en: '', zh: '' },
+        is_required: f.is_required ?? true,
+        width: f.width || 'full',
+        options: f.options ? JSON.parse(JSON.stringify(f.options)) : null,
+      };
+    });
+
+    setFields(preparedFields);
+    notifyChange();
+    toast.success(`ปรับปรุงโครงสร้างตามคำแนะนำของน้องฟ้าเรียบร้อย (${preparedFields.length} ช่องคำถาม)`, {
+      description: 'อย่าลืมกดปุ่ม "บันทึกข้อมูล" ที่มุมขวาบนเพื่อบันทึกการเปลี่ยนแปลงลงฐานข้อมูล',
+    });
+  };
+
   // Create brand-new form from Nong Fah template
   const handleCreateNewFormFromTemplate = async (template: GeneratedFormDefinition) => {
     try {
@@ -2066,7 +2092,9 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
       <NongFahChatWidget
         formTitle={form.title[activeLang] || form.title.th}
         pageContext="editor"
+        currentFields={fields}
         onApplyForm={handleApplyNongFahForm}
+        onApplyModifiedFields={handleApplyModifiedFields}
         onCreateFromTemplate={handleCreateNewFormFromTemplate}
         onOpenStudio={() => setShowNongFahModal(true)}
       />

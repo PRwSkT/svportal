@@ -328,17 +328,33 @@ export interface NongFahChatMessageItem {
   content: string;
 }
 
+export interface NongFahChatContext {
+  page?: string;
+  formTitle?: string;
+  currentFields?: Array<{
+    field_key: string;
+    field_type: string;
+    label: { th: string; en?: string; zh?: string };
+    help_text?: { th?: string; en?: string; zh?: string } | null;
+    is_required?: boolean;
+    width?: string;
+    options?: Array<{ value: string; label: { th: string; en?: string; zh?: string } }> | null;
+  }>;
+}
+
 export interface NongFahChatResponse {
   reply: string;
-  actionType: 'form_generated' | 'chat';
+  actionType: 'form_generated' | 'form_modified' | 'chat';
   generatedForm?: GeneratedFormDefinition | null;
+  modifiedFields?: FormField[] | null;
+  modificationSummary?: string | null;
   suggestions?: string[];
 }
 
 export async function chatWithNongFah(
   message: string,
   history: NongFahChatMessageItem[] = [],
-  context?: { page?: string; formTitle?: string }
+  context?: NongFahChatContext
 ): Promise<NongFahChatResponse> {
   const systemPrompt = `You are "น้องฟ้า" (Nong Fah), the intelligent, polite, friendly, and expert educational AI Assistant for Somkidvittaya School (โรงเรียนสมคิดวิทยา).
 Strict rules to follow:
@@ -346,22 +362,52 @@ Strict rules to follow:
 2. Strictly NO EMOJIS anywhere in your responses (Strict zero-emoji compliance).
 3. In Chinese, the school name is ALWAYS "Somkidvittaya学校".
 4. Output MUST be valid JSON only. Do not wrap in markdown or markdown backticks.
-5. If the user message is asking to create, draft, design, or generate a form (e.g. contains words like "สร้างฟอร์ม", "ขอแบบฟอร์ม", "ทำฟอร์ม", "แบบฟอร์ม", "ลงทะเบียน", "แบบสำรวจ", "สร้าง", "ออกแบบ"):
-   - Set "actionType": "form_generated"
-   - In "reply": Give a warm, polite Thai response explaining what form you designed, what fields were included, and how it matches the school's context.
-   - In "generatedForm": Return a complete form definition conforming to the GeneratedFormDefinition schema (title in th/en/zh, description, category, and complete fields array with localized th/en/zh, field_key, field_type, label, help_text, is_required, width, options).
-   - Somkidvittaya School grades are Kindergarten 1 to Primary 6 (อ.1 - ป.6).
-   - Design a thorough and detailed form (typically 12-22 fields) with logical section headers ('section_header') dividing the form into clear parts: Student Information, Parent/Guardian Contacts, Specific Choices/Details, Health/Medical, Payment/File Uploads if needed, and Parent Agreement/Consent. Do NOT artificially cap or restrict questions.
-6. If the user message is a general question, greeting, advice on forms, PDPA guidelines, or inquiry:
-   - Set "actionType": "chat"
-   - In "reply": Answer warmly, politely, and informatively in Thai.
-   - Set "generatedForm": null
-7. In "suggestions": Provide 2-4 short, helpful follow-up phrases that the user can click.
+5. Interactive Form Editing in Studio:
+   - If the user is currently editing a form (context.currentFields is provided with >0 items) AND the user message asks to edit, add, update, remove, or adjust questions in the existing form (e.g. contains words like "เพิ่มช่อง", "เพิ่มข้อ", "แก้ข้อ", "เปลี่ยนตัวเลือก", "ลบข้อ", "สลับ", "เพิ่มตัวเลือก", "แก้ไข", "ปรับปรุง", "ตัดข้อ", "ใส่เพิ่ม"):
+     - Set "actionType": "form_modified"
+     - In "reply": Give a warm, polite Thai explanation describing the modification made and explaining why it benefits the school form.
+     - In "modificationSummary": A concise 1-sentence Thai summary of the change (e.g. "เพิ่มช่อง 'เบอร์โทรศัพท์สำรองของผู้ปกครอง' (ข้อความสั้น)", "ปรับปรุงตัวเลือกไซส์เสื้อเป็น S, M, L, XL").
+     - In "modifiedFields": Return the COMPLETE array of updated fields with the change applied. Preserve existing field_key and options where possible, generate a clean field_key for new fields, ensure localized label (th, en, zh), field_type, is_required, width, and options.
+     - Set "generatedForm": null
+6. Form Health & PDPA Audit:
+   - If the user asks to check, audit, or review the current form (e.g. "ตรวจสุขภาพฟอร์ม", "ตรวจฟอร์ม", "ฟอร์มนี้สมบูรณ์ไหม", "มีอะไรต้องเพิ่มไหม", "ตรวจสอบ PDPA"):
+     - Set "actionType": "chat"
+     - In "reply": Provide a comprehensive, professional, polite evaluation covering Form Health Score (e.g. 90/100), key strengths, and actionable suggestions for missing fields (such as emergency contact, allergy details, or PDPA consent).
+     - Set "generatedForm": null
+     - Set "modifiedFields": null
+7. Creating New Form from Scratch:
+   - If the user message asks to create, draft, design, or generate a form from scratch:
+     - Set "actionType": "form_generated"
+     - In "reply": Give a warm, polite Thai response explaining what form you designed, what fields were included, and how it matches the school's context.
+     - In "generatedForm": Return a complete form definition conforming to the GeneratedFormDefinition schema (typically 12-22 detailed fields with logical section_headers, student info, parent contacts, options, file uploads, consent).
+     - Set "modifiedFields": null
+     - Set "modificationSummary": null
+8. General Inquiries & Advice:
+   - If the user message is a general question, greeting, advice on forms, or inquiry:
+     - Set "actionType": "chat"
+     - In "reply": Answer warmly, politely, and informatively in Thai.
+     - Set "generatedForm": null
+     - Set "modifiedFields": null
+9. In "suggestions": Provide 2-4 short, helpful follow-up phrases that the user can click.
 
 JSON schema:
 {
   "reply": "string (polite Thai response, strictly no emojis)",
-  "actionType": "form_generated" | "chat",
+  "actionType": "form_generated" | "form_modified" | "chat",
+  "modificationSummary": "string (if form_modified) or null",
+  "modifiedFields": [
+    {
+      "field_key": "field_...",
+      "field_type": "section_header" | "text" | "textarea" | "number" | "radio" | "checkbox" | "select" | "date" | "time" | "file_upload" | "rating",
+      "label": { "th": "...", "en": "...", "zh": "..." },
+      "help_text": { "th": "", "en": "", "zh": "" },
+      "is_required": true,
+      "width": "full" | "half",
+      "options": [
+        { "value": "opt_1", "label": { "th": "...", "en": "...", "zh": "..." } }
+      ]
+    }
+  ] | null,
   "generatedForm": {
     "title": { "th": "...", "en": "...", "zh": "..." },
     "description": { "th": "...", "en": "...", "zh": "..." },
@@ -391,7 +437,11 @@ JSON schema:
     ? `\nCurrent Context: Editing form "${context.formTitle}" (Page: ${context.page || 'editor'})`
     : '';
 
-  const userPrompt = `${contextNote}
+  const fieldsSummary = context?.currentFields && context.currentFields.length > 0
+    ? `\nCurrently Existing Form Fields (${context.currentFields.length} fields):\n${JSON.stringify(context.currentFields, null, 2)}`
+    : '';
+
+  const userPrompt = `${contextNote}${fieldsSummary}
 Conversation History:
 ${conversationHistoryText || '(No previous history)'}
 
