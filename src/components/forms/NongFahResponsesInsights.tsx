@@ -116,7 +116,7 @@ export function NongFahResponsesInsights({
   };
 
   return (
-    <div className="bg-gradient-to-br from-sky-50/70 via-white to-indigo-50/40 border border-sky-200 rounded-3xl p-5 sm:p-6 shadow-xs mb-8 transition-all">
+    <div id="nong-fah-insights" className="bg-gradient-to-br from-sky-50/70 via-white to-indigo-50/40 border border-sky-200 rounded-3xl p-5 sm:p-6 shadow-xs mb-8 transition-all scroll-mt-24">
       {/* Top Banner & Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-start sm:items-center gap-3.5">

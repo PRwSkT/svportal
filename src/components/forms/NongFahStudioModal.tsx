@@ -87,29 +87,29 @@ export function NongFahStudioModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
         <motion.div
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.96 }}
-          className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] shadow-2xl border border-slate-100 flex flex-col overflow-hidden text-slate-800"
+          className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] sm:max-h-[90vh] shadow-2xl border border-slate-100 flex flex-col overflow-hidden text-slate-800"
         >
           {/* Header */}
-          <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-purple-50 via-pink-50/30 to-white">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-[#7B1C3E] text-white flex items-center justify-center shadow-sm">
-                <Sparkles className="w-5 h-5 text-amber-300" />
+          <div className="px-4 sm:px-6 py-3.5 sm:py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-purple-50 via-pink-50/30 to-white">
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#7B1C3E] text-white flex items-center justify-center shadow-sm shrink-0">
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300" />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base font-bold text-slate-900">
-                    น้องฟ้า (Nong Fah) - AI ผู้ช่วยสร้างแบบฟอร์ม
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate">
+                    น้องฟ้า (Nong Fah) - AI ผู้ช่วยสร้างฟอร์ม
                   </h3>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                  <span className="text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200 shrink-0">
                     Gemma AI
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 truncate hidden sm:block">
                   ระบบผู้ช่วยอัจฉริยะโรงเรียนสมคิดวิทยา ออกแบบโครงสร้างและคำถามแบบฟอร์มให้อัตโนมัติ
                 </p>
               </div>
@@ -117,14 +117,15 @@ export function NongFahStudioModal({
 
             <button
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              className="p-1.5 sm:p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer shrink-0 ml-2"
+              title="ปิดหน้าต่าง"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Modal Body */}
-          <div className="p-6 overflow-y-auto space-y-5 flex-1">
+          <div className="p-4 sm:p-6 overflow-y-auto space-y-4 sm:space-y-5 flex-1">
             {/* Input area */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
@@ -136,17 +137,17 @@ export function NongFahStudioModal({
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   placeholder="เช่น ต้องการสร้างแบบฟอร์มสั่งซื้อชุดพละและสมุดการบ้าน แบ่งหมวดหมู่เสื้อผ้าและอุปกรณ์การเรียน มีช่องระบุจำนวน และช่องแนบสลิปโอนเงิน..."
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white resize-none leading-relaxed"
+                  className="w-full px-3.5 sm:px-4 py-2.5 sm:py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white resize-none leading-relaxed"
                   disabled={isGenerating}
                 />
               </div>
 
               {/* Sample Prompts */}
-              <div className="mt-3">
-                <span className="text-[11px] font-semibold text-slate-400 block mb-2">
-                  ตัวอย่างคำสั่งที่พบบ่อย (คลิกเพื่อเลือก):
+              <div className="mt-2.5 sm:mt-3">
+                <span className="text-[10px] sm:text-[11px] font-semibold text-slate-400 block mb-1.5">
+                  ตัวอย่างคำสั่งที่พบบ่อย (แตะเพื่อเลือก):
                 </span>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex gap-1.5 overflow-x-auto pb-1.5 sm:flex-wrap no-scrollbar">
                   {SAMPLE_PROMPTS.map((p, idx) => (
                     <button
                       key={idx}
@@ -156,7 +157,7 @@ export function NongFahStudioModal({
                         handleGenerate(p);
                       }}
                       disabled={isGenerating}
-                      className="text-[11px] px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-[#7B1C3E]/10 hover:text-[#7B1C3E] text-slate-600 border border-slate-200/80 transition-colors text-left cursor-pointer"
+                      className="text-[11px] px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-[#7B1C3E]/10 hover:text-[#7B1C3E] text-slate-700 border border-slate-200/80 transition-colors text-left shrink-0 sm:shrink cursor-pointer whitespace-nowrap sm:whitespace-normal"
                     >
                       {p}
                     </button>
@@ -260,17 +261,17 @@ export function NongFahStudioModal({
 
           {/* Footer Action */}
           {!generatedForm && (
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <div className="px-4 sm:px-6 py-3.5 sm:py-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-500 order-2 sm:order-1">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>Zero-PII & Educational Governance</span>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full sm:w-auto order-1 sm:order-2 justify-end">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-medium text-slate-600 hover:bg-white cursor-pointer"
+                  className="flex-1 sm:flex-none px-4 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 cursor-pointer text-center"
                 >
                   ยกเลิก
                 </button>
@@ -278,16 +279,16 @@ export function NongFahStudioModal({
                   type="button"
                   onClick={() => handleGenerate()}
                   disabled={isGenerating || !prompt.trim()}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#7B1C3E] hover:bg-[#631430] text-white rounded-xl text-xs font-bold shadow-sm disabled:opacity-50 transition-all cursor-pointer"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#7B1C3E] hover:bg-[#631430] text-white rounded-xl text-xs font-bold shadow-sm disabled:opacity-50 transition-all cursor-pointer text-center"
                 >
                   {isGenerating ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>น้องฟ้ากำลังออกแบบโครงสร้าง...</span>
+                      <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                      <span>กำลังออกแบบ...</span>
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-4 h-4 text-amber-300" />
+                      <Sparkles className="w-4 h-4 text-amber-300 shrink-0" />
                       <span>ให้น้องฟ้าช่วยสร้างฟอร์ม</span>
                     </>
                   )}

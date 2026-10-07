@@ -16,6 +16,7 @@ import {
 import { FormQRCodeModal } from '@/components/forms/FormQRCodeModal';
 import { NongFahResponsesInsights } from '@/components/forms/NongFahResponsesInsights';
 import { StudentDbSyncSection } from '@/components/forms/StudentDbSyncSection';
+import { NongFahFloatingBubble } from '@/components/forms/NongFahFloatingBubble';
 
 export default function FormResponsesPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -178,7 +179,7 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setShowQrModal(true)}
@@ -308,7 +309,7 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
         ) : (
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-600">
+              <table className="w-full min-w-[750px] text-left text-xs text-slate-600">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold uppercase text-[11px] tracking-wider">
                   <tr>
                     <th className="py-3.5 px-4 w-12 text-center">#</th>
@@ -489,7 +490,7 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
                 {selectedResponse.attachments && selectedResponse.attachments.length > 0 && (
                   <div className="pt-4">
                     <div className="text-xs font-bold text-slate-500 mb-2">ไฟล์และสลิปแนบทั้งหมด:</div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {selectedResponse.attachments.map((url, i) => (
                         <a
                           key={i}
@@ -537,6 +538,18 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
         onClose={() => setShowQrModal(false)}
         formTitle={form.title?.th || 'แบบฟอร์ม'}
         formSlug={form.slug}
+      />
+
+      {/* Cute Floating Nong Fah AI Chatbot Bubble */}
+      <NongFahFloatingBubble
+        onClick={() => {
+          const el = document.getElementById('nong-fah-insights');
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth' });
+          }
+        }}
+        label="น้องฟ้า AI สรุปผล"
+        badge="สรุปผล"
       />
     </div>
   );

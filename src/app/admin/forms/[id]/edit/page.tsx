@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { FormQRCodeModal } from '@/components/forms/FormQRCodeModal';
 import { NongFahStudioModal } from '@/components/forms/NongFahStudioModal';
+import { NongFahFloatingBubble } from '@/components/forms/NongFahFloatingBubble';
 import { GeneratedFormDefinition } from '@/lib/ai/gemma';
 
 const FIELD_TEMPLATES: {
@@ -155,6 +156,7 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
   const [fields, setFields] = useState<FormField[]>([]);
   const [activeLang, setActiveLang] = useState<SupportedLang>('th');
   const [activeTab, setActiveTab] = useState<'fields' | 'settings'>('fields');
+  const [mobileStudioTab, setMobileStudioTab] = useState<'canvas' | 'toolbox'>('canvas');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
@@ -268,6 +270,7 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
     };
     setFields([...fields, newField]);
     notifyChange();
+    setMobileStudioTab('canvas');
     toast.success(`เพิ่ม "${template.title}" เรียบร้อย`);
   };
 
@@ -652,33 +655,35 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
           </div>
 
           {/* Right: Actions */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             {/* Nong Fah AI Assistant */}
             <button
               type="button"
               onClick={() => setShowNongFahModal(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-sky-50 to-indigo-50 hover:from-sky-100 hover:to-indigo-100 text-sky-800 border border-sky-200 rounded-xl text-xs font-bold shadow-2xs transition-all cursor-pointer"
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-gradient-to-r from-sky-50 to-indigo-50 hover:from-sky-100 hover:to-indigo-100 text-sky-800 border border-sky-200 rounded-xl text-xs font-bold shadow-2xs transition-all cursor-pointer"
               title="ให้น้องฟ้าออกแบบโครงร่างฟอร์มให้คุณอัตโนมัติด้วย AI"
             >
-              <Bot className="w-4 h-4 text-sky-600" />
-              <span>น้องฟ้าช่วยสร้างฟอร์ม</span>
+              <Bot className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-600" />
+              <span>น้องฟ้า<span className="hidden sm:inline">ช่วยสร้างฟอร์ม</span></span>
             </button>
 
             {/* AI Translate Button */}
             <button
               onClick={handleAITranslate}
               disabled={isTranslating}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-semibold shadow-2xs transition-all disabled:opacity-50"
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-semibold shadow-2xs transition-all disabled:opacity-50"
             >
               {isTranslating ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
-                  กำลังแปลด้วย AI...
+                  <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin text-indigo-600" />
+                  <span className="hidden sm:inline">กำลังแปลด้วย AI...</span>
+                  <span className="sm:hidden">กำลังแปล...</span>
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-4 h-4 text-indigo-600" />
-                  แปล 3 ภาษาด้วย AI
+                  <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600" />
+                  <span className="hidden sm:inline">แปล 3 ภาษาด้วย AI</span>
+                  <span className="sm:hidden">แปล AI</span>
                 </>
               )}
             </button>
@@ -689,20 +694,21 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                 setPreviewLang(activeLang);
                 setShowPreviewModal(true);
               }}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
             >
-              <Eye className="w-4 h-4" />
-              ดูตัวอย่างฟอร์ม
+              <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">ดูตัวอย่างฟอร์ม</span>
+              <span className="sm:hidden">ตัวอย่าง</span>
             </button>
 
             {/* QR Code Sharing */}
             <button
               onClick={() => setShowQrModal(true)}
               title="สร้าง QR Code ตามดีไซน์ SV Portal"
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
             >
-              <QrCode className="w-4 h-4 text-[#6E0D22]" />
-              <span>QR Code</span>
+              <QrCode className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#6E0D22]" />
+              <span>QR<span className="hidden sm:inline"> Code</span></span>
             </button>
 
             {/* External Live Link */}
@@ -711,26 +717,26 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
               target="_blank"
               rel="noreferrer"
               title="เปิดหน้าเว็บจริงในแท็บใหม่"
-              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+              className="p-1.5 sm:p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
             >
-              <ExternalLink className="w-4 h-4" />
+              <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </a>
 
             {/* Save Button */}
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="inline-flex items-center gap-1.5 px-5 py-2 bg-[#7B1C3E] hover:bg-[#631430] text-white rounded-xl text-xs font-semibold shadow-sm transition-all hover:shadow disabled:opacity-50"
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-3.5 sm:px-5 py-1.5 sm:py-2 bg-[#7B1C3E] hover:bg-[#631430] text-white rounded-xl text-xs font-semibold shadow-sm transition-all hover:shadow disabled:opacity-50"
             >
               {isSaving ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  กำลังบันทึก...
+                  <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
+                  <span>บันทึก...</span>
                 </>
               ) : (
                 <>
-                  <Save className="w-4 h-4" />
-                  บันทึกแบบฟอร์ม
+                  <Save className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span>บันทึก<span className="hidden sm:inline">แบบฟอร์ม</span></span>
                 </>
               )}
             </button>
@@ -740,38 +746,38 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
         {/* Sub-bar: Tabs & Language Switcher */}
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-3 pt-3 border-t border-slate-100">
           {/* View Tabs */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold overflow-x-auto">
             <button
               onClick={() => setActiveTab('fields')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all shrink-0 cursor-pointer ${
                 activeTab === 'fields'
-                  ? 'bg-white text-slate-900 shadow-xs'
+                  ? 'bg-white text-slate-900 shadow-xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <LayoutTemplate className="w-3.5 h-3.5" />
-              โครงสร้างแบบฟอร์ม ({fields.length} บล็อก)
+              โครงสร้างฟอร์ม ({fields.length} ช่อง)
             </button>
             <button
               onClick={() => setActiveTab('settings')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all shrink-0 cursor-pointer ${
                 activeTab === 'settings'
-                  ? 'bg-white text-slate-900 shadow-xs'
+                  ? 'bg-white text-slate-900 shadow-xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Settings className="w-3.5 h-3.5" />
-              ภาพแบนเนอร์ & ตั้งค่าสิทธิ์
+              แบนเนอร์ & สิทธิ์
             </button>
           </div>
 
           {/* Active Language Switcher for Studio */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500 font-medium">แก้ไขข้อความในภาษา:</span>
+          <div className="flex items-center justify-between sm:justify-end gap-2">
+            <span className="text-xs text-slate-500 font-medium">แก้ไขภาษา:</span>
             <div className="flex items-center bg-white border border-slate-200 rounded-xl p-0.5 shadow-2xs">
               <button
                 onClick={() => setActiveLang('th')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   activeLang === 'th'
                     ? 'bg-[#7B1C3E] text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -781,23 +787,23 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
               </button>
               <button
                 onClick={() => setActiveLang('en')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   activeLang === 'en'
                     ? 'bg-[#1B3A6B] text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                English (EN)
+                <span className="hidden sm:inline">English (</span>EN<span className="hidden sm:inline">)</span>
               </button>
               <button
                 onClick={() => setActiveLang('zh')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   activeLang === 'zh'
                     ? 'bg-rose-700 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                中文 (ZH)
+                <span className="hidden sm:inline">中文 (</span>ZH<span className="hidden sm:inline">)</span>
               </button>
             </div>
           </div>
@@ -1138,9 +1144,40 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
           </div>
         ) : (
           /* Fields Designer Canvas */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Left Column: Toolbox (4 cols) */}
-            <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200 p-5 shadow-xs sticky top-28">
+          <div>
+            {/* Mobile Tab Switcher between Canvas and Toolbox */}
+            <div className="lg:hidden flex items-center bg-slate-200/80 p-1 rounded-2xl mb-4 text-xs font-bold shadow-inner">
+              <button
+                type="button"
+                onClick={() => setMobileStudioTab('canvas')}
+                className={`flex-1 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  mobileStudioTab === 'canvas'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <LayoutTemplate className="w-3.5 h-3.5 text-[#7B1C3E]" />
+                <span>หน้าฟอร์ม ({fields.length} ช่อง)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobileStudioTab('toolbox')}
+                className={`flex-1 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  mobileStudioTab === 'toolbox'
+                    ? 'bg-white text-[#7B1C3E] shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Plus className="w-3.5 h-3.5 text-[#7B1C3E]" />
+                <span>กล่องเครื่องมือ (+เพิ่ม)</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Left Column: Toolbox (4 cols) */}
+              <div className={`lg:col-span-4 bg-white rounded-2xl border border-slate-200 p-5 shadow-xs sticky top-28 ${
+                mobileStudioTab === 'toolbox' ? 'block' : 'hidden lg:block'
+              }`}>
               <div className="flex items-center gap-2 mb-2">
                 <Plus className="w-4 h-4 text-[#7B1C3E]" />
                 <h3 className="text-sm font-bold text-slate-900">เพิ่มองค์ประกอบฟอร์ม</h3>
@@ -1230,7 +1267,9 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
             </div>
 
             {/* Right Column: Canvas / Fields List (8 cols) */}
-            <div className="lg:col-span-8 space-y-4">
+            <div className={`lg:col-span-8 space-y-4 ${
+              mobileStudioTab === 'canvas' ? 'block' : 'hidden lg:block'
+            }`}>
               {/* Header card preview with inline editing */}
               <div className="bg-white rounded-2xl border-t-4 border-t-[#7B1C3E] border border-slate-200 p-6 shadow-xs relative overflow-hidden">
                 {form.banner_url !== 'none' && (
@@ -1301,8 +1340,9 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                   </button>
                 </div>
               ) : (
-                /* Fields list */
-                fields.map((field, index) => {
+                <>
+                  {/* Fields list */}
+                  {fields.map((field, index) => {
                   const tmpl = FIELD_TEMPLATES.find(t => t.type === field.field_type) || FIELD_TEMPLATES[0];
                   const Icon = tmpl.icon;
                   const hasOptions = ['radio', 'checkbox', 'select'].includes(field.field_type);
@@ -1573,12 +1613,24 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                       </div>
                     </motion.div>
                   );
-                })
-              )}
+                })}
+
+                {/* Mobile Add Element Button */}
+                <button
+                  type="button"
+                  onClick={() => setMobileStudioTab('toolbox')}
+                  className="w-full py-3.5 border-2 border-dashed border-[#7B1C3E]/30 hover:border-[#7B1C3E] bg-[#7B1C3E]/5 hover:bg-[#7B1C3E]/10 text-[#7B1C3E] font-bold rounded-2xl text-xs flex items-center justify-center gap-2 lg:hidden transition-all cursor-pointer shadow-2xs mt-4"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>แตะเพื่อเพิ่มช่องคำถาม / สื่อ (เปิดกล่องเครื่องมือ)</span>
+                </button>
+              </>
+            )}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+    </div>
 
       {/* Modal: Live Studio Interactive Preview */}
       <AnimatePresence>
@@ -1972,6 +2024,12 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
         isOpen={showNongFahModal}
         onClose={() => setShowNongFahModal(false)}
         onApplyForm={handleApplyNongFahForm}
+      />
+
+      {/* Cute Floating Nong Fah AI Chatbot Bubble */}
+      <NongFahFloatingBubble
+        onClick={() => setShowNongFahModal(true)}
+        label="น้องฟ้าช่วยสร้างฟอร์ม"
       />
     </div>
   );

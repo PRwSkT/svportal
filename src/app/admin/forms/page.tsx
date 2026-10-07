@@ -45,6 +45,7 @@ import {
   Info,
 } from 'lucide-react';
 import { FormQRCodeModal } from '@/components/forms/FormQRCodeModal';
+import { NongFahFloatingBubble } from '@/components/forms/NongFahFloatingBubble';
 
 const CATEGORIES = [
   { id: 'all', label: 'ทั้งหมด' },
@@ -1092,6 +1093,13 @@ export default function FormsAdminPage() {
         onClose={() => setQrModalForm(null)}
         formTitle={qrModalForm?.title?.th || ''}
         formSlug={qrModalForm?.slug || ''}
+      />
+
+      {/* Cute Floating Nong Fah AI Chatbot Bubble */}
+      <NongFahFloatingBubble
+        onClick={() => setShowCreateModal(true)}
+        label="น้องฟ้า AI ช่วยสร้างฟอร์ม"
+        badge="สร้างฟอร์ม"
       />
     </div>
   );

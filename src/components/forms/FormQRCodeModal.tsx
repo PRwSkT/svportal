@@ -434,7 +434,7 @@ export function FormQRCodeModal({ isOpen, onClose, formTitle, formSlug }: FormQR
           {/* Modal Main Layout: Left Controls + Right Live Preview */}
           <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 bg-slate-50/50">
             {/* Left Controls Column (7 Cols) */}
-            <div className="lg:col-span-7 space-y-5">
+            <div className="order-last lg:order-first lg:col-span-7 space-y-5">
               {/* Step 1: Content Link Info */}
               <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
@@ -638,8 +638,8 @@ export function FormQRCodeModal({ isOpen, onClose, formTitle, formSlug }: FormQR
               </div>
             </div>
 
-            {/* Right Preview Column (5 Cols) - Matching SV Portal Preview Panel */}
-            <div className="lg:col-span-5 flex flex-col items-center justify-between bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm">
+            {/* Right Preview Column (5 Cols) - Matching SV Portal Preview Panel (Appears first on mobile) */}
+            <div className="order-first lg:order-last lg:col-span-5 flex flex-col items-center justify-between bg-white p-4 sm:p-6 rounded-3xl border border-slate-200/90 shadow-sm">
               <div className="w-full text-center">
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest block mb-3">
                   ตัวอย่าง QR Code จริง (Live Preview)
