@@ -134,7 +134,7 @@ export function NongFahResponsesInsights({
               </span>
             </div>
             <p className="text-xs text-slate-600 mt-0.5">
-              ใช้โมเดล Gemma วิเคราะห์แนวโน้ม สรุปประเด็นสำคัญ และข้อเสนอแนะเชิงบริหาร โดยข้อมูลส่วนบุคคลถูกลบ 100% ก่อนประมวลผล
+              ใช้น้องฟ้า AI วิเคราะห์แนวโน้ม สรุปประเด็นสำคัญ และข้อเสนอแนะเชิงบริหาร โดยข้อมูลส่วนบุคคลถูกลบ 100% ก่อนประมวลผล
             </p>
           </div>
         </div>
@@ -195,7 +195,7 @@ export function NongFahResponsesInsights({
         <div className="mt-5 pt-5 border-t border-sky-100 space-y-3">
           <div className="flex items-center gap-2 text-xs font-semibold text-sky-800">
             <Loader2 className="w-4 h-4 animate-spin text-sky-600" />
-            <span>น้องฟ้ากำลังดึงสถิติ กรองข้อมูลส่วนบุคคล และประมวลผลข้อคิดเห็นผ่าน Gemma AI...</span>
+            <span>น้องฟ้ากำลังดึงสถิติ กรองข้อมูลส่วนบุคคล และประมวลผลข้อคิดเห็น...</span>
           </div>
           <div className="h-20 bg-white/60 animate-pulse rounded-2xl border border-sky-100" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

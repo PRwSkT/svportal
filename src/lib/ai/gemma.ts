@@ -90,7 +90,7 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
     }
   }
 
-  throw new Error(lastError?.message || 'ไม่สามารถติดต่อ AI Engine (Gemma) ได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง');
+  throw new Error(lastError?.message || 'ไม่สามารถติดต่อระบบน้องฟ้า AI ได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง');
 }
 
 /**
@@ -274,7 +274,103 @@ Analyze this data, extract executive insights, and return the report in JSON.`;
     const parsed = JSON.parse(cleaned);
     return parsed as NongFahAnalyticsSummary;
   } catch (err: any) {
-    console.error('Failed to parse Gemma summary JSON:', rawJson);
+    console.error('Failed to parse Nong Fah summary JSON:', rawJson);
     throw new Error('ผลลัพธ์บทวิเคราะห์จาก AI ไม่อยู่ในรูปแบบ JSON ที่ถูกต้อง');
   }
 }
+
+/**
+ * 3. "น้องฟ้า" Chat Interface (Conversational Assistant & Interactive Form Builder)
+ */
+export interface NongFahChatMessageItem {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface NongFahChatResponse {
+  reply: string;
+  actionType: 'form_generated' | 'chat';
+  generatedForm?: GeneratedFormDefinition | null;
+  suggestions?: string[];
+}
+
+export async function chatWithNongFah(
+  message: string,
+  history: NongFahChatMessageItem[] = [],
+  context?: { page?: string; formTitle?: string }
+): Promise<NongFahChatResponse> {
+  const systemPrompt = `You are "น้องฟ้า" (Nong Fah), the intelligent, polite, friendly, and expert educational AI Assistant for Somkidvittaya School (โรงเรียนสมคิดวิทยา).
+Strict rules to follow:
+1. NEVER mention Gemma, internal model names, or technical API backends. You are simply "น้องฟ้า" (Nong Fah AI Assistant).
+2. Strictly NO EMOJIS anywhere in your responses (Strict zero-emoji compliance).
+3. In Chinese, the school name is ALWAYS "Somkidvittaya学校".
+4. Output MUST be valid JSON only. Do not wrap in markdown or markdown backticks.
+5. If the user message is asking to create, draft, design, or generate a form (e.g. contains words like "สร้างฟอร์ม", "ขอแบบฟอร์ม", "ทำฟอร์ม", "แบบฟอร์ม", "ลงทะเบียน", "แบบสำรวจ", "สร้าง", "ออกแบบ"):
+   - Set "actionType": "form_generated"
+   - In "reply": Give a warm, polite Thai response explaining what form you designed, what fields were included, and how it matches the school's context.
+   - In "generatedForm": Return a complete form definition conforming to the GeneratedFormDefinition schema (title in th/en/zh, description, category, and complete fields array with localized th/en/zh, field_key, field_type, label, help_text, is_required, width, options).
+   - Somkidvittaya School grades are Kindergarten 1 to Primary 6 (อ.1 - ป.6).
+6. If the user message is a general question, greeting, advice on forms, PDPA guidelines, or inquiry:
+   - Set "actionType": "chat"
+   - In "reply": Answer warmly, politely, and informatively in Thai.
+   - Set "generatedForm": null
+7. In "suggestions": Provide 2-4 short, helpful follow-up phrases that the user can click.
+
+JSON schema:
+{
+  "reply": "string (polite Thai response, strictly no emojis)",
+  "actionType": "form_generated" | "chat",
+  "generatedForm": {
+    "title": { "th": "...", "en": "...", "zh": "..." },
+    "description": { "th": "...", "en": "...", "zh": "..." },
+    "category": "general" | "academic" | "activity" | "finance" | "survey",
+    "fields": [
+      {
+        "field_key": "field_...",
+        "field_type": "section_header" | "text" | "textarea" | "number" | "radio" | "checkbox" | "select" | "date" | "time" | "file_upload" | "rating",
+        "label": { "th": "...", "en": "...", "zh": "..." },
+        "help_text": { "th": "", "en": "", "zh": "" },
+        "is_required": true,
+        "width": "full" | "half",
+        "options": [
+          { "value": "opt_1", "label": { "th": "...", "en": "...", "zh": "..." } }
+        ]
+      }
+    ]
+  } | null,
+  "suggestions": ["string", "string"]
+}`;
+
+  const conversationHistoryText = (history || [])
+    .slice(-6)
+    .map(h => `${h.role === 'user' ? 'User' : 'น้องฟ้า'}: ${h.content}`)
+    .join('\n');
+  const contextNote = context?.formTitle
+    ? `\nCurrent Context: Editing form "${context.formTitle}" (Page: ${context.page || 'editor'})`
+    : '';
+
+  const userPrompt = `${contextNote}
+Conversation History:
+${conversationHistoryText || '(No previous history)'}
+
+Current User Message: "${message.trim()}"
+Analyze the message and return strictly JSON.`;
+
+  const rawJson = await callGemma({
+    systemPrompt,
+    userPrompt,
+    temperature: 0.2,
+    maxTokens: 2200,
+    responseMimeType: 'application/json',
+  });
+
+  try {
+    const cleaned = rawJson.replace(/```json/g, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+    return parsed as NongFahChatResponse;
+  } catch (err: any) {
+    console.error('Failed to parse Nong Fah chat response:', rawJson);
+    throw new Error('ผลลัพธ์จากน้องฟ้า AI ไม่อยู่ในรูปแบบ JSON ที่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
+  }
+}
+

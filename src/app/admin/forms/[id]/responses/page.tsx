@@ -16,7 +16,7 @@ import {
 import { FormQRCodeModal } from '@/components/forms/FormQRCodeModal';
 import { NongFahResponsesInsights } from '@/components/forms/NongFahResponsesInsights';
 import { StudentDbSyncSection } from '@/components/forms/StudentDbSyncSection';
-import { NongFahFloatingBubble } from '@/components/forms/NongFahFloatingBubble';
+import { NongFahChatWidget } from '@/components/forms/NongFahChatWidget';
 
 export default function FormResponsesPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -540,16 +540,10 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
         formSlug={form.slug}
       />
 
-      {/* Cute Floating Nong Fah AI Chatbot Bubble */}
-      <NongFahFloatingBubble
-        onClick={() => {
-          const el = document.getElementById('nong-fah-insights');
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth' });
-          }
-        }}
-        label="น้องฟ้า AI สรุปผล"
-        badge="สรุปผล"
+      {/* Interactive Bottom-Right Nong Fah Chat Widget */}
+      <NongFahChatWidget
+        formTitle={form.title?.th || 'แบบฟอร์ม'}
+        pageContext="responses"
       />
     </div>
   );

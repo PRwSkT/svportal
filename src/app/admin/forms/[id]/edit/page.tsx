@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { FormQRCodeModal } from '@/components/forms/FormQRCodeModal';
 import { NongFahStudioModal } from '@/components/forms/NongFahStudioModal';
-import { NongFahFloatingBubble } from '@/components/forms/NongFahFloatingBubble';
+import { NongFahChatWidget } from '@/components/forms/NongFahChatWidget';
 import { GeneratedFormDefinition } from '@/lib/ai/gemma';
 
 const FIELD_TEMPLATES: {
@@ -2026,10 +2026,12 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
         onApplyForm={handleApplyNongFahForm}
       />
 
-      {/* Cute Floating Nong Fah AI Chatbot Bubble */}
-      <NongFahFloatingBubble
-        onClick={() => setShowNongFahModal(true)}
-        label="น้องฟ้าช่วยสร้างฟอร์ม"
+      {/* Interactive Bottom-Right Nong Fah Chat Widget */}
+      <NongFahChatWidget
+        formTitle={form.title[activeLang] || form.title.th}
+        pageContext="editor"
+        onApplyForm={handleApplyNongFahForm}
+        onOpenStudio={() => setShowNongFahModal(true)}
       />
     </div>
   );

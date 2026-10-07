@@ -105,8 +105,8 @@ export function NongFahStudioModal({
                   <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate">
                     น้องฟ้า (Nong Fah) - AI ผู้ช่วยสร้างฟอร์ม
                   </h3>
-                  <span className="text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200 shrink-0">
-                    Gemma AI
+                  <span className="text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 border border-sky-200 shrink-0">
+                    AI Assistant
                   </span>
                 </div>
                 <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 truncate hidden sm:block">

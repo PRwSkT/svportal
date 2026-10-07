@@ -32,7 +32,7 @@ export function NongFahFloatingBubble({
           <span className="text-[11px] font-bold text-sky-900">{label}</span>
         </div>
         <span className="text-[10px] font-medium px-1.5 py-0.2 rounded-md bg-sky-100 text-sky-700">
-          Gemma AI
+          AI Assistant
         </span>
       </motion.div>
 
