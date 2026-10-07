@@ -8,8 +8,30 @@ export const dynamic = 'force-dynamic';
  * Requires at least 3 characters.
  * Returns only non-sensitive student identification data (Name, Grade, Student ID) in compliance with PDPA.
  */
+// Simple in-memory rate limiter (30 requests/min per IP)
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const record = rateLimitMap.get(ip);
+  if (!record || now > record.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + 60000 });
+    return false;
+  }
+  if (record.count >= 30) {
+    return true;
+  }
+  record.count++;
+  return false;
+}
+
 export async function GET(req: NextRequest) {
   try {
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    if (isRateLimited(ip)) {
+      return NextResponse.json({ success: false, error: 'คำขอถี่เกินไป กรุณารอสักครู่' }, { status: 429 });
+    }
+
     const { searchParams } = new URL(req.url);
     const query = searchParams.get('q')?.trim() || '';
 

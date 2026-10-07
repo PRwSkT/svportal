@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { analyzeStudentSyncOpportunities } from '@/lib/forms/database-sync';
+import { getServerUser } from '@/lib/auth';
+import { isSystemAdmin } from '@/lib/constants/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
+    const user = await getServerUser();
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const formId = searchParams.get('formId');
 
@@ -27,6 +34,36 @@ export async function GET(req: NextRequest) {
     }
 
     const form = formRes.data;
+
+    // Check permissions
+    let isAdmin = isSystemAdmin(user.email);
+    let currentPersonnelId: string | null = null;
+    if (!isAdmin) {
+      const { data: appUser } = await supabase
+        .from('app_users')
+        .select('role, personnel_id')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (appUser?.role === 'admin' || appUser?.role === 'executive') isAdmin = true;
+      currentPersonnelId = appUser?.personnel_id || null;
+    }
+    if (!currentPersonnelId && user.email) {
+      const { data: pData } = await supabase.from('personnel').select('id').eq('email', user.email).maybeSingle();
+      currentPersonnelId = pData?.id || null;
+    }
+    const isOwner = Boolean(
+      (form.created_by && form.created_by === user.id) ||
+      (currentPersonnelId && form.created_by === currentPersonnelId)
+    );
+    const collabs: string[] = form.collaborator_ids || [];
+    const isCollab = Boolean(
+      (user.id && collabs.includes(user.id)) ||
+      (currentPersonnelId && collabs.includes(currentPersonnelId))
+    );
+
+    if (!isAdmin && !isOwner && !isCollab) {
+      return NextResponse.json({ success: false, error: 'คุณไม่มีสิทธิ์เข้าถึงข้อมูลของแบบฟอร์มนี้' }, { status: 403 });
+    }
     const fields = fieldsRes.data || [];
     const responses = respRes.data || [];
 
@@ -74,10 +111,34 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getServerUser();
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
+    }
+
+    const isSysAdmin = isSystemAdmin(user.email);
+    let canSync = isSysAdmin;
+    const supabase = getAdminClient();
+
+    if (!canSync) {
+      const { data: appUser } = await supabase
+        .from('app_users')
+        .select('role, assigned_features')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const features: string[] = appUser?.assigned_features || [];
+      if (appUser?.role === 'admin' || features.includes('admin_forms') || features.includes('admin_students')) {
+        canSync = true;
+      }
+    }
+
+    if (!canSync) {
+      return NextResponse.json({ success: false, error: 'คุณไม่มีสิทธิ์ในการซิงค์ข้อมูลนักเรียน' }, { status: 403 });
+    }
+
     const body = await req.json();
     const { action, responseId, studentId, updates, newStudentPayload } = body;
-
-    const supabase = getAdminClient();
 
     // 1. Update Existing Student
     if (action === 'sync_update') {

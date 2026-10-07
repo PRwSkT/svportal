@@ -27,3 +27,15 @@ body {
   font-family: var(--font-sans);
 }
 
+/* QR Code Preview Canvas Fit */
+.qr-preview-container canvas,
+.qr-preview-container svg {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain !important;
+  display: block !important;
+}
+
+

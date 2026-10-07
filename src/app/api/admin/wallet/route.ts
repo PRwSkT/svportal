@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { createClient } from '@/lib/supabase/server';
+import { getAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(request: Request) {
   try {
-    const auth = await requireAuth();
+    const auth = await requireAuth('admin', 'admin_wallet_students');
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-    const supabase = await createClient();
+    const supabase = getAdminClient();
 
     const { data: wallets, error: walletErr } = await supabase
       .from('wallet_accounts')
@@ -38,23 +38,26 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const auth = await requireAuth();
+    const auth = await requireAuth('admin', 'admin_wallet_students');
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const body = await request.json();
     const { action, student_id, card_uid, daily_limit } = body;
-    const supabase = await createClient();
+    const supabase = getAdminClient();
 
     if (action === 'link_card') {
-      const normalizedUID = card_uid.toUpperCase().trim();
+      const normalizedUID = card_uid ? card_uid.toUpperCase().trim() : null;
       const { error } = await supabase
         .from('wallet_accounts')
-        .update({ card_uid: normalizedUID, updated_at: new Date().toISOString() })
+        .update({ card_uid: normalizedUID || null, updated_at: new Date().toISOString() })
         .eq('student_id', student_id);
       if (error) throw error;
       return NextResponse.json({ success: true });
     } 
     else if (action === 'update_limit') {
+      if (daily_limit !== null && (typeof daily_limit !== 'number' || daily_limit < 0)) {
+        return NextResponse.json({ error: 'วงเงินรายวันต้องเป็นตัวเลขที่มากกว่าหรือเท่ากับ 0' }, { status: 400 });
+      }
       const { error } = await supabase
         .from('wallet_accounts')
         .update({ daily_limit, updated_at: new Date().toISOString() })
@@ -71,19 +74,23 @@ export async function PATCH(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireAuth();
+    const auth = await requireAuth('admin', 'admin_wallet_students');
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const body = await request.json();
     const { student_id, amount, note } = body;
-    const supabase = await createClient();
+    const supabase = getAdminClient();
+
+    if (!amount || typeof amount !== 'number' || amount === 0) {
+      return NextResponse.json({ error: 'จำนวนเงินปรับยอดต้องไม่เป็น 0' }, { status: 400 });
+    }
 
     if (amount > 0) {
       const payload = {
         student_id,
         amount,
         channel: 'system',
-        cashier_note: `[Adjustment] ${note}`,
+        cashier_note: `[Adjustment] ${note || 'Admin adjustment'} (by ${auth.user?.email || auth.user?.id})`,
         svportal_ref: null,
       };
       const { data, error } = await supabase.rpc('topup_wallet', { payload });

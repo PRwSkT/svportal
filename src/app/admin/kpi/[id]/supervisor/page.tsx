@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { KpiEvaluation, KpiTemplate } from '@/types/kpi';
+import { KpiEvaluation, KpiTemplate, KpiUserContext } from '@/types/kpi';
 import { getEvaluationDetail, submitSupervisorEvaluation } from '../../actions';
 import { calculateKpiScoreSummaries } from '@/lib/kpi/scoring';
 import { toast } from 'sonner';
@@ -24,6 +24,7 @@ import {
   TrendingUp,
   Clock,
   Users,
+  ShieldCheck,
 } from 'lucide-react';
 
 const RATING_LABELS: Record<number, { label: string; color: string }> = {
@@ -40,11 +41,7 @@ export default function SupervisorEvaluationPage({ params }: { params: Promise<{
   const router = useRouter();
 
   const [evaluation, setEvaluation] = useState<KpiEvaluation | null>(null);
-  const [currentUserContext, setCurrentUserContext] = useState<{
-    userId: string | null;
-    personnelId: string | null;
-    isAdmin: boolean;
-  } | null>(null);
+  const [currentUserContext, setCurrentUserContext] = useState<KpiUserContext | null>(null);
   const [activeEvaluatorId, setActiveEvaluatorId] = useState<string>('');
 
   const [scores, setScores] = useState<Record<string, number>>({});
@@ -182,7 +179,7 @@ export default function SupervisorEvaluationPage({ params }: { params: Promise<{
     }
   };
 
-  if (isLoading || !evaluation) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-[#F5F4F2] flex items-center justify-center p-6">
         <div className="flex flex-col items-center gap-3">
@@ -193,13 +190,36 @@ export default function SupervisorEvaluationPage({ params }: { params: Promise<{
     );
   }
 
+  if (!evaluation) {
+    return (
+      <div className="min-h-screen bg-[#F5F4F2] flex items-center justify-center p-6 font-sans">
+        <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-slate-200 text-center shadow-lg">
+          <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-7 h-7" />
+          </div>
+          <h2 className="text-lg font-bold text-slate-900 mb-2">ไม่สามารถเข้าถึงการประเมินนี้ได้</h2>
+          <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+            คุณไม่มีสิทธิ์เข้าถึงหรือยังไม่ได้รับมอบหมายให้เป็นผู้ประเมินสำหรับรายการนี้ หรือไม่พบข้อมูลในระบบ
+          </p>
+          <Link
+            href="/admin/kpi"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#1B3A6B] hover:bg-[#122748] text-white rounded-xl text-xs font-bold shadow-sm transition-all"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>กลับสู่หน้ารายการประเมิน</span>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const p = evaluation.personnel;
   const template = evaluation.template;
 
   return (
     <div className="min-h-screen bg-[#F5F4F2] pb-32 font-sans text-slate-800">
-      {/* Sticky Top Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
+      {/* Top Header */}
+      <header className="bg-white border-b border-slate-200 shadow-2xs">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link
@@ -211,7 +231,7 @@ export default function SupervisorEvaluationPage({ params }: { params: Promise<{
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-[#1B3A6B]/10 text-[#1B3A6B]">
-                  หัวหน้างานประเมิน (Supervisor Evaluation)
+                  การประเมินโดยกรรมการและเพื่อนร่วมงาน (Committee & Peer Evaluation)
                 </span>
                 <span className="text-xs text-slate-400">•</span>
                 <span className="text-xs text-slate-500">{evaluation.cycle?.title}</span>
@@ -232,7 +252,7 @@ export default function SupervisorEvaluationPage({ params }: { params: Promise<{
             </div>
             <button
               onClick={handleSubmit}
-              disabled={isSubmitting}
+              disabled={isSubmitting || !template || !template.sections || template.sections.length === 0}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#1B3A6B] hover:bg-[#122748] text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all disabled:opacity-50"
             >
               {isSubmitting ? (
@@ -295,8 +315,8 @@ export default function SupervisorEvaluationPage({ params }: { params: Promise<{
             )}
           </div>
 
-          {/* Committee Review Progress Box */}
-          {evaluation.assigned_evaluators && evaluation.assigned_evaluators.length > 0 && (
+          {/* Committee Review Progress Box (Admin / Executive only) */}
+          {currentUserContext?.canViewAll && evaluation.assigned_evaluators && evaluation.assigned_evaluators.length > 0 && (
             <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-2xs">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
                 <div className="flex items-center gap-3">
@@ -314,8 +334,8 @@ export default function SupervisorEvaluationPage({ params }: { params: Promise<{
                   </div>
                 </div>
 
-                {/* Admin Evaluator Switcher */}
-                {currentUserContext?.isAdmin && evaluation.assigned_evaluators.length > 1 && (
+                {/* Admin / Executive Evaluator Switcher */}
+                {evaluation.assigned_evaluators.length > 1 && (
                   <div className="flex items-center gap-2 bg-purple-50/60 p-1.5 px-3 rounded-2xl border border-purple-200/80">
                     <span className="text-xs text-purple-900 font-bold shrink-0">กำลังบันทึกในนาม:</span>
                     <select
@@ -389,6 +409,36 @@ export default function SupervisorEvaluationPage({ params }: { params: Promise<{
             </div>
           )}
 
+          {/* Anonymous Evaluation Security Banner for Regular / Peer Evaluators */}
+          {!currentUserContext?.canViewAll && (
+            <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    การประเมินแบบไม่เปิดเผยตัวตน (Anonymous Evaluation)
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                    คะแนนและข้อคิดเห็นของท่านจะถูกนำไปถัวเฉลี่ยรวมกับคณะกรรมการและเพื่อนร่วมงานท่านอื่นในส่วนของกรรมการ โดยระบบจะไม่เปิดเผยชื่อผู้ประเมินแก่ผู้รับการประเมิน
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* If No Template Available */}
+          {(!template || !template.sections || template.sections.length === 0) && (
+            <div className="bg-amber-50/80 border border-amber-200/90 rounded-3xl p-8 text-center text-amber-900 shadow-2xs">
+              <AlertCircle className="w-10 h-10 text-amber-600 mx-auto mb-2" />
+              <h3 className="font-bold text-base">แบบประเมินสำหรับตำแหน่งนี้อยู่ระหว่างการจัดทำ</h3>
+              <p className="text-xs text-amber-700 mt-1 max-w-md mx-auto">
+                ยังไม่มีแบบประเมินที่กำหนดสำหรับตำแหน่งนี้ หรืออยู่ระหว่างการจัดทำแบบประเมิน กรุณาติดต่อฝ่ายบริหาร
+              </p>
+            </div>
+          )}
+
           {/* Render Sections */}
           {template?.sections.map((section, sIdx) => {
             const selfNote = evaluation.self_notes?.[section.id];
@@ -439,15 +489,26 @@ export default function SupervisorEvaluationPage({ params }: { params: Promise<{
                       >
                         <div className="flex items-start justify-between gap-3 mb-3">
                           <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="px-2 py-0.5 rounded-lg bg-[#1B3A6B]/10 text-[#1B3A6B] text-xs font-bold">
                                 {item.code}
                               </span>
+                              {typeof item.weight === 'number' && (
+                                <span className="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200/60 text-[11px] font-bold">
+                                  น้ำหนัก {item.weight}%
+                                </span>
+                              )}
                               <h4 className="text-sm font-bold text-slate-900">{item.title}</h4>
                             </div>
                             <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
                               {item.description}
                             </p>
+                            {item.evidence && (
+                              <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100/80 text-[11px] text-slate-600">
+                                <span className="font-bold text-slate-700">หลักฐานเชิงประจักษ์:</span>
+                                <span>{item.evidence}</span>
+                              </div>
+                            )}
                           </div>
 
                           {/* Self Rating Reference Tag */}
@@ -460,8 +521,13 @@ export default function SupervisorEvaluationPage({ params }: { params: Promise<{
 
                         {/* Supervisor Rating Selector (1 - 5) */}
                         <div className="pt-2">
-                          <div className="text-[11px] font-bold text-slate-400 mb-2 uppercase tracking-wider">
-                            คะแนนประเมินโดยหัวหน้างาน (1 - 5)
+                          <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 mb-2 uppercase tracking-wider">
+                            <span>คะแนนประเมินโดยหัวหน้างาน (1 - 5)</span>
+                            {currentRating > 0 && typeof item.weight === 'number' && (
+                              <span className="text-[#1B3A6B] font-semibold lowercase">
+                                คะแนนถ่วงน้ำหนัก: <strong>{((currentRating / 5) * item.weight).toFixed(2)}</strong> / {item.weight} คะแนน
+                              </span>
+                            )}
                           </div>
                           <div className="grid grid-cols-5 gap-2">
                             {[1, 2, 3, 4, 5].map((val) => {

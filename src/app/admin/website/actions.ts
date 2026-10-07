@@ -36,12 +36,31 @@ async function verifyAdmin(): Promise<{ authorized: boolean; error?: string }> {
   }
 }
 
+const ALLOWED_WEBSITE_TABLES = [
+  'calendar_events',
+  'news',
+  'documents',
+  'album_photos',
+  'albums',
+  'personnel',
+] as const;
+
+type AllowedWebsiteTable = typeof ALLOWED_WEBSITE_TABLES[number];
+
+function validateWebsiteTable(table: string): AllowedWebsiteTable {
+  if (!ALLOWED_WEBSITE_TABLES.includes(table as AllowedWebsiteTable)) {
+    throw new Error(`ไม่อนุญาตให้จัดการตาราง ${table} ผ่านฟังก์ชันนี้`);
+  }
+  return table as AllowedWebsiteTable;
+}
+
 export async function insertRecord(table: string, payload: any): Promise<ActionResult> {
   try {
     const auth = await verifyAdmin();
     if (!auth.authorized) {
       return { success: false, error: auth.error };
     }
+    const safeTable = validateWebsiteTable(table);
     const supabase = getAdminClient();
 
     // If inserting personnel with email, try auto-resolving user_id
@@ -81,10 +100,11 @@ export async function updateRecord(table: string, id: string, payload: any): Pro
     if (!auth.authorized) {
       return { success: false, error: auth.error };
     }
+    const safeTable = validateWebsiteTable(table);
     const supabase = getAdminClient();
 
     // If updating personnel with email, try auto-resolving user_id if missing
-    if (table === 'personnel' && payload.email !== undefined) {
+    if (safeTable === 'personnel' && payload.email !== undefined) {
       if (payload.email) {
         const email = payload.email.toLowerCase().trim();
         const { data: { users } } = await supabase.auth.admin.listUsers();
@@ -97,14 +117,14 @@ export async function updateRecord(table: string, id: string, payload: any): Pro
       }
     }
 
-    const { data, error } = await supabase.from(table).update(payload).eq('id', id).select();
+    const { data, error } = await supabase.from(safeTable).update(payload).eq('id', id).select();
     if (error) {
-      console.error(`Database error updating ${table} id=${id}:`, error);
+      console.error(`Database error updating ${safeTable} id=${id}:`, error);
       return { success: false, error: error.message };
     }
 
     // Sync app_users
-    if (table === 'personnel' && data && data[0]) {
+    if (safeTable === 'personnel' && data && data[0]) {
       if (data[0].user_id) {
         await supabase.from('app_users').update({
           personnel_id: data[0].id,
@@ -126,10 +146,11 @@ export async function deleteRecord(table: string, id: string): Promise<ActionRes
     if (!auth.authorized) {
       return { success: false, error: auth.error };
     }
+    const safeTable = validateWebsiteTable(table);
     const supabase = getAdminClient();
-    const { data, error } = await supabase.from(table).delete().eq('id', id).select();
+    const { data, error } = await supabase.from(safeTable).delete().eq('id', id).select();
     if (error) {
-      console.error(`Database error deleting from ${table} id=${id}:`, error);
+      console.error(`Database error deleting from ${safeTable} id=${id}:`, error);
       return { success: false, error: error.message };
     }
     return { success: true, data };
@@ -145,10 +166,11 @@ export async function toggleActive(table: string, id: string, currentStatus: boo
     if (!auth.authorized) {
       return { success: false, error: auth.error };
     }
+    const safeTable = validateWebsiteTable(table);
     const supabase = getAdminClient();
-    const { data, error } = await supabase.from(table).update({ is_active: !currentStatus }).eq('id', id).select();
+    const { data, error } = await supabase.from(safeTable).update({ is_active: !currentStatus }).eq('id', id).select();
     if (error) {
-      console.error(`Database error toggling status in ${table} id=${id}:`, error);
+      console.error(`Database error toggling status in ${safeTable} id=${id}:`, error);
       return { success: false, error: error.message };
     }
     return { success: true, data };

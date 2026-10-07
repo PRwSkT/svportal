@@ -1,4 +1,10 @@
 import React from 'react';
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'สร้าง QR Code | SV Portal',
+  description: 'ระบบสร้าง QR Code มาตรฐานโรงเรียนสมคิดวิทยา',
+};
 
 export default function QRCodeGeneratorPage() {
   return (
@@ -11,3 +17,4 @@ export default function QRCodeGeneratorPage() {
     </div>
   );
 }
+

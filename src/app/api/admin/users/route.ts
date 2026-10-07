@@ -3,6 +3,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 
 import { isSystemAdmin } from '@/lib/constants/auth';
+import { requireAuth } from '@/lib/auth';
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -250,6 +251,11 @@ export async function PATCH(request: Request) {
 // 1-Click Sync Endpoint to re-verify and auto-link all personnel with auth users
 export async function PUT() {
   try {
+    const auth = await requireAuth('admin', 'admin_users');
+    if (auth.error) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const supabaseAdmin = getAdminClient();
 
     const { data: personnelList, error: pErr } = await supabaseAdmin.from('personnel').select('*');

@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
+import { isSystemAdmin } from '@/lib/constants/auth';
 
 import { AppUser } from '@/types';
 
@@ -77,29 +78,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const loadSession = async () => {
-      // DEV MODE BYPASS FOR TESTING
-      if (process.env.NODE_ENV === 'development') {
-        const dummyUser = { id: 'dev-user-id', email: 'admin@dev.local' } as User;
-        const dummyAppUser: AppUser = {
-          id: 'dev-user-id',
-          full_name: 'ผู้ดูแลระบบ (Dev Mode)',
-          role: 'admin',
-          is_active: true,
-          assigned_features: [
-            'dashboard', 'pos_fees', 'admin_reports', 'pos_shop', 'admin_products', 
-            'pos_wallet_topup', 'admin_wallet_students', 'admin_students', 'admin_users', 
-            'admin_website', 'post_assistant', 'audio_remote', 'qr_generator', 
-            'settings', 'academic_todo', 'admin_attendance'
-          ],
-          created_at: new Date().toISOString()
-        };
-        setUser(dummyUser);
-        setRole('admin');
-        setAppUser(dummyAppUser);
-        setIsLoading(false);
-        return;
-      }
-
       try {
         // 1. Primary: Load directly from /api/auth/me (Same-origin server verified, avoids client RLS/CORS)
         const res = await fetch('/api/auth/me', { cache: 'no-store' });
@@ -124,8 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const currentUser = session?.user || null;
         setUser(currentUser);
         if (currentUser) {
-          const adminEmails = ['admin@somkidvittaya.ac.th', 'peerawat@somkidvittaya.ac.th', 'media@somkidvittaya.ac.th', 'admin@svportal.com'];
-          if (currentUser.email && adminEmails.includes(currentUser.email.toLowerCase())) {
+          if (isSystemAdmin(currentUser.email)) {
             setRole('admin');
           }
           await fetchAppUserFallback(currentUser.id, currentUser.email);
@@ -143,8 +120,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: import('@supabase/supabase-js').AuthChangeEvent, session: import('@supabase/supabase-js').Session | null) => {
-      if (process.env.NODE_ENV === 'development') return;
-      
       if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
         loadSession();
       } else if (event === 'SIGNED_OUT') {

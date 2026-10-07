@@ -43,8 +43,11 @@ export async function proxy(request: NextRequest) {
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value));
           response = NextResponse.next({
-            request,
+            request: {
+              headers: requestHeaders,
+            },
           });
+          response.headers.set('Content-Security-Policy', cspHeader);
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           );
@@ -59,11 +62,6 @@ export async function proxy(request: NextRequest) {
       redirectResponse.cookies.set(cookie.name, cookie.value, cookie);
     });
     return redirectResponse;
-  }
-
-  // DEV MODE BYPASS
-  if (process.env.NODE_ENV === 'development') {
-    return response;
   }
 
   // This will refresh session if expired
@@ -83,18 +81,21 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // Bypass auth for the root page (welcome menu), public website, webhooks/cron, auth callbacks
+  // Redirect legacy /website routes to the official school website to prevent confusion
+  if (request.nextUrl.pathname.startsWith('/website')) {
+    return NextResponse.redirect('https://somkidvittaya.ac.th', { status: 307 });
+  }
+
+  // Bypass auth for the root page (welcome menu), forms, webhooks/cron, auth callbacks
   if (
     request.nextUrl.pathname === '/' ||
-    request.nextUrl.pathname.startsWith('/website') ||
     request.nextUrl.pathname.startsWith('/forms') ||
     request.nextUrl.pathname.startsWith('/api/forms') ||
     request.nextUrl.pathname.startsWith('/auth') ||
     request.nextUrl.pathname.startsWith('/api/auth') ||
     request.nextUrl.pathname.startsWith('/api/cron') ||
     request.nextUrl.pathname.startsWith('/api/webhook') ||
-    (request.nextUrl.pathname.endsWith('.html') && !request.nextUrl.pathname.includes('audio-remote.html')) ||
-    request.nextUrl.pathname.includes('post-assistant') ||
+    request.nextUrl.pathname.startsWith('/post-assistant') ||
     request.nextUrl.pathname === '/api/admin/website/sync-post'
   ) {
     return response;
@@ -124,11 +125,14 @@ export async function proxy(request: NextRequest) {
     return redirectWithCookies(new URL('/login?error=Invalid_Domain', request.url));
   }
 
-  // Protect admin and assigned-feature routes
+  // Protect admin, POS, and assigned-feature routes
   if (
     request.nextUrl.pathname.startsWith('/admin') ||
     request.nextUrl.pathname === '/dashboard' ||
-    request.nextUrl.pathname.startsWith('/api/admin')
+    request.nextUrl.pathname.startsWith('/api/admin') ||
+    request.nextUrl.pathname.startsWith('/pos') ||
+    request.nextUrl.pathname.startsWith('/api/pos') ||
+    request.nextUrl.pathname.startsWith('/audio-remote')
   ) {
     if (isSystemAdmin(user?.email)) {
       return response;
@@ -170,15 +174,31 @@ export async function proxy(request: NextRequest) {
     } else if (path.startsWith('/admin/users') || path.startsWith('/api/admin/users')) {
       requiredFeature = 'admin_users';
     } else if (path.startsWith('/admin/forms') || path.startsWith('/api/admin/forms')) {
-      if (user.email?.endsWith('@somkidvittaya.ac.th') || assignedFeatures.includes('admin_forms')) {
-        return response;
-      }
       requiredFeature = 'admin_forms';
     } else if (path.startsWith('/admin/kpi') || path.startsWith('/api/admin/kpi')) {
-      if (user.email?.endsWith('@somkidvittaya.ac.th') || assignedFeatures.includes('admin_kpi')) {
+      requiredFeature = 'admin_kpi';
+    } else if (path.startsWith('/audio-remote')) {
+      requiredFeature = 'audio_remote';
+    } else if (path.startsWith('/pos/fees') || path.startsWith('/api/pos/fees')) {
+      if (userRole === 'cashier' || assignedFeatures.includes('pos_fees')) {
         return response;
       }
-      requiredFeature = 'admin_kpi';
+      requiredFeature = 'pos_fees';
+    } else if (path.startsWith('/pos/shop') || path.startsWith('/api/pos/checkout') || path.startsWith('/api/pos/products')) {
+      if (userRole === 'cashier' || assignedFeatures.includes('pos_shop')) {
+        return response;
+      }
+      requiredFeature = 'pos_shop';
+    } else if (path.startsWith('/pos/wallet') || path.startsWith('/api/pos/wallet')) {
+      if (userRole === 'cashier' || assignedFeatures.includes('pos_wallet_topup')) {
+        return response;
+      }
+      requiredFeature = 'pos_wallet_topup';
+    } else if (path.startsWith('/pos')) {
+      if (userRole === 'cashier' || assignedFeatures.some(f => f.startsWith('pos_'))) {
+        return response;
+      }
+      requiredFeature = 'pos_shop';
     }
 
     if (requiredFeature && assignedFeatures.includes(requiredFeature)) {
@@ -197,6 +217,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|css|js|html|ttf|woff|woff2)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|css|js|ttf|woff|woff2)$).*)',
   ],
 };

@@ -21,6 +21,9 @@ export interface KpiItem {
   title: string;
   description: string;
   max_score: number;
+  weight?: number; // item-specific weight in percent (e.g. 5)
+  evidence?: string; // evidence source (e.g. แผนการสอน)
+  evaluator_role?: string; // primary evaluator reference (e.g. หัวหน้าวิชาการ)
 }
 
 export interface KpiSection {
@@ -157,4 +160,12 @@ export interface SectionScoreSummary {
   supervisorAvg: number; // average 1-5
   supervisorScoreWeighted: number; // scaled to weight
   gap: number; // supervisorAvg - selfAvg
+}
+
+export interface KpiUserContext {
+  userId: string | null;
+  personnelId: string | null;
+  isAdmin: boolean;
+  isExecutive: boolean;
+  canViewAll: boolean;
 }

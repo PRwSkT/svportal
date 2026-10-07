@@ -24,19 +24,38 @@ export function calculateKpiScoreSummaries(evaluation: KpiEvaluation): {
     let selfSum = 0;
     let supervisorSum = 0;
 
-    sec.items.forEach((item) => {
-      const selfVal = evaluation.self_scores?.[item.id] || 0;
-      const supVal = evaluation.supervisor_scores?.[item.id] || 0;
-      selfSum += selfVal;
-      supervisorSum += supVal;
-    });
+    const hasItemWeights = sec.items.some((item) => typeof item.weight === 'number' && item.weight > 0);
+
+    let selfScoreWeighted = 0;
+    let supervisorScoreWeighted = 0;
+
+    if (hasItemWeights) {
+      sec.items.forEach((item) => {
+        const itemWeight = typeof item.weight === 'number' ? item.weight : sec.weight / itemCount;
+        const selfVal = evaluation.self_scores?.[item.id] || 0;
+        const supVal = evaluation.supervisor_scores?.[item.id] || 0;
+        selfSum += selfVal;
+        supervisorSum += supVal;
+        selfScoreWeighted += (selfVal / 5) * itemWeight;
+        supervisorScoreWeighted += (supVal / 5) * itemWeight;
+      });
+      selfScoreWeighted = Number(selfScoreWeighted.toFixed(2));
+      supervisorScoreWeighted = Number(supervisorScoreWeighted.toFixed(2));
+    } else {
+      sec.items.forEach((item) => {
+        const selfVal = evaluation.self_scores?.[item.id] || 0;
+        const supVal = evaluation.supervisor_scores?.[item.id] || 0;
+        selfSum += selfVal;
+        supervisorSum += supVal;
+      });
+      const selfAvg = selfSum / itemCount;
+      const supervisorAvg = supervisorSum / itemCount;
+      selfScoreWeighted = Number(((selfAvg / 5) * sec.weight).toFixed(2));
+      supervisorScoreWeighted = Number(((supervisorAvg / 5) * sec.weight).toFixed(2));
+    }
 
     const selfAvg = selfSum / itemCount;
     const supervisorAvg = supervisorSum / itemCount;
-
-    // Weight contribution: (avg / 5) * weight
-    const selfScoreWeighted = Number(((selfAvg / 5) * sec.weight).toFixed(2));
-    const supervisorScoreWeighted = Number(((supervisorAvg / 5) * sec.weight).toFixed(2));
 
     calculatedSelfTotal += selfScoreWeighted;
     calculatedSupervisorTotal += supervisorScoreWeighted;
@@ -69,8 +88,10 @@ export function calculateKpiScoreSummaries(evaluation: KpiEvaluation): {
 }
 
 export function generateAnonymousKpiEmailHtml(evaluation: KpiEvaluation): string {
+  const isStaff = evaluation.personnel?.category === 'staff';
+  const namePrefix = isStaff ? 'คุณ' : 'คุณครู';
   const personnelName = evaluation.personnel?.name_th || 'บุคลากรโรงเรียนสมคิดวิทยา';
-  const position = evaluation.personnel?.position_th || 'ครูผู้สอน';
+  const position = evaluation.personnel?.position_th || (isStaff ? 'เจ้าหน้าที่/พนักงาน' : 'ครูผู้สอน');
   const cycleTitle = evaluation.cycle?.title || 'การประเมินผลการปฏิบัติงาน';
   const { sections, selfTotal, supervisorTotal, finalGrade } = calculateKpiScoreSummaries(evaluation);
 
@@ -156,7 +177,7 @@ export function generateAnonymousKpiEmailHtml(evaluation: KpiEvaluation): string
                 <tr>
                   <td>
                     <div style="font-size: 18px; font-weight: 700; color: #0F172A; margin-bottom: 4px;">
-                      เรียน คุณครู ${personnelName}
+                      เรียน ${namePrefix} ${personnelName}
                     </div>
                     <div style="font-size: 13px; color: #64748B;">
                       ตำแหน่ง: <span style="font-weight: 600; color: #334155;">${position}</span>

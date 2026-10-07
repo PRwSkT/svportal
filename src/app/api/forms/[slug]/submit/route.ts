@@ -40,8 +40,7 @@ export async function POST(
       const isStaffOrAdmin =
         !!user &&
         (isSystemAdmin(user.email) ||
-          Boolean(user.email?.endsWith('@somkidvittaya.ac.th')) ||
-          user.user_metadata?.role === 'admin');
+          Boolean(user.email?.endsWith('@somkidvittaya.ac.th')));
 
       if (!isStaffOrAdmin) {
         return NextResponse.json(

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sparkles, ShieldCheck, RefreshCw, Loader2, AlertCircle,
@@ -102,6 +102,13 @@ export function NongFahResponsesInsights({
     }
   };
 
+  // Automatically fetch Nong Fah insights on mount if responses exist and not yet fetched
+  useEffect(() => {
+    if (totalResponses > 0 && !summary && !isLoading && !error) {
+      fetchSummary();
+    }
+  }, [formId, totalResponses]);
+
   const getSentimentBadge = (overall?: string) => {
     switch (overall) {
       case 'positive':
@@ -120,8 +127,12 @@ export function NongFahResponsesInsights({
       {/* Top Banner & Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-start sm:items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white shadow-md shrink-0">
-            <Sparkles className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-2xl overflow-hidden border-2 border-sky-300 shadow-sm shrink-0 bg-white flex items-center justify-center">
+            <img
+              src="/images/nongfah/nongfah-avatar.png?v=5"
+              alt="น้องฟ้า AI Chatbot"
+              className="w-full h-full object-cover"
+            />
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -134,7 +145,7 @@ export function NongFahResponsesInsights({
               </span>
             </div>
             <p className="text-xs text-slate-600 mt-0.5">
-              ใช้น้องฟ้า AI วิเคราะห์แนวโน้ม สรุปประเด็นสำคัญ และข้อเสนอแนะเชิงบริหาร โดยข้อมูลส่วนบุคคลถูกลบ 100% ก่อนประมวลผล
+              น้องฟ้า AI Chatbot โรงเรียนสมคิดวิทยา • วิเคราะห์แนวโน้ม สรุปประเด็นสำคัญ และดูแลด้วยใจ
             </p>
           </div>
         </div>
@@ -176,7 +187,13 @@ export function NongFahResponsesInsights({
       {!summary && !isLoading && !error && (
         <div className="mt-4 pt-4 border-t border-sky-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600 bg-white/70 p-4 rounded-2xl border border-sky-100">
           <div className="flex items-center gap-2.5">
-            <Bot className="w-5 h-5 text-sky-600 shrink-0" />
+            <div className="w-8 h-8 rounded-xl overflow-hidden border border-sky-200 bg-white shrink-0">
+              <img
+                src="/images/nongfah/nongfah-helpful.png?v=5"
+                alt="น้องฟ้า"
+                className="w-full h-full object-cover"
+              />
+            </div>
             <span>
               {totalResponses === 0
                 ? 'ยังไม่มีผู้ตอบแบบฟอร์ม เมื่อมีผู้ตอบเข้ามา คุณสามารถกดให้น้องฟ้าสรุปผลได้ทันที'
@@ -193,9 +210,16 @@ export function NongFahResponsesInsights({
       {/* Loading state skeleton */}
       {isLoading && (
         <div className="mt-5 pt-5 border-t border-sky-100 space-y-3">
-          <div className="flex items-center gap-2 text-xs font-semibold text-sky-800">
+          <div className="flex items-center gap-2.5 text-xs font-semibold text-sky-800">
+            <div className="w-7 h-7 rounded-lg overflow-hidden border border-sky-300 bg-white shrink-0">
+              <img
+                src="/images/nongfah/nongfah-thinking.png?v=5"
+                alt="น้องฟ้ากำลังคิด"
+                className="w-full h-full object-cover"
+              />
+            </div>
             <Loader2 className="w-4 h-4 animate-spin text-sky-600" />
-            <span>น้องฟ้ากำลังดึงสถิติ กรองข้อมูลส่วนบุคคล และประมวลผลข้อคิดเห็น...</span>
+            <span>น้องฟ้ากำลังดึงสถิติ กรองข้อมูลส่วนบุคคล และประมวลผลข้อคิดเห็นให้คุณครูนะคะ...</span>
           </div>
           <div className="h-20 bg-white/60 animate-pulse rounded-2xl border border-sky-100" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

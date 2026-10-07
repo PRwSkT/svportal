@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { chatWithNongFah } from '@/lib/ai/gemma';
+import { sanitizeTextForAI } from '@/lib/ai/pdpa-sanitizer';
+import { getServerUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getServerUser();
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'กรุณาเข้าสู่ระบบก่อนใช้งานน้องฟ้า AI' }, { status: 401 });
+    }
+
     const body = await req.json();
     const message = body?.message?.trim();
 
@@ -18,7 +25,8 @@ export async function POST(req: NextRequest) {
     const history = Array.isArray(body?.history) ? body.history : [];
     const context = body?.context || undefined;
 
-    const chatResponse = await chatWithNongFah(message, history, context);
+    const { cleanText: sanitizedMessage } = sanitizeTextForAI(message);
+    const chatResponse = await chatWithNongFah(sanitizedMessage, history, context);
 
     return NextResponse.json({
       success: true,

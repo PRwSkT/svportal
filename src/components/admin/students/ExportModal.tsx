@@ -99,7 +99,7 @@ export default function ExportModal({ isOpen, onClose, availableGrades }: Export
     try {
       // 1. Fetch data
       const gradeQuery = selectedGrades.length === availableGrades.length ? 'all' : selectedGrades.join(',');
-      const res = await fetch(`/api/admin/students?limit=10000&grade=${encodeURIComponent(gradeQuery)}`);
+      const res = await fetch(`/api/admin/students?limit=10000&includeDetails=true&grade=${encodeURIComponent(gradeQuery)}`);
       if (!res.ok) throw new Error('ไม่สามารถดึงข้อมูลได้');
       const json = await res.json();
       const students = Array.isArray(json) ? json : (json.data || []);

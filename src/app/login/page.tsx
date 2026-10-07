@@ -4,8 +4,11 @@ import { useState, useEffect, Suspense } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 function LoginForm() {
+  const { language, dict } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -15,13 +18,13 @@ function LoginForm() {
   useEffect(() => {
     const errParam = searchParams.get('error');
     if (errParam === 'Invalid_Domain') {
-      setError('อนุญาตให้เข้าสู่ระบบด้วยอีเมลของโรงเรียน (@somkidvittaya.ac.th) เท่านั้น');
+      setError(dict.login.invalidDomain);
     } else if (errParam === 'CouldNotAuthenticate') {
-      setError('ไม่สามารถยืนยันตัวตนกับระบบได้ กรุณาลองใหม่อีกครั้ง');
+      setError(dict.login.authFailed);
     } else if (errParam) {
-      setError(`เกิดข้อผิดพลาดในการเข้าสู่ระบบ (${errParam})`);
+      setError(`${dict.common.error} (${errParam})`);
     }
-  }, [searchParams]);
+  }, [searchParams, dict]);
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
@@ -49,7 +52,7 @@ function LoginForm() {
     setError(null);
 
     const supabase = createClient();
-    const loginEmail = email.trim().toLowerCase() === 'admin' ? 'admin@svportal.com' : email;
+    const loginEmail = email.trim();
     
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email: loginEmail,
@@ -59,7 +62,7 @@ function LoginForm() {
     if (signInError) {
       setIsLoading(false);
       if (signInError.message.includes('Invalid login credentials')) {
-        setError('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+        setError(dict.login.invalidCredentials);
       } else {
         setError(signInError.message);
       }
@@ -72,6 +75,11 @@ function LoginForm() {
   return (
     <div className="min-h-[80vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative z-10">
       <div className="max-w-md w-full space-y-8 bg-surface/80 backdrop-blur-xl p-6 sm:p-10 rounded-3xl shadow-2xl border border-white/60 relative">
+        {/* Language Switcher in top right of login card */}
+        <div className="absolute top-5 right-5 z-20">
+          <LanguageSwitcher size="sm" showIcon />
+        </div>
+
         {/* Decorative subtle gradient inside card (wrapped to fix Safari overflow border-radius bug) */}
         <div className="absolute inset-0 pointer-events-none" style={{ clipPath: 'inset(0px round 24px)' }}>
           <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/10 rounded-full blur-3xl"></div>
@@ -81,10 +89,10 @@ function LoginForm() {
         <div className="flex flex-col items-center relative z-10">
           <Image src="/SV-Portal.png" alt="SVPortal Logo" width={140} height={40} className="mb-4 drop-shadow-sm h-10 w-auto hover:scale-105 transition-transform duration-300" />
           <h2 className="text-center text-3xl font-extrabold text-primary flex items-center gap-2">
-            ยินดีต้อนรับสู่ SV Portal
+            {dict.login.welcomeTitle}
           </h2>
           <p className="mt-4 text-center text-sm text-foreground/70 font-medium">
-            เข้าสู่ระบบเพื่อใช้งาน (ใช้ระบบจัดการผู้ใช้ของโรงเรียน)
+            {dict.login.welcomeSubtitle}
           </p>
         </div>
         <div className="mt-8 relative z-10">
@@ -96,7 +104,7 @@ function LoginForm() {
             {isLoading ? (
               <span className="flex items-center gap-2 text-primary font-bold">
                 <span className="w-5 h-5 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
-                กำลังนำทางไปที่ Google...
+                {dict.common.loading}
               </span>
             ) : (
               <>
@@ -106,7 +114,7 @@ function LoginForm() {
                   <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                 </svg>
-                เข้าสู่ระบบด้วย Google (GMS)
+                {dict.login.googleLogin}
               </>
             )}
           </button>
@@ -118,7 +126,9 @@ function LoginForm() {
               <div className="w-full border-t border-foreground/10" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-3 bg-surface/90 rounded-full text-foreground/50 text-xs font-bold tracking-wider uppercase">หรือเข้าสู่ระบบด้วยอีเมลสำรอง</span>
+              <span className="px-3 bg-surface/90 rounded-full text-foreground/50 text-xs font-bold tracking-wider uppercase">
+                {language === 'th' ? 'หรือเข้าสู่ระบบด้วยอีเมลสำรอง' : 'Or sign in with school credentials'}
+              </span>
             </div>
           </div>
         </div>
@@ -132,7 +142,7 @@ function LoginForm() {
           )}
           <div className="space-y-4">
             <div>
-              <label htmlFor="email-address" className="sr-only">อีเมล</label>
+              <label htmlFor="email-address" className="sr-only">{dict.login.email}</label>
               <input
                 id="email-address"
                 name="email"
@@ -140,13 +150,13 @@ function LoginForm() {
                 autoComplete="email"
                 required
                 className="appearance-none rounded-[12px] relative block w-full px-4 py-3.5 border border-foreground/10 placeholder-foreground/40 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent sm:text-sm bg-white/60 backdrop-blur-sm transition-all"
-                placeholder="อีเมล หรือชื่อผู้ใช้ (admin)"
+                placeholder={dict.login.emailPlaceholder}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div>
-              <label htmlFor="password" className="sr-only">รหัสผ่าน</label>
+              <label htmlFor="password" className="sr-only">{dict.login.password}</label>
               <input
                 id="password"
                 name="password"
@@ -154,7 +164,7 @@ function LoginForm() {
                 autoComplete="current-password"
                 required
                 className="appearance-none rounded-[12px] relative block w-full px-4 py-3.5 border border-foreground/10 placeholder-foreground/40 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent sm:text-sm bg-white/60 backdrop-blur-sm transition-all"
-                placeholder="รหัสผ่าน"
+                placeholder={dict.login.passwordPlaceholder}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -167,36 +177,16 @@ function LoginForm() {
               disabled={isLoading}
               className="group relative w-full flex justify-center py-3.5 px-4 border border-transparent text-sm font-bold rounded-[16px] text-white bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-all shadow-lg shadow-primary/20 hover:shadow-primary/30 hover:-translate-y-0.5 active:translate-y-0"
             >
-              {isLoading ? 'กำลังดำเนินการ...' : 'เข้าสู่ระบบ'}
+              {isLoading ? dict.common.loading : dict.login.loginButton}
             </button>
           </div>
         </form>
-
-        <div className="mt-8 text-center relative z-10 flex justify-center">
-          <Image 
-            src="/logo2.png" 
-            alt="School Logo" 
-            width={320} 
-            height={180} 
-            className="h-16 w-auto opacity-60 hover:opacity-100 transition-all duration-300 drop-shadow-sm"
-          />
-        </div>
       </div>
     </div>
   );
 }
 
 export default function LoginPage() {
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      window.location.href = '/home';
-    }
-  }, []);
-
-  if (process.env.NODE_ENV === 'development') {
-    return <div className="min-h-screen flex items-center justify-center">Redirecting (Dev Mode)...</div>;
-  }
-
   return (
     <Suspense
       fallback={

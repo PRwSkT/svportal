@@ -64,34 +64,42 @@ export function getQueue(): QueueItem<unknown>[] {
   }
 }
 
+let isSyncing = false;
+
 export async function syncQueue(): Promise<void> {
   if (typeof window === 'undefined') return;
+  if (isSyncing) return;
+  isSyncing = true;
 
-  const queue = getQueue();
-  if (queue.length === 0) return;
+  try {
+    const queue = getQueue();
+    if (queue.length === 0) return;
 
-  const supabase = createClient();
-  const remainingQueue: QueueItem<unknown>[] = [];
+    const supabase = createClient();
+    const remainingQueue: QueueItem<unknown>[] = [];
 
-  for (const item of queue) {
-    try {
-      if (item.action === 'rpc') {
-        const { error } = await supabase.rpc(item.target, { payload: item.payload });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from(item.target).insert(item.payload as Record<string, unknown>);
-        if (error) throw error;
+    for (const item of queue) {
+      try {
+        if (item.action === 'rpc') {
+          const { error } = await supabase.rpc(item.target, { payload: item.payload });
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from(item.target).insert(item.payload as Record<string, unknown>);
+          if (error) throw error;
+        }
+        
+        console.log(`Successfully synced queued item ${item.id} (${item.action} -> ${item.target})`);
+      } catch (err) {
+        console.error(`Failed to sync item ${item.id}`, err);
+        item.retry_count += 1;
+        remainingQueue.push(item);
       }
-      
-      console.log(`Successfully synced queued item ${item.id} (${item.action} -> ${item.target})`);
-    } catch (err) {
-      console.error(`Failed to sync item ${item.id}`, err);
-      item.retry_count += 1;
-      remainingQueue.push(item);
     }
-  }
 
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(remainingQueue));
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(remainingQueue));
+  } finally {
+    isSyncing = false;
+  }
 }
 
 // Setup listener

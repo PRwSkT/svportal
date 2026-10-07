@@ -42,3 +42,21 @@ next-env.d.ts
 
 # netlify
 .netlify
+
+# sensitive student data (PDPA) & dumps
+*.csv
+students_data.*
+test_fees.*
+debug_*.html
+test_fb_token.js
+test_*.js
+test_*.py
+dl_drive.py
+scrape_students.js
+check_*.js
+setup_admin.js
+add_teachers.js
+list_users.js
+fix_users.js
+csv2json.js
+scratch/

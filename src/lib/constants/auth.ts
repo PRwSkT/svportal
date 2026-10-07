@@ -2,7 +2,6 @@ export const SYSTEM_ADMIN_EMAILS = [
   'admin@somkidvittaya.ac.th',
   'peerawat@somkidvittaya.ac.th',
   'media@somkidvittaya.ac.th',
-  'admin@svportal.com',
 ] as const;
 
 export function isSystemAdmin(email?: string | null): boolean {

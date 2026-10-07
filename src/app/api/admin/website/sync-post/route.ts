@@ -6,16 +6,20 @@ import { triggerWebsiteRebuild } from '@/lib/website-sync';
 export async function POST(request: Request) {
   try {
     const authHeader = request.headers.get('authorization') || request.headers.get('x-sync-secret');
-    const isSecretValid = process.env.SYNC_SECRET && authHeader?.includes(process.env.SYNC_SECRET);
+    const syncSecret = process.env.SYNC_SECRET;
+    const isSecretValid = Boolean(
+      syncSecret &&
+      authHeader &&
+      (authHeader === syncSecret || authHeader === `Bearer ${syncSecret}` || authHeader.includes(syncSecret))
+    );
 
-    const referer = request.headers.get('referer') || '';
-    const origin = request.headers.get('origin') || '';
-    const isFromPostAssistant = referer.includes('post-assistant') || referer.includes('localhost') || origin.includes('somkidvittaya.ac.th');
-
-    if (!isSecretValid && !isFromPostAssistant) {
-      const auth = await requireAuth();
+    if (!isSecretValid) {
+      const auth = await requireAuth('admin', 'admin_website');
       if (auth.error) {
-        return NextResponse.json({ error: auth.error }, { status: auth.status });
+        const authPost = await requireAuth('admin', 'post_assistant');
+        if (authPost.error) {
+          return NextResponse.json({ error: auth.error }, { status: auth.status });
+        }
       }
     }
 

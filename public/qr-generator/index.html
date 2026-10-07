@@ -14,13 +14,21 @@
     <div class="container portal-panel">
         <header>
             <div class="logo-container">
-                <img src="logo.png" alt="SV PORTAL" id="header-logo" onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='inline-block';">
-                <div id="logo-fallback" class="logo" style="display: none;">
-                    <span class="logo-sv">SV</span><span class="logo-portal">PORTAL</span>
-                </div>
+                <a href="/home" target="_top" title="กลับหน้าหลัก SV Portal" style="text-decoration: none; color: inherit; display: inline-flex; align-items: center; justify-content: center;">
+                    <img src="logo.png" alt="SV PORTAL" id="header-logo" onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='inline-block';">
+                    <div id="logo-fallback" class="logo" style="display: none;">
+                        <span class="logo-sv">SV</span><span class="logo-portal">PORTAL</span>
+                    </div>
+                </a>
             </div>
             <h2>QR Code Generator Tool</h2>
             <p>Customize and generate standard QR codes for your applications.</p>
+            <div style="margin-top: 10px; display: flex; justify-content: center;">
+                <a href="/home" target="_top" class="btn btn-outline btn-small" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-size: 0.85rem; padding: 6px 14px; border-radius: 20px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    กลับหน้าหลัก SV Portal
+                </a>
+            </div>
         </header>
 
         <div class="app-layout">

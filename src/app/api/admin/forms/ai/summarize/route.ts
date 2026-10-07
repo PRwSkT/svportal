@@ -2,11 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { prepareResponsesForSummarization } from '@/lib/ai/pdpa-sanitizer';
 import { summarizeResponsesWithNongFah } from '@/lib/ai/gemma';
+import { getServerUser } from '@/lib/auth';
+import { isSystemAdmin } from '@/lib/constants/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getServerUser();
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
+    }
+
     const body = await req.json();
     const formId = body?.formId?.trim();
 
@@ -25,6 +32,46 @@ export async function POST(req: NextRequest) {
 
     if (formErr || !form) {
       return NextResponse.json({ success: false, error: 'ไม่พบข้อมูลแบบฟอร์ม' }, { status: 404 });
+    }
+
+    // Authorization & IDOR Check: Admin, Owner, or Collaborator
+    let isAdmin = isSystemAdmin(user.email);
+    let currentPersonnelId: string | null = null;
+
+    if (!isAdmin) {
+      const { data: appUser } = await supabase
+        .from('app_users')
+        .select('role, personnel_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (appUser?.role === 'admin' || appUser?.role === 'executive') {
+        isAdmin = true;
+      }
+      currentPersonnelId = appUser?.personnel_id || null;
+    }
+
+    if (!currentPersonnelId && user.email) {
+      const { data: pData } = await supabase
+        .from('personnel')
+        .select('id')
+        .eq('email', user.email)
+        .maybeSingle();
+      currentPersonnelId = pData?.id || null;
+    }
+
+    const isOwner = Boolean(
+      (form.created_by && form.created_by === user.id) ||
+      (currentPersonnelId && form.created_by === currentPersonnelId)
+    );
+    const collabs: string[] = form.collaborator_ids || [];
+    const isCollab = Boolean(
+      (user.id && collabs.includes(user.id)) ||
+      (currentPersonnelId && collabs.includes(currentPersonnelId))
+    );
+
+    if (!isAdmin && !isOwner && !isCollab) {
+      return NextResponse.json({ success: false, error: 'คุณไม่มีสิทธิ์เข้าถึงข้อมูลของแบบฟอร์มนี้' }, { status: 403 });
     }
 
     // 2. Fetch Form Fields

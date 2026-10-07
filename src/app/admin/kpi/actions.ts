@@ -3,7 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { getServerUser } from '@/lib/auth';
 import { isSystemAdmin } from '@/lib/constants/auth';
-import { KpiCycle, KpiEvaluation, KpiTemplate, KpiQuarter, KpiEvaluatorReview } from '@/types/kpi';
+import { KpiCycle, KpiEvaluation, KpiTemplate, KpiQuarter, KpiEvaluatorReview, KpiUserContext } from '@/types/kpi';
 import { calculateKpiScoreSummaries } from '@/lib/kpi/scoring';
 import { sendAnonymousKpiEmail } from '@/lib/kpi/email';
 
@@ -17,20 +17,17 @@ function getAdminClient() {
 }
 
 /**
- * Shared helper to accurately resolve user role, admin status, and personnel ID
+ * Shared helper to accurately resolve user role, admin/executive status, and personnel ID
  */
-async function resolveUserContext(supabase: any): Promise<{
-  userId: string | null;
-  personnelId: string | null;
-  isAdmin: boolean;
-}> {
+async function resolveUserContext(supabase: any): Promise<KpiUserContext & { currentUser: any }> {
   try {
     const currentUser = await getServerUser();
     let isAdmin = false;
+    let isExecutive = false;
     let currentPersonnelId: string | null = null;
 
     if (currentUser) {
-      if (isSystemAdmin(currentUser.email) || currentUser.user_metadata?.role === 'admin') {
+      if (isSystemAdmin(currentUser.email)) {
         isAdmin = true;
       }
 
@@ -41,32 +38,54 @@ async function resolveUserContext(supabase: any): Promise<{
         .maybeSingle();
 
       if (appUser) {
-        if (appUser.role === 'admin' || appUser.role === 'executive') {
+        if (appUser.role === 'admin') {
           isAdmin = true;
+        } else if (appUser.role === 'executive') {
+          isExecutive = true;
         }
         if (appUser.personnel_id) {
           currentPersonnelId = appUser.personnel_id;
         }
       }
 
-      if (!currentPersonnelId && currentUser.email) {
+      if (currentUser.email) {
         const { data: pData } = await supabase
           .from('personnel')
-          .select('id')
+          .select('id, category')
           .eq('email', currentUser.email)
           .maybeSingle();
-        currentPersonnelId = pData?.id || null;
+
+        if (pData) {
+          if (!currentPersonnelId) currentPersonnelId = pData.id;
+          if (pData.category === 'executive') {
+            isExecutive = true;
+          } else if (pData.category === 'admin') {
+            isAdmin = true;
+          }
+        }
       }
     }
+
+    const canViewAll = isAdmin || isExecutive;
 
     return {
       userId: currentUser?.id || null,
       personnelId: currentPersonnelId,
       isAdmin,
+      isExecutive,
+      canViewAll,
+      currentUser,
     };
   } catch (err) {
     console.error('resolveUserContext error:', err);
-    return { userId: null, personnelId: null, isAdmin: false };
+    return {
+      userId: null,
+      personnelId: null,
+      isAdmin: false,
+      isExecutive: false,
+      canViewAll: false,
+      currentUser: null,
+    };
   }
 }
 
@@ -75,6 +94,9 @@ async function resolveUserContext(supabase: any): Promise<{
  */
 export async function getKpiCycles(): Promise<{ success: boolean; data?: KpiCycle[]; error?: string }> {
   try {
+    const user = await getServerUser();
+    if (!user) return { success: false, error: 'Unauthorized' };
+
     const supabase = getAdminClient();
     const { data, error } = await supabase
       .from('kpi_cycles')
@@ -104,6 +126,11 @@ export async function createQuarterlyCycle(payload: {
 }): Promise<{ success: boolean; data?: KpiCycle; error?: string }> {
   try {
     const supabase = getAdminClient();
+    const currentUserContext = await resolveUserContext(supabase);
+    if (!currentUserContext.canViewAll) {
+      return { success: false, error: 'คุณไม่มีสิทธิ์สร้างรอบการประเมิน (เฉพาะผู้บริหารและผู้ดูแลระบบ)' };
+    }
+
     const { data, error } = await supabase
       .from('kpi_cycles')
       .insert([
@@ -137,6 +164,9 @@ export async function createQuarterlyCycle(payload: {
  */
 export async function getKpiTemplates(): Promise<{ success: boolean; data?: KpiTemplate[]; error?: string }> {
   try {
+    const user = await getServerUser();
+    if (!user) return { success: false, error: 'Unauthorized' };
+
     const supabase = getAdminClient();
     const { data, error } = await supabase
       .from('kpi_templates')
@@ -170,6 +200,11 @@ export async function getEvaluatorCandidates(): Promise<{
 }> {
   try {
     const supabase = getAdminClient();
+    const currentUserContext = await resolveUserContext(supabase);
+    if (!currentUserContext.canViewAll) {
+      return { success: true, data: [] };
+    }
+
     const { data, error } = await supabase
       .from('personnel')
       .select('id, name_th, name_en, position_th, category, email, image_url')
@@ -197,11 +232,7 @@ export async function getKpiEvaluations(cycleId: string): Promise<{
     completed: number;
     avgScore: number;
   };
-  currentUserContext?: {
-    userId: string | null;
-    personnelId: string | null;
-    isAdmin: boolean;
-  };
+  currentUserContext?: KpiUserContext;
   error?: string;
 }> {
   try {
@@ -271,12 +302,36 @@ export async function getKpiEvaluations(cycleId: string): Promise<{
       };
     });
 
+    // 5. Apply Permission-based Filtering:
+    // Executives and Admins see EVERYONE (canViewAll = true).
+    // All other personnel see ONLY:
+    //  - Their own evaluation (self)
+    //  - OR evaluations where they are an assigned evaluator (supervisor)
+    const visibleEvaluations = currentUserContext.canViewAll
+      ? evaluations
+      : evaluations.filter((e) => {
+          const p = e.personnel;
+          const isSelf = Boolean(
+            (currentUserContext.personnelId && e.personnel_id === currentUserContext.personnelId) ||
+            (currentUserContext.userId && p?.user_id === currentUserContext.userId) ||
+            (currentUserContext.currentUser?.email && p?.email && p.email.toLowerCase() === currentUserContext.currentUser.email.toLowerCase())
+          );
+
+          const isAssignedEvaluator = Boolean(
+            currentUserContext.personnelId &&
+            (e.assigned_evaluator_ids?.includes(currentUserContext.personnelId) ||
+             e.assigned_evaluator_id === currentUserContext.personnelId)
+          );
+
+          return isSelf || isAssignedEvaluator;
+        });
+
     let totalScoreSum = 0;
     let completedCount = 0;
     let pendingSelfCount = 0;
     let pendingSupCount = 0;
 
-    evaluations.forEach((e) => {
+    visibleEvaluations.forEach((e) => {
       if (e.status === 'pending_self') pendingSelfCount++;
       if (e.status === 'self_submitted') pendingSupCount++;
       if (e.status === 'completed') {
@@ -287,17 +342,63 @@ export async function getKpiEvaluations(cycleId: string): Promise<{
 
     const avgScore = completedCount > 0 ? Number((totalScoreSum / completedCount).toFixed(2)) : 0;
 
+    // Anonymize evaluator identities for non-admins to ensure strict anonymity for peer & committee evaluations
+    const sanitizedEvaluations = currentUserContext.canViewAll
+      ? visibleEvaluations
+      : visibleEvaluations.map((e) => {
+          const isSelf = Boolean(
+            (currentUserContext.personnelId && e.personnel_id === currentUserContext.personnelId) ||
+            (currentUserContext.userId && e.personnel?.user_id === currentUserContext.userId) ||
+            (currentUserContext.currentUser?.email &&
+              e.personnel?.email &&
+              e.personnel.email.toLowerCase() === currentUserContext.currentUser.email.toLowerCase())
+          );
+
+          if (isSelf) {
+            // Evaluatee MUST NOT see who was assigned to evaluate them
+            return {
+              ...e,
+              assigned_evaluators: [],
+              assigned_evaluator_id: null,
+              assigned_evaluator_ids: [],
+              reviews: (e.reviews || []).map((r: any) => ({
+                ...r,
+                evaluator_id: 'anonymous',
+              })) as KpiEvaluatorReview[],
+            };
+          } else {
+            // Peer evaluator evaluating someone else: only see own assignment, never other peer evaluators
+            return {
+              ...e,
+              assigned_evaluators: (e.assigned_evaluators || []).filter(
+                (ev: any) => ev.id === currentUserContext.personnelId
+              ),
+              assigned_evaluator_id: currentUserContext.personnelId,
+              assigned_evaluator_ids: currentUserContext.personnelId ? [currentUserContext.personnelId] : [],
+              reviews: (e.reviews || []).filter(
+                (r: any) => r.evaluator_id === currentUserContext.personnelId
+              ),
+            };
+          }
+        });
+
     return {
       success: true,
-      data: evaluations,
+      data: sanitizedEvaluations,
       stats: {
-        total: evaluations.length,
+        total: visibleEvaluations.length,
         pendingSelf: pendingSelfCount,
         pendingSupervisor: pendingSupCount,
         completed: completedCount,
         avgScore,
       },
-      currentUserContext,
+      currentUserContext: {
+        userId: currentUserContext.userId,
+        personnelId: currentUserContext.personnelId,
+        isAdmin: currentUserContext.isAdmin,
+        isExecutive: currentUserContext.isExecutive,
+        canViewAll: currentUserContext.canViewAll,
+      },
     };
   } catch (err: any) {
     console.error('getKpiEvaluations error:', err);
@@ -319,6 +420,11 @@ export async function assignEvaluators(
 }> {
   try {
     const supabase = getAdminClient();
+    const currentUserContext = await resolveUserContext(supabase);
+    if (!currentUserContext.canViewAll) {
+      return { success: false, error: 'คุณไม่มีสิทธิ์กำหนดผู้ประเมิน (เฉพาะผู้บริหารและผู้ดูแลระบบ)' };
+    }
+
     const primaryId = evaluatorPersonnelIds[0] || null;
     const { error } = await supabase
       .from('kpi_evaluations')
@@ -374,6 +480,11 @@ export async function bulkAssignEvaluators(
 ): Promise<{ success: boolean; count: number; error?: string }> {
   try {
     const supabase = getAdminClient();
+    const currentUserContext = await resolveUserContext(supabase);
+    if (!currentUserContext.canViewAll) {
+      return { success: false, count: 0, error: 'คุณไม่มีสิทธิ์กำหนดผู้ประเมิน (เฉพาะผู้บริหารและผู้ดูแลระบบ)' };
+    }
+
     let count = 0;
     for (const item of assignments) {
       const primaryId = item.evaluatorPersonnelIds[0] || null;
@@ -400,11 +511,7 @@ export async function bulkAssignEvaluators(
 export async function getEvaluationDetail(evaluationId: string): Promise<{
   success: boolean;
   data?: KpiEvaluation;
-  currentUserContext?: {
-    userId: string | null;
-    personnelId: string | null;
-    isAdmin: boolean;
-  };
+  currentUserContext?: KpiUserContext;
   myReview?: KpiEvaluatorReview | null;
   error?: string;
 }> {
@@ -462,10 +569,57 @@ export async function getEvaluationDetail(evaluationId: string): Promise<{
       ? ((reviews || []).find((r: any) => r.evaluator_id === currentPersonnelId) as KpiEvaluatorReview) || null
       : null;
 
+    const p = data.personnel;
+    const isSelf = Boolean(
+      (currentUserContext.personnelId && data.personnel_id === currentUserContext.personnelId) ||
+      (currentUserContext.userId && p?.user_id === currentUserContext.userId) ||
+      (currentUserContext.currentUser?.email && p?.email && p.email.toLowerCase() === currentUserContext.currentUser.email.toLowerCase())
+    );
+
+    const isAssignedEvaluator = Boolean(
+      currentUserContext.personnelId &&
+      (ids.includes(currentUserContext.personnelId) || data.assigned_evaluator_id === currentUserContext.personnelId)
+    );
+
+    if (!currentUserContext.canViewAll && !isSelf && !isAssignedEvaluator) {
+      return {
+        success: false,
+        error: 'คุณไม่มีสิทธิ์ในการเข้าถึงข้อมูลการประเมินนี้ (อนุญาตเฉพาะเจ้าของแบบประเมิน กรรมการผู้ประเมิน และผู้บริหาร)',
+      };
+    }
+
+    // Anonymize evaluator identities for non-admins
+    if (!currentUserContext.canViewAll) {
+      if (isSelf) {
+        evaluationWithReviews.assigned_evaluators = [];
+        evaluationWithReviews.assigned_evaluator_id = null;
+        evaluationWithReviews.assigned_evaluator_ids = [];
+        evaluationWithReviews.reviews = (evaluationWithReviews.reviews || []).map((r: any) => ({
+          ...r,
+          evaluator_id: 'anonymous',
+        })) as KpiEvaluatorReview[];
+      } else if (isAssignedEvaluator) {
+        evaluationWithReviews.assigned_evaluators = (evaluationWithReviews.assigned_evaluators || []).filter(
+          (ev: any) => ev.id === currentPersonnelId
+        );
+        evaluationWithReviews.assigned_evaluator_id = currentPersonnelId;
+        evaluationWithReviews.assigned_evaluator_ids = currentPersonnelId ? [currentPersonnelId] : [];
+        evaluationWithReviews.reviews = (evaluationWithReviews.reviews || []).filter(
+          (r: any) => r.evaluator_id === currentPersonnelId
+        );
+      }
+    }
+
     return {
       success: true,
       data: evaluationWithReviews,
-      currentUserContext,
+      currentUserContext: {
+        userId: currentUserContext.userId,
+        personnelId: currentUserContext.personnelId,
+        isAdmin: currentUserContext.isAdmin,
+        isExecutive: currentUserContext.isExecutive,
+        canViewAll: currentUserContext.canViewAll,
+      },
       myReview,
     };
   } catch (err: any) {
@@ -488,14 +642,29 @@ export async function submitSelfEvaluation(
   try {
     const supabase = getAdminClient();
 
-    // 1. Get current evaluation with template
+    // 1. Get current evaluation with template & personnel
     const { data: evaluation, error: fetchErr } = await supabase
       .from('kpi_evaluations')
-      .select('*, template:template_id(*)')
+      .select('*, personnel:personnel_id(*), template:template_id(*)')
       .eq('id', evaluationId)
       .single();
 
     if (fetchErr || !evaluation) throw new Error('ไม่พบข้อมูลการประเมิน');
+
+    const currentUserContext = await resolveUserContext(supabase);
+    const p = evaluation.personnel;
+    const isSelf = Boolean(
+      (currentUserContext.personnelId && evaluation.personnel_id === currentUserContext.personnelId) ||
+      (currentUserContext.userId && p?.user_id === currentUserContext.userId) ||
+      (currentUserContext.currentUser?.email && p?.email && p.email.toLowerCase() === currentUserContext.currentUser.email.toLowerCase())
+    );
+
+    if (!currentUserContext.canViewAll && !isSelf) {
+      return {
+        success: false,
+        error: 'คุณไม่มีสิทธิ์ส่งแบบประเมินตนเองของบุคลากรท่านนี้ (ประเมินตนเองได้เฉพาะเจ้าของแบบประเมินเท่านั้น)',
+      };
+    }
 
     // 2. Compute self score based on template
     const draftEval: KpiEvaluation = {
@@ -567,13 +736,37 @@ export async function submitSupervisorEvaluation(
 
     if (fetchErr || !evaluation) throw new Error('ไม่พบข้อมูลการประเมิน');
 
+    const assignedIds: string[] =
+      evaluation.assigned_evaluator_ids && evaluation.assigned_evaluator_ids.length > 0
+        ? evaluation.assigned_evaluator_ids
+        : evaluation.assigned_evaluator_id
+        ? [evaluation.assigned_evaluator_id]
+        : [];
+
+    const isAssigned = Boolean(currentUserContext.personnelId && assignedIds.includes(currentUserContext.personnelId));
+
+    if (!currentUserContext.canViewAll && !isAssigned) {
+      return {
+        success: false,
+        error: 'คุณไม่มีสิทธิ์ประเมินในฐานะกรรมการของบุคลากรท่านนี้ (ไม่ได้อยู่ในรายชื่อคณะกรรมการผู้ได้รับมอบหมาย)',
+      };
+    }
+
     // 2. Identify the active evaluator
-    let currentPersonnelId: string | null = asEvaluatorId || currentUserContext.personnelId || null;
+    // Only Admin / Executive can evaluate as another evaluator; peer evaluators are strictly locked to own personnelId
+    let currentPersonnelId: string | null =
+      currentUserContext.canViewAll && asEvaluatorId
+        ? asEvaluatorId
+        : currentUserContext.personnelId || null;
 
     // Fallback if admin has no personnel link: pick first assigned evaluator or default director
-    if (!currentPersonnelId) {
+    if (!currentPersonnelId && currentUserContext.canViewAll) {
       const assigned = evaluation.assigned_evaluator_ids || [];
       currentPersonnelId = assigned[0] || evaluation.assigned_evaluator_id || '3da9e72c-e913-4606-9b33-46aa9427ff43';
+    }
+
+    if (!currentPersonnelId) {
+      return { success: false, error: 'ไม่พบข้อมูลรหัสบุคลากรของผู้ประเมิน' };
     }
 
     // 3. Compute single review score
@@ -613,13 +806,6 @@ export async function submitSupervisorEvaluation(
     if (reviewsErr) throw reviewsErr;
 
     const submittedReviews = (allReviews || []).filter((r) => r.status === 'submitted');
-    const assignedIds: string[] =
-      evaluation.assigned_evaluator_ids && evaluation.assigned_evaluator_ids.length > 0
-        ? evaluation.assigned_evaluator_ids
-        : evaluation.assigned_evaluator_id
-        ? [evaluation.assigned_evaluator_id]
-        : [];
-
     const totalAssigned = Math.max(assignedIds.length, 1);
     const submittedCount = submittedReviews.length;
 
@@ -658,15 +844,27 @@ export async function submitSupervisorEvaluation(
         }
       });
 
-      // Combine strengths & improvements into bullet points (anonymously)
-      const combinedStrengths = submittedReviews
-        .map((r: any) => r.strengths?.trim())
-        .filter(Boolean)
-        .join('\n• ');
-      const combinedImprovements = submittedReviews
-        .map((r: any) => r.improvements?.trim())
-        .filter(Boolean)
-        .join('\n• ');
+      // Combine strengths & improvements into clean bullet points (anonymously)
+      const formatBullets = (items: string[]) => {
+        const lines: string[] = [];
+        items.forEach((txt) => {
+          txt.split('\n').forEach((line) => {
+            const trimmed = line.trim();
+            if (!trimmed) return;
+            if (trimmed.startsWith('•') || trimmed.startsWith('-') || /^\d+[\.\)]/.test(trimmed)) {
+              lines.push(trimmed);
+            } else {
+              lines.push(`• ${trimmed}`);
+            }
+          });
+        });
+        return lines.join('\n');
+      };
+
+      const strengthList = submittedReviews.map((r: any) => r.strengths?.trim()).filter(Boolean);
+      const improvementList = submittedReviews.map((r: any) => r.improvements?.trim()).filter(Boolean);
+      const combinedStrengths = formatBullets(strengthList);
+      const combinedImprovements = formatBullets(improvementList);
       const combinedOverallComment = submittedReviews
         .map((r: any) => r.overall_comment?.trim())
         .filter(Boolean)
@@ -687,8 +885,8 @@ export async function submitSupervisorEvaluation(
           supervisor_scores: avgScores,
           supervisor_feedback: combinedFeedback,
           supervisor_overall_comment: combinedOverallComment || null,
-          supervisor_strengths: combinedStrengths ? `• ${combinedStrengths}` : null,
-          supervisor_improvements: combinedImprovements ? `• ${combinedImprovements}` : null,
+          supervisor_strengths: combinedStrengths || null,
+          supervisor_improvements: combinedImprovements || null,
           supervisor_total_score: finalAveragedScore,
           final_score: finalAveragedScore,
           final_grade: finalGrade,
@@ -754,6 +952,10 @@ export async function dispatchEvaluationEmail(evaluationId: string): Promise<{
 }> {
   try {
     const supabase = getAdminClient();
+    const currentUserContext = await resolveUserContext(supabase);
+    if (!currentUserContext.canViewAll) {
+      return { success: false, error: 'คุณไม่มีสิทธิ์จัดส่งผลประเมินทางอีเมล (เฉพาะผู้บริหารและผู้ดูแลระบบ)' };
+    }
 
     // 1. Fetch full evaluation
     const { data: evaluation, error: fetchErr } = await supabase
@@ -805,39 +1007,86 @@ export async function syncPersonnelForCycle(cycleId: string, templateId?: string
 }> {
   try {
     const supabase = getAdminClient();
+    const currentUserContext = await resolveUserContext(supabase);
+    if (!currentUserContext.canViewAll) {
+      return { success: false, insertedCount: 0, error: 'คุณไม่มีสิทธิ์ซิงค์ข้อมูลบุคลากร (เฉพาะผู้บริหารและผู้ดูแลระบบ)' };
+    }
 
     // Get active template if not provided
-    let activeTemplateId = templateId;
-    if (!activeTemplateId) {
-      const { data: tmpl } = await supabase
-        .from('kpi_templates')
-        .select('id')
-        .eq('is_active', true)
-        .limit(1)
-        .single();
-      activeTemplateId = tmpl?.id;
-    }
+    // Get active templates for teacher and staff
+    const { data: teacherTmpl } = await supabase
+      .from('kpi_templates')
+      .select('id')
+      .eq('target_role', 'teacher')
+      .eq('is_active', true)
+      .limit(1)
+      .single();
+
+    const { data: staffTmpl } = await supabase
+      .from('kpi_templates')
+      .select('id')
+      .eq('target_role', 'staff')
+      .eq('is_active', true)
+      .limit(1)
+      .single();
+
+    const teacherTemplateId = teacherTmpl?.id || templateId;
+    const staffTemplateId = staffTmpl?.id;
 
     // Get active personnel
     const { data: personnelList } = await supabase
       .from('personnel')
-      .select('id')
+      .select('id, category, position_th')
       .eq('is_active', true);
 
     if (!personnelList || personnelList.length === 0) {
       return { success: true, insertedCount: 0 };
     }
 
+    // Fetch existing evaluations for this cycle to avoid duplicate entries
+    const { data: existingEvaluations } = await supabase
+      .from('kpi_evaluations')
+      .select('id, personnel_id, template_id')
+      .eq('cycle_id', cycleId);
+
+    const existingMap = new Map((existingEvaluations || []).map((e) => [e.personnel_id, e]));
+
+    // If existing records were created before template was published, backfill template_id
+    for (const [pId, evalRecord] of existingMap.entries()) {
+      if (!evalRecord.template_id) {
+        const p = personnelList.find((item) => item.id === pId);
+        if (p) {
+          const targetTmplId =
+            p.category === 'teacher' ? teacherTemplateId : p.category === 'staff' ? staffTemplateId : null;
+          if (targetTmplId) {
+            await supabase
+              .from('kpi_evaluations')
+              .update({ template_id: targetTmplId })
+              .eq('id', evalRecord.id);
+          }
+        }
+      }
+    }
+
+    const unassignedPersonnel = personnelList.filter((p) => !existingMap.has(p.id));
+    if (unassignedPersonnel.length === 0) {
+      return { success: true, insertedCount: 0 };
+    }
+
     const defaultEvaluatorId = '3da9e72c-e913-4606-9b33-46aa9427ff43';
     let inserted = 0;
-    for (const p of personnelList) {
+    for (const p of unassignedPersonnel) {
+      const isTeacher = p.category === 'teacher';
+      const isStaff = p.category === 'staff';
+      const assignedTmplId = isTeacher ? teacherTemplateId : isStaff ? staffTemplateId : null;
+
       const { error } = await supabase
         .from('kpi_evaluations')
         .insert([
           {
             cycle_id: cycleId,
             personnel_id: p.id,
-            template_id: activeTemplateId || null,
+            template_id: assignedTmplId || null,
             assigned_evaluator_id: defaultEvaluatorId,
             assigned_evaluator_ids: [defaultEvaluatorId],
             status: 'pending_self',

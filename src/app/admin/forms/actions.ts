@@ -43,7 +43,7 @@ async function resolveFormUserContext(supabase: any): Promise<{
     let isAdmin = false;
     let currentPersonnelId: string | null = null;
 
-    if (isSystemAdmin(currentUser.email) || currentUser.user_metadata?.role === 'admin') {
+    if (isSystemAdmin(currentUser.email)) {
       isAdmin = true;
     }
 
@@ -344,6 +344,9 @@ export async function createForm(payload: {
       ? { th: payload.description_th.trim() }
       : null;
 
+    const isUuid = (val?: string | null): boolean =>
+      Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val));
+
     const newForm = {
       slug: cleanSlug,
       title: formTitle,
@@ -355,7 +358,7 @@ export async function createForm(payload: {
       response_count: 0,
       thank_you_title: { th: 'ขอบคุณสำหรับการส่งข้อมูล' },
       thank_you_message: { th: 'โรงเรียนสมคิดวิทยาได้รับข้อมูลของท่านเรียบร้อยแล้ว' },
-      created_by: context.userId || null,
+      created_by: isUuid(context.userId) ? context.userId : null,
       collaborator_ids: [],
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),

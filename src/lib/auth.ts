@@ -5,7 +5,9 @@ import { AppUser } from '@/types';
 export async function getServerUser() {
   const supabase = await createClient();
   const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) return null;
+  if (error || !user) {
+    return null;
+  }
   return user;
 }
 
@@ -38,9 +40,9 @@ export async function requireAuth(requiredRole?: 'admin' | 'cashier' | string, r
     return { user, role, appUser: appUser as AppUser | null, error: null };
   }
 
-  // If a specific feature is required and the user has it assigned, grant access
-  if (requiredFeature && assignedFeatures.includes(requiredFeature)) {
-    return { user, role, appUser: appUser as AppUser | null, error: null };
+  // If a specific feature is required, the user must have it assigned
+  if (requiredFeature && !assignedFeatures.includes(requiredFeature)) {
+    return { error: 'Forbidden', status: 403, user, role, appUser: appUser as AppUser | null };
   }
 
   // If a required role is specified and does not match

@@ -17,12 +17,14 @@ export default function NotFound() {
           >
             <Home className="w-4 h-4" /> พอร์ทัลหลัก
           </Link>
-          <Link
-            href="/website"
+          <a
+            href="https://somkidvittaya.ac.th"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-foreground/5 text-foreground/80 hover:text-primary font-bold rounded-2xl border border-foreground/10 hover:bg-foreground/10 transition-all text-sm"
           >
             <Globe className="w-4 h-4" /> เว็บไซต์โรงเรียน
-          </Link>
+          </a>
         </div>
       </div>
     </div>

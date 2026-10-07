@@ -6,8 +6,8 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   try {
     const authHeader = request.headers.get('authorization');
-    // For production, ensure this secret is set
-    if (process.env.SVPORTAL_WEBHOOK_SECRET && authHeader !== `Bearer ${process.env.SVPORTAL_WEBHOOK_SECRET}`) {
+    const webhookSecret = process.env.SVPORTAL_WEBHOOK_SECRET;
+    if (!webhookSecret || authHeader !== `Bearer ${webhookSecret}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

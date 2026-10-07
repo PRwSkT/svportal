@@ -9,6 +9,7 @@ import {
   KpiStatus,
   KpiGrade,
   KpiQuarter,
+  KpiUserContext,
 } from '@/types/kpi';
 import {
   getKpiCycles,
@@ -52,8 +53,10 @@ import {
   Check,
   Info,
 } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function KpiDashboardPage() {
+  const { dict, isThai, formatDate } = useLanguage();
   const [cycles, setCycles] = useState<KpiCycle[]>([]);
   const [selectedCycleId, setSelectedCycleId] = useState<string>('');
   const [evaluations, setEvaluations] = useState<KpiEvaluation[]>([]);
@@ -71,19 +74,18 @@ export default function KpiDashboardPage() {
     avgScore: 0,
   });
 
-  const [currentUserContext, setCurrentUserContext] = useState<{
-    userId: string | null;
-    personnelId: string | null;
-    isAdmin: boolean;
-  }>({
+  const [currentUserContext, setCurrentUserContext] = useState<KpiUserContext>({
     userId: null,
     personnelId: null,
-    isAdmin: true,
+    isAdmin: false,
+    isExecutive: false,
+    canViewAll: false,
   });
 
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | KpiStatus>('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'teacher' | 'staff'>('all');
   const [viewFilter, setViewFilter] = useState<'all' | 'assigned_to_me' | 'my_self'>('all');
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -399,9 +401,14 @@ export default function KpiDashboardPage() {
       p?.name_en?.toLowerCase().includes(q) ||
       p?.position_th?.toLowerCase().includes(q) ||
       p?.email?.toLowerCase().includes(q) ||
-      (e.assigned_evaluators || []).some((ev) => ev.name_th?.toLowerCase().includes(q));
+      (currentUserContext.canViewAll && (e.assigned_evaluators || []).some((ev) => ev.name_th?.toLowerCase().includes(q)));
 
     const matchStatus = statusFilter === 'all' || e.status === statusFilter;
+
+    const matchRole =
+      roleFilter === 'all' ||
+      (roleFilter === 'teacher' && p?.category === 'teacher') ||
+      (roleFilter === 'staff' && p?.category === 'staff');
 
     let matchView = true;
     if (viewFilter === 'assigned_to_me') {
@@ -414,7 +421,7 @@ export default function KpiDashboardPage() {
       matchView = e.personnel_id === currentUserContext.personnelId;
     }
 
-    return matchSearch && matchStatus && matchView;
+    return matchSearch && matchStatus && matchRole && matchView;
   });
 
   const selectedCycle = cycles.find((c) => c.id === selectedCycleId);
@@ -422,7 +429,7 @@ export default function KpiDashboardPage() {
   return (
     <div className="min-h-screen bg-[#F5F4F2] pb-24 font-sans text-slate-800">
       {/* Top Banner / Breadcrumb */}
-      <header className="bg-white border-b border-slate-200/80 sticky top-0 z-30 shadow-2xs">
+      <header className="bg-white border-b border-slate-200/80 shadow-2xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-[#7B1C3E] text-white flex items-center justify-center shadow-md">
@@ -431,14 +438,14 @@ export default function KpiDashboardPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
-                  ระบบประเมินผลการปฏิบัติงานรายไตรมาส (Quarterly KPI)
+                  {dict.kpi.title}
                 </h1>
                 <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                  Somkidvittaya Official
+                  {dict.common.officialBadge}
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                ประเมินตนเอง (Self) • หัวหน้างานประเมินตามสิทธิ์ (Supervisor) • วิเคราะห์ผล & แจ้งผลทาง Gmail
+                {dict.kpi.subtitle}
               </p>
             </div>
           </div>
@@ -461,8 +468,8 @@ export default function KpiDashboardPage() {
               </select>
             </div>
 
-            {/* Admin Action: Assign Evaluators */}
-            {currentUserContext.isAdmin && (
+            {/* Admin / Executive Action: Assign Evaluators */}
+            {currentUserContext.canViewAll && (
               <button
                 onClick={() => setShowAssignModal(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold shadow-2xs transition-colors"
@@ -473,8 +480,8 @@ export default function KpiDashboardPage() {
               </button>
             )}
 
-            {/* Admin Action: Add New Quarterly Cycle */}
-            {currentUserContext.isAdmin && (
+            {/* Admin / Executive Action: Add New Quarterly Cycle */}
+            {currentUserContext.canViewAll && (
               <button
                 onClick={() => setShowCreateQuarterModal(true)}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#7B1C3E] hover:bg-[#631430] text-white rounded-xl text-xs font-bold shadow-sm transition-all"
@@ -485,16 +492,18 @@ export default function KpiDashboardPage() {
               </button>
             )}
 
-            {/* Sync Personnel */}
-            <button
-              onClick={handleSyncPersonnel}
-              disabled={isSyncing}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold shadow-2xs transition-colors disabled:opacity-50"
-              title="ตรวจสอบและซิงค์รายชื่อบุคลากรใหม่เข้าสู่รอบนี้"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-[#7B1C3E]' : ''}`} />
-              <span className="hidden sm:inline">ซิงค์บุคลากร</span>
-            </button>
+            {/* Sync Personnel - Admin / Executive only */}
+            {currentUserContext.canViewAll && (
+              <button
+                onClick={handleSyncPersonnel}
+                disabled={isSyncing}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold shadow-2xs transition-colors disabled:opacity-50"
+                title="ตรวจสอบและซิงค์รายชื่อบุคลากรใหม่เข้าสู่รอบนี้"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-[#7B1C3E]' : ''}`} />
+                <span className="hidden sm:inline">ซิงค์บุคลากร</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -509,15 +518,29 @@ export default function KpiDashboardPage() {
               <span className="bg-amber-400 text-amber-950 px-2 py-0.2 rounded font-black text-[10px]">
                 {selectedCycle?.quarter || 'Q1'}
               </span>
-              <span>การประเมินรายไตรมาสตามสิทธิ์ที่ Admin กำหนด</span>
+              <span>
+                {currentUserContext.canViewAll
+                  ? 'มุมมองผู้บริหารและผู้ดูแลระบบ (สิทธิ์เข้าถึงทุกรายการ)'
+                  : 'มุมมองตามสิทธิ์การประเมินของคุณ'}
+              </span>
             </div>
             <h2 className="text-xl sm:text-2xl font-bold leading-snug">
               {selectedCycle?.title || 'การประเมินผลการปฏิบัติงาน'}
             </h2>
             <p className="text-xs sm:text-sm text-white/80 mt-2 leading-relaxed">
-              • <strong>รอบประเมินรายไตรมาส (Quarterly):</strong> บุคลากรประเมินตนเองตามตัวชี้วัด &rarr;
-              • <strong>การแบ่งสิทธิ์ประเมิน:</strong> ผู้ที่ได้รับมอบหมายเป็นผู้ประเมิน (Supervisor) เท่านั้นที่จะมีสิทธิ์ให้คะแนนบุคลากรที่ตนดูแล &rarr;
-              • <strong>แจ้งผลอย่างเป็นธรรม:</strong> สรุปผลเรดาร์ชาร์ตและส่งเข้า Gmail โดยไม่ระบุตัวตนผู้ประเมิน
+              {currentUserContext.canViewAll ? (
+                <>
+                  • <strong>รอบประเมินรายไตรมาส (Quarterly):</strong> บุคลากรประเมินตนเองตามตัวชี้วัด &rarr;
+                  • <strong>การแบ่งสิทธิ์ประเมิน:</strong> ผู้ที่ได้รับมอบหมายเป็นผู้ประเมิน (Supervisor) เท่านั้นที่จะมีสิทธิ์ให้คะแนนบุคลากรที่ตนดูแล &rarr;
+                  • <strong>แจ้งผลอย่างเป็นธรรม:</strong> สรุปผลเรดาร์ชาร์ตและส่งเข้า Gmail โดยไม่ระบุตัวตนผู้ประเมิน
+                </>
+              ) : (
+                <>
+                  • <strong>สิทธิ์การเข้าถึงข้อมูล:</strong> แสดงเฉพาะการประเมินตนเอง และรายการที่คุณได้รับมอบหมายเป็นผู้ประเมิน &rarr;
+                  • <strong>ประเมินตนเอง (Self):</strong> ตรวจสอบและบันทึกคะแนนตนเองตามตัวชี้วัด &rarr;
+                  • <strong>ตรวจประเมิน (Supervisor):</strong> บันทึกคะแนนและข้อคิดเห็นแก่บุคลากรในความดูแล
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -526,7 +549,9 @@ export default function KpiDashboardPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">บุคลากรทั้งหมด</span>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                {currentUserContext.canViewAll ? 'บุคลากรทั้งหมด' : 'รายการตามสิทธิ์'}
+              </span>
               <div className="p-2 rounded-xl bg-slate-100 text-slate-600">
                 <Users className="w-4 h-4" />
               </div>
@@ -534,7 +559,11 @@ export default function KpiDashboardPage() {
             <div className="mt-3 text-2xl sm:text-3xl font-extrabold text-slate-900">
               {stats.total} <span className="text-xs font-normal text-slate-400">ท่าน</span>
             </div>
-            <div className="mt-1 text-[11px] text-slate-500">ในรอบ {selectedCycle?.quarter || 'Q1'}</div>
+            <div className="mt-1 text-[11px] text-slate-500">
+              {currentUserContext.canViewAll
+                ? `ในรอบ ${selectedCycle?.quarter || 'Q1'}`
+                : 'การประเมินที่คุณมีสิทธิ์'}
+            </div>
           </div>
 
           <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs">
@@ -586,7 +615,11 @@ export default function KpiDashboardPage() {
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="ค้นหาชื่อครู, ตำแหน่ง, ผู้ประเมิน..."
+              placeholder={
+                currentUserContext.canViewAll
+                  ? 'ค้นหาชื่อครู/บุคลากร, ตำแหน่ง, ผู้ประเมิน...'
+                  : 'ค้นหาชื่อครู/บุคลากร, ตำแหน่ง...'
+              }
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white transition-all"
@@ -595,7 +628,43 @@ export default function KpiDashboardPage() {
 
           {/* Scope Filters */}
           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-            {/* View Scope (All vs Assigned to me) */}
+            {/* Role Category Filter (Admin / Executive view) */}
+            {currentUserContext.canViewAll && (
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+                <button
+                  onClick={() => setRoleFilter('all')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    roleFilter === 'all'
+                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  ทุกสายงาน
+                </button>
+                <button
+                  onClick={() => setRoleFilter('teacher')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    roleFilter === 'teacher'
+                      ? 'bg-[#1B3A6B] text-white shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  ครูและผู้ช่วยครู
+                </button>
+                <button
+                  onClick={() => setRoleFilter('staff')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    roleFilter === 'staff'
+                      ? 'bg-[#7B1C3E] text-white shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  เจ้าหน้าที่/พนักงาน
+                </button>
+              </div>
+            )}
+
+            {/* View Scope (All vs Assigned to me vs My self) */}
             <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
               <button
                 onClick={() => setViewFilter('all')}
@@ -605,7 +674,7 @@ export default function KpiDashboardPage() {
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                ทั้งหมด
+                {currentUserContext.canViewAll ? 'ทั้งหมด' : 'ทั้งหมดตามสิทธิ์'}
               </button>
               {currentUserContext.personnelId && (
                 <>
@@ -627,7 +696,7 @@ export default function KpiDashboardPage() {
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    ของฉันเอง
+                    การประเมินของฉัน
                   </button>
                 </>
               )}
@@ -641,7 +710,7 @@ export default function KpiDashboardPage() {
                   statusFilter === 'all' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600'
                 }`}
               >
-                ทุกสถานะ
+                {dict.common.all}
               </button>
               <button
                 onClick={() => setStatusFilter('pending_self')}
@@ -649,7 +718,7 @@ export default function KpiDashboardPage() {
                   statusFilter === 'pending_self' ? 'bg-white text-amber-700 shadow-2xs font-bold' : 'text-slate-600'
                 }`}
               >
-                รอประเมินตนเอง
+                {isThai ? 'รอประเมินตนเอง' : 'Pending Self'}
               </button>
               <button
                 onClick={() => setStatusFilter('self_submitted')}
@@ -657,7 +726,7 @@ export default function KpiDashboardPage() {
                   statusFilter === 'self_submitted' ? 'bg-white text-blue-700 shadow-2xs font-bold' : 'text-slate-600'
                 }`}
               >
-                รอหัวหน้างาน
+                {isThai ? 'รอหัวหน้างาน' : 'Pending Review'}
               </button>
               <button
                 onClick={() => setStatusFilter('completed')}
@@ -665,7 +734,7 @@ export default function KpiDashboardPage() {
                   statusFilter === 'completed' ? 'bg-white text-emerald-700 shadow-2xs font-bold' : 'text-slate-600'
                 }`}
               >
-                เสร็จสิ้น
+                {dict.common.success}
               </button>
             </div>
           </div>
@@ -690,10 +759,16 @@ export default function KpiDashboardPage() {
                 <thead>
                   <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-[11px] font-bold">
                     <th className="py-4 px-6">บุคลากรผู้รับการประเมิน</th>
-                    <th className="py-4 px-4">ผู้มีสิทธิ์ประเมิน (Supervisor)</th>
+                    <th className="py-4 px-4">
+                      {currentUserContext.canViewAll
+                        ? 'ผู้มีสิทธิ์ประเมิน (กรรมการ/เพื่อนร่วมงาน)'
+                        : 'สถานะกรรมการ & เพื่อนร่วมงาน'}
+                    </th>
                     <th className="py-4 px-4">สถานะ</th>
                     <th className="py-4 px-4 text-center">ตนเอง</th>
-                    <th className="py-4 px-4 text-center">หัวหน้างาน</th>
+                    <th className="py-4 px-4 text-center">
+                      {currentUserContext.canViewAll ? 'กรรมการ/เพื่อนร่วมงาน' : 'คะแนนสรุป'}
+                    </th>
                     <th className="py-4 px-4 text-center">เกรดสรุป</th>
                     <th className="py-4 px-6 text-right">ดำเนินการ</th>
                   </tr>
@@ -704,9 +779,9 @@ export default function KpiDashboardPage() {
                     const assignedSup = e.assigned_evaluator;
                     const hasEmail = Boolean(p?.email);
 
-                    // Check if current user is one of the assigned supervisors or admin
+                    // Check if current user is one of the assigned supervisors or admin / executive
                     const canSupervise =
-                      currentUserContext.isAdmin ||
+                      currentUserContext.canViewAll ||
                       Boolean(
                         currentUserContext.personnelId &&
                           (e.assigned_evaluator_ids?.includes(currentUserContext.personnelId) ||
@@ -762,69 +837,125 @@ export default function KpiDashboardPage() {
                           </div>
                         </td>
 
-                        {/* Assigned Evaluators (Committee) Column */}
+                        {/* Assigned Evaluators (Committee & Peers) Column */}
                         <td className="py-4 px-4">
                           <div className="space-y-1.5 min-w-[190px]">
-                            {e.assigned_evaluators && e.assigned_evaluators.length > 0 ? (
-                              <div className="flex flex-col gap-1">
-                                {e.assigned_evaluators.map((ev) => {
-                                  const review = (e.reviews || []).find(
-                                    (r) => r.evaluator_id === ev.id && r.status === 'submitted'
-                                  );
-                                  const isSubmitted = Boolean(review);
-                                  return (
-                                    <div
-                                      key={ev.id}
-                                      className="flex items-center justify-between gap-1.5 text-[11px] font-semibold py-0.5 px-2 bg-purple-50/70 border border-purple-200/80 rounded-lg text-purple-950"
-                                    >
-                                      <span className="truncate max-w-[130px]">{ev.name_th}</span>
-                                      {isSubmitted ? (
-                                        <span className="inline-flex items-center text-[10px] text-emerald-700 font-bold shrink-0">
-                                          <CheckCircle2 className="w-3 h-3 text-emerald-600 mr-0.5" />
-                                          {review?.total_score ? `${review.total_score}%` : 'ประเมินแล้ว'}
-                                        </span>
-                                      ) : (
-                                        <span className="inline-flex items-center text-[10px] text-amber-600 font-medium shrink-0">
-                                          <Clock className="w-3 h-3 text-amber-500 mr-0.5" /> รอ
-                                        </span>
-                                      )}
-                                    </div>
-                                  );
-                                })}
+                            {currentUserContext.canViewAll ? (
+                              // ADMIN / EXECUTIVE VIEW: Can see all evaluator names, progress, and button to assign
+                              <>
+                                {e.assigned_evaluators && e.assigned_evaluators.length > 0 ? (
+                                  <div className="flex flex-col gap-1">
+                                    {e.assigned_evaluators.map((ev) => {
+                                      const review = (e.reviews || []).find(
+                                        (r) => r.evaluator_id === ev.id && r.status === 'submitted'
+                                      );
+                                      const isSubmitted = Boolean(review);
+                                      return (
+                                        <div
+                                          key={ev.id}
+                                          className="flex items-center justify-between gap-1.5 text-[11px] font-semibold py-0.5 px-2 bg-purple-50/70 border border-purple-200/80 rounded-lg text-purple-950"
+                                        >
+                                          <span className="truncate max-w-[130px]">{ev.name_th}</span>
+                                          {isSubmitted ? (
+                                            <span className="inline-flex items-center text-[10px] text-emerald-700 font-bold shrink-0">
+                                              <CheckCircle2 className="w-3 h-3 text-emerald-600 mr-0.5" />
+                                              {review?.total_score ? `${review.total_score}%` : 'ประเมินแล้ว'}
+                                            </span>
+                                          ) : (
+                                            <span className="inline-flex items-center text-[10px] text-amber-600 font-medium shrink-0">
+                                              <Clock className="w-3 h-3 text-amber-500 mr-0.5" /> รอ
+                                            </span>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-slate-400 italic">ยังไม่กำหนดผู้ประเมิน</span>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenPersonAssignModal(e)}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                                  title={`กำหนดผู้ประเมินรายคนให้ ${p?.name_th}`}
+                                >
+                                  <Settings2 className="w-3.5 h-3.5 text-purple-600" />
+                                  <span>กำหนดผู้ประเมิน ({e.assigned_evaluator_ids?.length || 0} ท่าน)</span>
+                                </button>
+                              </>
+                            ) : isSelf ? (
+                              // EVALUATEE VIEW: STRICT ANONYMITY - ZERO EVALUATOR / PEER NAMES
+                              <div className="flex flex-col gap-1 text-xs">
+                                <div className="font-bold text-slate-700 flex items-center gap-1.5">
+                                  <Users className="w-3.5 h-3.5 text-purple-600" />
+                                  <span>คณะกรรมการและเพื่อนร่วมงาน</span>
+                                </div>
+                                <div className="text-[11px] text-slate-500">
+                                  {e.status === 'completed' ? (
+                                    <span className="inline-flex items-center text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
+                                      <CheckCircle2 className="w-3 h-3 text-emerald-600 mr-1" />
+                                      ประเมินครบถ้วนแล้ว
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center text-amber-700 font-medium bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg">
+                                      <Clock className="w-3 h-3 text-amber-500 mr-1" />
+                                      {submittedReviewCount > 0
+                                        ? `ประเมินแล้ว ${submittedReviewCount} ท่าน (อยู่ระหว่างประเมิน)`
+                                        : 'รอคณะกรรมการและเพื่อนร่วมงานประเมิน'}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-slate-400 italic">
+                                  * ไม่เปิดเผยรายชื่อผู้ประเมินเพื่อความเป็นธรรม
+                                </span>
                               </div>
                             ) : (
-                              <span className="text-xs text-slate-400 italic">ยังไม่กำหนดผู้ประเมิน</span>
-                            )}
-
-                            {currentUserContext.isAdmin && (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenPersonAssignModal(e)}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg shadow-2xs transition-colors cursor-pointer"
-                                title={`กำหนดผู้ประเมินรายคนให้ ${p?.name_th}`}
-                              >
-                                <Settings2 className="w-3.5 h-3.5 text-purple-600" />
-                                <span>กำหนดผู้ประเมิน ({e.assigned_evaluator_ids?.length || 0} ท่าน)</span>
-                              </button>
+                              // PEER EVALUATOR VIEW: ONLY SHOW OWN ASSIGNMENT STATUS - ZERO OTHER PEER NAMES
+                              <div className="flex flex-col gap-1 text-xs">
+                                <div className="font-bold text-slate-700 flex items-center gap-1.5">
+                                  <UserCheck className="w-3.5 h-3.5 text-blue-600" />
+                                  <span>สิทธิ์การประเมินของคุณ</span>
+                                </div>
+                                <div>
+                                  {myReview ? (
+                                    <span className="inline-flex items-center text-[11px] text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
+                                      <CheckCircle2 className="w-3 h-3 text-emerald-600 mr-1" />
+                                      คุณประเมินแล้ว ({myReview.total_score ? `${myReview.total_score}%` : 'เรียบร้อย'})
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center text-[11px] text-amber-700 font-medium bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg">
+                                      <Clock className="w-3 h-3 text-amber-500 mr-1" />
+                                      รอคุณร่วมประเมิน
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-purple-600 font-medium">
+                                  * คะแนนจะถัวเฉลี่ยรวมในส่วนของกรรมการ
+                                </span>
+                              </div>
                             )}
                           </div>
                         </td>
 
                         {/* Status Column */}
                         <td className="py-4 px-4">
-                          {e.status === 'pending_self' && (
+                          {!e.template_id ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                              <Clock className="w-3.5 h-3.5 text-slate-400" />
+                              รอแบบประเมินเจ้าหน้าที่
+                            </span>
+                          ) : e.status === 'pending_self' ? (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/80">
                               <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                               รอประเมินตนเอง
                             </span>
-                          )}
-                          {e.status === 'self_submitted' && (
+                          ) : e.status === 'self_submitted' ? (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/80">
                               <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
                               รอผู้ประเมิน ({submittedReviewCount}/{assignedReviewCount} คน)
                             </span>
-                          )}
-                          {e.status === 'completed' && (
+                          ) : (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                               ประเมินครบแล้ว
@@ -880,73 +1011,85 @@ export default function KpiDashboardPage() {
                         {/* Actions Column */}
                         <td className="py-4 px-6 text-right">
                           <div className="inline-flex items-center gap-1.5">
-                            {/* 1. Self Evaluation Button */}
-                            <Link
-                              href={`/admin/kpi/${e.id}/self`}
-                              title="ประเมินตนเอง (Self Evaluation)"
-                              className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors flex items-center gap-1"
-                            >
-                              <User className="w-3.5 h-3.5 text-slate-500" />
-                              <span className="hidden sm:inline">ประเมินตนเอง</span>
-                            </Link>
-
-                            {/* 2. Supervisor Evaluation Button (Only if authorized) */}
-                            {canSupervise ? (
-                              <Link
-                                href={`/admin/kpi/${e.id}/supervisor`}
-                                title="ตรวจประเมินผลการปฏิบัติงาน"
-                                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-colors flex items-center gap-1 shadow-2xs ${
-                                  myReview
-                                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200'
-                                    : 'bg-[#1B3A6B] hover:bg-[#122748] text-white'
-                                }`}
-                              >
-                                <UserCheck className="w-3.5 h-3.5" />
-                                <span className="hidden sm:inline">
-                                  {myReview ? 'แก้ไขคะแนน' : 'ตรวจประเมิน'}
-                                </span>
-                              </Link>
+                            {!e.template_id ? (
+                              <span className="text-[11px] text-slate-400 italic px-2.5 py-1 bg-slate-50 border border-slate-200/80 rounded-xl">
+                                รอจัดทำแบบประเมิน
+                              </span>
                             ) : (
-                              <button
-                                disabled
-                                title={`สงวนสิทธิ์เฉพาะผู้ได้รับมอบหมายและผู้ดูแลระบบ`}
-                                className="px-2.5 py-1.5 rounded-xl bg-slate-100 text-slate-400 text-xs font-medium cursor-not-allowed opacity-60 flex items-center gap-1"
-                              >
-                                <UserCheck className="w-3.5 h-3.5" />
-                                <span className="hidden sm:inline">ไม่มีสิทธิ์</span>
-                              </button>
+                              <>
+                                {/* 1. Self Evaluation Button */}
+                                {(isSelf || currentUserContext.canViewAll) && (
+                                  <Link
+                                    href={`/admin/kpi/${e.id}/self`}
+                                    title="ประเมินตนเอง (Self Evaluation)"
+                                    className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors flex items-center gap-1"
+                                  >
+                                    <User className="w-3.5 h-3.5 text-slate-500" />
+                                    <span className="hidden sm:inline">ประเมินตนเอง</span>
+                                  </Link>
+                                )}
+
+                                {/* 2. Supervisor Evaluation Button (Only if authorized and not reviewing self unless canViewAll) */}
+                                {canSupervise && (!isSelf || currentUserContext.canViewAll) ? (
+                                  <Link
+                                    href={`/admin/kpi/${e.id}/supervisor`}
+                                    title="ตรวจประเมินผลการปฏิบัติงาน"
+                                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-colors flex items-center gap-1 shadow-2xs ${
+                                      myReview
+                                        ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200'
+                                        : 'bg-[#1B3A6B] hover:bg-[#122748] text-white'
+                                    }`}
+                                  >
+                                    <UserCheck className="w-3.5 h-3.5" />
+                                    <span className="hidden sm:inline">
+                                      {myReview ? 'แก้ไขคะแนน' : 'ตรวจประเมิน'}
+                                    </span>
+                                  </Link>
+                                ) : !isSelf && currentUserContext.canViewAll ? (
+                                  <button
+                                    disabled
+                                    title={`สงวนสิทธิ์เฉพาะผู้ได้รับมอบหมายและผู้ดูแลระบบ`}
+                                    className="px-2.5 py-1.5 rounded-xl bg-slate-100 text-slate-400 text-xs font-medium cursor-not-allowed opacity-60 flex items-center gap-1"
+                                  >
+                                    <UserCheck className="w-3.5 h-3.5" />
+                                    <span className="hidden sm:inline">ไม่มีสิทธิ์</span>
+                                  </button>
+                                ) : null}
+
+                                {/* 3. Analytics Button */}
+                                <Link
+                                  href={`/admin/kpi/${e.id}/analytics`}
+                                  title="วิเคราะห์ผลคะแนน & เรดาร์ชาร์ต"
+                                  className="px-2.5 py-1.5 rounded-xl bg-[#7B1C3E] hover:bg-[#631430] text-white text-xs font-semibold transition-colors flex items-center gap-1 shadow-2xs"
+                                >
+                                  <BarChart3 className="w-3.5 h-3.5" />
+                                  <span>วิเคราะห์ผล</span>
+                                </Link>
+
+                                {/* 4. Anonymous Email Notify Button - Admin / Executive only */}
+                                {currentUserContext.canViewAll && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setEmailModalEval(e)}
+                                    disabled={e.status !== 'completed' || !hasEmail}
+                                    title={
+                                      !hasEmail
+                                        ? 'ไม่มีอีเมลในระบบ'
+                                        : e.status !== 'completed'
+                                        ? 'ต้องประเมินเสร็จสิ้นก่อนจึงจะแจ้งผลได้'
+                                        : 'ส่งผลการประเมินเข้า Gmail (ไม่ระบุชื่อผู้ประเมิน)'
+                                    }
+                                    className={`p-1.5 rounded-xl border transition-colors ${
+                                      e.email_notified_status === 'sent'
+                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                        : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200 disabled:opacity-30'
+                                    }`}
+                                  >
+                                    <Mail className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </>
                             )}
-
-                            {/* 3. Analytics Button */}
-                            <Link
-                              href={`/admin/kpi/${e.id}/analytics`}
-                              title="วิเคราะห์ผลคะแนน & เรดาร์ชาร์ต"
-                              className="px-2.5 py-1.5 rounded-xl bg-[#7B1C3E] hover:bg-[#631430] text-white text-xs font-semibold transition-colors flex items-center gap-1 shadow-2xs"
-                            >
-                              <BarChart3 className="w-3.5 h-3.5" />
-                              <span>วิเคราะห์ผล</span>
-                            </Link>
-
-                            {/* 4. Anonymous Email Notify Button */}
-                            <button
-                              type="button"
-                              onClick={() => setEmailModalEval(e)}
-                              disabled={e.status !== 'completed' || !hasEmail}
-                              title={
-                                !hasEmail
-                                  ? 'ไม่มีอีเมลในระบบ'
-                                  : e.status !== 'completed'
-                                  ? 'ต้องประเมินเสร็จสิ้นก่อนจึงจะแจ้งผลได้'
-                                  : 'ส่งผลการประเมินเข้า Gmail (ไม่ระบุชื่อผู้ประเมิน)'
-                              }
-                              className={`p-1.5 rounded-xl border transition-colors ${
-                                e.email_notified_status === 'sent'
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                  : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200 disabled:opacity-30'
-                              }`}
-                            >
-                              <Mail className="w-4 h-4" />
-                            </button>
                           </div>
                         </td>
                       </tr>

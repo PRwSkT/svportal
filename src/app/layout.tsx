@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AppNav } from "@/components/AppNav";
 import { Toaster } from "sonner";
 import Image from "next/image";
@@ -48,14 +49,16 @@ export default async function RootLayout({
         </div>
 
         <Toaster position="top-right" richColors />
-        <AuthProvider>
-          <div className="relative z-50">
-            <AppNav />
-          </div>
-          <main className="flex-1 relative z-10 pb-24 md:pb-10">
-            {children}
-          </main>
-        </AuthProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <div className="sticky top-0 z-50">
+              <AppNav />
+            </div>
+            <main className="flex-1 relative z-10 pb-24 md:pb-10">
+              {children}
+            </main>
+          </AuthProvider>
+        </LanguageProvider>
       </body>
     </html>
   );

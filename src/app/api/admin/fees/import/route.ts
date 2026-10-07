@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { createClient } from '@/lib/supabase/server';
+import { getAdminClient } from '@/lib/supabase/admin';
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireAuth();
+    const auth = await requireAuth('admin', 'pos_fees');
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No rows provided' }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    const supabase = getAdminClient();
 
     // Fetch existing pairs for the students in this chunk to skip duplicates
     const studentIds = [...new Set(rows.map(r => r.student_id))];

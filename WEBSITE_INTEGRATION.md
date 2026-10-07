@@ -17,8 +17,8 @@ The School Website (`somkidvittaya.ac.th`) and SV-Portal (`sv-portal.somkidvitta
 
 ### B. Full Site Rebuild (Every 7 Days or on Manual Demand)
 - **Netlify Build Hook:**
-  - URL: `https://api.netlify.com/build_hooks/6a9f6146cf134165e6622bc2`
-  - Saved in `.env.local` as `NETLIFY_BUILD_HOOK_URL`.
+  - Configured via environment variable `NETLIFY_BUILD_HOOK_URL` in `.env.local`
+  - Used securely on server-side actions
 - **Manual Trigger Button:**
   - Located in SV-Portal Admin Sidebar at `/admin/website` (`[ 🚀 สั่ง Deploy เว็บไซต์จริง ]`).
   - Calls `manualTriggerDeploy()` in `src/app/admin/website/actions.ts`.

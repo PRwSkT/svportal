@@ -3,8 +3,10 @@ import { KpiEvaluation, SectionScoreSummary } from '@/types/kpi';
 import { calculateKpiScoreSummaries } from './scoring';
 
 export function generateAnonymousKpiEmailHtml(evaluation: KpiEvaluation): string {
+  const isStaff = evaluation.personnel?.category === 'staff';
+  const namePrefix = isStaff ? 'คุณ' : 'คุณครู';
   const personnelName = evaluation.personnel?.name_th || 'บุคลากรโรงเรียนสมคิดวิทยา';
-  const position = evaluation.personnel?.position_th || 'ครูผู้สอน';
+  const position = evaluation.personnel?.position_th || (isStaff ? 'เจ้าหน้าที่/พนักงาน' : 'ครูผู้สอน');
   const cycleTitle = evaluation.cycle?.title || 'การประเมินผลการปฏิบัติงาน';
   const { sections, selfTotal, supervisorTotal, finalGrade } = calculateKpiScoreSummaries(evaluation);
 
@@ -90,7 +92,7 @@ export function generateAnonymousKpiEmailHtml(evaluation: KpiEvaluation): string
                 <tr>
                   <td>
                     <div style="font-size: 18px; font-weight: 700; color: #0F172A; margin-bottom: 4px;">
-                      เรียน คุณครู ${personnelName}
+                      เรียน ${namePrefix} ${personnelName}
                     </div>
                     <div style="font-size: 13px; color: #64748B;">
                       ตำแหน่ง: <span style="font-weight: 600; color: #334155;">${position}</span>
@@ -235,13 +237,16 @@ export async function sendAnonymousKpiEmail(evaluation: KpiEvaluation): Promise<
     throw new Error('บุคลากรท่านนี้ยังไม่มีการระบุอีเมลในระบบ');
   }
 
-  const subject = `[SVPortal] แจ้งผลการประเมินการปฏิบัติงาน (${evaluation.cycle?.title || 'ประจำรอบ'}) — คุณครู ${evaluation.personnel?.name_th || ''}`;
+  const isStaff = evaluation.personnel?.category === 'staff';
+  const namePrefix = isStaff ? 'คุณ' : 'คุณครู';
+
+  const subject = `[SVPortal] แจ้งผลการประเมินการปฏิบัติงาน (${evaluation.cycle?.title || 'ประจำรอบ'}) — ${namePrefix} ${evaluation.personnel?.name_th || ''}`;
   const htmlContent = generateAnonymousKpiEmailHtml(evaluation);
 
   const { supervisorTotal, finalGrade } = calculateKpiScoreSummaries(evaluation);
 
   // Fallback direct Gmail compose URL
-  const plainSummary = `เรียน คุณครู ${evaluation.personnel?.name_th || ''}\n\nโรงเรียนสมคิดวิทยาขอแจ้งสรุปผลการประเมินการปฏิบัติงาน ${evaluation.cycle?.title || ''}\nระดับผลการประเมิน: เกรด ${finalGrade} (${supervisorTotal.toFixed(2)}%)\n\nท่านสามารถเข้าสู่ระบบ SVPortal เพื่อตรวจสอบรายงานการประเมินและเรดาร์ชาร์ตฉบับเต็มได้ที่:\nhttps://sv-portal.somkidvittaya.ac.th/admin/kpi\n\n(อีเมลฉบับนี้เป็นรายงานอัตโนมัติ ไม่ระบุข้อมูลผู้ประเมิน)`;
+  const plainSummary = `เรียน ${namePrefix} ${evaluation.personnel?.name_th || ''}\n\nโรงเรียนสมคิดวิทยาขอแจ้งสรุปผลการประเมินการปฏิบัติงาน ${evaluation.cycle?.title || ''}\nระดับผลการประเมิน: เกรด ${finalGrade} (${supervisorTotal.toFixed(2)}%)\n\nท่านสามารถเข้าสู่ระบบ SVPortal เพื่อตรวจสอบรายงานการประเมินและเรดาร์ชาร์ตฉบับเต็มได้ที่:\nhttps://sv-portal.somkidvittaya.ac.th/admin/kpi\n\n(อีเมลฉบับนี้เป็นรายงานอัตโนมัติ ไม่ระบุข้อมูลผู้ประเมิน)`;
   const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
     recipientEmail
   )}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(plainSummary)}`;

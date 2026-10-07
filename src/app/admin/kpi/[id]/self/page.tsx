@@ -109,7 +109,7 @@ export default function SelfEvaluationPage({ params }: { params: Promise<{ id: s
     }
   };
 
-  if (isLoading || !evaluation) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-[#F5F4F2] flex items-center justify-center p-6">
         <div className="flex flex-col items-center gap-3">
@@ -120,13 +120,36 @@ export default function SelfEvaluationPage({ params }: { params: Promise<{ id: s
     );
   }
 
+  if (!evaluation) {
+    return (
+      <div className="min-h-screen bg-[#F5F4F2] flex items-center justify-center p-6 font-sans">
+        <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-slate-200 text-center shadow-lg">
+          <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-7 h-7" />
+          </div>
+          <h2 className="text-lg font-bold text-slate-900 mb-2">ไม่สามารถเข้าถึงแบบประเมินตนเองนี้ได้</h2>
+          <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+            คุณไม่มีสิทธิ์เข้าถึงแบบประเมินตนเองของบุคคลอื่น หรือไม่พบข้อมูลในระบบ
+          </p>
+          <Link
+            href="/admin/kpi"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#7B1C3E] hover:bg-[#631430] text-white rounded-xl text-xs font-bold shadow-sm transition-all"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>กลับสู่หน้ารายการประเมิน</span>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const p = evaluation.personnel;
   const template = evaluation.template;
 
   return (
     <div className="min-h-screen bg-[#F5F4F2] pb-32 font-sans text-slate-800">
-      {/* Sticky Header Bar */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
+      {/* Header Bar */}
+      <header className="bg-white border-b border-slate-200 shadow-2xs">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link
@@ -159,7 +182,7 @@ export default function SelfEvaluationPage({ params }: { params: Promise<{ id: s
             </div>
             <button
               onClick={handleSubmit}
-              disabled={isSubmitting}
+              disabled={isSubmitting || !template || !template.sections || template.sections.length === 0}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#7B1C3E] hover:bg-[#631430] text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all disabled:opacity-50"
             >
               {isSubmitting ? (
@@ -214,6 +237,17 @@ export default function SelfEvaluationPage({ params }: { params: Promise<{ id: s
             </div>
           </div>
 
+          {/* If No Template Available */}
+          {(!template || !template.sections || template.sections.length === 0) && (
+            <div className="bg-amber-50/80 border border-amber-200/90 rounded-3xl p-8 text-center text-amber-900 shadow-2xs">
+              <AlertCircle className="w-10 h-10 text-amber-600 mx-auto mb-2" />
+              <h3 className="font-bold text-base">แบบประเมินสำหรับตำแหน่งนี้อยู่ระหว่างการจัดทำ</h3>
+              <p className="text-xs text-amber-700 mt-1 max-w-md mx-auto">
+                ยังไม่มีแบบประเมินที่กำหนดสำหรับตำแหน่งนี้ หรืออยู่ระหว่างการจัดทำแบบประเมิน กรุณาติดต่อฝ่ายบริหาร
+              </p>
+            </div>
+          )}
+
           {/* Render Sections */}
           {template?.sections.map((section, sIdx) => {
             return (
@@ -251,22 +285,38 @@ export default function SelfEvaluationPage({ params }: { params: Promise<{ id: s
                       >
                         <div className="flex items-start justify-between gap-3 mb-3">
                           <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="px-2 py-0.5 rounded-lg bg-[#7B1C3E]/10 text-[#7B1C3E] text-xs font-bold">
                                 {item.code}
                               </span>
+                              {typeof item.weight === 'number' && (
+                                <span className="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200/60 text-[11px] font-bold">
+                                  น้ำหนัก {item.weight}%
+                                </span>
+                              )}
                               <h4 className="text-sm font-bold text-slate-900">{item.title}</h4>
                             </div>
                             <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
                               {item.description}
                             </p>
+                            {item.evidence && (
+                              <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100/80 text-[11px] text-slate-600">
+                                <span className="font-bold text-slate-700">หลักฐานเชิงประจักษ์:</span>
+                                <span>{item.evidence}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
 
                         {/* 1-5 Rating Selector */}
                         <div className="pt-2">
-                          <div className="text-[11px] font-bold text-slate-400 mb-2 uppercase tracking-wider">
-                            เลือกระดับการประเมินตนเอง (1 - 5)
+                          <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 mb-2 uppercase tracking-wider">
+                            <span>เลือกระดับการประเมินตนเอง (1 - 5)</span>
+                            {currentRating > 0 && typeof item.weight === 'number' && (
+                              <span className="text-[#7B1C3E] font-semibold lowercase">
+                                คะแนนถ่วงน้ำหนัก: <strong>{((currentRating / 5) * item.weight).toFixed(2)}</strong> / {item.weight} คะแนน
+                              </span>
+                            )}
                           </div>
                           <div className="grid grid-cols-5 gap-2">
                             {[1, 2, 3, 4, 5].map((val) => {

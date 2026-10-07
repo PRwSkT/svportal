@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { KpiEvaluation, SectionScoreSummary } from '@/types/kpi';
+import { KpiEvaluation, SectionScoreSummary, KpiUserContext } from '@/types/kpi';
 import { getEvaluationDetail, dispatchEvaluationEmail } from '../../actions';
 import { calculateKpiScoreSummaries, generateAnonymousKpiEmailHtml } from '@/lib/kpi/scoring';
 import { toast } from 'sonner';
@@ -41,6 +41,7 @@ import {
   X,
   Loader2,
   AlertTriangle,
+  AlertCircle,
 } from 'lucide-react';
 
 export default function IndividualKpiAnalyticsPage({
@@ -52,6 +53,7 @@ export default function IndividualKpiAnalyticsPage({
   const evaluationId = resolvedParams.id;
 
   const [evaluation, setEvaluation] = useState<KpiEvaluation | null>(null);
+  const [currentUserContext, setCurrentUserContext] = useState<KpiUserContext | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
@@ -63,6 +65,7 @@ export default function IndividualKpiAnalyticsPage({
       const res = await getEvaluationDetail(evaluationId);
       if (res.success && res.data) {
         setEvaluation(res.data);
+        setCurrentUserContext(res.currentUserContext || null);
       } else {
         toast.error('ไม่สามารถโหลดข้อมูลการประเมินได้', { description: res.error });
       }
@@ -71,12 +74,35 @@ export default function IndividualKpiAnalyticsPage({
     loadData();
   }, [evaluationId]);
 
-  if (isLoading || !evaluation) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-[#F5F4F2] flex items-center justify-center p-6">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-[#7B1C3E]" />
           <p className="text-sm font-medium text-slate-500">กำลังประมวลผลการวิเคราะห์ KPI...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!evaluation) {
+    return (
+      <div className="min-h-screen bg-[#F5F4F2] flex items-center justify-center p-6 font-sans">
+        <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-slate-200 text-center shadow-lg">
+          <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-7 h-7" />
+          </div>
+          <h2 className="text-lg font-bold text-slate-900 mb-2">ไม่สามารถเข้าถึงผลการประเมินนี้ได้</h2>
+          <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+            คุณไม่มีสิทธิ์เข้าถึงรายงานการวิเคราะห์ของบุคคลอื่น หรือไม่พบข้อมูลในระบบ
+          </p>
+          <Link
+            href="/admin/kpi"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#7B1C3E] hover:bg-[#631430] text-white rounded-xl text-xs font-bold shadow-sm transition-all"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>กลับสู่หน้ารายการประเมิน</span>
+          </Link>
         </div>
       </div>
     );
@@ -145,7 +171,7 @@ export default function IndividualKpiAnalyticsPage({
   return (
     <div className="min-h-screen bg-[#F5F4F2] pb-24 font-sans text-slate-800 print:bg-white print:p-0">
       {/* Top Header Bar (Hidden in Print) */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs print:hidden">
+      <header className="bg-white border-b border-slate-200 shadow-2xs print:hidden">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Link
@@ -178,22 +204,26 @@ export default function IndividualKpiAnalyticsPage({
               <span>พิมพ์รายงาน</span>
             </button>
 
-            <button
-              onClick={() => setShowEmailPreviewModal(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
-            >
-              <FileText className="w-4 h-4" />
-              <span>ดูพรีวิวอีเมล</span>
-            </button>
+            {currentUserContext?.canViewAll && (
+              <>
+                <button
+                  onClick={() => setShowEmailPreviewModal(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>ดูพรีวิวอีเมล</span>
+                </button>
 
-            <button
-              onClick={() => setShowEmailModal(true)}
-              disabled={!p?.email}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-[#7B1C3E] hover:bg-[#631430] text-white rounded-xl text-xs font-bold shadow-sm transition-all disabled:opacity-50"
-            >
-              <Mail className="w-4 h-4" />
-              <span>{evaluation.email_notified_status === 'sent' ? 'ส่งผลเข้า Gmail อีกครั้ง' : 'ส่งผลเข้า Gmail (ไม่ระบุผู้ประเมิน)'}</span>
-            </button>
+                <button
+                  onClick={() => setShowEmailModal(true)}
+                  disabled={!p?.email}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#7B1C3E] hover:bg-[#631430] text-white rounded-xl text-xs font-bold shadow-sm transition-all disabled:opacity-50"
+                >
+                  <Mail className="w-4 h-4" />
+                  <span>{evaluation.email_notified_status === 'sent' ? 'ส่งผลเข้า Gmail อีกครั้ง' : 'ส่งผลเข้า Gmail (ไม่ระบุผู้ประเมิน)'}</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -302,8 +332,8 @@ export default function IndividualKpiAnalyticsPage({
               </div>
             </div>
 
-            <div className="h-72 w-full flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-72 w-full min-w-0 flex items-center justify-center" style={{ minHeight: 280 }}>
+              <ResponsiveContainer width="100%" height={280} minWidth={0}>
                 <RadarChart data={radarData} outerRadius={90}>
                   <PolarGrid stroke="#E2E8F0" />
                   <PolarAngleAxis
@@ -347,8 +377,8 @@ export default function IndividualKpiAnalyticsPage({
               </div>
             </div>
 
-            <div className="h-72 w-full">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-72 w-full min-w-0" style={{ minHeight: 280 }}>
+              <ResponsiveContainer width="100%" height={280} minWidth={0}>
                 <BarChart data={gapData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
                   <XAxis

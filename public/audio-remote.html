@@ -61,9 +61,26 @@
     
     <div id="app-section" class="flex flex-col gap-5">
       <!-- Header -->
-      <div class="bg-primary text-white text-center py-4 px-6 rounded-2xl shadow-lg border border-white/20">
-        <h1 class="text-xl font-semibold mb-1">ระบบควบคุมระยะไกล (Remote Control)</h1>
-        <p class="text-sm opacity-90">ผู้ใช้งาน: <span id="user-display" class="font-medium text-amber-300">Admin</span></p>
+      <div class="bg-gradient-to-r from-primary to-[#5a142c] text-white py-4 px-6 rounded-2xl shadow-lg border border-white/20 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <a href="/home" target="_top" class="hover:opacity-90 transition">
+            <img src="/SV-Portal.png" alt="SV Portal" class="h-8 w-auto brightness-0 invert" />
+          </a>
+          <div>
+            <h1 class="text-lg font-bold leading-tight">ระบบควบคุมกระจายเสียง (Audio Remote)</h1>
+            <p class="text-xs text-white/80">ผู้ใช้งาน: <span id="user-display" class="font-medium text-amber-300">กำลังตรวจสอบ...</span></p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <a href="/broadcaster.html" target="_blank" class="text-xs bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg font-medium transition inline-flex items-center gap-1.5" title="เปิดหน้าสถานีเสียง">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+            หน้าสถานีเสียง
+          </a>
+          <a href="/home" target="_top" class="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg font-medium transition inline-flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
+            กลับหน้าหลัก
+          </a>
+        </div>
       </div>
 
       <!-- Music Remote -->
@@ -145,17 +162,20 @@
         </div>
       </div>
 
-      <button onclick="window.history.back()" 
-        class="w-full mt-2 text-gray-500 hover:text-gray-800 font-medium py-2 transition">
-        กลับสู่หน้าหลัก
-      </button>
+      <a href="/home" target="_top" 
+        class="w-full mt-2 text-gray-500 hover:text-gray-800 font-medium py-2.5 text-center transition block border border-gray-300 rounded-xl bg-white/50">
+        กลับสู่หน้าหลัก SV Portal
+      </a>
     </div>
   </div>
 
   <!-- SOS Keypad Modal -->
   <div id="sos-modal" class="fixed inset-0 bg-gray-900/95 z-[100] flex items-center justify-center hidden">
     <div class="bg-white rounded-3xl shadow-2xl p-6 w-[95%] max-w-lg border-2 border-red-500 overflow-y-auto max-h-[90vh]">
-      <h3 class="text-center text-xl font-bold text-red-600 mb-4">🚨 เลือกรหัสเหตุฉุกเฉิน (SOS Code)</h3>
+      <h3 class="text-center text-xl font-bold text-red-600 mb-4 flex items-center justify-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+        เลือกรหัสเหตุฉุกเฉิน (SOS Code)
+      </h3>
       
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
         <button onclick="confirmColorSos('red')" class="p-4 bg-red-100 hover:bg-red-200 border-2 border-red-500 rounded-2xl flex flex-col items-center justify-center gap-2 transition text-red-800">
@@ -205,13 +225,26 @@
     const API_URL = "https://script.google.com/macros/s/AKfycbyDmhCMyqQdnF3LdDSR_sFzCW3dj5C5Oh7D-ToR529Ij01nQLCjZM7Iqec6E_VqDlSGtg/exec"; 
 
     window.addEventListener('load', function() {
-      document.getElementById('user-display').innerText = 'Admin (SVPortal)';
+      fetch('/api/auth/me')
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data && (data.appUser?.full_name || data.user?.email)) {
+            document.getElementById('user-display').innerText = data.appUser?.full_name || data.user.email;
+          } else {
+            document.getElementById('user-display').innerText = 'เจ้าหน้าที่โรงเรียน';
+          }
+        })
+        .catch(() => {
+          document.getElementById('user-display').innerText = 'เจ้าหน้าที่โรงเรียน';
+        });
+
       fetchState();
       setInterval(fetchState, 5000);
     });
 
     function extractVideoID(url) {
-      let match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/);
+      if (!url) return null;
+      let match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))((\w|-){11})/);
       return (match && match[1]) ? match[1] : null;
     }
 
@@ -266,7 +299,7 @@
 
         return `<div class="${classes}">
           <div class="truncate flex-1 pr-2 ${isPlaying ? 'font-medium text-red-700' : 'text-gray-700'}">
-            ${isPlaying ? '▶️ ' : ''}${item.title || 'Unknown Video'}
+            ${isPlaying ? '<span class="text-[11px] bg-red-600 text-white px-1.5 py-0.5 rounded font-bold mr-1.5 inline-block">กำลังเล่น</span>' : ''}${item.title || 'Unknown Video'}
           </div>
           <div class="flex-shrink-0">${controls}</div>
         </div>`;

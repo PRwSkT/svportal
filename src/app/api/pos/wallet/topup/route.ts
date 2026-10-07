@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireAuth();
+    const auth = await requireAuth('cashier', 'pos_wallet_topup');
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const body = await request.json();
@@ -16,14 +16,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'ข้อมูลการเติมเงินไม่ถูกต้อง' }, { status: 400 });
     }
 
+    if (amount > 10000) {
+      return NextResponse.json({ error: 'ยอดเติมเงินสูงสุดไม่เกิน 10,000 บาท ต่อครั้ง' }, { status: 400 });
+    }
+
     // Call the RPC function
     const { data, error } = await supabase.rpc('topup_wallet', {
       payload: {
         student_id: studentId,
         amount: amount,
         channel: topupMethod || 'counter',
-        cashier_note: null,
-        svportal_ref: null
+        cashier_note: `Cashier: ${auth.user?.email || auth.user?.id}`,
+        svportal_ref: body.idempotencyKey || null
       }
     });
 

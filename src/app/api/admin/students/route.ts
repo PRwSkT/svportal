@@ -22,10 +22,13 @@ export async function GET(request: Request) {
 
     const supabase = await createClient();
 
-    let query = supabase
-      .from('students')
-      .select('*, student_addresses(*), student_parents(*)')
-      .limit(10000);
+    const includeDetails = searchParams.get('includeDetails') === 'true';
+
+    const baseQuery = includeDetails
+      ? supabase.from('students').select('*, student_addresses(*), student_parents(*)')
+      : supabase.from('students').select('id, name, prefix, first_name, last_name, grade, status, wallet_balance, updated_at, created_at, photo_url, gender, birthdate');
+
+    let query: any = baseQuery.limit(10000);
 
     if (searchQuery) {
       const sanitized = searchQuery.replace(/[,()"]/g, '');
@@ -48,10 +51,10 @@ export async function GET(request: Request) {
     
     if (error) throw error;
     
-    let sortedData = [...(allStudents || [])];
+    let sortedData: any[] = [...(allStudents || [])];
     
     // Sort logic
-    sortedData.sort((a, b) => {
+    sortedData.sort((a: any, b: any) => {
       if (gradeFilter === 'all') {
         // Sort by Grade Level (อ comes before ป)
         const gradeA = a.grade || '';

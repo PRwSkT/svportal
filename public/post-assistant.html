@@ -31,7 +31,9 @@
 
     <!-- ── Page Header ── -->
     <div class="sv-page-header">
-        <img src="SV-Portal.png" class="sv-page-logo" alt="SV Portal" fetchpriority="high">
+        <a href="/home" target="_top" title="กลับหน้าหลัก SV Portal" style="display: flex; align-items: center; text-decoration: none;">
+            <img src="SV-Portal.png" class="sv-page-logo" alt="SV Portal" fetchpriority="high">
+        </a>
         <div class="sv-page-title-wrap">
             <div class="sv-page-title">Social Post Assistant</div>
             <div class="sv-page-subtitle" data-i18n="page_subtitle">สร้างโพสต์โซเชียลมีเดีย 3 ภาษา + ภาพพร้อมโพสต์</div>
@@ -39,6 +41,9 @@
         <div class="sv-portal-badge">
             <i class="fas fa-star"></i> AI Powered
         </div>
+        <a href="/home" target="_top" class="button is-small is-light" style="border-radius: 8px; font-weight: 500; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" title="กลับหน้าหลัก SV Portal">
+            <i class="fas fa-arrow-left"></i> <span>หน้าหลัก</span>
+        </a>
         <div class="lang-toggle sv-lang-toggle">
             <button class="lang-btn active" onclick="setLang('th')" id="lang-th">ไทย</button>
             <button class="lang-btn" onclick="setLang('en')" id="lang-en">EN</button>

@@ -6,7 +6,7 @@ import { requireAuth } from '@/lib/auth';
 export async function POST(request: Request) {
   try {
     // Only admin or cashier can trigger backups
-    const auth = await requireAuth();
+    const auth = await requireAuth('cashier', 'admin_reports');
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }

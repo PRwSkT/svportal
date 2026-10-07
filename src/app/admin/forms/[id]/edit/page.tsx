@@ -24,7 +24,7 @@ import {
   FileText, AlignLeft, Hash, CheckSquare, CircleDot, ChevronDownSquare,
   Calendar, Clock, Upload, Star, Heading, Loader2, ExternalLink,
   ShieldCheck, AlertCircle, RefreshCw, X, LayoutTemplate,
-  Image as ImageIcon, Info, Smartphone, Monitor, User, Users, UserCheck, Search, QrCode, Bot
+  Image as ImageIcon, Info, Smartphone, Monitor, User, Users, UserCheck, Search, QrCode, Bot, BarChart2
 } from 'lucide-react';
 import { FormQRCodeModal } from '@/components/forms/FormQRCodeModal';
 import { NongFahStudioModal } from '@/components/forms/NongFahStudioModal';
@@ -659,7 +659,7 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Top Navbar */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40 px-4 sm:px-6 py-3 shadow-xs">
+      <header className="bg-white border-b border-slate-200 sticky top-16 z-40 px-4 sm:px-6 py-3 shadow-xs">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
           {/* Left: Back & Title */}
           <div className="flex items-center gap-3">
@@ -718,6 +718,16 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
 
           {/* Right: Actions */}
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            {/* View Responses & AI Dashboard */}
+            <Link
+              href={`/admin/forms/${form.id}/responses`}
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-sky-50 hover:bg-sky-100 text-sky-900 border border-sky-300 rounded-xl text-xs font-bold shadow-2xs transition-all"
+              title="เปิดแดชบอร์ดข้อมูลการตอบกลับและบทสรุปจากน้องฟ้า AI"
+            >
+              <BarChart2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-600" />
+              <span>ดูข้อมูลตอบกลับ & บทสรุป AI</span>
+            </Link>
+
             {/* Nong Fah AI Assistant */}
             <button
               type="button"
@@ -725,7 +735,11 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
               className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-gradient-to-r from-sky-50 to-indigo-50 hover:from-sky-100 hover:to-indigo-100 text-sky-800 border border-sky-200 rounded-xl text-xs font-bold shadow-2xs transition-all cursor-pointer"
               title="ให้น้องฟ้าออกแบบโครงร่างฟอร์มให้คุณอัตโนมัติด้วย AI"
             >
-              <Bot className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-600" />
+              <img
+                src="/images/nongfah/nongfah-avatar.png?v=5"
+                alt="น้องฟ้า"
+                className="w-4 h-4 sm:w-5 sm:h-5 rounded-full object-cover bg-white border border-sky-300 shrink-0"
+              />
               <span>น้องฟ้า<span className="hidden sm:inline">ช่วยสร้างฟอร์ม</span></span>
             </button>
 

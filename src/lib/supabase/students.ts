@@ -13,14 +13,16 @@ export async function getStudents(
     .order('id', { ascending: true })
     .limit(5000);
 
-  if (searchQuery) {
-    const sanitized = searchQuery.replace(/[,()"]/g, '');
-    query = query.or(`id.ilike.%${sanitized}%,name.ilike.%${sanitized}%`);
+  if (typeof searchQuery === 'string' && searchQuery.trim()) {
+    const sanitized = searchQuery.trim().replace(/[,()"]/g, '');
+    if (sanitized) {
+      query = query.or(`id.ilike.%${sanitized}%,name.ilike.%${sanitized}%`);
+    }
   }
-  if (statusFilter && statusFilter !== 'all') {
+  if (typeof statusFilter === 'string' && statusFilter && statusFilter !== 'all') {
     query = query.eq('status', statusFilter);
   }
-  if (gradeFilter && gradeFilter !== 'all') {
+  if (typeof gradeFilter === 'string' && gradeFilter && gradeFilter !== 'all') {
     query = query.eq('grade', gradeFilter);
   }
 

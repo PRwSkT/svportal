@@ -219,7 +219,7 @@ export default function AdminAttendancePage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[600px]">
               <thead className="bg-foreground/[0.02] border-b border-foreground/10 print:bg-gray-100 print:border-y-2 print:border-black">
                 <tr>
                   <th className="p-3 md:p-4 font-bold text-foreground/50 print:text-black text-sm uppercase tracking-wider text-center w-16">ลำดับ</th>

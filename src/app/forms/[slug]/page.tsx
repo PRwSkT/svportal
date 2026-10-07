@@ -58,8 +58,7 @@ export default async function FormViewerPage({ params }: { params: Promise<{ slu
   const isStaffOrAdmin =
     !!currentUser &&
     (isSystemAdmin(currentUser.email) ||
-      Boolean(currentUser.email?.endsWith('@somkidvittaya.ac.th')) ||
-      currentUser.user_metadata?.role === 'admin');
+      Boolean(currentUser.email?.endsWith('@somkidvittaya.ac.th')));
 
   // 3. Draft Mode Handling
   if (!form.is_published) {
@@ -99,13 +98,13 @@ export default async function FormViewerPage({ params }: { params: Promise<{ slu
             แบบฟอร์มนี้อยู่ในสถานะแบบร่าง (Draft) หรือยังไม่เปิดให้บุคคลภายนอกเข้าทำแบบสอบถามในขณะนี้
           </p>
           <div className="space-y-2.5">
-            <Link
-              href="/website"
+            <a
+              href="https://somkidvittaya.ac.th"
               className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 bg-[#7B1C3E] hover:bg-[#631430] text-white rounded-xl font-semibold shadow-sm transition-all text-sm"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>กลับสู่หน้าหลักโรงเรียน</span>
-            </Link>
+            </a>
             <Link
               href={`/login?redirect=/forms/${slug}`}
               className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium transition-all text-xs"
@@ -134,13 +133,13 @@ export default async function FormViewerPage({ params }: { params: Promise<{ slu
             แบบฟอร์มนี้มีกำหนดเปิดรับคำตอบในวันที่{' '}
             {new Date(form.starts_at).toLocaleDateString('th-TH', { dateStyle: 'long', timeStyle: 'short' })}
           </p>
-          <Link
-            href="/website"
+          <a
+            href="https://somkidvittaya.ac.th"
             className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-[#7B1C3E] text-white rounded-xl font-semibold text-sm"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>กลับสู่หน้าหลัก</span>
-          </Link>
+          </a>
         </div>
       </div>
     );
@@ -159,13 +158,13 @@ export default async function FormViewerPage({ params }: { params: Promise<{ slu
             สิ้นสุดระยะเวลาเปิดรับคำตอบเมื่อวันที่{' '}
             {new Date(form.ends_at).toLocaleDateString('th-TH', { dateStyle: 'long', timeStyle: 'short' })}
           </p>
-          <Link
-            href="/website"
+          <a
+            href="https://somkidvittaya.ac.th"
             className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-[#7B1C3E] text-white rounded-xl font-semibold text-sm"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>กลับสู่หน้าหลัก</span>
-          </Link>
+          </a>
         </div>
       </div>
     );

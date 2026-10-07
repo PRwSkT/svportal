@@ -192,12 +192,15 @@ export function FormQRCodeModal({ isOpen, onClose, formTitle, formSlug }: FormQR
         if (!isMounted) return;
 
         const options = {
-          width: 720,
-          height: 720,
-          margin: 40,
+          width: 1024,
+          height: 1024,
+          margin: 48,
           type: 'canvas' as const,
           data: fullFormUrl,
           image: selectedLogo || undefined,
+          qrOptions: {
+            errorCorrectionLevel: 'Q' as const,
+          },
           dotsOptions: {
             color: qrColor,
             type: dotsStyle,
@@ -207,7 +210,7 @@ export function FormQRCodeModal({ isOpen, onClose, formTitle, formSlug }: FormQR
           },
           imageOptions: {
             crossOrigin: 'anonymous',
-            margin: logoMargin,
+            margin: logoMargin * 2,
             imageSize: logoSize,
           },
           cornersSquareOptions: {
@@ -220,15 +223,35 @@ export function FormQRCodeModal({ isOpen, onClose, formTitle, formSlug }: FormQR
           },
         };
 
+        const enforceCanvasStyle = () => {
+          if (qrContainerRef.current) {
+            const el = qrContainerRef.current.querySelector('canvas, svg') as HTMLElement | SVGElement | null;
+            if (el) {
+              el.style.width = '100%';
+              el.style.height = '100%';
+              el.style.maxWidth = '100%';
+              el.style.maxHeight = '100%';
+              el.style.objectFit = 'contain';
+              el.style.display = 'block';
+            }
+          }
+        };
+
         if (!qrCodeInstanceRef.current) {
           qrCodeInstanceRef.current = new QRCodeStyling(options);
           if (qrContainerRef.current) {
             qrContainerRef.current.innerHTML = '';
             qrCodeInstanceRef.current.append(qrContainerRef.current);
+            enforceCanvasStyle();
           }
         } else {
           qrCodeInstanceRef.current.update(options);
+          enforceCanvasStyle();
         }
+
+        requestAnimationFrame(enforceCanvasStyle);
+        setTimeout(enforceCanvasStyle, 50);
+        setTimeout(enforceCanvasStyle, 150);
       } catch (err) {
         console.error('Failed to load QRCodeStyling:', err);
       }
@@ -647,7 +670,7 @@ export function FormQRCodeModal({ isOpen, onClose, formTitle, formSlug }: FormQR
 
                 {/* SV Portal Styled QR Canvas Wrapper */}
                 <div
-                  className="p-5 rounded-3xl mx-auto shadow-md border inline-block transition-all"
+                  className="p-4 sm:p-5 rounded-3xl mx-auto shadow-md border inline-flex items-center justify-center transition-all bg-white"
                   style={{
                     backgroundColor: bgColor,
                     borderColor: bgColor === '#ffffff' ? '#E2E8F0' : 'rgba(0,0,0,0.1)',
@@ -655,7 +678,7 @@ export function FormQRCodeModal({ isOpen, onClose, formTitle, formSlug }: FormQR
                 >
                   <div
                     ref={qrContainerRef}
-                    className="w-56 h-56 sm:w-64 sm:h-64 flex items-center justify-center overflow-hidden rounded-2xl"
+                    className="qr-preview-container w-56 h-56 sm:w-64 sm:h-64 flex items-center justify-center overflow-hidden rounded-2xl [&_canvas]:!w-full [&_canvas]:!h-full [&_canvas]:!max-w-full [&_canvas]:!max-h-full [&_canvas]:!block [&_canvas]:object-contain [&_svg]:!w-full [&_svg]:!h-full [&_svg]:!max-w-full [&_svg]:!max-h-full [&_svg]:!block [&_svg]:object-contain"
                   />
                 </div>
 

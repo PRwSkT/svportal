@@ -6,11 +6,12 @@
 import { FormDefinition, FormField, FormResponse } from '@/types';
 
 // Regex patterns for Thai and standard PII
-const CITIZEN_ID_REGEX = /\b\d{1}[-\s]?\d{4}[-\s]?\d{5}[-\s]?\d{2}[-\s]?\d{1}\b/g;
-const THAI_PHONE_REGEX = /\b(0[689]\d{1}[-\s]?\d{3}[-\s]?\d{4}|0[2-7]\d{1}[-\s]?\d{3}[-\s]?\d{3,4})\b/g;
-const EMAIL_REGEX = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
-const THAI_NAMED_TITLE_REGEX = /\b(นาย|นางสาว|นาง|เด็กชาย|เด็กหญิง|ด\.ช\.|ด\.ญ\.|คุณ|อาจารย์|ครู)\s*([ก-๙]+)\s+([ก-๙]+)\b/g;
-const STUDENT_ID_REGEX = /\b(SV-?\d{4,6}|10\d{3})\b/g;
+const CITIZEN_ID_REGEX = /(?:^|[^\d])(\d{1}[-\s]?\d{4}[-\s]?\d{5}[-\s]?\d{2}[-\s]?\d{1})(?:$|[^\d])/g;
+const THAI_PHONE_REGEX = /(?:^|[^\d])(0[689]\d{1}[-\s]?\d{3}[-\s]?\d{4}|0[2-7]\d{1}[-\s]?\d{3}[-\s]?\d{3,4})(?:$|[^\d])/g;
+const EMAIL_REGEX = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+const THAI_NAMED_TITLE_REGEX = /(?:^|[^\wก-๙])(นาย|นางสาว|นาง|เด็กชาย|เด็กหญิง|ด\.ช\.|ด\.ญ\.|คุณ|อาจารย์|ครู)\s*([ก-๙]+(?:\s+[ก-๙]+)?)/g;
+const THAI_ADDRESS_REGEX = /(?:บ้านเลขที่|เลขที่|หมู่ที่|หมู่|ซอย|ถนน|ตำบล|ต\.|อำเภอ|อ\.|จังหวัด|จ\.|รหัสไปรษณีย์)\s*[\dก-๙\/\.\-]+/g;
+const STUDENT_ID_REGEX = /(?:^|[^\w])(SV-?\d{4,6}|10\d{3})(?:$|[^\w])/g;
 
 /**
  * Redacts personal identifying information from freeform text
@@ -26,13 +27,13 @@ export function sanitizeTextForAI(text: string): { cleanText: string; redactionC
   // 1. Redact Citizen ID
   clean = clean.replace(CITIZEN_ID_REGEX, () => {
     count++;
-    return '[เลขบัตรประชาชน]';
+    return ' [เลขบัตรประชาชน] ';
   });
 
   // 2. Redact Phone numbers
   clean = clean.replace(THAI_PHONE_REGEX, () => {
     count++;
-    return '[เบอร์โทรศัพท์]';
+    return ' [เบอร์โทรศัพท์] ';
   });
 
   // 3. Redact Emails
@@ -41,18 +42,25 @@ export function sanitizeTextForAI(text: string): { cleanText: string; redactionC
     return '[อีเมล]';
   });
 
-  // 4. Normalize Student IDs as pseudonymous tokens for correlating insights
-  clean = clean.replace(STUDENT_ID_REGEX, (match) => {
-    return `SID:${match}`;
+  // 4. Redact Thai Addresses
+  clean = clean.replace(THAI_ADDRESS_REGEX, () => {
+    count++;
+    return ' [ที่อยู่] ';
   });
 
   // 5. Redact Titled Thai names
   clean = clean.replace(THAI_NAMED_TITLE_REGEX, () => {
     count++;
-    return '[ชื่อบุคคล]';
+    return ' [ชื่อบุคคล] ';
   });
 
-  return { cleanText: clean, redactionCount: count };
+  // 6. Mask Student IDs
+  clean = clean.replace(STUDENT_ID_REGEX, () => {
+    count++;
+    return ' [รหัสนักเรียน] ';
+  });
+
+  return { cleanText: clean.replace(/\s{2,}/g, ' ').trim(), redactionCount: count };
 }
 
 export interface SanitizedFieldSummary {
@@ -260,8 +268,8 @@ export function prepareResponsesForSummarization(
 
       if (Object.keys(nonPiiAnswers).length > 0) {
         pseudonymizedStudentCases.push({
-          studentId: cleanSid,
-          submissionId: resp.id,
+          studentId: `นักเรียน #${pseudonymizedStudentCases.length + 1}`,
+          submissionId: `sub_${pseudonymizedStudentCases.length + 1}`,
           answers: nonPiiAnswers,
         });
       }

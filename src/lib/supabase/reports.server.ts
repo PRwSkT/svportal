@@ -1,9 +1,9 @@
-import { createClient } from './server';
+import { getAdminClient } from './admin';
 import { DailySummary } from '@/types';
 
 export async function getDailySummary(dateStr: string): Promise<DailySummary> {
   // dateStr format: YYYY-MM-DD
-  const supabase = await createClient();
+  const supabase = getAdminClient();
   
   // Use Bangkok timezone-aware bounds (GMT+7)
   const startOfDay = `${dateStr}T00:00:00.000+07:00`;

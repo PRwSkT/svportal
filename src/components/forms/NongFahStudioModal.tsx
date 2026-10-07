@@ -96,21 +96,25 @@ export function NongFahStudioModal({
         >
           {/* Header */}
           <div className="px-4 sm:px-6 py-3.5 sm:py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-purple-50 via-pink-50/30 to-white">
-            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#7B1C3E] text-white flex items-center justify-center shadow-sm shrink-0">
-                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300" />
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-11 h-11 rounded-2xl overflow-hidden border-2 border-purple-200 bg-white shadow-xs shrink-0 flex items-center justify-center">
+                <img
+                  src="/images/nongfah/nongfah-avatar.png?v=5"
+                  alt="น้องฟ้า AI Chatbot"
+                  className="w-full h-full object-cover"
+                />
               </div>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                   <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate">
-                    น้องฟ้า (Nong Fah) - AI ผู้ช่วยสร้างฟอร์ม
+                    น้องฟ้า (Nong Fah) - AI Chatbot
                   </h3>
                   <span className="text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 border border-sky-200 shrink-0">
-                    AI Assistant
+                    AI Chatbot
                   </span>
                 </div>
                 <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 truncate hidden sm:block">
-                  ระบบผู้ช่วยอัจฉริยะโรงเรียนสมคิดวิทยา ออกแบบโครงสร้างและคำถามแบบฟอร์มให้อัตโนมัติ
+                  โรงเรียนสมคิดวิทยา (Somkidvittaya School)
                 </p>
               </div>
             </div>
@@ -144,9 +148,18 @@ export function NongFahStudioModal({
 
               {/* Sample Prompts */}
               <div className="mt-2.5 sm:mt-3">
-                <span className="text-[10px] sm:text-[11px] font-semibold text-slate-400 block mb-1.5">
-                  ตัวอย่างคำสั่งที่พบบ่อย (แตะเพื่อเลือก):
-                </span>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <div className="w-5 h-5 rounded-md overflow-hidden bg-sky-50 border border-sky-200 shrink-0">
+                    <img
+                      src="/images/nongfah/nongfah-friendly.png?v=5"
+                      alt="น้องฟ้าแนะนำ"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500">
+                    น้องฟ้าแนะนำคำสั่งที่พบบ่อย (แตะเพื่อเลือก):
+                  </span>
+                </div>
                 <div className="flex gap-1.5 overflow-x-auto pb-1.5 sm:flex-wrap no-scrollbar">
                   {SAMPLE_PROMPTS.map((p, idx) => (
                     <button
@@ -177,17 +190,50 @@ export function NongFahStudioModal({
               </div>
             )}
 
+            {/* Loading / Generating State Card with Thinking Pose */}
+            {isGenerating && (
+              <div className="p-6 bg-gradient-to-r from-purple-50/80 via-pink-50/40 to-sky-50/60 border border-purple-200 rounded-3xl flex flex-col items-center justify-center text-center space-y-3 shadow-2xs">
+                <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-purple-300 shadow-md bg-white">
+                  <img
+                    src="/images/nongfah/nongfah-thinking.png?v=5"
+                    alt="น้องฟ้ากำลังคิด"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900 flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-[#7B1C3E]" />
+                    <span>น้องฟ้ากำลังคิดและออกแบบโครงสร้างฟอร์มให้คุณครูนะคะ...</span>
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-1">
+                    จัดหมวดหมู่คำถาม สร้างหัวข้อส่วน กำหนดตัวเลือก และจัดเตรียมฟังก์ชันที่เหมาะสม
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Generated Form Preview */}
             {generatedForm && (
               <div className="border border-purple-200 bg-purple-50/20 rounded-2xl p-5 space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-purple-100">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                      ออกแบบสำเร็จ
-                    </span>
-                    <span className="text-xs font-bold text-slate-800">
-                      {generatedForm.fields.length} ช่องรายการคำถาม
-                    </span>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl overflow-hidden border border-emerald-300 shadow-2xs bg-white shrink-0">
+                      <img
+                        src="/images/nongfah/nongfah-cheer.png?v=5"
+                        alt="น้องฟ้าออกแบบสำเร็จ"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          ออกแบบสำเร็จ
+                        </span>
+                        <span className="text-xs font-bold text-slate-800">
+                          {generatedForm.fields.length} ช่องรายการคำถาม
+                        </span>
+                      </div>
+                    </div>
                   </div>
                   <button
                     type="button"

@@ -1,8 +1,10 @@
 'use client';
 
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { 
   GraduationCap, 
   FileText, 
@@ -25,85 +27,86 @@ import { getRoleConfig } from '@/lib/constants/roles';
 
 export default function HomeLaunchpad() {
   const { user, appUser, role, isLoading } = useAuth();
+  const { language, dict } = useLanguage();
 
   if (isLoading || (!appUser && user)) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-foreground/50 text-sm font-medium">กำลังโหลดข้อมูลระบบ...</p>
+          <p className="text-foreground/50 text-sm font-medium">{dict.common.loading}</p>
         </div>
       </div>
     );
   }
   
-  // All possible departments and tools
+  // All possible departments and tools with dynamic translations
   const allDepartments = [
     {
-      title: "งานการเงิน",
+      title: dict.nav.financeAccounting,
       icon: <Wallet className="w-5 h-5 text-emerald-500" />,
       color: "border-emerald-500/20 bg-emerald-500/5",
       tools: [
-        { id: "dashboard", name: "แดชบอร์ดสรุปยอด", href: "/dashboard", icon: <LineChart className="w-6 h-6" />, color: "bg-emerald-500 text-white" },
-        { id: "pos_fees", name: "ชำระค่าเทอม", href: "/pos/fees", icon: <CreditCard className="w-6 h-6" />, color: "bg-emerald-500/20 text-emerald-600" },
-        { id: "admin_reports", name: "รายงานการเงิน", href: "/admin/reports", icon: <FileText className="w-6 h-6" />, color: "bg-emerald-500/20 text-emerald-600" }
+        { id: "dashboard", name: dict.nav.dashboard, href: "/dashboard", icon: <LineChart className="w-6 h-6" />, color: "bg-emerald-500 text-white" },
+        { id: "pos_fees", name: dict.nav.posFees, href: "/pos/fees", icon: <CreditCard className="w-6 h-6" />, color: "bg-emerald-500/20 text-emerald-600" },
+        { id: "admin_reports", name: dict.nav.adminReports, href: "/admin/reports", icon: <FileText className="w-6 h-6" />, color: "bg-emerald-500/20 text-emerald-600" }
       ]
     },
     {
-      title: "งานร้านค้าสหกรณ์",
+      title: dict.nav.coopStore,
       icon: <ShoppingBag className="w-5 h-5 text-blue-500" />,
       color: "border-blue-500/20 bg-blue-500/5",
       tools: [
-        { id: "pos_shop", name: "POS ขายสินค้า", href: "/pos/shop", icon: <ShoppingCart className="w-6 h-6" />, color: "bg-blue-500 text-white" },
-        { id: "admin_products", name: "จัดการสินค้า", href: "/admin/products", icon: <ShoppingBag className="w-6 h-6" />, color: "bg-blue-500/20 text-blue-600" },
-        { id: "pos_wallet_topup", name: "เติมเงิน Wallet", href: "/pos/wallet/topup", icon: <Wallet className="w-6 h-6" />, color: "bg-blue-500/20 text-blue-600" },
-        { id: "admin_wallet_students", name: "Wallet นักเรียน", href: "/admin/wallet/students", icon: <Users className="w-6 h-6" />, color: "bg-blue-500/20 text-blue-600" }
+        { id: "pos_shop", name: dict.nav.posShop, href: "/pos/shop", icon: <ShoppingCart className="w-6 h-6" />, color: "bg-blue-500 text-white" },
+        { id: "admin_products", name: dict.nav.adminProducts, href: "/admin/products", icon: <ShoppingBag className="w-6 h-6" />, color: "bg-blue-500/20 text-blue-600" },
+        { id: "pos_wallet_topup", name: dict.nav.posWalletTopup, href: "/pos/wallet/topup", icon: <Wallet className="w-6 h-6" />, color: "bg-blue-500/20 text-blue-600" },
+        { id: "admin_wallet_students", name: dict.nav.adminWalletStudents, href: "/admin/wallet/students", icon: <Users className="w-6 h-6" />, color: "bg-blue-500/20 text-blue-600" }
       ]
     },
     {
-      title: "งานทะเบียน",
+      title: dict.nav.registrar,
       icon: <FileText className="w-5 h-5 text-indigo-500" />,
       color: "border-indigo-500/20 bg-indigo-500/5",
       tools: [
-        { id: "admin_students", name: "ข้อมูลนักเรียน", href: "/admin/students", icon: <Users className="w-6 h-6" />, color: "bg-indigo-500/20 text-indigo-600" }
+        { id: "admin_students", name: dict.nav.adminStudents, href: "/admin/students", icon: <Users className="w-6 h-6" />, color: "bg-indigo-500/20 text-indigo-600" }
       ]
     },
     {
-      title: "งาน HR",
+      title: dict.nav.hrAdmin,
       icon: <Users className="w-5 h-5 text-purple-500" />,
       color: "border-purple-500/20 bg-purple-500/5",
       tools: [
-        { id: "admin_users", name: "จัดการผู้ใช้งาน", href: "/admin/users", icon: <Users className="w-6 h-6" />, color: "bg-purple-500/20 text-purple-600" },
-        { id: "admin_attendance", name: "ข้อมูลการเข้างาน", href: "/admin/attendance", icon: <Clock className="w-6 h-6" />, color: "bg-purple-500/20 text-purple-600" },
-        { id: "admin_kpi", name: "ประเมินบุคลากร (KPI)", href: "/admin/kpi", icon: <Award className="w-6 h-6" />, color: "bg-[#7B1C3E] text-white" }
+        { id: "admin_users", name: dict.nav.adminUsers, href: "/admin/users", icon: <Users className="w-6 h-6" />, color: "bg-purple-500/20 text-purple-600" },
+        { id: "admin_attendance", name: dict.nav.adminAttendance, href: "/admin/attendance", icon: <Clock className="w-6 h-6" />, color: "bg-purple-500/20 text-purple-600" },
+        { id: "admin_kpi", name: dict.nav.adminKpi, href: "/admin/kpi", icon: <Award className="w-6 h-6" />, color: "bg-[#7B1C3E] text-white" }
       ]
     },
     {
-      title: "งานประชาสัมพันธ์ (PR)",
+      title: dict.nav.pr,
       icon: <Megaphone className="w-5 h-5 text-rose-500" />,
       color: "border-rose-500/20 bg-rose-500/5",
       tools: [
-        { id: "admin_website", name: "จัดการเว็บไซต์", href: "/admin/website", icon: <Globe className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
-        { id: "admin_forms", name: "ระบบแบบฟอร์ม (SV-Forms)", href: "/admin/forms", icon: <FileText className="w-6 h-6" />, color: "bg-[#7B1C3E]/20 text-[#7B1C3E]" },
-        { id: "post_assistant", name: "Post Assistance", href: "/post-assistant.html", icon: <MessageSquare className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
-        { id: "audio_remote", name: "Audio Remote", href: "/audio-remote.html", icon: <Radio className="w-6 h-6" />, color: "bg-rose-500 text-white" },
-        { id: "qr_generator", name: "สร้าง QR Code", href: "/qr-generator", icon: <QrCode className="w-6 h-6" />, color: "bg-rose-500 text-white" }
+        { id: "admin_website", name: dict.nav.adminWebsite, href: "/admin/website", icon: <Globe className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
+        { id: "admin_forms", name: dict.nav.adminForms, href: "/admin/forms", icon: <FileText className="w-6 h-6" />, color: "bg-[#7B1C3E]/20 text-[#7B1C3E]" },
+        { id: "post_assistant", name: dict.nav.postAssistant, href: "/post-assistant", icon: <MessageSquare className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
+        { id: "audio_remote", name: dict.nav.audioRemote, href: "/audio-remote", icon: <Radio className="w-6 h-6" />, color: "bg-rose-500 text-white" },
+        { id: "qr_generator", name: dict.nav.qrGenerator, href: "/qr-generator", icon: <QrCode className="w-6 h-6" />, color: "bg-rose-500 text-white" }
       ]
     },
     {
-      title: "งานบริหารทั่วไป",
+      title: dict.nav.generalAdmin,
       icon: <Settings className="w-5 h-5 text-slate-500" />,
       color: "border-slate-500/20 bg-slate-500/5",
       tools: [
-        { id: "settings", name: "การตั้งค่า", href: "#", icon: <Settings className="w-6 h-6" />, color: "bg-slate-500/20 text-slate-600" }
+        { id: "settings", name: dict.nav.settings, href: "#", icon: <Settings className="w-6 h-6" />, color: "bg-slate-500/20 text-slate-600" }
       ]
     },
     {
-      title: "งานวิชาการ",
+      title: language === 'th' ? "งานวิชาการ" : "Academic Affairs",
       icon: <GraduationCap className="w-5 h-5 text-orange-500" />,
       color: "border-orange-500/20 bg-orange-500/5",
       tools: [
-        { id: "academic_todo", name: "รอการพัฒนา", href: "#", icon: <GraduationCap className="w-6 h-6" />, color: "bg-orange-500/20 text-orange-600" }
+        { id: "academic_todo", name: language === 'th' ? "รอการพัฒนา" : "In Development", href: "#", icon: <GraduationCap className="w-6 h-6" />, color: "bg-orange-500/20 text-orange-600" }
       ]
     }
   ];
@@ -152,13 +155,15 @@ export default function HomeLaunchpad() {
         <div>
           <div className="flex items-center gap-3 mb-1 flex-wrap">
             <h1 className="text-3xl font-extrabold tracking-tight text-primary">
-              สวัสดี, {displayName}
+              {language === 'th' ? `สวัสดี, ${displayName}` : `Welcome, ${displayName}`}
             </h1>
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border shadow-sm ${roleBadge.badgeClass}`}>
-              {roleBadge.fullLabel}
+              {language === 'th' ? roleBadge.fullLabel : `${roleBadge.labelEn} (${roleBadge.labelTh})`}
             </span>
           </div>
-          <p className="text-foreground/60 font-medium">ยินดีต้อนรับสู่ศูนย์กลางระบบงาน (SVPortal)</p>
+          <p className="text-foreground/60 font-medium">
+            {dict.home.launchpadSubtitle}
+          </p>
         </div>
         
         {/* Quick Actions / Standalone */}
@@ -172,7 +177,7 @@ export default function HomeLaunchpad() {
               <div className="p-2 bg-white/20 rounded-xl">
                 <Clock className="w-6 h-6" />
               </div>
-              <span className="font-bold text-lg">ลงเวลาทำงาน</span>
+              <span className="font-bold text-lg">{dict.nav.adminAttendance}</span>
             </motion.div>
           </Link>
         </div>
@@ -182,8 +187,12 @@ export default function HomeLaunchpad() {
       {filteredDepartments.length === 0 ? (
         <div className="bg-surface backdrop-blur-xl rounded-3xl p-12 text-center border border-white/60">
           <Settings className="w-16 h-16 text-foreground/20 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-foreground/60 mb-2">ยังไม่มีโมดูลที่ได้รับมอบหมาย</h2>
-          <p className="text-foreground/40">กรุณาติดต่อผู้ดูแลระบบเพื่อกำหนดสิทธิ์การเข้าถึงฟีเจอร์ต่างๆ</p>
+          <h2 className="text-xl font-bold text-foreground/60 mb-2">
+            {language === 'th' ? 'ยังไม่มีโมดูลที่ได้รับมอบหมาย' : 'No assigned modules found'}
+          </h2>
+          <p className="text-foreground/40">
+            {language === 'th' ? 'กรุณาติดต่อผู้ดูแลระบบเพื่อกำหนดสิทธิ์การเข้าถึงฟีเจอร์ต่างๆ' : 'Please contact the administrator to configure access permissions'}
+          </p>
         </div>
       ) : (
         <motion.div 

@@ -799,7 +799,7 @@ Thai Caption to Translate:
 // Helper: Meta API Config
 // ==========================================
 function getMetaConfig_(targetPage) {
-  var sysToken = "EAAYA0g05EhoBSY0mxZARe3hje6CjMqnoez2SJl4N7R4FZBMZAU0TpXG3D7kxBCO8k826wGd84vkrHd809UZCyyj5J4LSo8mgoRMXvqYOR1joESZAX4aZCxrYVsPZAEjVxJsZCpnA6Ouq3fcX17ZALIoZBs8EbySfKwTqaQS17AOsT4kNOLF694QXdbF2BNzQdQOAB6EAZDZD";
+  var sysToken = PropertiesService.getScriptProperties().getProperty('META_TOKEN') || "";
   var config = {
     token: sysToken,
     pageId: "192831060756593", // main

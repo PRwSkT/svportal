@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { translateThaiToEnZh } from '@/lib/translate';
 import { FormField } from '@/types';
+import { getServerUser } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getServerUser();
+    if (!user) {
+      return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
+    }
+
     const body = await req.json();
     const { title, description, fields, thank_you_title, thank_you_message } = body;
 

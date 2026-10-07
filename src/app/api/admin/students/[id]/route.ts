@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getAdminClient } from '@/lib/supabase/admin';
 import { requireAuth } from '@/lib/auth';
 
 export async function GET(
@@ -7,7 +7,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
-    const auth = await requireAuth();
+    const auth = await requireAuth('admin', 'admin_students');
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -20,7 +20,7 @@ export async function GET(
       id = (context.params as { id: string }).id;
     }
 
-    const supabase = await createClient();
+    const supabase = getAdminClient();
     const { data, error } = await supabase
       .from('students')
       .select('*, student_addresses(*), student_parents(*)')

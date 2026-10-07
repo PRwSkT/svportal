@@ -91,8 +91,8 @@ export function NongFahChatWidget({
       role: 'assistant',
       content:
         pageContext === 'editor'
-          ? 'สวัสดีค่ะคุณครู น้องฟ้าพร้อมช่วยปรับแต่งฟอร์ม ตรวจสุขภาพฟอร์ม หรือเพิ่ม/แก้คำถามในหน้านี้ได้ทันทีค่ะ สามารถพิมพ์บอกน้องฟ้าได้เลยนะคะ'
-          : 'สวัสดีค่ะคุณครูและบุคลากรโรงเรียนสมคิดวิทยา น้องฟ้าพร้อมช่วยออกแบบฟอร์ม สรุปผลข้อมูล หรือตอบคำถามการจัดสร้างแบบฟอร์มค่ะ คุณครูสามารถพิมพ์บอกรายละเอียดที่ต้องการ หรือกดเลือกหัวข้อแนะนำด้านล่างได้เลยนะคะ',
+          ? 'สวัสดีค่ะ หนูฟ้ายินดีให้บริการนะคะ หนูฟ้าพร้อมช่วยคุณครูปรับแต่งฟอร์ม ตรวจสุขภาพฟอร์ม หรือเพิ่ม/แก้ไขคำถามในหน้านี้ได้ทันทีค่ะ สามารถพิมพ์บอกหนูฟ้าได้เลยนะคะ'
+          : 'สวัสดีค่ะ หนูฟ้ายินดีให้บริการนะคะ หนูฟ้าพร้อมช่วยออกแบบฟอร์ม สรุปผลข้อมูล หรือตอบคำถามการจัดสร้างแบบฟอร์มของโรงเรียนสมคิดวิทยาค่ะ คุณครูสามารถพิมพ์บอกรายละเอียดที่ต้องการ หรือกดเลือกหัวข้อแนะนำด้านล่างได้เลยนะคะ',
       suggestions: activeDefaultSuggestions,
       timestamp: new Date(),
     },
@@ -255,45 +255,52 @@ export function NongFahChatWidget({
             className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 flex items-center gap-2.5 cursor-pointer group select-none pointer-events-auto"
             onClick={() => setIsOpen(true)}
           >
-            {/* Desktop Speech Pill */}
+            {/* Floating Speech Preview Badge */}
             <motion.div
               initial={{ opacity: 0, x: 10, scale: 0.9 }}
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ delay: 0.1 }}
-              className="hidden sm:flex items-center gap-2 py-2 px-3.5 bg-white/95 backdrop-blur-md border border-sky-200/90 rounded-2xl shadow-lg shadow-sky-900/10 hover:border-sky-300 transition-all text-xs font-bold text-slate-800"
+              className="hidden sm:flex items-center gap-2.5 py-1.5 px-3 bg-white/95 backdrop-blur-md border border-sky-200/90 rounded-2xl shadow-lg shadow-sky-900/10 hover:border-sky-300 transition-all text-xs font-bold text-slate-800"
             >
+              <div className="w-7 h-7 rounded-xl overflow-hidden bg-sky-50 border border-sky-200 shrink-0">
+                <img
+                  src="/images/nongfah/nongfah-wave.png?v=5"
+                  alt="น้องฟ้าทักทาย"
+                  className="w-full h-full object-cover"
+                />
+              </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[11px] font-bold text-sky-900">น้องฟ้า AI แชทสร้างฟอร์ม</span>
+                <span className="text-[11px] font-bold text-slate-900">สวัสดีค่ะ หนูฟ้ายินดีให้บริการนะคะ</span>
               </div>
-              <span className="text-[10px] font-medium px-1.5 py-0.2 rounded-md bg-sky-100 text-sky-700">
-                ผู้ช่วยอัจฉริยะ
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[#7B1C3E]/10 text-[#7B1C3E]">
+                AI Chatbot
               </span>
             </motion.div>
 
-            {/* Launcher Bubble Button */}
+            {/* Launcher Bubble Button with Real Character Avatar */}
             <motion.button
               type="button"
               whileHover={{ scale: 1.08 }}
               whileTap={{ scale: 0.94 }}
               className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-3xl bg-gradient-to-tr from-[#6E0D22] via-[#8C143B] to-indigo-700 p-0.5 shadow-xl shadow-[#7B1C3E]/25 flex items-center justify-center cursor-pointer focus:outline-none focus:ring-4 focus:ring-sky-300/50"
-              title="เปิดช่องแชทน้องฟ้า AI (Nong Fah AI Assistant)"
-              aria-label="เปิดช่องแชทน้องฟ้า AI (Nong Fah AI Assistant)"
+              title="เปิดช่องแชทน้องฟ้า AI Chatbot (โรงเรียนสมคิดวิทยา)"
+              aria-label="เปิดช่องแชทน้องฟ้า AI Chatbot (โรงเรียนสมคิดวิทยา)"
             >
               <span className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-sky-400 via-pink-400 to-purple-500 opacity-60 blur-xs group-hover:opacity-100 transition-opacity animate-pulse -z-10" />
 
-              <div className="w-full h-full rounded-[22px] bg-gradient-to-br from-[#7B1C3E] to-[#4A0A1C] flex flex-col items-center justify-center text-white relative overflow-hidden">
-                <Sparkles className="w-3.5 h-3.5 text-amber-300 absolute top-2 right-2 animate-bounce" />
-                <Bot className="w-6 h-6 sm:w-7 sm:h-7 text-white drop-shadow-xs" />
-                <span className="text-[9px] font-bold tracking-tight text-amber-200 mt-0.5">
-                  น้องฟ้า
-                </span>
+              <div className="w-full h-full rounded-[22px] bg-white overflow-hidden relative border-2 border-white/60 shadow-inner flex items-center justify-center">
+                <img
+                  src="/images/nongfah/nongfah-avatar.png?v=5"
+                  alt="น้องฟ้า AI Chatbot โรงเรียนสมคิดวิทยา"
+                  className="w-full h-full object-cover hover:scale-105 transition-transform"
+                />
               </div>
 
-              <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+              <span className="absolute -top-1 -right-1 flex h-4 w-4">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-white" />
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-white" />
               </span>
             </motion.button>
           </aside>
@@ -314,14 +321,18 @@ export function NongFahChatWidget({
             {/* Header */}
             <div className="bg-gradient-to-r from-[#6E0D22] via-[#7B1C3E] to-[#8C143B] text-white px-4 py-3.5 sm:px-4.5 sm:py-4 flex items-center justify-between shadow-md shrink-0">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="relative w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shrink-0">
-                  <Bot className="w-5 h-5 text-amber-300" />
+                <div className="relative w-11 h-11 rounded-2xl overflow-hidden bg-white border-2 border-white/40 flex items-center justify-center shrink-0 shadow-xs">
+                  <img
+                    src="/images/nongfah/nongfah-avatar.png?v=5"
+                    alt="น้องฟ้า AI"
+                    className="w-full h-full object-cover"
+                  />
                   <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-[#7B1C3E]" />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
                     <h3 className="text-sm sm:text-base font-bold text-white truncate">
-                      น้องฟ้า (AI Assistant)
+                      น้องฟ้า (AI Chatbot)
                     </h3>
                     <span className="text-[10px] font-semibold px-2 py-0.2 rounded-full bg-white/20 text-white border border-white/20 shrink-0">
                       ออนไลน์
@@ -393,10 +404,14 @@ export function NongFahChatWidget({
                     key={msg.id}
                     className={`flex items-start gap-2.5 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
                   >
-                    {/* Bot Avatar Icon */}
+                    {/* Bot Avatar Icon with Real Character Image */}
                     {!isUser && (
-                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-br from-[#7B1C3E] to-[#4A0A1C] text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
-                        <Bot className="w-4 h-4 text-amber-200" />
+                      <div className="w-8 h-8 rounded-xl overflow-hidden border border-slate-200/90 shadow-2xs shrink-0 mt-0.5 bg-white flex items-center justify-center">
+                        <img
+                          src="/images/nongfah/nongfah-avatar.png?v=5"
+                          alt="น้องฟ้า"
+                          className="w-full h-full object-cover"
+                        />
                       </div>
                     )}
 
@@ -655,15 +670,19 @@ export function NongFahChatWidget({
                 );
               })}
 
-              {/* Loading State Animation */}
+              {/* Loading State Animation with Thinking Character */}
               {isLoading && (
                 <div className="flex items-start gap-2.5">
-                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-br from-[#7B1C3E] to-[#4A0A1C] text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
-                    <Bot className="w-4 h-4 text-amber-200 animate-pulse" />
+                  <div className="w-8 h-8 rounded-xl overflow-hidden border border-sky-200 shadow-2xs shrink-0 mt-0.5 bg-white flex items-center justify-center">
+                    <img
+                      src="/images/nongfah/nongfah-thinking.png?v=5"
+                      alt="น้องฟ้ากำลังคิด"
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                   <div className="bg-white border border-sky-100 rounded-2xl rounded-tl-xs p-3.5 shadow-sm text-xs text-sky-900 flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin text-sky-600 shrink-0" />
-                    <span>น้องฟ้ากำลังคิดและออกแบบโครงสร้างฟอร์ม...</span>
+                    <span>น้องฟ้ากำลังคิดและออกแบบโครงสร้างฟอร์มให้คุณครูนะคะ...</span>
                   </div>
                 </div>
               )}

@@ -93,8 +93,8 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
   { id: 'admin_attendance', name: 'ข้อมูลการเข้างาน', category: 'งาน HR', href: '/admin/attendance' },
   { id: 'admin_website', name: 'จัดการเว็บไซต์', category: 'งานประชาสัมพันธ์ (PR)', href: '/admin/website' },
   { id: 'admin_forms', name: 'ระบบแบบฟอร์ม (SV-Forms)', category: 'งานประชาสัมพันธ์ (PR)', href: '/admin/forms' },
-  { id: 'post_assistant', name: 'Post Assistance', category: 'งานประชาสัมพันธ์ (PR)', href: '/post-assistant.html' },
-  { id: 'audio_remote', name: 'Audio Remote', category: 'งานประชาสัมพันธ์ (PR)', href: '/audio-remote.html' },
+  { id: 'post_assistant', name: 'Social Post Assistant', category: 'งานประชาสัมพันธ์ (PR)', href: '/post-assistant' },
+  { id: 'audio_remote', name: 'ระบบกระจายเสียง (Audio Remote)', category: 'งานประชาสัมพันธ์ (PR)', href: '/audio-remote' },
   { id: 'qr_generator', name: 'สร้าง QR Code', category: 'งานประชาสัมพันธ์ (PR)', href: '/qr-generator' },
   { id: 'settings', name: 'การตั้งค่า', category: 'งานบริหารทั่วไป', href: '#' },
   { id: 'academic_todo', name: 'รอการพัฒนา', category: 'งานวิชาการ', href: '#' }
