@@ -69,7 +69,7 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
           'X-Goog-Api-Client': 'svportal-forms/1.0',
         },
         body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(12000),
       });
 
       if (!res.ok) {
@@ -91,6 +91,44 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
   }
 
   throw new Error(lastError?.message || 'ไม่สามารถติดต่อระบบน้องฟ้า AI ได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง');
+}
+
+/**
+ * Robust JSON Parser with graceful truncation repair
+ */
+function safeParseJson<T>(rawText: string, fallbackErrorMessage: string): T {
+  let cleaned = (rawText || '').trim();
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+  }
+
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch {
+    try {
+      let repaired = cleaned;
+      const quoteMatches = repaired.match(/(?<!\\)"/g);
+      if (quoteMatches && quoteMatches.length % 2 !== 0) {
+        repaired += '"';
+      }
+      const openBrackets = (repaired.match(/\[/g) || []).length;
+      const closeBrackets = (repaired.match(/\]/g) || []).length;
+      for (let i = 0; i < openBrackets - closeBrackets; i++) repaired += ']';
+
+      const openBraces = (repaired.match(/\{/g) || []).length;
+      const closeBraces = (repaired.match(/\}/g) || []).length;
+      for (let i = 0; i < openBraces - closeBraces; i++) repaired += '}';
+
+      return JSON.parse(repaired) as T;
+    } catch {
+      console.error('safeParseJson failed to parse:', rawText?.slice(0, 300));
+      throw new Error(fallbackErrorMessage);
+    }
+  }
 }
 
 /**
@@ -117,6 +155,7 @@ Strict requirements:
 5. Field types can be: 'section_header', 'text', 'textarea', 'number', 'radio', 'checkbox', 'select', 'date', 'time', 'file_upload', 'rating'.
 6. For choices (radio, checkbox, select), provide clear options with values like 'opt_1', 'opt_2' and localized labels.
 7. Remember the school grades are Nursery to Grade 6: อ.1 - ป.6.
+8. Design a focused, complete set of questions (around 6-10 fields) suitable for school parents and teachers.
 
 JSON Schema to follow:
 {
@@ -145,18 +184,14 @@ Design a complete, comprehensive form structure for this requirement. Return str
     systemPrompt,
     userPrompt,
     temperature: 0.2,
-    maxTokens: 1800,
+    maxTokens: 4000,
     responseMimeType: 'application/json',
   });
 
-  try {
-    const cleaned = rawJson.replace(/```json/g, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(cleaned);
-    return parsed as GeneratedFormDefinition;
-  } catch (err: any) {
-    console.error('Failed to parse Gemma generated form JSON:', rawJson);
-    throw new Error('ผลลัพธ์จาก AI ไม่อยู่ในรูปแบบ JSON ที่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
-  }
+  return safeParseJson<GeneratedFormDefinition>(
+    rawJson,
+    'ผลลัพธ์จาก AI ไม่อยู่ในรูปแบบ JSON ที่ถูกต้อง กรุณาลองใหม่อีกครั้ง'
+  );
 }
 
 /**
@@ -265,18 +300,14 @@ Analyze this data, extract executive insights, and return the report in JSON.`;
     systemPrompt,
     userPrompt,
     temperature: 0.2,
-    maxTokens: 3000,
+    maxTokens: 3500,
     responseMimeType: 'application/json',
   });
 
-  try {
-    const cleaned = rawJson.replace(/```json/g, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(cleaned);
-    return parsed as NongFahAnalyticsSummary;
-  } catch (err: any) {
-    console.error('Failed to parse Nong Fah summary JSON:', rawJson);
-    throw new Error('ผลลัพธ์บทวิเคราะห์จาก AI ไม่อยู่ในรูปแบบ JSON ที่ถูกต้อง');
-  }
+  return safeParseJson<NongFahAnalyticsSummary>(
+    rawJson,
+    'ผลลัพธ์บทวิเคราะห์จาก AI ไม่อยู่ในรูปแบบ JSON ที่ถูกต้อง'
+  );
 }
 
 /**
@@ -360,17 +391,13 @@ Analyze the message and return strictly JSON.`;
     systemPrompt,
     userPrompt,
     temperature: 0.2,
-    maxTokens: 2200,
+    maxTokens: 4000,
     responseMimeType: 'application/json',
   });
 
-  try {
-    const cleaned = rawJson.replace(/```json/g, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(cleaned);
-    return parsed as NongFahChatResponse;
-  } catch (err: any) {
-    console.error('Failed to parse Nong Fah chat response:', rawJson);
-    throw new Error('ผลลัพธ์จากน้องฟ้า AI ไม่อยู่ในรูปแบบ JSON ที่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
-  }
+  return safeParseJson<NongFahChatResponse>(
+    rawJson,
+    'ผลลัพธ์จากน้องฟ้า AI ไม่อยู่ในรูปแบบ JSON ที่ถูกต้อง กรุณาลองใหม่อีกครั้ง'
+  );
 }
 
