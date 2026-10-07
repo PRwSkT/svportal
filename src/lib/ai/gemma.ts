@@ -158,6 +158,28 @@ Design a complete, comprehensive form structure for this requirement. Return str
 }
 
 /**
+ * Individual student insight identified by Nong Fah using pseudonymous student ID
+ * Enriched on the school server with real database profile
+ */
+export interface StudentSpecificInsight {
+  student_id: string;
+  category: 'urgent_followup' | 'health_allergy' | 'update_record' | 'special_request' | 'general';
+  topic: string;
+  details: string;
+  suggested_action: string;
+  student_profile?: {
+    id: string;
+    name: string;
+    grade: string;
+    status: string;
+    current_height?: number | null;
+    current_weight?: number | null;
+    current_disability?: string | null;
+    parent_phone?: string | null;
+  } | null;
+}
+
+/**
  * Result structure when Nong Fah summarizes form responses
  */
 export interface NongFahAnalyticsSummary {
@@ -174,6 +196,7 @@ export interface NongFahAnalyticsSummary {
     quote: string;
   }[];
   actionableRecommendations: string[];
+  studentSpecificInsights?: StudentSpecificInsight[];
 }
 
 /**
@@ -183,14 +206,15 @@ export async function summarizeResponsesWithNongFah(
   payload: SanitizedFormAnalysisPayload
 ): Promise<NongFahAnalyticsSummary> {
   const systemPrompt = `You are "น้องฟ้า" (Nong Fah), an analytical AI Assistant for Somkidvittaya School administrators and teachers.
-You are given aggregated statistical summaries and anonymized text samples from form respondents.
-All personal data has been pre-filtered and redacted.
-Your goal is to write a high-level Executive Summary and actionable insights for school leadership.
+You are given aggregated statistical summaries, anonymized text samples, and pseudonymous student response cases (identified strictly by student ID).
+All personal names, citizen IDs, and phone numbers have been pre-filtered.
+Your goal is to write a high-level Executive Summary, actionable insights, and identify any specific student cases that require attention or record updates.
 Strict requirements:
 1. Output MUST be valid JSON only. Do not wrap in markdown or backticks.
 2. In Chinese translations or school references, use "Somkidvittaya" or "โรงเรียนสมคิดวิทยา".
 3. Strictly NO EMOJIS anywhere!
 4. Tone must be formal, objective, encouraging, and highly professional.
+5. In "studentSpecificInsights", if there are student IDs (e.g. "10270") with notable items (allergies, health issues, leaves, record updates, urgent follow-ups), extract them cleanly.
 
 JSON Schema:
 {
@@ -212,21 +236,34 @@ JSON Schema:
   "actionableRecommendations": [
     "ข้อเสนอแนะเชิงปฏิบัติการสำหรับโรงเรียนเพื่อนำไปปรับปรุง 1",
     "ข้อเสนอแนะ 2"
+  ],
+  "studentSpecificInsights": [
+    {
+      "student_id": "10270",
+      "category": "health_allergy",
+      "topic": "แจ้งการแพ้อาหารหรือปัญหาสุขภาพ",
+      "details": "ผู้ปกครองระบุว่าแพ้ถั่วลิสง...",
+      "suggested_action": "ประสานงานครูประจำชั้นและห้องพยาบาล"
+    }
   ]
 }`;
+
+  const studentCasesSection = (payload.pseudonymizedStudentCases && payload.pseudonymizedStudentCases.length > 0)
+    ? `\nPseudonymized Student Submissions (Student ID only):\n${JSON.stringify(payload.pseudonymizedStudentCases.slice(0, 25), null, 2)}\n`
+    : '';
 
   const userPrompt = `Form Title: ${payload.formTitle}
 Total Respondents: ${payload.totalResponses}
 Aggregated Field Summaries:
 ${JSON.stringify(payload.fieldsSummary, null, 2)}
-
-Analyze this data and return the executive report in JSON.`;
+${studentCasesSection}
+Analyze this data, extract executive insights, and return the report in JSON.`;
 
   const rawJson = await callGemma({
     systemPrompt,
     userPrompt,
     temperature: 0.2,
-    maxTokens: 2500,
+    maxTokens: 3000,
     responseMimeType: 'application/json',
   });
 

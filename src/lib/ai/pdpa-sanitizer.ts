@@ -41,10 +41,9 @@ export function sanitizeTextForAI(text: string): { cleanText: string; redactionC
     return '[อีเมล]';
   });
 
-  // 4. Redact Student IDs
-  clean = clean.replace(STUDENT_ID_REGEX, () => {
-    count++;
-    return '[รหัสนักเรียน]';
+  // 4. Normalize Student IDs as pseudonymous tokens for correlating insights
+  clean = clean.replace(STUDENT_ID_REGEX, (match) => {
+    return `SID:${match}`;
   });
 
   // 5. Redact Titled Thai names
@@ -68,12 +67,19 @@ export interface SanitizedFieldSummary {
   anonymizedTextSample?: string[];
 }
 
+export interface PseudonymizedStudentCase {
+  studentId: string;
+  submissionId: string;
+  answers: Record<string, string>;
+}
+
 export interface SanitizedFormAnalysisPayload {
   formId: string;
   formTitle: string;
   formDescription?: string;
   totalResponses: number;
   fieldsSummary: SanitizedFieldSummary[];
+  pseudonymizedStudentCases?: PseudonymizedStudentCase[];
 }
 
 /**
@@ -207,11 +213,67 @@ export function prepareResponsesForSummarization(
     }
   }
 
+  // 4. Extract Pseudonymized Student Cases if a student ID field exists
+  const studentIdField = fields.find((f) => {
+    const lbl = (f.label?.th || f.label?.en || f.field_key).toLowerCase();
+    return f.field_key === 'student_id' || lbl.includes('รหัสนักเรียน') || lbl.includes('student id');
+  });
+
+  const pseudonymizedStudentCases: PseudonymizedStudentCase[] = [];
+
+  if (studentIdField) {
+    for (const resp of responses.slice(0, 35)) {
+      const rawSid = resp.answers?.[studentIdField.field_key];
+      if (!rawSid) continue;
+      const cleanSid = String(rawSid).trim();
+      if (!cleanSid) continue;
+
+      const nonPiiAnswers: Record<string, string> = {};
+      for (const field of fields) {
+        if (field.id === studentIdField.id) continue;
+        if (['section_header', 'image', 'info_text'].includes(field.field_type)) continue;
+
+        const lbl = field.label?.th || field.label?.en || field.field_key;
+        const lower = lbl.toLowerCase();
+        // Skip direct PII fields like student name, parent name, citizen ID, phone
+        if (
+          lower.includes('เลขบัตร') ||
+          lower.includes('ประชาชน') ||
+          lower.includes('เบอร์โทร') ||
+          lower.includes('อีเมล') ||
+          lower.includes('ชื่อ-นามสกุล') ||
+          lower.includes('ชื่อนักเรียน') ||
+          lower.includes('ชื่อผู้ปกครอง')
+        ) {
+          continue;
+        }
+
+        const ans = resp.answers?.[field.field_key];
+        if (ans !== undefined && ans !== null && ans !== '') {
+          const valStr = Array.isArray(ans) ? ans.join(', ') : String(ans);
+          const { cleanText } = sanitizeTextForAI(valStr);
+          if (cleanText.trim()) {
+            nonPiiAnswers[lbl] = cleanText.trim();
+          }
+        }
+      }
+
+      if (Object.keys(nonPiiAnswers).length > 0) {
+        pseudonymizedStudentCases.push({
+          studentId: cleanSid,
+          submissionId: resp.id,
+          answers: nonPiiAnswers,
+        });
+      }
+    }
+  }
+
   return {
     formId: form.id,
     formTitle,
     formDescription,
     totalResponses,
     fieldsSummary,
+    pseudonymizedStudentCases,
   };
 }

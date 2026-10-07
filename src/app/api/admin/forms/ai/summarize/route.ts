@@ -63,6 +63,46 @@ export async function POST(req: NextRequest) {
     // 5. Invoke Gemma via Nong Fah Summarizer
     const summaryResult = await summarizeResponsesWithNongFah(sanitizedPayload);
 
+    // 6. Enrich Nong Fah's Student-Specific Insights with Real Database Data (Safe Server-side Join)
+    const rawStudentInsights = summaryResult.studentSpecificInsights || [];
+    const extractedStudentIds = Array.from(
+      new Set(
+        rawStudentInsights
+          .map((item) => String(item.student_id).replace(/^SID:?/i, '').trim())
+          .filter(Boolean)
+      )
+    );
+
+    if (extractedStudentIds.length > 0) {
+      const { data: dbStudents } = await supabase
+        .from('students')
+        .select('id, name, grade, status, height, weight, disability, student_parents(phone_number, relationship)')
+        .in('id', extractedStudentIds);
+
+      const studentMap = new Map((dbStudents || []).map((s) => [s.id, s]));
+
+      summaryResult.studentSpecificInsights = rawStudentInsights.map((item) => {
+        const cleanId = String(item.student_id).replace(/^SID:?/i, '').trim();
+        const student = studentMap.get(cleanId);
+        return {
+          ...item,
+          student_id: cleanId,
+          student_profile: student
+            ? {
+                id: student.id,
+                name: student.name,
+                grade: student.grade,
+                status: student.status,
+                current_height: student.height,
+                current_weight: student.weight,
+                current_disability: student.disability,
+                parent_phone: student.student_parents?.[0]?.phone_number || null,
+              }
+            : null,
+        };
+      });
+    }
+
     return NextResponse.json({
       success: true,
       data: summaryResult,

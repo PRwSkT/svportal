@@ -5,19 +5,50 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sparkles, ShieldCheck, RefreshCw, Loader2, AlertCircle,
   TrendingUp, Lightbulb, CheckCircle2, ChevronDown, ChevronUp,
-  FileSpreadsheet, MessageSquare, Bot
+  FileSpreadsheet, MessageSquare, Bot, UserCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+export interface StudentInsightItem {
+  student_id: string;
+  category: 'urgent_followup' | 'health_allergy' | 'update_record' | 'special_request' | 'general';
+  topic: string;
+  details: string;
+  suggested_action: string;
+  student_profile?: {
+    id: string;
+    name: string;
+    grade: string;
+    status: string;
+    current_height?: number | null;
+    current_weight?: number | null;
+    current_disability?: string | null;
+    parent_phone?: string | null;
+  } | null;
+}
+
 interface NongFahSummaryData {
-  executive_summary: string;
-  total_analyzed: number;
-  key_findings: string[];
+  executive_summary?: string;
+  executiveSummary?: string;
+  total_analyzed?: number;
+  totalAnalyzed?: number;
+  key_findings?: string[];
+  keyFindings?: string[];
   sentiment_overview?: {
-    overall: 'positive' | 'neutral' | 'negative' | 'mixed';
-    details: string;
+    overall?: 'positive' | 'neutral' | 'negative' | 'mixed';
+    details?: string;
+    summary?: string;
   };
-  recommendations: string[];
+  sentimentOverview?: {
+    positivePercentage?: number;
+    neutralPercentage?: number;
+    negativePercentage?: number;
+    summary?: string;
+  };
+  recommendations?: string[];
+  actionableRecommendations?: string[];
+  studentSpecificInsights?: StudentInsightItem[];
+  student_specific_insights?: StudentInsightItem[];
   anonymized_metrics?: {
     label: string;
     value: string | number;
@@ -200,11 +231,11 @@ export function NongFahResponsesInsights({
                 <FileSpreadsheet className="w-4 h-4 text-sky-600" />
                 <span>บทสรุปผู้บริหาร (Executive Summary)</span>
                 <span className="text-[11px] font-normal text-slate-500 font-mono ml-auto">
-                  วิเคราะห์จาก {summary.total_analyzed} การตอบกลับ
+                  วิเคราะห์จาก {summary.total_analyzed || summary.totalAnalyzed || totalResponses} การตอบกลับ
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-slate-700 leading-relaxed whitespace-pre-line">
-                {summary.executive_summary}
+                {summary.executive_summary || summary.executiveSummary}
               </p>
             </div>
 
@@ -217,7 +248,7 @@ export function NongFahResponsesInsights({
                   <span>ประเด็นและข้อสังเกตสำคัญ (Key Findings)</span>
                 </div>
                 <ul className="space-y-2.5">
-                  {(summary.key_findings || []).map((finding, idx) => (
+                  {(summary.key_findings || summary.keyFindings || []).map((finding, idx) => (
                     <li key={idx} className="flex items-start gap-2.5 text-xs text-slate-700">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                       <span className="leading-snug">{finding}</span>
@@ -233,7 +264,7 @@ export function NongFahResponsesInsights({
                   <span>ข้อเสนอแนะเชิงบริหาร (Actionable Recommendations)</span>
                 </div>
                 <ul className="space-y-2.5">
-                  {(summary.recommendations || []).map((rec, idx) => (
+                  {(summary.recommendations || summary.actionableRecommendations || []).map((rec, idx) => (
                     <li key={idx} className="flex items-start gap-2.5 text-xs text-slate-700">
                       <span className="w-4 h-4 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
                         {idx + 1}
@@ -244,6 +275,60 @@ export function NongFahResponsesInsights({
                 </ul>
               </div>
             </div>
+
+            {/* Student-Specific Insights (Live DB Enriched) */}
+            {((summary.studentSpecificInsights || summary.student_specific_insights) || []).length > 0 && (
+              <div className="bg-white rounded-2xl p-5 border border-sky-200/90 shadow-2xs">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+                    <UserCheck className="w-4 h-4 text-sky-600" />
+                    <span>ข้อมูลและประเด็นเฉพาะรายบุคคล (Student-Specific Insights)</span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-sky-800 bg-sky-50 border border-sky-200 px-2.5 py-0.5 rounded-full">
+                    ดึงข้อมูลสดจากฐานข้อมูล {((summary.studentSpecificInsights || summary.student_specific_insights) || []).length} รายการ
+                  </span>
+                </div>
+                <div className="space-y-3">
+                  {((summary.studentSpecificInsights || summary.student_specific_insights) || []).map((item, idx) => {
+                    const profile = item.student_profile;
+                    return (
+                      <div
+                        key={idx}
+                        className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 hover:border-sky-300 transition-all"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1.5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-bold text-slate-900">
+                              {profile?.name || `นักเรียนรหัส ${item.student_id}`}
+                            </span>
+                            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700">
+                              รหัส {item.student_id}
+                            </span>
+                            {profile?.grade && (
+                              <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-sky-100 text-sky-800">
+                                ชั้น {profile.grade}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 self-start sm:self-auto">
+                            {item.topic}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-700 leading-relaxed">
+                          {item.details}
+                        </p>
+                        {item.suggested_action && (
+                          <div className="mt-2 text-[11px] text-sky-900 bg-sky-50/80 border border-sky-100 p-2 rounded-lg flex items-start gap-1.5">
+                            <span className="font-bold shrink-0">ข้อแนะนำ:</span>
+                            <span>{item.suggested_action}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Sentiment & Tone (if available) */}
             {summary.sentiment_overview && (

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { FormQRCodeModal } from '@/components/forms/FormQRCodeModal';
 import { NongFahResponsesInsights } from '@/components/forms/NongFahResponsesInsights';
+import { StudentDbSyncSection } from '@/components/forms/StudentDbSyncSection';
 
 export default function FormResponsesPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -247,6 +248,11 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
         <NongFahResponsesInsights
           formId={form.id}
           totalResponses={total}
+        />
+
+        {/* Student Database Sync & Update Section */}
+        <StudentDbSyncSection
+          formId={form.id}
         />
 
         {/* Filters Bar */}
