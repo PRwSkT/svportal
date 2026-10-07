@@ -7,9 +7,9 @@ import { FormField } from '@/types';
 import { SanitizedFormAnalysisPayload } from './pdpa-sanitizer';
 
 const GEMMA_MODELS = [
-  'gemini-2.5-flash-lite',
   'gemini-3.5-flash-lite',
   'gemini-3.1-flash-lite',
+  'gemini-2.5-flash-lite',
 ];
 
 interface GemmaCallOptions {
