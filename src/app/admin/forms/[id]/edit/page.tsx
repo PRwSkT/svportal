@@ -25,7 +25,7 @@ import {
   Calendar, Clock, Upload, Star, Heading, Loader2, ExternalLink,
   ShieldCheck, AlertCircle, RefreshCw, X, LayoutTemplate,
   Image as ImageIcon, Info, Smartphone, Monitor, User, Users, UserCheck, Search, QrCode, Bot, BarChart2,
-  Award, ShieldAlert
+  Award, ShieldAlert, Shuffle
 } from 'lucide-react';
 import { FormQRCodeModal } from '@/components/forms/FormQRCodeModal';
 import { NongFahStudioModal } from '@/components/forms/NongFahStudioModal';
@@ -1098,6 +1098,68 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                       className="rounded text-[#7B1C3E] focus:ring-[#7B1C3E] w-4 h-4"
                     />
                     <span>แสดงเฉลยข้อที่ถูกต้องและคำอธิบายหลังส่งข้อสอบ</span>
+                  </label>
+                </div>
+
+                {/* Question & Option Shuffling */}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Shuffle className="w-4 h-4 text-[#7B1C3E]" />
+                    <span className="text-xs font-bold text-slate-800">
+                      การสลับลำดับข้อสอบและตัวเลือก (Question & Choice Shuffling)
+                    </span>
+                  </div>
+
+                  <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={form.quiz_settings?.shuffle_questions ?? false}
+                      onChange={(e) => {
+                        setForm({
+                          ...form,
+                          quiz_settings: {
+                            ...form.quiz_settings!,
+                            shuffle_questions: e.target.checked,
+                          },
+                        });
+                        notifyChange();
+                      }}
+                      className="rounded text-[#7B1C3E] focus:ring-[#7B1C3E] w-4 h-4 mt-0.5"
+                    />
+                    <div>
+                      <span className="font-semibold text-slate-900 block">
+                        สลับลำดับข้อสอบแบบสุ่ม (Shuffle Questions Order)
+                      </span>
+                      <span className="text-[11px] text-slate-500">
+                        สลับลำดับคำถามสำหรับผู้สอบแต่ละคนแบบสุ่ม เพื่อป้องกันการลอกข้อสอบระหว่างผู้เรียนที่นั่งใกล้กัน (ระบบจะคงส่วนข้อมูลผู้เข้าสอบและหัวข้อตอนไว้ตามลำดับที่ถูกต้อง)
+                      </span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700 pt-2 border-t border-slate-200/60">
+                    <input
+                      type="checkbox"
+                      checked={form.quiz_settings?.shuffle_options ?? false}
+                      onChange={(e) => {
+                        setForm({
+                          ...form,
+                          quiz_settings: {
+                            ...form.quiz_settings!,
+                            shuffle_options: e.target.checked,
+                          },
+                        });
+                        notifyChange();
+                      }}
+                      className="rounded text-[#7B1C3E] focus:ring-[#7B1C3E] w-4 h-4 mt-0.5"
+                    />
+                    <div>
+                      <span className="font-semibold text-slate-900 block">
+                        สลับลำดับตัวเลือกคำตอบแบบสุ่ม (Shuffle Choices / Options)
+                      </span>
+                      <span className="text-[11px] text-slate-500">
+                        สลับลำดับชอยส์ ก, ข, ค, ง ของคำถามแบบเลือกตอบสำหรับผู้สอบแต่ละคน
+                      </span>
+                    </div>
                   </label>
                 </div>
 

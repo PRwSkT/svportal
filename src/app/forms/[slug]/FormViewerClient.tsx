@@ -13,7 +13,7 @@ import {
   Lock, ArrowRight, Loader2, RefreshCw, FileText, ChevronRight,
   Info, Image as ImageIcon, Search, UserCheck, Shield, ShieldAlert,
   ShieldCheck, Timer, AlertOctagon, Maximize2, Minimize2, Award,
-  XCircle, Clock, AlertTriangle, Eye, CheckCircle, X
+  XCircle, Clock, AlertTriangle, Eye, CheckCircle, X, Shuffle
 } from 'lucide-react';
 
 const UI_TEXT: Record<SupportedLang, {
@@ -93,6 +93,122 @@ interface FormViewerProps {
   isDraftPreview?: boolean;
 }
 
+function shuffleArray<T>(array: T[]): T[] {
+  const result = [...array];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+function shuffleExamFields(
+  fields: FormField[],
+  shuffleQuestions: boolean,
+  shuffleOptions: boolean
+): FormField[] {
+  if (!shuffleQuestions && !shuffleOptions) {
+    return fields;
+  }
+
+  // 1. Shuffle options inside choice questions if shuffleOptions is true
+  let processedFields = fields.map((f) => {
+    if (
+      shuffleOptions &&
+      ['radio', 'checkbox', 'select'].includes(f.field_type) &&
+      Array.isArray(f.options) &&
+      f.options.length > 1
+    ) {
+      return {
+        ...f,
+        options: shuffleArray(f.options),
+      };
+    }
+    return f;
+  });
+
+  if (!shuffleQuestions) {
+    return processedFields;
+  }
+
+  // 2. Shuffle questions order:
+  // Check if form has section headers
+  const hasSections = processedFields.some((f) => f.field_type === 'section_header');
+
+  if (hasSections) {
+    const result: FormField[] = [];
+    let currentHeader: FormField | null = null;
+    let currentQuestions: FormField[] = [];
+
+    const flushCurrentSection = () => {
+      if (currentHeader) {
+        result.push(currentHeader);
+      }
+      // Check if currentQuestions contains student info / profile fields
+      const isStudentInfoSection =
+        currentQuestions.length > 0 &&
+        currentQuestions.every(
+          (q) =>
+            ['image', 'info_text'].includes(q.field_type) ||
+            (!q.quiz_config?.points &&
+              (q.label?.th?.includes('ชื่อ') ||
+                q.label?.th?.includes('เลขประจำตัว') ||
+                q.label?.th?.includes('นักเรียน') ||
+                q.label?.th?.includes('ชั้น') ||
+                q.label?.th?.includes('ห้อง')))
+        );
+
+      if (isStudentInfoSection) {
+        result.push(...currentQuestions);
+      } else {
+        result.push(...shuffleArray(currentQuestions));
+      }
+      currentQuestions = [];
+    };
+
+    for (const field of processedFields) {
+      if (field.field_type === 'section_header') {
+        flushCurrentSection();
+        currentHeader = field;
+      } else {
+        currentQuestions.push(field);
+      }
+    }
+    flushCurrentSection();
+    return result;
+  } else {
+    // No section headers:
+    // Separate student identification / profile fields at top from actual questions
+    const topInfoFields: FormField[] = [];
+    const questionFields: FormField[] = [];
+
+    for (const field of processedFields) {
+      const isIntro =
+        ['image', 'info_text'].includes(field.field_type) ||
+        (!field.quiz_config?.points &&
+          (field.label?.th?.includes('ชื่อ') ||
+            field.label?.th?.includes('เลขประจำตัว') ||
+            field.label?.th?.includes('นักเรียน') ||
+            field.label?.th?.includes('ชั้น') ||
+            field.label?.th?.includes('ห้อง')));
+
+      if (isIntro && questionFields.length === 0) {
+        topInfoFields.push(field);
+      } else {
+        questionFields.push(field);
+      }
+    }
+
+    return [...topInfoFields, ...shuffleArray(questionFields)];
+  }
+}
+
+function formatQuizQuestionLabel(label: string, questionIndex: number, isShuffled: boolean): string {
+  if (!isShuffled) return label;
+  const cleaned = label.replace(/^(?:ข้อ(?:ที่)?\s*\d+[\s.:)\-]*|\d+[\s.:)\-]+\s*)/i, '').trim();
+  return `ข้อที่ ${questionIndex}. ${cleaned || label}`;
+}
+
 export default function FormViewerClient({
   initialForm,
   initialFields,
@@ -100,6 +216,7 @@ export default function FormViewerClient({
   isDraftPreview = false,
 }: FormViewerProps) {
   const [lang, setLang] = useState<SupportedLang>('th');
+  const [displayFields, setDisplayFields] = useState<FormField[]>(initialFields);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [attachments, setAttachments] = useState<Record<string, string>>({});
   const [uploadingField, setUploadingField] = useState<string | null>(null);
@@ -125,6 +242,16 @@ export default function FormViewerClient({
   const [warningModalReason, setWarningModalReason] = useState<string>('');
   const [quizScoreResult, setQuizScoreResult] = useState<QuizSubmissionScore | null>(null);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+
+  // Shuffle questions & choices on client mount if configured
+  useEffect(() => {
+    if (!isQuiz) return;
+    const shouldShuffleQuestions = Boolean(initialForm.quiz_settings?.shuffle_questions);
+    const shouldShuffleOptions = Boolean(initialForm.quiz_settings?.shuffle_options);
+    if (shouldShuffleQuestions || shouldShuffleOptions) {
+      setDisplayFields(shuffleExamFields(initialFields, shouldShuffleQuestions, shouldShuffleOptions));
+    }
+  }, [isQuiz, initialForm.quiz_settings?.shuffle_questions, initialForm.quiz_settings?.shuffle_options, initialFields]);
 
   const proctorLogRef = useRef<ProctoringLog>({
     tab_switch_count: 0,
@@ -495,6 +622,11 @@ export default function FormViewerClient({
     if (antiCheat?.enforce_fullscreen) {
       await enterFullscreen();
     }
+    const shouldShuffleQuestions = Boolean(initialForm.quiz_settings?.shuffle_questions);
+    const shouldShuffleOptions = Boolean(initialForm.quiz_settings?.shuffle_options);
+    if (shouldShuffleQuestions || shouldShuffleOptions) {
+      setDisplayFields(shuffleExamFields(initialFields, shouldShuffleQuestions, shouldShuffleOptions));
+    }
     proctorLogRef.current.started_at = new Date().toISOString();
     setExamStarted(true);
     toast.success('เริ่มทำข้อสอบ ขอให้ตั้งใจทำข้อสอบอย่างเต็มที่');
@@ -510,7 +642,7 @@ export default function FormViewerClient({
       const errors: Record<string, boolean> = {};
       let hasError = false;
 
-      for (const field of initialFields) {
+      for (const field of displayFields) {
         if (field.is_required && !nonInputTypes.includes(field.field_type)) {
           const val = answers[field.field_key];
           const isEmpty =
@@ -712,6 +844,18 @@ export default function FormViewerClient({
                   <span><strong>ปิดกั้นคลิกขวา:</strong> ไม่อนุญาตให้เปิด Context Menu</span>
                 </li>
               )}
+              {initialForm.quiz_settings?.shuffle_questions && (
+                <li className="flex items-start gap-2">
+                  <span className="text-amber-600 font-bold">•</span>
+                  <span><strong>สลับลำดับข้อสอบ:</strong> ลำดับข้อสอบของแต่ละคนจะถูกสุ่มสลับ เพื่อความโปร่งใสและยุติธรรมในการประเมิน</span>
+                </li>
+              )}
+              {initialForm.quiz_settings?.shuffle_options && (
+                <li className="flex items-start gap-2">
+                  <span className="text-amber-600 font-bold">•</span>
+                  <span><strong>สลับตัวเลือกคำตอบ:</strong> ตัวเลือก (ชอยส์) ในข้อสอบปรนัยจะถูกสุ่มสลับสำหรับผู้สอบแต่ละคน</span>
+                </li>
+              )}
               <li className="flex items-start gap-2">
                 <span className="text-amber-600 font-bold">•</span>
                 <span><strong>ส่งข้อสอบอัตโนมัติ:</strong> เมื่อหมดเวลา หรือเมื่อระบบตรวจพบการละเมิดกฎ ระบบจะส่งคะแนนทันที</span>
@@ -827,11 +971,13 @@ export default function FormViewerClient({
                 <span>เฉลยคำตอบและคำอธิบาย (Question Review)</span>
               </h3>
               <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
-                {initialFields
+                {displayFields
                   .filter((f) => !['section_header', 'image', 'info_text'].includes(f.field_type))
                   .map((field, idx) => {
                     const item = quizScoreResult.breakdown[field.field_key];
                     if (!item) return null;
+                    const rawLabel = getLocalized(field.label);
+                    const qLabel = formatQuizQuestionLabel(rawLabel, idx + 1, Boolean(initialForm.quiz_settings?.shuffle_questions));
                     return (
                       <div
                         key={field.id}
@@ -843,7 +989,7 @@ export default function FormViewerClient({
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <span className="font-bold text-slate-800">
-                            ข้อที่ {idx + 1}. {getLocalized(field.label)}
+                            {qLabel}
                           </span>
                           <span
                             className={`px-2 py-0.5 rounded-md font-bold text-[11px] shrink-0 ${
@@ -1214,9 +1360,20 @@ export default function FormViewerClient({
 
           {/* Render Form Elements in Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            {initialFields.map((field) => {
-              const fieldLabel = getLocalized(field.label);
-              const rawHelp = getLocalized(field.help_text);
+            {(() => {
+              let quizQuestionCounter = 0;
+              return displayFields.map((field) => {
+                const rawLabel = getLocalized(field.label);
+                const isNonInput = ['section_header', 'image', 'info_text'].includes(field.field_type);
+                const isStudentField = isStudentLookupField(rawLabel);
+                let fieldLabel = rawLabel;
+
+                if (isQuiz && !isNonInput && !isStudentField) {
+                  quizQuestionCounter += 1;
+                  fieldLabel = formatQuizQuestionLabel(rawLabel, quizQuestionCounter, Boolean(initialForm.quiz_settings?.shuffle_questions));
+                }
+
+                const rawHelp = getLocalized(field.help_text);
 
               // Helper: Check if help text is dummy placeholder text from template
               const isDummyHelp = (text?: string | null) => {
@@ -1654,7 +1811,8 @@ export default function FormViewerClient({
                   )}
                 </motion.div>
               );
-            })}
+            });
+          })()}
           </div>
 
           {/* Submit Button Bar */}
