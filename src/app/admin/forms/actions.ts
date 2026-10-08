@@ -392,6 +392,7 @@ export async function createForm(payload: {
           options: f.options ? (Array.isArray(f.options) ? f.options : null) : null,
           validation: f.validation || null,
           image_url: f.image_url || null,
+          quiz_config: f.quiz_config || null,
           sort_order: idx,
           width: f.width || 'full',
         };
@@ -533,6 +534,7 @@ export async function saveFormStudio(
           options: f.options || null,
           validation: f.validation || null,
           image_url: f.image_url || null,
+          quiz_config: f.quiz_config || null,
           sort_order: idx,
           width: f.width || 'full',
         };

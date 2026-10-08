@@ -13,7 +13,7 @@ import {
   Lock, ArrowRight, Loader2, RefreshCw, FileText, ChevronRight,
   Info, Image as ImageIcon, Search, UserCheck, Shield, ShieldAlert,
   ShieldCheck, Timer, AlertOctagon, Maximize2, Minimize2, Award,
-  XCircle, Clock, AlertTriangle, Eye, CheckCircle
+  XCircle, Clock, AlertTriangle, Eye, CheckCircle, X
 } from 'lucide-react';
 
 const UI_TEXT: Record<SupportedLang, {
@@ -124,6 +124,7 @@ export default function FormViewerClient({
   const [showWarningModal, setShowWarningModal] = useState<boolean>(false);
   const [warningModalReason, setWarningModalReason] = useState<string>('');
   const [quizScoreResult, setQuizScoreResult] = useState<QuizSubmissionScore | null>(null);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   const proctorLogRef = useRef<ProctoringLog>({
     tab_switch_count: 0,
@@ -854,6 +855,16 @@ export default function FormViewerClient({
                             {item.points_awarded} / {item.max_points} คะแนน
                           </span>
                         </div>
+                        {field.image_url && (
+                          <div className="my-2 max-w-sm rounded-xl overflow-hidden border border-slate-200/80 bg-white p-1.5 shadow-2xs">
+                            <img
+                              src={field.image_url}
+                              alt="รูปประกอบโจทย์"
+                              className="max-h-44 w-auto object-contain rounded-lg mx-auto cursor-pointer hover:opacity-90 transition-opacity"
+                              onClick={() => setPreviewImageUrl(field.image_url!)}
+                            />
+                          </div>
+                        )}
                         <div className="space-y-1 text-slate-600">
                           <div>
                             <span className="text-slate-400">คำตอบของคุณ: </span>
@@ -1127,6 +1138,38 @@ export default function FormViewerClient({
         </div>
       )}
 
+      {/* Question / Media Image Lightbox Modal */}
+      <AnimatePresence>
+        {previewImageUrl && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-xs"
+            onClick={() => setPreviewImageUrl(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.92 }}
+              className="relative max-w-4xl max-h-[92vh] bg-white rounded-3xl overflow-hidden shadow-2xl p-2.5 sm:p-4 flex flex-col items-center border border-white/20"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setPreviewImageUrl(null)}
+                className="absolute top-4 right-4 z-10 p-2 bg-black/70 hover:bg-black/90 text-white rounded-full transition-all shadow-md"
+                title="ปิดหน้าต่างรูปภาพ"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <img
+                src={previewImageUrl}
+                alt="รูปภาพประกอบโจทย์ขนาดใหญ่"
+                className="max-h-[82vh] w-auto object-contain rounded-2xl"
+              />
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Main Form Container */}
       <main className={`max-w-3xl mx-auto px-4 sm:px-6 pt-6 ${antiCheat?.block_clipboard ? 'select-none' : ''}`}>
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -1304,6 +1347,29 @@ export default function FormViewerClient({
                       </span>
                     )}
                   </div>
+
+                  {/* Question Image (if attached) */}
+                  {field.image_url && (
+                    <div className="mb-4">
+                      <div
+                        onClick={() => setPreviewImageUrl(field.image_url!)}
+                        className="group relative inline-block max-w-full rounded-2xl overflow-hidden border border-slate-200/90 bg-slate-50/80 p-2 cursor-pointer hover:border-[#7B1C3E]/60 transition-all shadow-2xs"
+                        title="คลิกเพื่อดูภาพขยาย"
+                      >
+                        <img
+                          src={field.image_url}
+                          alt={fieldLabel || 'รูปภาพประกอบโจทย์'}
+                          className="max-h-72 sm:max-h-88 w-auto object-contain rounded-xl mx-auto group-hover:scale-[1.01] transition-transform duration-200"
+                        />
+                        <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-xl">
+                          <span className="px-3 py-1.5 bg-black/75 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-md">
+                            <Maximize2 className="w-3.5 h-3.5" />
+                            คลิกเพื่อดูภาพขนาดใหญ่
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Input Fields By Type */}
                   <div className="mt-2">

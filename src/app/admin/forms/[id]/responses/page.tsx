@@ -878,9 +878,19 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
 
                     return (
                       <div key={field.id} className={idx > 0 ? 'pt-4' : ''}>
-                        <div className="text-xs font-bold text-slate-500 mb-1">
-                          {idx + 1}. {label}
+                        <div className="text-xs font-bold text-slate-500 mb-1 flex items-center justify-between">
+                          <span>{idx + 1}. {label}</span>
+                          {field.quiz_config?.points && (
+                            <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                              {field.quiz_config.points} คะแนน
+                            </span>
+                          )}
                         </div>
+                        {field.image_url && (
+                          <div className="mb-2 max-w-xs rounded-xl overflow-hidden border border-slate-200 bg-white p-1 shadow-2xs">
+                            <img src={field.image_url} alt="ภาพประกอบโจทย์" className="max-h-36 w-auto object-contain rounded-lg" />
+                          </div>
+                        )}
                         <div className="text-sm font-medium text-slate-900 bg-slate-50 p-3 rounded-xl">
                           {rawAns === undefined || rawAns === null || rawAns === '' ? (
                             <span className="text-slate-400 italic">ไม่มีข้อมูล</span>

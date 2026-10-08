@@ -478,7 +478,7 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
     }
   };
 
-  // Image Upload for image fields
+  // Image Upload for questions and image fields
   const handleImageFieldUpload = async (index: number, file: File) => {
     setUploadingImageIndex(index);
     try {
@@ -486,21 +486,22 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
       if (file.type.startsWith('image/')) {
         fileToUpload = await compressImage(file, 1600, 0.85);
       }
-      const fileExt = file.name.split('.').pop() || 'jpg';
-      const fileName = `form_images/${form?.id || 'common'}/${Date.now()}_${Math.random().toString(36).substring(2, 6)}.${fileExt}`;
+      const formData = new FormData();
+      formData.append('file', fileToUpload);
+      formData.append('formId', form?.id || 'common');
 
-      const { data, error } = await supabase.storage
-        .from('form-attachments')
-        .upload(fileName, fileToUpload, { cacheControl: '3600', upsert: true });
+      const res = await fetch('/api/admin/forms/upload-image', {
+        method: 'POST',
+        body: formData,
+      });
 
-      if (error) throw error;
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'อัปโหลดรูปภาพไม่สำเร็จ');
+      }
 
-      const { data: publicUrlData } = supabase.storage
-        .from('form-attachments')
-        .getPublicUrl(data.path);
-
-      updateField(index, { image_url: publicUrlData.publicUrl });
-      toast.success('อัปโหลดรูปภาพเรียบร้อย');
+      updateField(index, { image_url: data.url });
+      toast.success('อัปโหลดรูปภาพประกอบเรียบร้อย');
     } catch (err: any) {
       toast.error('อัปโหลดรูปภาพไม่สำเร็จ', { description: err.message });
     } finally {
@@ -517,20 +518,21 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
       if (file.type.startsWith('image/')) {
         fileToUpload = await compressImage(file, 1920, 0.85);
       }
-      const fileExt = file.name.split('.').pop() || 'jpg';
-      const fileName = `form_banners/${form.id}/${Date.now()}.${fileExt}`;
+      const formData = new FormData();
+      formData.append('file', fileToUpload);
+      formData.append('formId', form.id);
 
-      const { data, error } = await supabase.storage
-        .from('form-attachments')
-        .upload(fileName, fileToUpload, { cacheControl: '3600', upsert: true });
+      const res = await fetch('/api/admin/forms/upload-image', {
+        method: 'POST',
+        body: formData,
+      });
 
-      if (error) throw error;
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'อัปโหลดภาพแบนเนอร์ไม่สำเร็จ');
+      }
 
-      const { data: publicUrlData } = supabase.storage
-        .from('form-attachments')
-        .getPublicUrl(data.path);
-
-      setForm(prev => prev ? { ...prev, banner_url: publicUrlData.publicUrl } : null);
+      setForm(prev => prev ? { ...prev, banner_url: data.url } : null);
       notifyChange();
       toast.success('อัปโหลดภาพแบนเนอร์สำเร็จ');
     } catch (err: any) {
@@ -2021,6 +2023,101 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                           )}
                         </div>
 
+                        {/* Question Image Attachment for regular questions */}
+                        {!isImage && !isHeader && (
+                          <div className="pt-2 pb-1 border-t border-slate-100">
+                            {field.image_url ? (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                                    <ImageIcon className="w-3.5 h-3.5 text-[#7B1C3E]" />
+                                    <span>รูปภาพประกอบโจทย์ / คำถาม</span>
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateField(index, { image_url: null })}
+                                    className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 hover:underline flex items-center gap-1"
+                                  >
+                                    <X className="w-3 h-3" />
+                                    ลบรูปภาพออก
+                                  </button>
+                                </div>
+                                <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 p-2.5 flex flex-col sm:flex-row items-center gap-3">
+                                  <div className="relative max-h-48 max-w-xs shrink-0 rounded-xl overflow-hidden border border-slate-200 bg-white flex items-center justify-center p-1 shadow-2xs">
+                                    <img
+                                      src={field.image_url}
+                                      alt="Question illustration"
+                                      className="max-h-40 w-auto object-contain rounded-lg"
+                                    />
+                                  </div>
+                                  <div className="flex-1 w-full space-y-2.5">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#7B1C3E] hover:bg-[#631430] text-white rounded-xl text-xs font-semibold cursor-pointer shadow-2xs transition-colors">
+                                        <Upload className="w-3.5 h-3.5" />
+                                        <span>{uploadingImageIndex === index ? 'กำลังอัปโหลด...' : 'เปลี่ยนรูปภาพใหม่'}</span>
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          disabled={uploadingImageIndex === index}
+                                          className="hidden"
+                                          onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) handleImageFieldUpload(index, file);
+                                          }}
+                                        />
+                                      </label>
+                                      <a
+                                        href={field.image_url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-800 font-medium"
+                                      >
+                                        <Eye className="w-3 h-3" />
+                                        ดูภาพเต็ม
+                                      </a>
+                                    </div>
+                                    <div>
+                                      <span className="text-[11px] text-slate-500 block mb-1">ลิงก์ URL รูปภาพ:</span>
+                                      <input
+                                        type="url"
+                                        placeholder="https://..."
+                                        value={field.image_url || ''}
+                                        onChange={(e) => updateField(index, { image_url: e.target.value })}
+                                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:ring-1 focus:ring-[#7B1C3E]"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashed border-slate-300 hover:border-[#7B1C3E] bg-slate-50/80 hover:bg-rose-50/40 text-slate-600 hover:text-[#7B1C3E] text-xs font-medium cursor-pointer transition-all">
+                                  <ImageIcon className="w-3.5 h-3.5 text-slate-400" />
+                                  <span>{uploadingImageIndex === index ? 'กำลังอัปโหลดรูปภาพ...' : '+ แนบรูปภาพประกอบโจทย์'}</span>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    disabled={uploadingImageIndex === index}
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) handleImageFieldUpload(index, file);
+                                    }}
+                                  />
+                                </label>
+                                <span className="text-[11px] text-slate-400">หรือวาง URL:</span>
+                                <input
+                                  type="url"
+                                  placeholder="https://... (วางลิงก์รูปภาพ)"
+                                  value={field.image_url || ''}
+                                  onChange={(e) => updateField(index, { image_url: e.target.value })}
+                                  className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-mono w-44 sm:w-60 focus:outline-none focus:ring-1 focus:ring-[#7B1C3E]"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         {/* Options editor for choice fields */}
                         {hasOptions && (
                           <div className="pt-2">
@@ -2423,6 +2520,11 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                               {lbl} {field.is_required && <span className="text-rose-500">*</span>}
                             </label>
                             {hlp && <p className="text-[11px] text-slate-500 mb-2">{hlp}</p>}
+                            {field.image_url && (
+                              <div className="mb-2.5 rounded-lg overflow-hidden border border-slate-100 bg-slate-50 flex items-center justify-center p-1.5">
+                                <img src={field.image_url} alt="Question illustration" className="max-h-48 w-auto object-contain rounded" />
+                              </div>
+                            )}
                             <div className="h-8 bg-slate-50 border border-slate-200 rounded-lg flex items-center px-3 text-xs text-slate-400">
                               ตัวอย่างช่องกรอกข้อมูล ({field.field_type})
                             </div>
