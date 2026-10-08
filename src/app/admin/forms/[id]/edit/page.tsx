@@ -382,6 +382,111 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
     notifyChange();
   };
 
+  const [aiChoiceLoadingIndex, setAiChoiceLoadingIndex] = useState<number | null>(null);
+
+  // Shuffle choice options order
+  const shuffleOptions = (fieldIndex: number) => {
+    setFields(prev => {
+      const copy = [...prev];
+      const curOpts = [...(copy[fieldIndex].options || [])];
+      if (curOpts.length < 2) return prev;
+      for (let i = curOpts.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [curOpts[i], curOpts[j]] = [curOpts[j], curOpts[i]];
+      }
+      copy[fieldIndex].options = curOpts;
+      return copy;
+    });
+    notifyChange();
+    toast.success('สลับลำดับตัวเลือกแบบสุ่มเรียบร้อยแล้ว');
+  };
+
+  // Nong Fah AI Generate Multiple Choice Options & Key
+  const handleGenerateChoicesWithNongFah = async (
+    fieldIndex: number,
+    action: 'generate_all' | 'suggest_correct'
+  ) => {
+    const field = fields[fieldIndex];
+    if (!field) return;
+
+    const qTitle = field.label?.[activeLang] || field.label?.th || '';
+    if (!qTitle.trim()) {
+      toast.error('กรุณาระบุโจทย์คำถามก่อนให้น้องฟ้าช่วยดำเนินการ');
+      return;
+    }
+
+    if (action === 'suggest_correct' && (!field.options || field.options.length === 0)) {
+      toast.error('กรุณาเพิ่มตัวเลือกคำตอบอย่างน้อย 1 ตัวเลือกเพื่อให้ AI วิเคราะห์เฉลย');
+      return;
+    }
+
+    setAiChoiceLoadingIndex(fieldIndex);
+    const toastId = toast.loading(
+      action === 'generate_all'
+        ? 'น้องฟ้ากำลังคิดตัวเลือกที่สมดุลและเฉลยคำตอบ...'
+        : 'น้องฟ้ากำลังวิเคราะห์ตัวเลือกเพื่อแนะนำข้อที่ถูกต้อง...'
+    );
+
+    try {
+      const res = await fetch('/api/admin/forms/ai/generate-choices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questionTitle: qTitle,
+          questionHelp: field.help_text?.[activeLang] || field.help_text?.th,
+          fieldType: field.field_type,
+          existingOptions: field.options || [],
+          action,
+          optionCount: 4,
+          enableSearchGrounding: Boolean(field.quiz_config?.enable_search_grounding),
+        }),
+      });
+
+      const data = await res.json();
+      toast.dismiss(toastId);
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'เกิดข้อผิดพลาดในการประมวลผล');
+      }
+
+      const result = data.result;
+
+      setFields(prev => {
+        const copy = [...prev];
+        const target = copy[fieldIndex];
+
+        if (action === 'generate_all') {
+          target.options = result.options.map((opt: any) => ({
+            value: opt.value,
+            label: opt.label,
+          }));
+        }
+
+        target.quiz_config = {
+          ...(target.quiz_config || {}),
+          points: target.quiz_config?.points ?? 1,
+          correct_answers: result.correct_values,
+          explanation: result.explanation || target.quiz_config?.explanation,
+        };
+
+        return copy;
+      });
+
+      notifyChange();
+
+      if (action === 'generate_all') {
+        toast.success('น้องฟ้าสร้าง 4 ตัวเลือกพร้อมสลับลำดับและเฉลยให้เรียบร้อยแล้ว!');
+      } else {
+        toast.success('น้องฟ้าแนะนำเฉลยข้อที่ถูกต้องพร้อมคำอธิบายเรียบร้อยแล้ว!');
+      }
+    } catch (err: any) {
+      toast.dismiss(toastId);
+      toast.error('ไม่สามารถให้ AI ดำเนินการได้', { description: err.message });
+    } finally {
+      setAiChoiceLoadingIndex(null);
+    }
+  };
+
   // Apply Nong Fah AI Generated Form
   const handleApplyNongFahForm = (
     generated: GeneratedFormDefinition,
@@ -2183,9 +2288,39 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                         {/* Options editor for choice fields */}
                         {hasOptions && (
                           <div className="pt-2">
-                            <label className="block text-xs font-semibold text-slate-700 mb-2">
-                              ตัวเลือกคำตอบ ({activeLang.toUpperCase()})
-                            </label>
+                            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                              <label className="text-xs font-semibold text-slate-700">
+                                ตัวเลือกคำตอบ ({activeLang.toUpperCase()})
+                              </label>
+                              <div className="flex items-center gap-1.5">
+                                {/* Shuffle order button */}
+                                <button
+                                  type="button"
+                                  onClick={() => shuffleOptions(index)}
+                                  className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-lg transition-colors cursor-pointer"
+                                  title="สลับลำดับตัวเลือกแบบสุ่ม"
+                                >
+                                  <Shuffle className="w-3 h-3 text-slate-500" />
+                                  <span>สุ่มสลับช้อยส์</span>
+                                </button>
+
+                                {/* Nong Fah generate choices */}
+                                <button
+                                  type="button"
+                                  disabled={aiChoiceLoadingIndex === index}
+                                  onClick={() => handleGenerateChoicesWithNongFah(index, 'generate_all')}
+                                  className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
+                                  title="ให้น้องฟ้าคิด 4 ตัวเลือกและเฉลยคำตอบให้อัตโนมัติ"
+                                >
+                                  {aiChoiceLoadingIndex === index ? (
+                                    <Loader2 className="w-3 h-3 animate-spin text-purple-600" />
+                                  ) : (
+                                    <Sparkles className="w-3 h-3 text-purple-600" />
+                                  )}
+                                  <span>น้องฟ้าสร้างช้อยส์+เฉลย</span>
+                                </button>
+                              </div>
+                            </div>
                             <div className="space-y-2">
                               {(field.options || []).map((opt, optIdx) => (
                                 <div key={opt.value || optIdx} className="flex items-center gap-2">
@@ -2282,8 +2417,24 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                             {/* Select / Radio / Checkbox: Choose correct option */}
                             {hasOptions && field.options && (
                               <div className="space-y-1.5">
-                                <div className="text-[11px] font-semibold text-slate-700">
-                                  เลือกคำตอบที่ถูกต้อง ({field.field_type === 'checkbox' ? 'เลือกได้หลายข้อ' : 'เลือกข้อที่ถูกต้อง 1 ข้อ'}):
+                                <div className="flex flex-wrap items-center justify-between gap-1">
+                                  <div className="text-[11px] font-semibold text-slate-700">
+                                    เลือกคำตอบที่ถูกต้อง ({field.field_type === 'checkbox' ? 'เลือกได้หลายข้อ' : 'เลือกข้อที่ถูกต้อง 1 ข้อ'}):
+                                  </div>
+                                  <button
+                                    type="button"
+                                    disabled={aiChoiceLoadingIndex === index}
+                                    onClick={() => handleGenerateChoicesWithNongFah(index, 'suggest_correct')}
+                                    className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-md transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
+                                    title="ให้น้องฟ้าอ่านโจทย์และตัวเลือก แล้วแนะนำช้อยส์ที่ถูกพร้อมเขียนคำอธิบาย"
+                                  >
+                                    {aiChoiceLoadingIndex === index ? (
+                                      <Loader2 className="w-2.5 h-2.5 animate-spin text-purple-600" />
+                                    ) : (
+                                      <Bot className="w-2.5 h-2.5 text-purple-600" />
+                                    )}
+                                    <span>ให้น้องฟ้าช่วยเฉลย</span>
+                                  </button>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                                   {field.options.map((opt) => {

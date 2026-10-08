@@ -621,4 +621,209 @@ Output MUST be strictly valid JSON matching this schema:
   }
 }
 
+export interface GenerateChoicesInput {
+  questionTitle: string;
+  questionHelp?: string;
+  fieldType?: 'radio' | 'checkbox' | 'select';
+  existingOptions?: { value: string; label: Record<string, string> | string }[];
+  action?: 'generate_all' | 'suggest_correct';
+  optionCount?: number;
+  enableSearchGrounding?: boolean;
+}
+
+export interface GeneratedChoiceOption {
+  value: string;
+  label: { th: string; en: string; zh: string };
+  is_correct: boolean;
+  distractor_reason?: string;
+}
+
+export interface GenerateChoicesResult {
+  options: GeneratedChoiceOption[];
+  correct_values: string[];
+  explanation: { th: string; en: string; zh: string };
+}
+
+/**
+ * Multiple-choice question assistant:
+ * 1. Generates balanced options + distractors + randomizes order + selects correct key + writes explanation
+ * 2. Or analyzes existing teacher choices to recommend the correct choice & provide pedagogical explanation
+ */
+export async function generateChoicesWithNongFah(
+  input: GenerateChoicesInput
+): Promise<GenerateChoicesResult> {
+  const {
+    questionTitle,
+    questionHelp,
+    fieldType = 'radio',
+    existingOptions = [],
+    action = 'generate_all',
+    optionCount = 4,
+    enableSearchGrounding = false,
+  } = input;
+
+  if (action === 'suggest_correct' && existingOptions.length > 0) {
+    // Action 2: Suggest correct choice from existing options
+    const systemPrompt = `You are "น้องฟ้า" (Nong Fah), an educational AI assistant for Somkidvittaya School (โรงเรียนสมคิดวิทยา).
+A teacher has provided an exam question and a list of existing multiple-choice options.
+Your task:
+1. Carefully analyze each option based on factual knowledge and academic accuracy.
+2. Determine which option is the correct answer (or multiple options if checkbox).
+3. Provide a clear educational explanation for why this choice is right and clarify why the other options are wrong or misconceptions.
+4. Strictly NO EMOJIS!
+
+Output MUST be strictly valid JSON matching this schema:
+{
+  "correct_values": ["value_of_correct_option"],
+  "options_analysis": [
+    { "value": "string", "is_correct": boolean, "rationale": "string" }
+  ],
+  "explanation": {
+    "th": "string (คำอธิบายเฉลยภาษาไทย)",
+    "en": "string (Explanation in English)",
+    "zh": "string (中文解析)"
+  }
+}`;
+
+    let userPrompt = `โจทย์คำถาม: "${questionTitle}"\n`;
+    if (questionHelp) userPrompt += `คำอธิบายโจทย์: "${questionHelp}"\n`;
+    userPrompt += `ประเภทคำถาม: ${fieldType === 'checkbox' ? 'เลือกได้หลายข้อ (Checkbox)' : 'เลือกได้ข้อเดียว (Single choice)'}\n`;
+    userPrompt += `ตัวเลือกที่มีอยู่:\n`;
+    existingOptions.forEach((opt, idx) => {
+      const lbl = typeof opt.label === 'object' ? (opt.label.th || JSON.stringify(opt.label)) : String(opt.label);
+      userPrompt += `${idx + 1}. value: "${opt.value}", label: "${lbl}"\n`;
+    });
+    userPrompt += `กรุณาแนะนำช้อยส์ที่ถูกต้องและสร้างคำอธิบายเฉลย`;
+
+    const rawJson = await callGemma({
+      systemPrompt,
+      userPrompt,
+      temperature: 0.1,
+      maxTokens: 2048,
+      responseMimeType: 'application/json',
+      enableSearchGrounding,
+    });
+
+    const parsed = safeParseJson<any>(rawJson, 'Failed to parse AI choice suggestion');
+    const correctValues: string[] = Array.isArray(parsed.correct_values)
+      ? parsed.correct_values
+      : [];
+
+    const mappedOptions: GeneratedChoiceOption[] = existingOptions.map((opt) => {
+      const isCorrect = correctValues.includes(opt.value);
+      const analysis = Array.isArray(parsed.options_analysis)
+        ? parsed.options_analysis.find((a: any) => a.value === opt.value)
+        : null;
+      const thLabel = typeof opt.label === 'object' ? opt.label.th || '' : String(opt.label);
+      const enLabel = typeof opt.label === 'object' ? opt.label.en || thLabel : thLabel;
+      const zhLabel = typeof opt.label === 'object' ? opt.label.zh || thLabel : thLabel;
+
+      return {
+        value: opt.value,
+        label: { th: thLabel, en: enLabel, zh: zhLabel },
+        is_correct: isCorrect,
+        distractor_reason: analysis?.rationale || '',
+      };
+    });
+
+    return {
+      options: mappedOptions,
+      correct_values: correctValues,
+      explanation: {
+        th: parsed.explanation?.th || 'คำตอบที่ถูกต้องตามหลักวิชาการ',
+        en: parsed.explanation?.en || 'Correct answer based on academic facts.',
+        zh: parsed.explanation?.zh || '根据学术事实的正确答案。',
+      },
+    };
+  }
+
+  // Action 1: Generate all choices + key + explanation
+  const count = Math.max(2, Math.min(6, optionCount));
+  const systemPrompt = `You are "น้องฟ้า" (Nong Fah), an expert educational assessment assistant for Somkidvittaya School (โรงเรียนสมคิดวิทยา).
+Your task is to generate high-quality, balanced multiple-choice options (ปรนัย) for an exam question.
+
+Pedagogical Guidelines:
+1. Generate exactly ${count} multiple-choice options.
+2. For single choice (${fieldType === 'checkbox' ? 'multiple answers allowed' : 'radio/select'}):
+   ${fieldType === 'checkbox' ? 'Mark 1 or more options as is_correct: true if appropriate.' : 'Exactly 1 option MUST have is_correct: true, and the other ' + (count - 1) + ' options MUST have is_correct: false.'}
+3. Distractors (ตัวเลือกหลอก): Plausible, testing common misconceptions or related topics. Avoid trivial or nonsensical choices.
+4. Balanced Length: Keep all options similar in grammatical structure, length, and detail.
+5. Multilingual Labels: Provide natural labels for each option in Thai (th), English (en), and Chinese (zh).
+6. Provide an educational explanation in Thai (th), English (en), and Chinese (zh) detailing why the correct option is right and addressing the distractors.
+7. Strictly NO EMOJIS!
+
+Output MUST be strictly valid JSON matching this schema:
+{
+  "options": [
+    {
+      "label": { "th": "string", "en": "string", "zh": "string" },
+      "is_correct": boolean,
+      "distractor_reason": "string (เหตุผลทางวิชาการว่าทำไมตัวเลือกนี้ถึงถูกหรือผิด)"
+    }
+  ],
+  "explanation": {
+    "th": "string (คำอธิบายเฉลยภาษาไทย)",
+    "en": "string (Explanation in English)",
+    "zh": "string (中文解析)"
+  }
+}`;
+
+  let userPrompt = `โจทย์คำถาม: "${questionTitle}"\n`;
+  if (questionHelp) userPrompt += `คำแนะนำโจทย์: "${questionHelp}"\n`;
+  userPrompt += `จำนวนตัวเลือกที่ต้องการ: ${count} ข้อ\n`;
+  userPrompt += `กรุณาสร้างตัวเลือกและเฉลยคำตอบเป็น JSON ตาม Schema`;
+
+  const rawJson = await callGemma({
+    systemPrompt,
+    userPrompt,
+    temperature: 0.2,
+    maxTokens: 2048,
+    responseMimeType: 'application/json',
+    enableSearchGrounding,
+  });
+
+  const parsed = safeParseJson<any>(rawJson, 'Failed to parse generated choices JSON');
+  const rawOptions: any[] = Array.isArray(parsed.options) ? parsed.options : [];
+
+  // Generate unique values and randomly shuffle so correct choice position is randomized
+  const preparedOptions: GeneratedChoiceOption[] = rawOptions.map((opt, i) => {
+    const randomSuffix = Math.random().toString(36).substring(2, 6);
+    return {
+      value: `opt_${Date.now()}_${i}_${randomSuffix}`,
+      label: {
+        th: String(opt.label?.th || `ตัวเลือกที่ ${i + 1}`).trim(),
+        en: String(opt.label?.en || opt.label?.th || `Option ${i + 1}`).trim(),
+        zh: String(opt.label?.zh || opt.label?.th || `选项 ${i + 1}`).trim(),
+      },
+      is_correct: Boolean(opt.is_correct),
+      distractor_reason: opt.distractor_reason ? String(opt.distractor_reason).trim() : undefined,
+    };
+  });
+
+  // Fisher-Yates shuffle the options array so correct choice isn't always the first item!
+  for (let i = preparedOptions.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [preparedOptions[i], preparedOptions[j]] = [preparedOptions[j], preparedOptions[i]];
+  }
+
+  const correctValues = preparedOptions.filter((o) => o.is_correct).map((o) => o.value);
+
+  // If no option was marked correct, ensure at least the first one is marked
+  if (correctValues.length === 0 && preparedOptions.length > 0) {
+    preparedOptions[0].is_correct = true;
+    correctValues.push(preparedOptions[0].value);
+  }
+
+  return {
+    options: preparedOptions,
+    correct_values: correctValues,
+    explanation: {
+      th: parsed.explanation?.th || 'คำตอบที่ถูกต้องตามหลักวิชาการ',
+      en: parsed.explanation?.en || 'Correct answer based on academic facts.',
+      zh: parsed.explanation?.zh || '根据学术事实的正确答案。',
+    },
+  };
+}
+
+
 
