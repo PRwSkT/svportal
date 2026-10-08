@@ -7,9 +7,10 @@ import { FormField } from '@/types';
 import { SanitizedFormAnalysisPayload } from './pdpa-sanitizer';
 
 const GEMMA_MODELS = [
-  'gemini-3.5-flash-lite',
-  'gemini-3.1-flash-lite',
   'gemini-2.5-flash-lite',
+  'gemini-flash-latest',
+  'gemini-flash-lite-latest',
+  'gemini-2.5-pro',
   'gemma-4-26b-a4b-it',
   'gemma-4-31b-it',
 ];
@@ -20,6 +21,7 @@ interface GemmaCallOptions {
   temperature?: number;
   maxTokens?: number;
   responseMimeType?: string;
+  enableSearchGrounding?: boolean;
 }
 
 /**
@@ -62,7 +64,11 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
         requestBody.generationConfig.responseMimeType = 'application/json';
       }
 
-      const res = await fetch(url, {
+      if (options.enableSearchGrounding) {
+        requestBody.tools = [{ googleSearch: {} }];
+      }
+
+      let res = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -71,6 +77,20 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
         body: JSON.stringify(requestBody),
         signal: AbortSignal.timeout(25000),
       });
+
+      // If search grounding was rejected by model/quota, fallback without tools immediately
+      if (!res.ok && options.enableSearchGrounding) {
+        delete requestBody.tools;
+        res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Client': 'svportal-forms/1.0',
+          },
+          body: JSON.stringify(requestBody),
+          signal: AbortSignal.timeout(25000),
+        });
+      }
 
       if (!res.ok) {
         const errorText = await res.text();
@@ -496,4 +516,109 @@ Analyze the message and return strictly JSON.`;
     'ผลลัพธ์จากน้องฟ้า AI ไม่อยู่ในรูปแบบ JSON ที่ถูกต้อง กรุณาลองใหม่อีกครั้ง'
   );
 }
+
+/**
+ * 6. "น้องฟ้า" ช่วยประเมินและเสนอคะแนนข้อสอบข้อเขียน (AI Written Exam Grading Assistant)
+ * วิเคราะห์คำตอบของนักเรียนตามแนวคำตอบ / รูบริกของคุณครู และเสนอแนะคะแนนพร้อมเหตุผล
+ */
+export interface EvaluateWrittenQuestionInput {
+  questionTitle: string;
+  questionHelp?: string | null;
+  studentAnswer: string;
+  gradingRubric?: string | null;
+  sampleAnswers?: string[] | null;
+  maxPoints: number;
+  enableSearchGrounding?: boolean;
+}
+
+export interface EvaluateWrittenQuestionOutput {
+  suggested_points: number;
+  max_points: number;
+  is_correct: boolean;
+  feedback: string;
+  key_points_covered: string[];
+  key_points_missed: string[];
+}
+
+export async function evaluateWrittenAnswerWithNongFah(
+  input: EvaluateWrittenQuestionInput
+): Promise<EvaluateWrittenQuestionOutput> {
+  const {
+    questionTitle,
+    questionHelp,
+    studentAnswer,
+    gradingRubric,
+    sampleAnswers,
+    maxPoints,
+    enableSearchGrounding = false,
+  } = input;
+
+  const systemPrompt = `You are "น้องฟ้า" (Nong Fah), an expert and fair educational grading assistant for Somkidvittaya School (โรงเรียนสมคิดวิทยา).
+Your task is to analyze a student's written examination answer and recommend a suggested score along with the rationale and breakdown of why that score was given, to assist the teacher.
+
+Strict Guidelines:
+1. Primary Reference: Base your evaluation strictly on the teacher's grading rubric, key points, and sample answers if provided.
+2. Conceptual Understanding: Assess the student's actual understanding of the concepts, logical reasoning, and depth of explanation, rather than penalizing for minor spelling or phrasing differences.
+3. Partial Credit: Award fair partial points (between 0 and ${maxPoints}) reflecting how many key concepts or criteria the student satisfied.
+4. If the student answer is completely irrelevant, nonsensical, or empty, award 0 points.
+5. Strictly NO EMOJIS in any text output!
+6. Provide constructive, respectful, and professional feedback in Thai. Explain clearly why the points were awarded, what was done well, and what was missing.
+
+Output MUST be strictly valid JSON matching this schema:
+{
+  "suggested_points": number (between 0 and ${maxPoints}, can be a decimal e.g. 2.5),
+  "is_correct": boolean (true if suggested_points >= ${maxPoints * 0.5}),
+  "feedback": "string (คำอธิบายติชมและที่มาของคะแนน แนะนำจุดที่ตอบได้ดีและจุดที่ควรปรับปรุง)",
+  "key_points_covered": ["string (ประเด็นสำคัญที่นักเรียนตอบได้ถูกต้อง)"],
+  "key_points_missed": ["string (ประเด็นสำคัญตามแนวคำตอบที่ยังขาดไป)"]
+}`;
+
+  let userPrompt = `โจทย์คำถาม: "${questionTitle}"\n`;
+  if (questionHelp) {
+    userPrompt += `คำแนะนำโจทย์: "${questionHelp}"\n`;
+  }
+  userPrompt += `คะแนนเต็ม: ${maxPoints} คะแนน\n`;
+
+  if (gradingRubric && gradingRubric.trim()) {
+    userPrompt += `หลักแนวคำตอบ / รูบริกการให้คะแนนของคุณครู:\n"""\n${gradingRubric.trim()}\n"""\n`;
+  }
+
+  if (sampleAnswers && sampleAnswers.length > 0) {
+    userPrompt += `ตัวอย่างคำตอบที่ถูกต้อง:\n${sampleAnswers.map((a, i) => `${i + 1}. ${a}`).join('\n')}\n`;
+  }
+
+  userPrompt += `คำตอบของนักเรียน:\n"""\n${(studentAnswer || '').trim() || '(ไม่มีคำตอบ)'}\n"""\n`;
+  userPrompt += `กรุณาวิเคราะห์คำตอบตามแนวคำตอบของคุณครู และส่งคืนผลการประเมินเป็น JSON ตาม Schema ที่กำหนด`;
+
+  try {
+    const rawJson = await callGemma({
+      systemPrompt,
+      userPrompt,
+      temperature: 0.1,
+      maxTokens: 2048,
+      responseMimeType: 'application/json',
+      enableSearchGrounding,
+    });
+
+    const parsed = safeParseJson<any>(rawJson, 'Failed to parse AI evaluation JSON');
+    const rawSuggested = Number(parsed.suggested_points ?? parsed.points_awarded ?? 0);
+    const suggestedPoints = Math.min(
+      maxPoints,
+      Math.max(0, isNaN(rawSuggested) ? 0 : rawSuggested)
+    );
+
+    return {
+      suggested_points: Math.round(suggestedPoints * 10) / 10,
+      max_points: maxPoints,
+      is_correct: Boolean(parsed.is_correct ?? suggestedPoints >= maxPoints * 0.5),
+      feedback: String(parsed.feedback || 'นักเรียนตอบคำถามตามเกณฑ์ที่กำหนด').trim(),
+      key_points_covered: Array.isArray(parsed.key_points_covered) ? parsed.key_points_covered : [],
+      key_points_missed: Array.isArray(parsed.key_points_missed) ? parsed.key_points_missed : [],
+    };
+  } catch (err: any) {
+    console.error('Nong Fah evaluation error:', err);
+    throw err;
+  }
+}
+
 

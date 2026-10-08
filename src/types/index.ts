@@ -355,6 +355,8 @@ export interface QuestionQuizConfig {
   points?: number; // คะแนนของข้อนี้ (เช่น 1, 2)
   correct_answers?: string[]; // คำตอบที่ถูกต้อง (เช่น opt_1 หรือข้อความคำตอบ)
   explanation?: MultiLangText | null; // คำอธิบายเฉลย
+  grading_rubric?: string | null; // หลักแนวคำตอบ / รูบริกการให้คะแนนสำหรับข้อเขียน (ให้ AI ช่วยวิเคราะห์)
+  enable_search_grounding?: boolean; // ให้น้องฟ้าค้นหา Google Search เพื่อตรวจสอบข้อเท็จจริง
 }
 
 export interface AntiCheatConfig {
@@ -461,6 +463,17 @@ export interface QuizSubmissionScore {
     student_answer: any;
     correct_answers?: string[];
     explanation?: string;
+    teacher_score?: number | null;
+    teacher_comment?: string | null;
+    ai_evaluation?: {
+      suggested_points: number;
+      max_points: number;
+      feedback: string;
+      key_points_covered: string[];
+      key_points_missed: string[];
+      evaluated_at: string;
+    } | null;
+    graded_by?: 'auto' | 'ai_assisted' | 'teacher' | null;
   }>;
 }
 

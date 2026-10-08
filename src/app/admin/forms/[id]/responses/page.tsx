@@ -13,7 +13,8 @@ import {
   BarChart2, FileText, CheckCircle2, Calendar, Globe,
   Loader2, ExternalLink, X, Image as ImageIcon, AlertCircle, QrCode,
   PieChart, HelpCircle, List, Sparkles, Bot,
-  Award, ShieldCheck, ShieldAlert, AlertTriangle, Clock, Timer, CheckCircle, XCircle
+  Award, ShieldCheck, ShieldAlert, AlertTriangle, Clock, Timer, CheckCircle, XCircle,
+  Save, Check, RefreshCw
 } from 'lucide-react';
 import { FormQRCodeModal } from '@/components/forms/FormQRCodeModal';
 import { NongFahResponsesInsights } from '@/components/forms/NongFahResponsesInsights';
@@ -43,6 +44,26 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
   // Modal for detail view
   const [selectedResponse, setSelectedResponse] = useState<FormResponse | null>(null);
   const [showQrModal, setShowQrModal] = useState(false);
+
+  // Teacher Grading & AI Evaluation State
+  const [evaluatingFieldKey, setEvaluatingFieldKey] = useState<string | null>(null);
+  const [savingFieldKey, setSavingFieldKey] = useState<string | null>(null);
+  const [teacherScores, setTeacherScores] = useState<Record<string, { points: number; comment: string }>>({});
+
+  useEffect(() => {
+    if (selectedResponse?.quiz_score?.breakdown) {
+      const initial: Record<string, { points: number; comment: string }> = {};
+      for (const [key, val] of Object.entries(selectedResponse.quiz_score.breakdown)) {
+        initial[key] = {
+          points: (val as any).teacher_score ?? val.points_awarded ?? 0,
+          comment: (val as any).teacher_comment ?? '',
+        };
+      }
+      setTeacherScores(initial);
+    } else {
+      setTeacherScores({});
+    }
+  }, [selectedResponse?.id]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -74,6 +95,140 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
       }
     } else {
       toast.error('ลบไม่สำเร็จ', { description: res.error });
+    }
+  };
+
+  // Nong Fah AI Written Answer Evaluation
+  const handleAiEvaluateWritten = async (field: FormField) => {
+    if (!selectedResponse) return;
+    const rawAns = selectedResponse.answers?.[field.field_key];
+    if (rawAns === undefined || rawAns === null || String(rawAns).trim() === '') {
+      toast.error('ผู้เรียนไม่ได้ระบุคำตอบในข้อนี้');
+      return;
+    }
+
+    setEvaluatingFieldKey(field.field_key);
+    try {
+      const res = await fetch('/api/admin/forms/ai/evaluate-written', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          responseId: selectedResponse.id,
+          fieldKey: field.field_key,
+          questionTitle: field.label?.th || field.field_key,
+          questionHelp: field.help_text?.th,
+          studentAnswer: String(rawAns),
+          gradingRubric: field.quiz_config?.grading_rubric || null,
+          sampleAnswers: field.quiz_config?.correct_answers || null,
+          maxPoints: field.quiz_config?.points ?? 1,
+          enableSearchGrounding: Boolean(field.quiz_config?.enable_search_grounding),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'เกิดข้อผิดพลาดในการประเมิน');
+      }
+
+      const evalResult = data.evaluation;
+      toast.success(`น้องฟ้าประเมินข้อนี้เรียบร้อย (เสนอแนะ ${evalResult.suggested_points}/${evalResult.max_points} คะแนน)`);
+
+      // Update response state locally
+      const currentQuizScore = selectedResponse.quiz_score || {
+        total_score: 0,
+        max_score: 0,
+        percentage: 0,
+        passed: false,
+        time_spent_seconds: 0,
+        submitted_at: new Date().toISOString(),
+        breakdown: {},
+      };
+
+      const updatedBreakdown = {
+        ...(currentQuizScore.breakdown || {}),
+        [field.field_key]: {
+          ...((currentQuizScore.breakdown as any)?.[field.field_key] || {
+            points_awarded: 0,
+            max_points: evalResult.max_points,
+            is_correct: false,
+            user_answer: rawAns,
+          }),
+          ai_evaluation: {
+            suggested_points: evalResult.suggested_points,
+            max_points: evalResult.max_points,
+            feedback: evalResult.feedback,
+            key_points_covered: evalResult.key_points_covered,
+            key_points_missed: evalResult.key_points_missed,
+            evaluated_at: new Date().toISOString(),
+          },
+        },
+      };
+
+      const updatedResponse: FormResponse = {
+        ...selectedResponse,
+        quiz_score: {
+          ...currentQuizScore,
+          submitted_at: currentQuizScore.submitted_at || new Date().toISOString(),
+          breakdown: updatedBreakdown,
+        },
+      };
+
+      setSelectedResponse(updatedResponse);
+      setResponses(prev => prev.map(r => r.id === updatedResponse.id ? updatedResponse : r));
+
+      // Fill in teacher scores state with suggested score
+      setTeacherScores(prev => ({
+        ...prev,
+        [field.field_key]: {
+          points: evalResult.suggested_points,
+          comment: prev[field.field_key]?.comment || evalResult.feedback || '',
+        },
+      }));
+    } catch (err: any) {
+      toast.error('ไม่สามารถให้ AI วิเคราะห์คำตอบได้', { description: err.message });
+    } finally {
+      setEvaluatingFieldKey(null);
+    }
+  };
+
+  // Teacher Saves Final Score
+  const handleSaveTeacherScore = async (fieldKey: string) => {
+    if (!selectedResponse) return;
+    const scoreState = teacherScores[fieldKey];
+    const pts = scoreState ? scoreState.points : 0;
+    const comment = scoreState ? scoreState.comment : '';
+
+    setSavingFieldKey(fieldKey);
+    try {
+      const res = await fetch('/api/admin/forms/scores/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          responseId: selectedResponse.id,
+          fieldKey,
+          teacherScore: pts,
+          teacherComment: comment,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'เกิดข้อผิดพลาดในการบันทึกคะแนน');
+      }
+
+      const updatedQuizScore = data.quiz_score;
+      const updatedResponse: FormResponse = {
+        ...selectedResponse,
+        quiz_score: updatedQuizScore,
+      };
+
+      setSelectedResponse(updatedResponse);
+      setResponses(prev => prev.map(r => r.id === updatedResponse.id ? updatedResponse : r));
+      toast.success('บันทึกคะแนนและคำนวณผลรวมใหม่เรียบร้อยแล้ว');
+    } catch (err: any) {
+      toast.error('บันทึกคะแนนไม่สำเร็จ', { description: err.message });
+    } finally {
+      setSavingFieldKey(null);
     }
   };
 
@@ -876,38 +1031,358 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
                       }
                     }
 
+                    const breakdownItem = selectedResponse.quiz_score?.breakdown?.[field.field_key];
+                    const isWrittenQuestion = field.field_type === 'textarea' || (field.field_type === 'text' && Boolean(field.quiz_config?.grading_rubric || !field.quiz_config?.correct_answers?.length));
+                    const isEvaluating = evaluatingFieldKey === field.field_key;
+                    const isSaving = savingFieldKey === field.field_key;
+                    const maxPts = field.quiz_config?.points ?? 1;
+
                     return (
-                      <div key={field.id} className={idx > 0 ? 'pt-4' : ''}>
-                        <div className="text-xs font-bold text-slate-500 mb-1 flex items-center justify-between">
-                          <span>{idx + 1}. {label}</span>
-                          {field.quiz_config?.points && (
-                            <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                              {field.quiz_config.points} คะแนน
-                            </span>
-                          )}
+                      <div key={field.id} className={`${idx > 0 ? 'pt-4 border-t border-slate-100' : ''} space-y-2`}>
+                        {/* Question Title & Points Header */}
+                        <div className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <span className="text-[#7B1C3E] font-black">{idx + 1}.</span>
+                            <span>{label}</span>
+                          </span>
+                          <div className="flex items-center gap-2">
+                            {isWrittenQuestion ? (
+                              <span className="text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-md">
+                                ข้อสอบอัตนัย/เขียน
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+                                {field.field_type}
+                              </span>
+                            )}
+                            {field.quiz_config?.points && (
+                              <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                                เต็ม {field.quiz_config.points} คะแนน
+                              </span>
+                            )}
+                          </div>
                         </div>
+
+                        {/* Question Image if present */}
                         {field.image_url && (
                           <div className="mb-2 max-w-xs rounded-xl overflow-hidden border border-slate-200 bg-white p-1 shadow-2xs">
                             <img src={field.image_url} alt="ภาพประกอบโจทย์" className="max-h-36 w-auto object-contain rounded-lg" />
                           </div>
                         )}
-                        <div className="text-sm font-medium text-slate-900 bg-slate-50 p-3 rounded-xl">
-                          {rawAns === undefined || rawAns === null || rawAns === '' ? (
-                            <span className="text-slate-400 italic">ไม่มีข้อมูล</span>
-                          ) : typeof rawAns === 'string' && rawAns.startsWith('http') ? (
-                            <a
-                              href={rawAns}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-[#7B1C3E] underline font-semibold flex items-center gap-1"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                              เปิดดูไฟล์แนบ
-                            </a>
-                          ) : (
-                            displayAns
-                          )}
+
+                        {/* Student's Answer */}
+                        <div className="space-y-1">
+                          <div className="text-[11px] font-semibold text-slate-500 flex items-center justify-between">
+                            <span>คำตอบของผู้เรียน:</span>
+                            {breakdownItem && (
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                breakdownItem.is_correct
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                  : (breakdownItem.points_awarded > 0 || ((breakdownItem as any).teacher_score ?? 0) > 0)
+                                  ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                  : 'bg-rose-100 text-rose-800 border border-rose-300'
+                              }`}>
+                                {(breakdownItem as any).teacher_score !== null && (breakdownItem as any).teacher_score !== undefined
+                                  ? `ครูให้: ${(breakdownItem as any).teacher_score} / ${breakdownItem.max_points} คะแนน`
+                                  : `ได้: ${breakdownItem.points_awarded} / ${breakdownItem.max_points} คะแนน`}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm font-medium text-slate-900 bg-slate-50 border border-slate-200/80 p-3 rounded-xl whitespace-pre-wrap leading-relaxed">
+                            {rawAns === undefined || rawAns === null || rawAns === '' ? (
+                              <span className="text-slate-400 italic">ไม่มีข้อมูล (ไม่ได้ตอบ)</span>
+                            ) : typeof rawAns === 'string' && rawAns.startsWith('http') ? (
+                              <a
+                                href={rawAns}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[#7B1C3E] underline font-semibold flex items-center gap-1"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                                เปิดดูไฟล์แนบ
+                              </a>
+                            ) : (
+                              displayAns
+                            )}
+                          </div>
                         </div>
+
+                        {/* Auto-graded Question Result (if not written and has breakdown) */}
+                        {!isWrittenQuestion && breakdownItem && (
+                          <div className="text-xs space-y-1 pt-1">
+                            {!breakdownItem.is_correct && breakdownItem.correct_answers && breakdownItem.correct_answers.length > 0 && (
+                              <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg text-rose-900 text-[11px] flex items-center gap-1.5">
+                                <span className="font-bold shrink-0">เฉลยที่ถูกต้อง:</span>
+                                <span>
+                                  {breakdownItem.correct_answers.map(ansVal => {
+                                    const opt = field.options?.find(o => o.value === ansVal);
+                                    return opt?.label?.th || ansVal;
+                                  }).join(', ')}
+                                </span>
+                              </div>
+                            )}
+                            {field.quiz_config?.explanation?.th && (
+                              <div className="text-[11px] text-slate-600 bg-slate-100 p-2 rounded-lg">
+                                <span className="font-semibold text-slate-800">คำอธิบายเฉลย: </span>
+                                {field.quiz_config.explanation.th}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Written / Subjective Question Section: Rubric + Nong Fah Assistant + Teacher Review */}
+                        {isQuiz && isWrittenQuestion && (
+                          <div className="pt-2 space-y-2.5">
+                            {/* Rubric Box (if teacher configured) */}
+                            {field.quiz_config?.grading_rubric && (
+                              <div className="p-2.5 bg-amber-50/80 border border-amber-200 rounded-xl text-xs space-y-1">
+                                <div className="flex items-center justify-between font-bold text-amber-900">
+                                  <span className="flex items-center gap-1">
+                                    <FileText className="w-3.5 h-3.5 text-amber-700" />
+                                    เกณฑ์การให้คะแนน / แนวคำตอบที่คุณครูกำหนด (Rubric):
+                                  </span>
+                                  {field.quiz_config?.enable_search_grounding && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                                      <Globe className="w-3 h-3 text-blue-600" />
+                                      Google Search Grounding
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-slate-700 whitespace-pre-wrap text-[11px] leading-relaxed">
+                                  {field.quiz_config.grading_rubric}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Nong Fah AI Evaluation Assistant */}
+                            {breakdownItem?.ai_evaluation ? (
+                              <div className="p-3 bg-gradient-to-br from-purple-50/90 to-indigo-50/80 border border-purple-200 rounded-xl text-xs space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-1.5 font-bold text-purple-950">
+                                    <Bot className="w-4 h-4 text-purple-600" />
+                                    <span>ผลการวิเคราะห์และข้อเสนอแนะจากน้องฟ้า AI</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-2.5 py-0.5 bg-purple-100 text-purple-900 border border-purple-300 font-bold rounded-full text-[11px]">
+                                      เสนอแนะ: {breakdownItem.ai_evaluation.suggested_points} / {breakdownItem.ai_evaluation.max_points} คะแนน
+                                    </span>
+                                    <button
+                                      type="button"
+                                      disabled={isEvaluating}
+                                      onClick={() => handleAiEvaluateWritten(field)}
+                                      className="p-1 text-purple-600 hover:text-purple-800 hover:bg-purple-100 rounded-lg transition-colors cursor-pointer"
+                                      title="วิเคราะห์ใหม่อีกครั้ง"
+                                    >
+                                      <RefreshCw className={`w-3.5 h-3.5 ${isEvaluating ? 'animate-spin' : ''}`} />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Feedback Rationale */}
+                                <div className="p-2.5 bg-white/90 rounded-lg border border-purple-100 text-slate-800 text-[11px] leading-relaxed">
+                                  <span className="font-semibold text-purple-900">เหตุผลที่มาของคะแนน: </span>
+                                  {breakdownItem.ai_evaluation.feedback}
+                                </div>
+
+                                {/* Key Points Covered */}
+                                {breakdownItem.ai_evaluation.key_points_covered && breakdownItem.ai_evaluation.key_points_covered.length > 0 && (
+                                  <div className="space-y-1">
+                                    <div className="text-[11px] font-semibold text-emerald-800 flex items-center gap-1">
+                                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                      ประเด็นที่นักเรียนตอบได้ครอบคลุม:
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {breakdownItem.ai_evaluation.key_points_covered.map((pt: string, pIdx: number) => (
+                                        <span key={pIdx} className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md text-[10px]">
+                                          ✓ {pt}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Key Points Missed */}
+                                {breakdownItem.ai_evaluation.key_points_missed && breakdownItem.ai_evaluation.key_points_missed.length > 0 && (
+                                  <div className="space-y-1">
+                                    <div className="text-[11px] font-semibold text-amber-800 flex items-center gap-1">
+                                      <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                                      ประเด็นที่ตกหล่นหรือควรเพิ่มเติม:
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {breakdownItem.ai_evaluation.key_points_missed.map((pt: string, pIdx: number) => (
+                                        <span key={pIdx} className="px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded-md text-[10px]">
+                                          - {pt}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Apply AI Score Button */}
+                                <div className="pt-1 flex items-center justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (!breakdownItem?.ai_evaluation) return;
+                                      const aiPts = breakdownItem.ai_evaluation.suggested_points;
+                                      const aiFb = breakdownItem.ai_evaluation.feedback || '';
+                                      setTeacherScores(prev => ({
+                                        ...prev,
+                                        [field.field_key]: {
+                                          points: aiPts,
+                                          comment: prev[field.field_key]?.comment || aiFb,
+                                        },
+                                      }));
+                                      toast.info(`นำคะแนนเสนอแนะ (${aiPts} คะแนน) ใส่ในช่องให้คะแนนแล้ว`);
+                                    }}
+                                    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-semibold rounded-lg shadow-2xs transition-all flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Check className="w-3 h-3" />
+                                    <span>ใช้คะแนนที่น้องฟ้าเสนอ ({breakdownItem.ai_evaluation?.suggested_points ?? 0} คะแนน)</span>
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between p-2.5 bg-purple-50/60 border border-dashed border-purple-300 rounded-xl">
+                                <div className="text-xs text-purple-900 font-medium flex items-center gap-1.5">
+                                  <Bot className="w-4 h-4 text-purple-600 shrink-0" />
+                                  <span>ให้น้องฟ้าช่วยวิเคราะห์แนวคำตอบและเสนอแนะคะแนนตามเกณฑ์</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  disabled={isEvaluating}
+                                  onClick={() => handleAiEvaluateWritten(field)}
+                                  className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 shrink-0"
+                                >
+                                  {isEvaluating ? (
+                                    <>
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      <span>น้องฟ้ากำลังวิเคราะห์...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Sparkles className="w-3.5 h-3.5" />
+                                      <span>ให้น้องฟ้าช่วยตรวจ</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Teacher Final Score & Feedback Box */}
+                            <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2">
+                              <div className="flex items-center justify-between text-xs font-bold text-amber-950">
+                                <span className="flex items-center gap-1">
+                                  <Award className="w-4 h-4 text-amber-600" />
+                                  การให้คะแนนโดยคุณครู (Teacher Review):
+                                </span>
+                                {(breakdownItem as any)?.graded_by === 'teacher' && (
+                                  <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 font-semibold">
+                                    คุณครูตรวจบันทึกแล้ว
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-3">
+                                <div className="flex items-center gap-2">
+                                  <label className="text-xs text-slate-700 font-medium">คะแนนที่ให้:</label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={maxPts}
+                                    step={0.5}
+                                    value={teacherScores[field.field_key]?.points ?? (breakdownItem as any)?.teacher_score ?? breakdownItem?.points_awarded ?? 0}
+                                    onChange={(e) => {
+                                      const val = parseFloat(e.target.value) || 0;
+                                      setTeacherScores(prev => ({
+                                        ...prev,
+                                        [field.field_key]: {
+                                          points: Math.min(maxPts, Math.max(0, val)),
+                                          comment: prev[field.field_key]?.comment ?? (breakdownItem as any)?.teacher_comment ?? '',
+                                        },
+                                      }));
+                                    }}
+                                    className="w-20 px-2.5 py-1 bg-white border border-amber-300 rounded-lg text-xs font-bold text-amber-950 text-center focus:ring-2 focus:ring-amber-500"
+                                  />
+                                  <span className="text-xs text-slate-600 font-medium">/ {maxPts} คะแนน</span>
+                                </div>
+
+                                {/* Quick score buttons */}
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setTeacherScores(prev => ({
+                                      ...prev,
+                                      [field.field_key]: { points: 0, comment: prev[field.field_key]?.comment || '' },
+                                    }))}
+                                    className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-medium text-slate-600 hover:bg-slate-100 cursor-pointer"
+                                  >
+                                    0 คะแนน
+                                  </button>
+                                  {maxPts > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setTeacherScores(prev => ({
+                                        ...prev,
+                                        [field.field_key]: { points: Math.round((maxPts / 2) * 10) / 10, comment: prev[field.field_key]?.comment || '' },
+                                      }))}
+                                      className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-medium text-slate-600 hover:bg-slate-100 cursor-pointer"
+                                    >
+                                      ครึ่งหนึ่ง ({maxPts / 2})
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => setTeacherScores(prev => ({
+                                      ...prev,
+                                      [field.field_key]: { points: maxPts, comment: prev[field.field_key]?.comment || '' },
+                                    }))}
+                                    className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-medium text-slate-600 hover:bg-slate-100 cursor-pointer"
+                                  >
+                                    เต็ม ({maxPts})
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Teacher Comment & Save Button */}
+                              <div className="flex gap-2 items-center pt-1">
+                                <input
+                                  type="text"
+                                  value={teacherScores[field.field_key]?.comment ?? (breakdownItem as any)?.teacher_comment ?? ''}
+                                  onChange={(e) => {
+                                    setTeacherScores(prev => ({
+                                      ...prev,
+                                      [field.field_key]: {
+                                        points: prev[field.field_key]?.points ?? (breakdownItem as any)?.teacher_score ?? breakdownItem?.points_awarded ?? 0,
+                                        comment: e.target.value,
+                                      },
+                                    }));
+                                  }}
+                                  placeholder="ข้อคิดเห็น / คำแนะนำเพิ่มเติมจากคุณครู..."
+                                  className="flex-1 px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-xs text-slate-900 focus:ring-2 focus:ring-amber-500 placeholder:text-slate-400"
+                                />
+                                <button
+                                  type="button"
+                                  disabled={isSaving}
+                                  onClick={() => handleSaveTeacherScore(field.field_key)}
+                                  className="px-3 py-1.5 bg-[#7B1C3E] hover:bg-[#601630] text-white rounded-lg text-xs font-bold shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 shrink-0"
+                                >
+                                  {isSaving ? (
+                                    <>
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      <span>กำลังบันทึก...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Save className="w-3.5 h-3.5" />
+                                      <span>บันทึกคะแนน</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

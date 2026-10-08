@@ -2351,6 +2351,59 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                               </div>
                             )}
 
+                            {/* AI Grading Rubric & Teacher Guidelines for Written/Subjective Questions */}
+                            {(field.field_type === 'textarea' || field.field_type === 'text') && (
+                              <div className="space-y-2 p-3 bg-amber-100/70 rounded-xl border border-amber-300">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-950">
+                                    <Sparkles className="w-3.5 h-3.5 text-amber-700" />
+                                    <span>แนวคำตอบและเกณฑ์การให้คะแนนสำหรับน้องฟ้า AI (AI Rubric):</span>
+                                  </div>
+                                  <span className="text-[10px] text-amber-800 font-medium bg-amber-200/80 px-2 py-0.5 rounded-full">
+                                    {field.field_type === 'textarea' ? 'ข้อสอบอัตนัย / ข้อเขียนยาว' : 'ข้อสอบตอบสั้น'}
+                                  </span>
+                                </div>
+                                <textarea
+                                  rows={3}
+                                  value={field.quiz_config?.grading_rubric || ''}
+                                  onChange={(e) => {
+                                    updateField(index, {
+                                      quiz_config: {
+                                        ...(field.quiz_config || {}),
+                                        grading_rubric: e.target.value,
+                                      },
+                                    });
+                                  }}
+                                  placeholder="ระบุใจความสำคัญ, คีย์เวิร์ดที่ต้องมี, หรือเกณฑ์การแบ่งคะแนน (เช่น ต้องระบุปัจจัย 3 ประการครบถ้วน, ถ้าอธิบายกระบวนการถูกต้องให้ 3 คะแนน, มีตัวอย่างประกอบบวกเพิ่ม 1 คะแนน)..."
+                                  className="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-xs text-slate-900 focus:ring-1 focus:ring-amber-500 placeholder:text-slate-400"
+                                />
+                                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px]">
+                                  <label className="flex items-center gap-1.5 cursor-pointer text-amber-900 font-medium">
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(field.quiz_config?.enable_search_grounding)}
+                                      onChange={(e) => {
+                                        updateField(index, {
+                                          quiz_config: {
+                                            ...(field.quiz_config || {}),
+                                            enable_search_grounding: e.target.checked,
+                                          },
+                                        });
+                                      }}
+                                      className="rounded border-amber-400 text-[#7B1C3E] focus:ring-[#7B1C3E] w-3.5 h-3.5 cursor-pointer"
+                                    />
+                                    <span className="flex items-center gap-1">
+                                      <Globe className="w-3.5 h-3.5 text-amber-700" />
+                                      ให้น้องฟ้าค้นหา Google Search เพื่อตรวจสอบข้อเท็จจริง (Search Grounding)
+                                    </span>
+                                  </label>
+                                  <span className="text-[10px] text-amber-700/80">
+                                    * น้องฟ้าจะช่วยวิเคราะห์คำตอบและเสนอคะแนนให้คุณครูพิจารณาในหน้ารวมคำตอบ
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+
                             {/* Explanation / Rationale */}
                             <div className="space-y-1">
                               <div className="text-[11px] font-semibold text-slate-700">
