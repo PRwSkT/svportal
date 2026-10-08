@@ -629,6 +629,7 @@ export interface GenerateChoicesInput {
   action?: 'generate_all' | 'suggest_correct';
   optionCount?: number;
   enableSearchGrounding?: boolean;
+  examLanguage?: 'th' | 'en' | 'zh';
 }
 
 export interface GeneratedChoiceOption {
@@ -660,6 +661,7 @@ export async function generateChoicesWithNongFah(
     action = 'generate_all',
     optionCount = 4,
     enableSearchGrounding = false,
+    examLanguage,
   } = input;
 
   if (action === 'suggest_correct' && existingOptions.length > 0) {
@@ -771,6 +773,10 @@ Output MUST be strictly valid JSON matching this schema:
   let userPrompt = `โจทย์คำถาม: "${questionTitle}"\n`;
   if (questionHelp) userPrompt += `คำแนะนำโจทย์: "${questionHelp}"\n`;
   userPrompt += `จำนวนตัวเลือกที่ต้องการ: ${count} ข้อ\n`;
+  if (examLanguage) {
+    const langDesc = examLanguage === 'en' ? 'ภาษาอังกฤษ (English) ล้วน' : examLanguage === 'zh' ? 'ภาษาจีน (Chinese) ล้วน' : 'ภาษาไทย ล้วน';
+    userPrompt += `ข้อกำหนดภาษาข้อสอบ: ข้อสอบนี้เป็นข้อสอบวิชาที่ใช้${langDesc}โดยเฉพาะ กรุณาสร้างตัวเลือกและคำอธิบายเฉลยให้สอดคล้องกับภาษา${langDesc}นี้อย่างเป็นธรรมชาติ\n`;
+  }
   userPrompt += `กรุณาสร้างตัวเลือกและเฉลยคำตอบเป็น JSON ตาม Schema`;
 
   const rawJson = await callGemma({
@@ -788,12 +794,16 @@ Output MUST be strictly valid JSON matching this schema:
   // Generate unique values and randomly shuffle so correct choice position is randomized
   const preparedOptions: GeneratedChoiceOption[] = rawOptions.map((opt, i) => {
     const randomSuffix = Math.random().toString(36).substring(2, 6);
+    const primaryText = examLanguage
+      ? (opt.label?.[examLanguage] || opt.label?.th || opt.label?.en || `ตัวเลือกที่ ${i + 1}`).trim()
+      : null;
+
     return {
       value: `opt_${Date.now()}_${i}_${randomSuffix}`,
       label: {
-        th: String(opt.label?.th || `ตัวเลือกที่ ${i + 1}`).trim(),
-        en: String(opt.label?.en || opt.label?.th || `Option ${i + 1}`).trim(),
-        zh: String(opt.label?.zh || opt.label?.th || `选项 ${i + 1}`).trim(),
+        th: primaryText || String(opt.label?.th || `ตัวเลือกที่ ${i + 1}`).trim(),
+        en: primaryText || String(opt.label?.en || opt.label?.th || `Option ${i + 1}`).trim(),
+        zh: primaryText || String(opt.label?.zh || opt.label?.th || `选项 ${i + 1}`).trim(),
       },
       is_correct: Boolean(opt.is_correct),
       distractor_reason: opt.distractor_reason ? String(opt.distractor_reason).trim() : undefined,
@@ -814,13 +824,17 @@ Output MUST be strictly valid JSON matching this schema:
     correctValues.push(preparedOptions[0].value);
   }
 
+  const primaryExplanation = examLanguage
+    ? (parsed.explanation?.[examLanguage] || parsed.explanation?.th || parsed.explanation?.en || 'คำตอบที่ถูกต้องตามหลักวิชาการ').trim()
+    : null;
+
   return {
     options: preparedOptions,
     correct_values: correctValues,
     explanation: {
-      th: parsed.explanation?.th || 'คำตอบที่ถูกต้องตามหลักวิชาการ',
-      en: parsed.explanation?.en || 'Correct answer based on academic facts.',
-      zh: parsed.explanation?.zh || '根据学术事实的正确答案。',
+      th: primaryExplanation || parsed.explanation?.th || 'คำตอบที่ถูกต้องตามหลักวิชาการ',
+      en: primaryExplanation || parsed.explanation?.en || 'Correct answer based on academic facts.',
+      zh: primaryExplanation || parsed.explanation?.zh || '根据学术事实的正确答案。',
     },
   };
 }

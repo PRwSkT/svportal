@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
       action = 'generate_all',
       optionCount = 4,
       enableSearchGrounding = false,
+      examLanguage,
     } = body;
 
     if (!questionTitle || !String(questionTitle).trim()) {
@@ -37,6 +38,7 @@ export async function POST(req: NextRequest) {
       action,
       optionCount: Number(optionCount) || 4,
       enableSearchGrounding: Boolean(enableSearchGrounding),
+      examLanguage,
     });
 
     return NextResponse.json({

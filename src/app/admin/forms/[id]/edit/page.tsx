@@ -25,7 +25,7 @@ import {
   Calendar, Clock, Upload, Star, Heading, Loader2, ExternalLink,
   ShieldCheck, AlertCircle, RefreshCw, X, LayoutTemplate,
   Image as ImageIcon, Info, Smartphone, Monitor, User, Users, UserCheck, Search, QrCode, Bot, BarChart2,
-  Award, ShieldAlert, Shuffle
+  Award, ShieldAlert, Shuffle, Languages
 } from 'lucide-react';
 import { FormQRCodeModal } from '@/components/forms/FormQRCodeModal';
 import { NongFahStudioModal } from '@/components/forms/NongFahStudioModal';
@@ -164,6 +164,9 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
   const [isTranslating, setIsTranslating] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+  // Derived state: Quiz mode indicator
+  const isQuiz = Boolean(form?.quiz_settings?.is_quiz);
+
   // Upload States
   const [uploadingImageIndex, setUploadingImageIndex] = useState<number | null>(null);
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
@@ -195,6 +198,9 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
 
       if (res.success && res.data) {
         setForm(res.data.form);
+        if (res.data.form.quiz_settings?.is_quiz && res.data.form.quiz_settings.exam_language) {
+          setActiveLang(res.data.form.quiz_settings.exam_language);
+        }
         const isDummy = (txt?: string | null) => {
           if (!txt) return false;
           const t = txt.trim();
@@ -322,7 +328,11 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
     setFields(prev => {
       const copy = [...prev];
       const cur = copy[index].label || { th: '' };
-      copy[index].label = { ...cur, [activeLang]: text };
+      copy[index].label = {
+        ...cur,
+        [activeLang]: text,
+        ...(isQuiz ? { th: cur.th || text } : {}),
+      };
       return copy;
     });
     notifyChange();
@@ -332,7 +342,11 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
     setFields(prev => {
       const copy = [...prev];
       const cur = copy[index].help_text || { th: '' };
-      copy[index].help_text = { ...cur, [activeLang]: text };
+      copy[index].help_text = {
+        ...cur,
+        [activeLang]: text,
+        ...(isQuiz ? { th: cur.th || text } : {}),
+      };
       return copy;
     });
     notifyChange();
@@ -344,10 +358,14 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
       const copy = [...prev];
       const curOpts = copy[fieldIndex].options || [];
       const optNum = curOpts.length + 1;
+      const isEnglishExam = isQuiz && (form?.quiz_settings?.exam_language === 'en' || activeLang === 'en');
+      const isChineseExam = isQuiz && (form?.quiz_settings?.exam_language === 'zh' || activeLang === 'zh');
+      const defaultText = isEnglishExam ? `Option ${optNum}` : isChineseExam ? `选项 ${optNum}` : `ตัวเลือกที่ ${optNum}`;
+
       const newOpt: FormFieldOption = {
-        value: `opt_${Date.now().toString(36)}`,
+        value: `opt_${Date.now().toString(36)}_${optNum}`,
         label: {
-          th: `ตัวเลือกที่ ${optNum}`,
+          th: isEnglishExam || isChineseExam ? defaultText : `ตัวเลือกที่ ${optNum}`,
           en: `Option ${optNum}`,
           zh: `选项 ${optNum}`,
         },
@@ -365,6 +383,7 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
       curOpts[optIndex].label = {
         ...curOpts[optIndex].label,
         [activeLang]: text,
+        ...(isQuiz ? { th: curOpts[optIndex].label?.th || text } : {}),
       };
       copy[fieldIndex].options = curOpts;
       return copy;
@@ -439,6 +458,7 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
           action,
           optionCount: 4,
           enableSearchGrounding: Boolean(field.quiz_config?.enable_search_grounding),
+          examLanguage: isQuiz ? (form?.quiz_settings?.exam_language || activeLang) : undefined,
         }),
       });
 
@@ -852,25 +872,27 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
             </button>
 
             {/* AI Translate Button */}
-            <button
-              onClick={handleAITranslate}
-              disabled={isTranslating}
-              className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-semibold shadow-2xs transition-all disabled:opacity-50"
-            >
-              {isTranslating ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin text-indigo-600" />
-                  <span className="hidden sm:inline">กำลังแปลด้วย AI...</span>
-                  <span className="sm:hidden">กำลังแปล...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600" />
-                  <span className="hidden sm:inline">แปล 3 ภาษาด้วย AI</span>
-                  <span className="sm:hidden">แปล AI</span>
-                </>
-              )}
-            </button>
+            {!isQuiz && (
+              <button
+                onClick={handleAITranslate}
+                disabled={isTranslating}
+                className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-semibold shadow-2xs transition-all disabled:opacity-50"
+              >
+                {isTranslating ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin text-indigo-600" />
+                    <span className="hidden sm:inline">กำลังแปลด้วย AI...</span>
+                    <span className="sm:hidden">กำลังแปล...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600" />
+                    <span className="hidden sm:inline">แปล 3 ภาษาด้วย AI</span>
+                    <span className="sm:hidden">แปล AI</span>
+                  </>
+                )}
+              </button>
+            )}
 
             {/* In-Studio Live Preview */}
             <button
@@ -969,41 +991,87 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
             </button>
           </div>
 
-          {/* Active Language Switcher for Studio */}
+          {/* Active Language Switcher for Studio: Hidden in Quiz mode in favor of fixed subject exam language */}
           <div className="flex items-center justify-between sm:justify-end gap-2">
-            <span className="text-xs text-slate-500 font-medium">แก้ไขภาษา:</span>
-            <div className="flex items-center bg-white border border-slate-200 rounded-xl p-0.5 shadow-2xs">
-              <button
-                onClick={() => setActiveLang('th')}
-                className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  activeLang === 'th'
-                    ? 'bg-[#7B1C3E] text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                ไทย (TH)
-              </button>
-              <button
-                onClick={() => setActiveLang('en')}
-                className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  activeLang === 'en'
-                    ? 'bg-[#1B3A6B] text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <span className="hidden sm:inline">English (</span>EN<span className="hidden sm:inline">)</span>
-              </button>
-              <button
-                onClick={() => setActiveLang('zh')}
-                className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  activeLang === 'zh'
-                    ? 'bg-rose-700 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <span className="hidden sm:inline">中文 (</span>ZH<span className="hidden sm:inline">)</span>
-              </button>
-            </div>
+            {!isQuiz ? (
+              <>
+                <span className="text-xs text-slate-500 font-medium">แก้ไขภาษา:</span>
+                <div className="flex items-center bg-white border border-slate-200 rounded-xl p-0.5 shadow-2xs">
+                  <button
+                    onClick={() => setActiveLang('th')}
+                    className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      activeLang === 'th'
+                        ? 'bg-[#7B1C3E] text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    ไทย (TH)
+                  </button>
+                  <button
+                    onClick={() => setActiveLang('en')}
+                    className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      activeLang === 'en'
+                        ? 'bg-[#1B3A6B] text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span className="hidden sm:inline">English (</span>EN<span className="hidden sm:inline">)</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveLang('zh')}
+                    className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      activeLang === 'zh'
+                        ? 'bg-rose-700 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span className="hidden sm:inline">中文 (</span>ZH<span className="hidden sm:inline">)</span>
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center gap-2 bg-amber-50/80 border border-amber-200 rounded-xl px-2.5 py-1">
+                <span className="text-xs text-amber-900 font-bold flex items-center gap-1">
+                  <Award className="w-3.5 h-3.5 text-amber-600" />
+                  <span>ภาษาข้อสอบวิชานี้:</span>
+                </span>
+                <select
+                  value={form?.quiz_settings?.exam_language || activeLang}
+                  onChange={(e) => {
+                    const newLang = e.target.value as SupportedLang;
+                    setActiveLang(newLang);
+                    setForm(prev => prev ? ({
+                      ...prev,
+                      quiz_settings: {
+                        ...(prev.quiz_settings || {
+                          is_quiz: true,
+                          anti_cheat: {
+                            enforce_fullscreen: true,
+                            detect_tab_switch: true,
+                            max_tab_switches: 3,
+                            block_clipboard: true,
+                            block_right_click: true,
+                            block_keyboard_shortcuts: true,
+                            auto_submit_on_violation: true,
+                          },
+                        }),
+                        exam_language: newLang,
+                      },
+                    }) : null);
+                    notifyChange();
+                    toast.info(`ตั้งค่าภาษาข้อสอบวิชานี้เป็น ${newLang === 'en' ? 'English (ภาษาอังกฤษ)' : newLang === 'zh' ? '中文 (ภาษาจีน)' : 'ภาษาไทย'}`);
+                  }}
+                  className="bg-white border border-amber-300 rounded-lg px-2 py-0.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                >
+                  <option value="th">ภาษาไทย (TH)</option>
+                  <option value="en">English (EN)</option>
+                  <option value="zh">中文 (ZH)</option>
+                </select>
+                <span className="text-[10px] text-amber-700 font-medium hidden md:inline">
+                  (ตายตัวตามวิชา • ปิดโหมด 3 ภาษา)
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -1100,6 +1168,74 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
               </div>
             ) : (
               <div className="space-y-6">
+                {/* Subject Exam Language Setting */}
+                <div className="p-4 sm:p-5 bg-gradient-to-r from-amber-50 to-orange-50/40 border border-amber-200 rounded-2xl space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+                        <Languages className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-slate-900 block">
+                          ภาษาประจำวิชาของข้อสอบ (Subject Exam Language)
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          ข้อสอบแต่ละวิชาจะมีภาษาที่ตายตัว จึงปิดโหมด 3 ภาษาสำหรับข้อสอบ
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-semibold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-md self-start sm:self-auto">
+                      ตายตัวตามวิชา • ล็อคภาษาผู้สอบ
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    ระบบจะบังคับใช้ภาษานี้ตลอดทั้งชุดข้อสอบและน้องฟ้า AI จะสร้างช้อยส์/คำถามในภาษานี้โดยเฉพาะ พร้อมทั้งซ่อนปุ่มสลับภาษาสำหรับนักเรียนเพื่อป้องกันการแปลภาษาโดยไม่ได้รับอนุญาต
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                    {[
+                      { id: 'th' as const, label: 'ภาษาไทย (TH)', desc: 'วิชาทั่วไป / ภาษาไทย / สังคม / วิทย์ / คณิต' },
+                      { id: 'en' as const, label: 'English (EN)', desc: 'Foreign Language / EP / MEP Program' },
+                      { id: 'zh' as const, label: '中文 (ZH)', desc: 'วิชาภาษาจีน / Chinese Language Exam' },
+                    ].map((langItem) => {
+                      const isSelected = (form.quiz_settings?.exam_language || 'th') === langItem.id;
+                      return (
+                        <button
+                          key={langItem.id}
+                          type="button"
+                          onClick={() => {
+                            const newLang = langItem.id;
+                            setActiveLang(newLang);
+                            setForm({
+                              ...form,
+                              quiz_settings: {
+                                ...form.quiz_settings!,
+                                exam_language: newLang,
+                              },
+                            });
+                            notifyChange();
+                            toast.info(`ตั้งค่าภาษาประจำวิชาของข้อสอบเป็น ${langItem.label}`);
+                          }}
+                          className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-amber-600 text-white border-amber-600 shadow-xs ring-2 ring-amber-300'
+                              : 'bg-white text-slate-700 border-slate-200 hover:border-amber-300 hover:bg-amber-50/30'
+                          }`}
+                        >
+                          <div className="font-bold text-xs flex items-center justify-between">
+                            <span>{langItem.label}</span>
+                            {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
+                          </div>
+                          <div className={`text-[10px] mt-1 leading-snug ${isSelected ? 'text-amber-100' : 'text-slate-400'}`}>
+                            {langItem.desc}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {/* Basic Exam Controls */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
@@ -1688,39 +1824,49 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  หัวข้อสำเร็จ ({activeLang.toUpperCase()})
+                  หัวข้อสำเร็จ {isQuiz ? '' : `(${activeLang.toUpperCase()})`}
                 </label>
                 <input
                   type="text"
                   value={form.thank_you_title?.[activeLang] || ''}
                   onChange={(e) => {
+                    const text = e.target.value;
+                    const newTitle: any = { ...(form.thank_you_title || { th: '' }), [activeLang]: text };
+                    if (isQuiz && activeLang !== 'th') {
+                      newTitle.th = text;
+                    }
                     setForm({
                       ...form,
-                      thank_you_title: { ...(form.thank_you_title || { th: '' }), [activeLang]: e.target.value },
+                      thank_you_title: newTitle,
                     });
                     notifyChange();
                   }}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white"
-                  placeholder="เช่น ขอบคุณสำหรับการส่งข้อมูล"
+                  placeholder={isQuiz ? "เช่น ส่งข้อสอบเรียบร้อยแล้ว" : "เช่น ขอบคุณสำหรับการส่งข้อมูล"}
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  ข้อความชี้แจง ({activeLang.toUpperCase()})
+                  ข้อความชี้แจง {isQuiz ? '' : `(${activeLang.toUpperCase()})`}
                 </label>
                 <textarea
                   rows={2}
                   value={form.thank_you_message?.[activeLang] || ''}
                   onChange={(e) => {
+                    const text = e.target.value;
+                    const newMsg: any = { ...(form.thank_you_message || { th: '' }), [activeLang]: text };
+                    if (isQuiz && activeLang !== 'th') {
+                      newMsg.th = text;
+                    }
                     setForm({
                       ...form,
-                      thank_you_message: { ...(form.thank_you_message || { th: '' }), [activeLang]: e.target.value },
+                      thank_you_message: newMsg,
                     });
                     notifyChange();
                   }}
                   className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white resize-none"
-                  placeholder="เช่น โรงเรียนสมคิดวิทยาได้รับข้อมูลของท่านเรียบร้อยแล้ว"
+                  placeholder={isQuiz ? "เช่น ระบบได้บันทึกคำตอบและประเมินผลการสอบเรียบร้อยแล้ว" : "เช่น โรงเรียนสมคิดวิทยาได้รับข้อมูลของท่านเรียบร้อยแล้ว"}
                 />
               </div>
             </div>
@@ -1932,9 +2078,16 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
 
                 <div className="flex items-center justify-between text-xs font-semibold text-[#7B1C3E] mb-2">
                   <span>โรงเรียนสมคิดวิทยา (Somkidvittaya School)</span>
-                  <span className="text-slate-400 font-mono text-[11px]">
-                    ภาษาที่กำลังแก้ไข: <strong className="text-slate-700">{activeLang.toUpperCase()}</strong>
-                  </span>
+                  {isQuiz ? (
+                    <span className="text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[11px] font-medium flex items-center gap-1">
+                      <Languages className="w-3 h-3 text-amber-700" />
+                      <span>ภาษาข้อสอบ: <strong className="font-bold">{activeLang === 'th' ? 'ภาษาไทย' : activeLang === 'en' ? 'English' : '中文 (Chinese)'}</strong></span>
+                    </span>
+                  ) : (
+                    <span className="text-slate-400 font-mono text-[11px]">
+                      ภาษาที่กำลังแก้ไข: <strong className="text-slate-700">{activeLang.toUpperCase()}</strong>
+                    </span>
+                  )}
                 </div>
 
                 {/* Inline Title input */}
@@ -1942,13 +2095,18 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                   type="text"
                   value={form.title?.[activeLang] || ''}
                   onChange={(e) => {
+                    const text = e.target.value;
+                    const newTitle: any = { ...form.title, [activeLang]: text };
+                    if (isQuiz && activeLang !== 'th') {
+                      newTitle.th = text;
+                    }
                     setForm({
                       ...form,
-                      title: { ...form.title, [activeLang]: e.target.value }
+                      title: newTitle,
                     });
                     notifyChange();
                   }}
-                  placeholder={`ชื่อแบบฟอร์มภาษา ${activeLang.toUpperCase()}...`}
+                  placeholder={isQuiz ? 'ชื่อแบบทดสอบ / ชุดข้อสอบ...' : `ชื่อแบบฟอร์มภาษา ${activeLang.toUpperCase()}...`}
                   className="w-full text-xl sm:text-2xl font-bold text-slate-900 border-b border-transparent hover:border-slate-200 focus:border-[#7B1C3E] focus:outline-none py-1 bg-transparent transition-colors"
                 />
 
@@ -1957,13 +2115,18 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                   rows={2}
                   value={form.description?.[activeLang] || ''}
                   onChange={(e) => {
+                    const text = e.target.value;
+                    const newDesc: any = { ...(form.description || { th: '' }), [activeLang]: text };
+                    if (isQuiz && activeLang !== 'th') {
+                      newDesc.th = text;
+                    }
                     setForm({
                       ...form,
-                      description: { ...(form.description || { th: '' }), [activeLang]: e.target.value }
+                      description: newDesc,
                     });
                     notifyChange();
                   }}
-                  placeholder={`คำชี้แจง / รายละเอียดส่วนหัวของแบบฟอร์มภาษา ${activeLang.toUpperCase()}...`}
+                  placeholder={isQuiz ? 'คำชี้แจง / คำสั่งในการทำแบบทดสอบ...' : `คำชี้แจง / รายละเอียดส่วนหัวของแบบฟอร์มภาษา ${activeLang.toUpperCase()}...`}
                   className="w-full text-xs text-slate-600 mt-2 p-2 rounded-xl bg-slate-50 border border-slate-200 hover:border-slate-300 focus:border-[#7B1C3E] focus:outline-none transition-colors resize-none"
                 />
               </div>
@@ -2153,13 +2316,15 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                               ? 'หัวข้อของข้อความชี้แจง / รายละเอียด'
                               : isImage
                               ? 'คำบรรยายภาพ / ชื่อรูปภาพ'
-                              : 'ข้อความคำถาม'} ({activeLang.toUpperCase()})
+                              : isQuiz
+                              ? 'โจทย์ข้อสอบ'
+                              : 'ข้อความคำถาม'} {isQuiz ? '' : `(${activeLang.toUpperCase()})`}
                           </label>
                           <input
                             type="text"
                             value={field.label?.[activeLang] || ''}
                             onChange={(e) => updateFieldLabel(index, e.target.value)}
-                            placeholder={`ระบุข้อความภาษา ${activeLang.toUpperCase()}...`}
+                            placeholder={isQuiz ? 'พิมพ์ข้อความโจทย์ข้อสอบ...' : `ระบุข้อความภาษา ${activeLang.toUpperCase()}...`}
                             className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white"
                           />
                         </div>
@@ -2169,14 +2334,16 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                           <label className="block text-xs font-semibold text-slate-500 mb-1">
                             {isInfoText
                               ? 'เนื้อหารายละเอียดชี้แจง / ข้อกำหนด (Paragraph Details)'
-                              : 'คำอธิบายเพิ่มเติม / คำแนะนำใต้ช่อง (Help text)'} ({activeLang.toUpperCase()})
+                              : isQuiz
+                              ? 'คำอธิบายหรือคำชี้แจงใต้โจทย์ (ถ้ามี)'
+                              : 'คำอธิบายเพิ่มเติม / คำแนะนำใต้ช่อง (Help text)'} {isQuiz ? '' : `(${activeLang.toUpperCase()})`}
                           </label>
                           {isInfoText ? (
                             <textarea
                               rows={3}
                               value={field.help_text?.[activeLang] || ''}
                               onChange={(e) => updateFieldHelpText(index, e.target.value)}
-                              placeholder={`ระบุเนื้อหารายละเอียด ข้อกำหนด กฎระเบียบภาษา ${activeLang.toUpperCase()}...`}
+                              placeholder={isQuiz ? 'ระบุเนื้อหารายละเอียด คำชี้แจง หรือข้อกำหนด...' : `ระบุเนื้อหารายละเอียด ข้อกำหนด กฎระเบียบภาษา ${activeLang.toUpperCase()}...`}
                               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white leading-relaxed resize-y"
                             />
                           ) : (
@@ -2184,7 +2351,7 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                               type="text"
                               value={field.help_text?.[activeLang] || ''}
                               onChange={(e) => updateFieldHelpText(index, e.target.value)}
-                              placeholder={`คำอธิบายเพิ่มเติม (ถ้ามี)...`}
+                              placeholder={isQuiz ? 'คำอธิบายหรือคำชี้แจงใต้โจทย์ (ถ้ามี)...' : 'คำอธิบายเพิ่มเติม (ถ้ามี)...'}
                               className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white"
                             />
                           )}
@@ -2290,7 +2457,7 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                           <div className="pt-2">
                             <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                               <label className="text-xs font-semibold text-slate-700">
-                                ตัวเลือกคำตอบ ({activeLang.toUpperCase()})
+                                {isQuiz ? 'ตัวเลือกคำตอบ (ช้อยส์)' : `ตัวเลือกคำตอบ (${activeLang.toUpperCase()})`}
                               </label>
                               <div className="flex items-center gap-1.5">
                                 {/* Shuffle order button */}
@@ -2329,7 +2496,7 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                                     type="text"
                                     value={opt.label?.[activeLang] || ''}
                                     onChange={(e) => updateOptionLabel(index, optIdx, e.target.value)}
-                                    placeholder={`ตัวเลือกที่ ${optIdx + 1} (${activeLang.toUpperCase()})`}
+                                    placeholder={isQuiz ? `ตัวเลือกที่ ${optIdx + 1}` : `ตัวเลือกที่ ${optIdx + 1} (${activeLang.toUpperCase()})`}
                                     className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#7B1C3E] focus:bg-white"
                                   />
                                   <button
@@ -2564,17 +2731,22 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
                                 type="text"
                                 value={field.quiz_config?.explanation?.[activeLang] || ''}
                                 onChange={(e) => {
+                                  const text = e.target.value;
+                                  const newExp: any = {
+                                    ...(field.quiz_config?.explanation || { th: '' }),
+                                    [activeLang]: text,
+                                  };
+                                  if (isQuiz && activeLang !== 'th') {
+                                    newExp.th = text;
+                                  }
                                   updateField(index, {
                                     quiz_config: {
                                       ...(field.quiz_config || {}),
-                                      explanation: {
-                                        ...(field.quiz_config?.explanation || { th: '' }),
-                                        [activeLang]: e.target.value,
-                                      },
+                                      explanation: newExp,
                                     },
                                   });
                                 }}
-                                placeholder={`คำอธิบายเฉลยภาษา ${activeLang.toUpperCase()}...`}
+                                placeholder={isQuiz ? 'ระบุคำอธิบายเฉลย หรือหลักคิดที่ถูกต้อง...' : `คำอธิบายเฉลยภาษา ${activeLang.toUpperCase()}...`}
                                 className="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-xs text-slate-900 focus:ring-1 focus:ring-amber-500"
                               />
                             </div>

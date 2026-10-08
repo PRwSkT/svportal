@@ -373,6 +373,7 @@ export interface AntiCheatConfig {
 
 export interface QuizSettings {
   is_quiz: boolean; // เปิดโหมดข้อสอบ
+  exam_language?: SupportedLang; // ภาษาตายตัวของวิชาที่ออกข้อสอบ (เช่น th, en, zh) ปิดโหมด 3 ภาษา
   time_limit_minutes?: number | null; // เวลาทำข้อสอบ (นาที, null = ไม่จำกัด)
   passing_score_percentage?: number; // เกณฑ์ผ่าน (%)
   shuffle_questions?: boolean; // สลับลำดับข้อสอบ

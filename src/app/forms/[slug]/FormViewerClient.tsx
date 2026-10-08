@@ -215,7 +215,12 @@ export default function FormViewerClient({
   currentUser,
   isDraftPreview = false,
 }: FormViewerProps) {
-  const [lang, setLang] = useState<SupportedLang>('th');
+  // Quiz & Anti-Cheat Proctoring States
+  const isQuiz = Boolean(initialForm.quiz_settings?.is_quiz);
+  const examSubjectLang: SupportedLang = (isQuiz && initialForm.quiz_settings?.exam_language)
+    ? initialForm.quiz_settings.exam_language
+    : 'th';
+  const [lang, setLang] = useState<SupportedLang>(examSubjectLang);
   const [displayFields, setDisplayFields] = useState<FormField[]>(initialFields);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [attachments, setAttachments] = useState<Record<string, string>>({});
@@ -224,8 +229,6 @@ export default function FormViewerClient({
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
 
-  // Quiz & Anti-Cheat Proctoring States
-  const isQuiz = Boolean(initialForm.quiz_settings?.is_quiz);
   const antiCheat = initialForm.quiz_settings?.anti_cheat;
   const [examStarted, setExamStarted] = useState(!isQuiz);
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(
@@ -1132,36 +1135,45 @@ export default function FormViewerClient({
             </div>
           </div>
 
-          {/* Floating Trilingual Switcher */}
-          <div className="flex items-center bg-black/25 backdrop-blur-md rounded-xl p-1 border border-white/20 shadow-xs">
-            <button
-              type="button"
-              onClick={() => setLang('th')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                lang === 'th' ? 'bg-white text-[#7B1C3E] shadow-sm' : 'text-white/80 hover:text-white'
-              }`}
-            >
-              ไทย
-            </button>
-            <button
-              type="button"
-              onClick={() => setLang('en')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                lang === 'en' ? 'bg-white text-[#1B3A6B] shadow-sm' : 'text-white/80 hover:text-white'
-              }`}
-            >
-              EN
-            </button>
-            <button
-              type="button"
-              onClick={() => setLang('zh')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                lang === 'zh' ? 'bg-white text-rose-800 shadow-sm' : 'text-white/80 hover:text-white'
-              }`}
-            >
-              中文
-            </button>
-          </div>
+          {/* Trilingual Switcher (Survey Forms) OR Locked Subject Indicator (Quiz/Exam) */}
+          {!isQuiz ? (
+            <div className="flex items-center bg-black/25 backdrop-blur-md rounded-xl p-1 border border-white/20 shadow-xs">
+              <button
+                type="button"
+                onClick={() => setLang('th')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                  lang === 'th' ? 'bg-white text-[#7B1C3E] shadow-sm' : 'text-white/80 hover:text-white'
+                }`}
+              >
+                ไทย
+              </button>
+              <button
+                type="button"
+                onClick={() => setLang('en')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                  lang === 'en' ? 'bg-white text-[#1B3A6B] shadow-sm' : 'text-white/80 hover:text-white'
+                }`}
+              >
+                EN
+              </button>
+              <button
+                type="button"
+                onClick={() => setLang('zh')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                  lang === 'zh' ? 'bg-white text-rose-800 shadow-sm' : 'text-white/80 hover:text-white'
+                }`}
+              >
+                中文
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-black/25 backdrop-blur-md rounded-xl border border-white/20 shadow-xs text-xs font-bold text-white/95">
+              <Award className="w-3.5 h-3.5 text-amber-300" />
+              <span>
+                {lang === 'en' ? 'English Exam' : lang === 'zh' ? '中文试卷 (Chinese Exam)' : 'แบบทดสอบออนไลน์'}
+              </span>
+            </div>
+          )}
         </div>
       </header>
 
