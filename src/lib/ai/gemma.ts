@@ -7,12 +7,12 @@ import { FormField } from '@/types';
 import { SanitizedFormAnalysisPayload } from './pdpa-sanitizer';
 
 const GEMMA_MODELS = [
-  'gemini-2.5-flash-lite',
-  'gemini-flash-latest',
+  'gemini-3-flash-preview',
+  'gemini-3.5-flash',
   'gemini-flash-lite-latest',
-  'gemini-2.5-pro',
-  'gemma-4-26b-a4b-it',
-  'gemma-4-31b-it',
+  'gemini-3.5-flash-lite',
+  'gemini-flash-latest',
+  'gemini-2.5-flash-lite',
 ];
 
 interface GemmaCallOptions {
@@ -64,7 +64,8 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
         requestBody.generationConfig.responseMimeType = 'application/json';
       }
 
-      if (options.enableSearchGrounding) {
+      // Note: Google Generative AI API disallows combining search grounding with responseMimeType: 'application/json'
+      if (options.enableSearchGrounding && responseMimeType !== 'application/json') {
         requestBody.tools = [{ googleSearch: {} }];
       }
 
@@ -75,11 +76,11 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
           'X-Goog-Api-Client': 'svportal-forms/1.0',
         },
         body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(25000),
+        signal: AbortSignal.timeout(14000),
       });
 
       // If search grounding was rejected by model/quota, fallback without tools immediately
-      if (!res.ok && options.enableSearchGrounding) {
+      if (!res.ok && options.enableSearchGrounding && requestBody.tools) {
         delete requestBody.tools;
         res = await fetch(url, {
           method: 'POST',
@@ -88,7 +89,7 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
             'X-Goog-Api-Client': 'svportal-forms/1.0',
           },
           body: JSON.stringify(requestBody),
-          signal: AbortSignal.timeout(25000),
+          signal: AbortSignal.timeout(14000),
         });
       }
 
@@ -354,6 +355,7 @@ export interface NongFahChatContext {
   formTitle?: string;
   totalResponses?: number;
   responsesSummary?: SanitizedFormAnalysisPayload;
+  lastGeneratedForm?: GeneratedFormDefinition | null;
   currentFields?: Array<{
     field_key: string;
     field_type: string;
@@ -389,13 +391,21 @@ Strict rules to follow:
 2. Strictly NO EMOJIS anywhere in your responses (Strict zero-emoji compliance).
 3. In Chinese, the school name is ALWAYS "Somkidvittaya学校".
 4. Output MUST be valid JSON only. Do not wrap in markdown or markdown backticks.
-5. Interactive Form Editing in Studio:
-   - If the user is currently editing a form (context.currentFields is provided with >0 items) AND the user message asks to edit, add, update, remove, or adjust questions in the existing form (e.g. contains words like "เพิ่มช่อง", "เพิ่มข้อ", "แก้ข้อ", "เปลี่ยนตัวเลือก", "ลบข้อ", "สลับ", "เพิ่มตัวเลือก", "แก้ไข", "ปรับปรุง", "ตัดข้อ", "ใส่เพิ่ม"):
-     - Set "actionType": "form_modified"
-     - In "reply": Give a warm, polite Thai explanation describing the modification made and explaining why it benefits the school form.
-     - In "modificationSummary": A concise 1-sentence Thai summary of the change (e.g. "เพิ่มช่อง 'เบอร์โทรศัพท์สำรองของผู้ปกครอง' (ข้อความสั้น)", "ปรับปรุงตัวเลือกไซส์เสื้อเป็น S, M, L, XL").
-     - In "modifiedFields": Return the COMPLETE array of updated fields with the change applied. Preserve existing field_key and options where possible, generate a clean field_key for new fields, ensure localized label (th, en, zh), field_type, is_required, width, and options.
-     - Set "generatedForm": null
+5. Interactive Form Follow-up, Editing & Refinement (ช่วยงานจริง ห้ามตอบบอกให้ผู้ใช้ไปทำเอง):
+   - เมื่อผู้ใช้พิมพ์คำสั่งขอแก้ไข, ปรับปรุง, เพิ่ม, ลบ หรือปรับแต่งคำถาม เช่น "เพิ่มช่อง...", "เพิ่มข้อ...", "แก้ข้อ...", "เปลี่ยนตัวเลือก...", "ลบข้อ...", "สลับ...", "เอา...ออก", "ขอ...ด้วย", "ปรับปรุง...", "ใส่...", "เปลี่ยนเป็น...":
+     A) หากมีแบบฟอร์มที่สร้างไว้ก่อนหน้าในเซสชันนี้ (context.lastGeneratedForm หรือระบุในประวัติการสนทนา):
+        - คุณต้องนำแบบฟอร์มเดิมนั้นมาแก้ไข/เพิ่มเติมตามที่ผู้ใช้สั่งทันที ห้ามบอกให้ผู้ใช้ไปกดเพิ่มเองในสตูดิโอ!
+        - ตั้ง "actionType": "form_generated"
+        - ใน "reply": อธิบายอย่างสุภาพว่าได้ปรับปรุงอะไรให้ (เช่น "หนูฟ้าได้เพิ่มช่องเบอร์โทรศัพท์ฉุกเฉินให้เรียบร้อยแล้วนะคะ พร้อมอัปเดตแบบฟอร์มด้านล่างให้คุณครูนำไปใช้งานได้ทันทีค่ะ")
+        - ใน "generatedForm": ส่งคืนโครงสร้างแบบฟอร์มฉบับอัปเดตที่สมบูรณ์ (มีทั้งข้อเดิมและข้อที่เพิ่ม/แก้ไขใหม่)
+        - ตั้ง "modifiedFields": null
+        - ตั้ง "modificationSummary": null
+     B) หากผู้ใช้อยู่ในหน้าสตูดิโอแก้ไขฟอร์ม (context.currentFields มีรายการคำถาม > 0 ข้อ):
+        - ตั้ง "actionType": "form_modified"
+        - ใน "reply": อธิบายการแก้ไข
+        - ใน "modificationSummary": สรุปสั้น 1 ประโยค
+        - ใน "modifiedFields": ส่งคืน array ของคำถามทั้งหมดที่ปรับปรุงแล้ว
+        - ตั้ง "generatedForm": null
 6. Form Health & PDPA Audit:
    - If the user asks to check, audit, or review the current form (e.g. "ตรวจสุขภาพฟอร์ม", "ตรวจฟอร์ม", "ฟอร์มนี้สมบูรณ์ไหม", "มีอะไรต้องเพิ่มไหม", "ตรวจสอบ PDPA"):
      - Set "actionType": "chat"
@@ -406,7 +416,7 @@ Strict rules to follow:
    - If the user message asks to create, draft, design, or generate a form from scratch:
      - Set "actionType": "form_generated"
      - In "reply": Give a warm, polite Thai response explaining what form you designed, what fields were included, and how it matches the school's context.
-     - In "generatedForm": Return a complete form definition conforming to the GeneratedFormDefinition schema (typically 12-22 detailed fields with logical section_headers, student info, parent contacts, options, file uploads, consent).
+     - In "generatedForm": Return a complete form definition conforming to the GeneratedFormDefinition schema (typically 10-18 detailed fields with logical section_headers, student info, parent contacts, options, file uploads, consent).
      - Set "modifiedFields": null
      - Set "modificationSummary": null
 8. General Inquiries & Advice:
@@ -482,6 +492,10 @@ JSON schema:
     ? `\nCurrently Existing Form Fields (${context.currentFields.length} fields):\n${JSON.stringify(context.currentFields, null, 2)}`
     : '';
 
+  const lastFormText = context?.lastGeneratedForm
+    ? `\n=== PREVIOUSLY GENERATED FORM IN THIS SESSION ===\nTitle: ${context.lastGeneratedForm.title?.th || ''}\nCategory: ${context.lastGeneratedForm.category}\nExisting Fields (${context.lastGeneratedForm.fields?.length || 0} fields):\n${JSON.stringify(context.lastGeneratedForm.fields, null, 2)}\n=== END PREVIOUS FORM ===\n`
+    : '';
+
   const responsesDataText = context?.responsesSummary
     ? `\n=== REAL FORM RESPONSES DATA (Total Submissions: ${context.responsesSummary.totalResponses}) ===
 Form Title: ${context.responsesSummary.formTitle}
@@ -496,20 +510,20 @@ ${
 === END OF FORM RESPONSES DATA ===\n`
     : '';
 
-  const userPrompt = `${contextNote}${fieldsSummary}${responsesDataText}
+  const userPrompt = `${contextNote}${fieldsSummary}${lastFormText}${responsesDataText}
 Conversation History:
 ${conversationHistoryText || '(No previous history)'}
 
 Current User Message: "${message.trim()}"
-Analyze the message and return strictly JSON.`;
+Analyze the message, perform the action, and return strictly JSON.`;
 
   const rawJson = await callGemma({
     systemPrompt,
     userPrompt,
     temperature: 0.2,
-    maxTokens: 8192,
+    maxTokens: 4096,
     responseMimeType: 'application/json',
-    enableSearchGrounding: true,
+    enableSearchGrounding: false,
   });
 
   return safeParseJson<NongFahChatResponse>(

@@ -257,12 +257,34 @@ ${moduleContextGuidance}
 3. ทันโลก ทันเหตุการณ์: คุณมีความรอบรู้ข้อมูลข่าวสารการศึกษา นโยบายกระทรวงศึกษาธิการ กฎหมาย PDPA และระเบียบ สช. ล่าสุดของปี 2568-2569
 4. ให้คำตอบที่ชัดเจน กระชับ มีขั้นตอนนำไปปฏิบัติได้จริง หากคุณครูถามหรือสั่งงานที่ตรงกับหน้าที่เปิดอยู่ ให้ช่วยแนะนำหรือร่างเนื้อหาให้ทันที
 5. ภาษาในการตอบ: ภาษาไทยเป็นหลัก หากมีศัพท์วิชาการภาษาอังกฤษหรือจีนสามารถระบุประกอบได้อย่างถูกต้อง (ชื่อโรงเรียนภาษาจีนคือ Somkidvittaya学校)
+6. Action-Oriented Assistance (ช่วยงานจริง ไม่ใช่แค่บอกให้ผู้ใช้ไปทำเอง):
+- เมื่อผู้ใช้ถามถึงงานหรือต้องการทำอะไร (เช่น "จะพิมพ์ ปพ.1", "ตัดเกรดยังไง", "ขอดูตารางสอน", "จะทำฟอร์ม", "ขอเบิกเงินเรียนฟรี", "ตรวจรถตู้", "เช็กชื่อเด็ก", "รายงาน สช."):
+  นอกจากอธิบายขั้นตอนที่กระชับและชัดเจนแล้ว ให้ใส่ "actionButton" ด้วย URL และข้อความปุ่มที่ตรงกับงาน เพื่อให้ผู้ใช้สามารถกดคลิกเดียวแล้วระบบจะพาไปเปิดหน้านั้นได้ทันที!
+  หากเป็นการพูดคุยทักทายทั่วไป ให้ใส่ actionButton เป็น null
+  ตัวอย่าง URL ภายในระบบ:
+  - ระเบียน ปพ.1/ปพ.2/ปพ.3/ปพ.6: "/academic/documents"
+  - ตัดเกรด ปพ.5 / วิชาการ: "/academic/gradebook"
+  - ตารางสอน / ครูสอนแทน: "/academic/timetable"
+  - คลังข้อสอบ AI / วัดผล: "/academic/exams"
+  - สร้างและจัดการแบบฟอร์ม: "/admin/forms"
+  - ข้อมูลนักเรียน / สถิติ / สช. REGIS: "/admin/students"
+  - โภชนาการ / นมโรงเรียน: "/admin/students/nutrition"
+  - เงินอุดหนุนเรียนฟรี 15 ปี (แบบ อร.1/1): "/admin/subsidy/free15y"
+  - รถตู้โรงเรียน / ตรวจความปลอดภัย: "/admin/safety/van"
+  - ห้องพยาบาล / บันทึกการจ่ายยา: "/admin/health/infirmary"
+  - บันทึกเวลาเรียน / เช็กชื่อ: "/attendance"
+  - ค่าธรรมเนียม / การเงิน: "/pos/fees"
 
 รูปแบบผลลัพธ์ (Output Format):
 ให้ตอบเป็น JSON object ที่ถูกต้องตามโครงสร้างนี้เท่านั้น (ห้ามครอบด้วย markdown backticks หรือคำเกริ่นอื่น):
 {
   "reply": "string (ข้อความตอบกลับภาษาไทยอย่างสุภาพ มีเนื้อหาสาระครบถ้วน ห้ามมีอีโมจิเด็ดขาด)",
-  "actionType": "chat" | "form_suggest" | "timetable_check" | "student_check" | "opec_help",
+  "actionType": "chat" | "navigate" | "action_card",
+  "actionButton": {
+    "label": "string (ข้อความบนปุ่ม 1-คลิก เช่น 'เปิดระบบระเบียน ปพ.1 ทันที', 'ไปที่หน้าตัดเกรด ปพ.5')",
+    "url": "string (URL ภายในระบบ เช่น '/academic/documents')",
+    "description": "string (คำอธิบายสั้นๆ)"
+  } | null,
   "suggestions": [
     "string (ข้อความสั้น 2-4 ข้อความ ให้คุณครูกดถามต่อได้สะดวก)"
   ]
@@ -285,14 +307,14 @@ ${moduleContextGuidance}
 
     fullUserPrompt += `\n[ข้อความคำถาม/คำสั่งล่าสุดของคุณครู]:\n"${sanitizedMessage}"\n\nกรุณาตอบเป็น JSON ตามโครงสร้างที่กำหนด`;
 
-    // 5. Call Gemma / Gemini with Search Grounding enabled for up-to-date real-world facts
+    // 5. Call Gemma / Gemini with optimized model chain and JSON response
     const rawAiResponse = await callGemma({
       systemPrompt,
       userPrompt: fullUserPrompt,
       temperature: 0.2,
       maxTokens: 2048,
       responseMimeType: 'application/json',
-      enableSearchGrounding: true,
+      enableSearchGrounding: false,
     });
 
     // 6. Safe Parse JSON
@@ -305,6 +327,7 @@ ${moduleContextGuidance}
       parsed = {
         reply: rawAiResponse.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim(),
         actionType: 'chat',
+        actionButton: null,
         suggestions: defaultSuggestions,
       };
     }
@@ -322,6 +345,7 @@ ${moduleContextGuidance}
       data: {
         reply: parsed.reply,
         actionType: parsed.actionType || 'chat',
+        actionButton: parsed.actionButton || null,
         suggestions: parsed.suggestions,
         moduleContext: moduleContextName,
         pathname,

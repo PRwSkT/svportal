@@ -153,10 +153,22 @@ export function NongFahChatWidget({
     setIsLoading(true);
 
     try {
-      const historyPayload = messages.slice(-6).map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
+      const lastFormMsg = [...messages].reverse().find((m) => m.generatedForm);
+      const lastGeneratedForm = lastFormMsg?.generatedForm || undefined;
+
+      const historyPayload = messages.slice(-6).map((m) => {
+        let content = m.content;
+        if (m.generatedForm) {
+          const fieldNames = (m.generatedForm.fields || [])
+            .map((f, i) => `${i + 1}. ${f.label?.th || f.field_key}`)
+            .join(', ');
+          content += `\n[แบบฟอร์มที่สร้าง: "${m.generatedForm.title?.th}", มีคำถาม ${m.generatedForm.fields?.length || 0} ข้อ: ${fieldNames}]`;
+        }
+        return {
+          role: m.role,
+          content,
+        };
+      });
 
       const res = await fetch('/api/admin/forms/ai/chat', {
         method: 'POST',
@@ -168,6 +180,7 @@ export function NongFahChatWidget({
             page: pageContext,
             formId: formId || undefined,
             formTitle: formTitle || undefined,
+            lastGeneratedForm,
             currentFields: currentFields?.map((f) => ({
               field_key: f.field_key,
               field_type: f.field_type,
@@ -181,7 +194,17 @@ export function NongFahChatWidget({
         }),
       });
 
-      const json = await res.json();
+      const rawText = await res.text();
+      let json: any = null;
+      try {
+        json = JSON.parse(rawText);
+      } catch {
+        throw new Error(
+          res.status === 504 || res.status === 408
+            ? 'น้องฟ้าใช้เวลาประมวลผลนานกว่าปกติ กรุณาลองส่งคำสั่งอีกครั้งนะคะ'
+            : `ระบบตอบกลับไม่สมบูรณ์ (HTTP ${res.status}) กรุณาลองใหม่อีกครั้งค่ะ`
+        );
+      }
 
       if (!res.ok || !json.success) {
         throw new Error(json.error || 'เกิดข้อผิดพลาดในการประมวลผลคำสั่ง');
@@ -201,10 +224,20 @@ export function NongFahChatWidget({
 
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (err: any) {
+      let displayError = err?.message;
+      if (
+        !displayError ||
+        displayError.includes('The string did not match the expected pattern') ||
+        displayError.includes('Unexpected token') ||
+        displayError.includes('JSON.parse') ||
+        displayError.includes('Failed to fetch')
+      ) {
+        displayError = 'ขออภัยค่ะ น้องฟ้าใช้เวลาประมวลผลนานเกินไป หรือการเชื่อมต่อมีปัญหาชั่วคราว กรุณากดส่งคำสั่งใหม่อีกครั้งนะคะ';
+      }
       const errorMsg: ChatMessage = {
         id: 'msg-err-' + Date.now(),
         role: 'assistant',
-        content: err?.message || 'ขออภัยค่ะ น้องฟ้าไม่สามารถประมวลผลคำสั่งได้ในขณะนี้ กรุณาลองใหม่อีกครั้งนะคะ',
+        content: displayError,
         suggestions: ['กดส่งคำสั่งลองใหม่อีกครั้ง', text],
         timestamp: new Date(),
       };

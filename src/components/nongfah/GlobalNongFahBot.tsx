@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -20,6 +21,8 @@ import {
   Utensils,
   Wallet,
   Compass,
+  ArrowRight,
+  ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -28,6 +31,11 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   suggestions?: string[];
+  actionButton?: {
+    label: string;
+    url: string;
+    description?: string;
+  } | null;
   timestamp: Date;
 }
 
@@ -261,7 +269,13 @@ export function GlobalNongFahBot() {
         }),
       });
 
-      const json = await res.json();
+      const rawText = await res.text();
+      let json: any = null;
+      try {
+        json = JSON.parse(rawText);
+      } catch (parseErr) {
+        throw new Error('ระบบเซิร์ฟเวอร์ตอบกลับล่าช้าหรือขัดข้องชั่วคราว กรุณากดส่งคำสั่งลองใหม่อีกครั้งนะคะ');
+      }
 
       if (json.success && json.data) {
         const aiMsg: ChatMessage = {
@@ -269,6 +283,7 @@ export function GlobalNongFahBot() {
           role: 'assistant',
           content: json.data.reply,
           suggestions: json.data.suggestions || pageContext.suggestions,
+          actionButton: json.data.actionButton || null,
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, aiMsg]);
@@ -279,12 +294,22 @@ export function GlobalNongFahBot() {
       }
     } catch (err: any) {
       console.error('[NongFah Chat Error]:', err);
+      let errorText =
+        err?.message ||
+        'ขออภัยค่ะ หนูฟ้าไม่สามารถประมวลผลข้อความได้ในขณะนี้ กรุณาลองใหม่อีกครั้งนะคะ';
+      if (
+        typeof errorText === 'string' &&
+        (errorText.includes('did not match the expected pattern') ||
+          errorText.includes('JSON') ||
+          errorText.includes('SyntaxError'))
+      ) {
+        errorText =
+          'ขออภัยค่ะ ระบบประมวลผล AI ตอบกลับล่าช้าหรือขัดข้องชั่วคราว กรุณากดส่งคำสั่งลองใหม่อีกครั้งนะคะ';
+      }
       const errorMsg: ChatMessage = {
         id: `err-${Date.now()}`,
         role: 'assistant',
-        content:
-          err?.message ||
-          'ขออภัยค่ะ หนูฟ้าไม่สามารถประมวลผลข้อความได้ในขณะนี้ กรุณาลองใหม่อีกครั้งนะคะ',
+        content: errorText,
         suggestions: pageContext.suggestions,
         timestamp: new Date(),
       };
@@ -526,6 +551,25 @@ export function GlobalNongFahBot() {
                       <div className="whitespace-pre-line font-normal pr-3">
                         {msg.content}
                       </div>
+
+                      {/* 1-Click Interactive Action Button */}
+                      {msg.actionButton && (
+                        <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-col gap-1.5">
+                          {msg.actionButton.description && (
+                            <p className="text-[11px] text-slate-500 font-normal">
+                              {msg.actionButton.description}
+                            </p>
+                          )}
+                          <Link
+                            href={msg.actionButton.url}
+                            onClick={() => setIsOpen(false)}
+                            className="inline-flex items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#7B1C3E] to-[#9E1B46] text-white text-xs font-semibold hover:opacity-95 shadow-xs transition-all group/btn"
+                          >
+                            <span>{msg.actionButton.label}</span>
+                            <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover/btn:translate-x-0.5" />
+                          </Link>
+                        </div>
+                      )}
 
                       <div
                         className={`text-[9px] mt-1.5 flex justify-end font-light ${
