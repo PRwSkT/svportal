@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getServerUser } from '@/lib/auth';
+import { getRealAuthUser } from '@/lib/auth';
 import { isSystemAdmin } from '@/lib/constants/auth';
 import { gradeQuizSubmission, evaluateIntegrityStatus } from '@/lib/quiz/grading';
 import { FormDefinition, FormField } from '@/types';
@@ -38,7 +38,7 @@ export async function POST(
 
     // 2. Check if published
     if (!form.is_published) {
-      const user = await getServerUser();
+      const user = await getRealAuthUser();
       const isStaffOrAdmin =
         !!user &&
         (isSystemAdmin(user.email) ||
@@ -75,10 +75,11 @@ export async function POST(
       );
     }
 
-    // 5. Check internal user access
+    // 5. Check user session & access type
+    // Use real authenticated session only — public visitors must never inherit mock preview admin
     let respondentId = null;
     let respondentEmail = null;
-    const user = await getServerUser();
+    const user = await getRealAuthUser();
 
     if (form.access_type !== 'public') {
       if (!user) {
@@ -90,8 +91,19 @@ export async function POST(
       respondentId = user.id;
       respondentEmail = user.email;
     } else if (user) {
+      // Authenticated user answering a public form
       respondentId = user.id;
       respondentEmail = user.email;
+    } else {
+      // Guest answering a public form: check if any answer contains an email address
+      if (answers && typeof answers === 'object') {
+        for (const val of Object.values(answers)) {
+          if (typeof val === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim())) {
+            respondentEmail = val.trim();
+            break;
+          }
+        }
+      }
     }
 
     // Capture IP

@@ -32,6 +32,9 @@ const UI_TEXT: Record<SupportedLang, {
   internalOnlyDesc: string;
   loginButton: string;
   validationError: string;
+  submittingAs: string;
+  publicGuestBadge: string;
+  switchAccount: string;
 }> = {
   th: {
     schoolName: 'โรงเรียนสมคิดวิทยา',
@@ -49,6 +52,9 @@ const UI_TEXT: Record<SupportedLang, {
     internalOnlyDesc: 'แบบฟอร์มนี้สงวนสิทธิ์สำหรับครูและบุคลากรโรงเรียนสมคิดวิทยาเท่านั้น กรุณาเข้าสู่ระบบด้วยบัญชี @somkidvittaya.ac.th',
     loginButton: 'เข้าสู่ระบบสำหรับบุคลากร',
     validationError: 'กรุณากรอกข้อมูลในช่องที่จำเป็นให้ครบถ้วน',
+    submittingAs: 'ส่งในนาม',
+    publicGuestBadge: 'แบบฟอร์มสาธารณะ (บุคคลทั่วไป)',
+    switchAccount: 'สลับบัญชี',
   },
   en: {
     schoolName: 'Somkidvittaya School',
@@ -66,6 +72,9 @@ const UI_TEXT: Record<SupportedLang, {
     internalOnlyDesc: 'This form is restricted to Somkidvittaya School personnel only. Please sign in with your @somkidvittaya.ac.th account.',
     loginButton: 'Sign in to access',
     validationError: 'Please fill in all required fields.',
+    submittingAs: 'Submitting as',
+    publicGuestBadge: 'Public Form (Guest)',
+    switchAccount: 'Switch account',
   },
   zh: {
     schoolName: 'Somkidvittaya学校',
@@ -83,6 +92,9 @@ const UI_TEXT: Record<SupportedLang, {
     internalOnlyDesc: '本表单仅限Somkidvittaya学校教职员工填写，请使用 @somkidvittaya.ac.th 账号登录。',
     loginButton: '教职工登录',
     validationError: '请完整填写所有必填项目。',
+    submittingAs: '提交身份',
+    publicGuestBadge: '公开表单（访客）',
+    switchAccount: '切换账号',
   },
 };
 
@@ -1387,11 +1399,25 @@ export default function FormViewerClient({
               </p>
             )}
 
-            <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+            <div className="mt-6 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
               <span className="text-rose-600 font-medium">* {t.requiredBadge}</span>
-              {currentUser && (
-                <span className="text-slate-500 truncate max-w-[200px]">
-                  ส่งในนาม: {currentUser.email}
+              {currentUser ? (
+                <div className="flex items-center gap-2 text-slate-500 max-w-[280px] sm:max-w-xs">
+                  <span className="truncate">
+                    {t.submittingAs}: <strong className="font-semibold text-slate-700">{currentUser.email}</strong>
+                  </span>
+                  <Link
+                    href={`/login?redirect=/forms/${initialForm.slug}`}
+                    className="text-xs text-[#7B1C3E] hover:underline whitespace-nowrap font-medium"
+                    title={t.switchAccount}
+                  >
+                    ({t.switchAccount})
+                  </Link>
+                </div>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 font-medium text-[11px]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  {t.publicGuestBadge}
                 </span>
               )}
             </div>

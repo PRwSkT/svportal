@@ -26,6 +26,24 @@ export async function getServerUser() {
   return null;
 }
 
+/**
+ * Returns the authenticated user strictly from Supabase session cookies.
+ * NEVER falls back to MOCK_PREVIEW_USER.
+ * Essential for public forms, guest submissions, and any flow where visitors must not inherit mock admin identity.
+ */
+export async function getRealAuthUser() {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (!error && user) {
+      return user;
+    }
+  } catch {
+    // Ignore cookie read error
+  }
+  return null;
+}
+
 export async function getUserRole(): Promise<'admin' | 'cashier' | string | null> {
   try {
     const supabase = await createClient();

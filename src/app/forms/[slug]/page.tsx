@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { notFound } from 'next/navigation';
 import FormViewerClient from './FormViewerClient';
 import { FormDefinition, FormField } from '@/types';
-import { getServerUser } from '@/lib/auth';
+import { getRealAuthUser } from '@/lib/auth';
 import { isSystemAdmin } from '@/lib/constants/auth';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -54,7 +54,8 @@ export default async function FormViewerPage({ params }: { params: Promise<{ slu
     .eq('form_id', form.id)
     .order('sort_order', { ascending: true });
 
-  const currentUser = await getServerUser();
+  // Use real authenticated session only — public visitors must never inherit mock preview admin
+  const currentUser = await getRealAuthUser();
   const isStaffOrAdmin =
     !!currentUser &&
     (isSystemAdmin(currentUser.email) ||
