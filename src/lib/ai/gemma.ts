@@ -6,12 +6,133 @@
 import { FormField } from '@/types';
 import { SanitizedFormAnalysisPayload } from './pdpa-sanitizer';
 
-const GEMMA_MODELS = [
-  'gemini-flash-lite-latest',
-  'gemini-3-flash-preview',
-  'gemini-3.5-flash',
-  'gemini-flash-latest',
-];
+export type TaskComplexity = 'low' | 'medium' | 'high';
+
+/**
+ * Models requested by school administration:
+ * 1. 3.5 flash lite: 'gemini-3.5-flash-lite'
+ * 2. 3.1 flash lite: 'gemini-3.1-flash-lite'
+ * 3. 3.6 flash: 'gemini-3.6-flash'
+ * 4. 3 flash: 'gemini-3-flash-preview'
+ * 5. 2.5 flash: 'gemini-2.5-flash', 'gemini-2.5-flash-lite'
+ */
+export function getModelsForComplexity(complexity: TaskComplexity): string[] {
+  switch (complexity) {
+    case 'high':
+      // คำถามและคำตอบที่ซับซ้อนสูง (เช่น สร้างฟอร์มใหม่จากศูนย์, ออกข้อสอบ, วิเคราะห์สถิติตอบกลับ, ประเมินข้อสอบอัตนัย)
+      // ใช้โมเดลเรือธง 3.6 Flash -> 3 Flash -> 3.5 Flash Lite -> 3.1 Flash Lite -> 2.5 Flash
+      return [
+        'gemini-3.6-flash',
+        'gemini-3-flash-preview',
+        'gemini-3.5-flash-lite',
+        'gemini-3.1-flash-lite',
+        'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
+        'gemini-flash-lite-latest',
+      ];
+    case 'medium':
+      // คำถามและคำตอบความซับซ้อนปานกลาง (เช่น ปรับปรุงแก้ไขฟอร์มเดิม, ตรวจสุขภาพฟอร์ม/PDPA, แปลภาษา, สร้างตัวเลือกช้อยส์)
+      // ใช้โมเดลความเร็วสูง 3.5 Flash Lite -> 3.1 Flash Lite -> 3.6 Flash -> 3 Flash -> 2.5 Flash
+      return [
+        'gemini-3.5-flash-lite',
+        'gemini-3.1-flash-lite',
+        'gemini-3.6-flash',
+        'gemini-3-flash-preview',
+        'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
+        'gemini-flash-lite-latest',
+      ];
+    case 'low':
+    default:
+      // คำถามและคำตอบความซับซ้อนต่ำ (เช่น ทักทาย, ถามทั่วไป, สารทุกข์สุกดิบ, ขอปุ่มนำทางด่วน)
+      // ใช้โมเดลขนาดเบาและเร็วที่สุด 3.1 Flash Lite -> 3.5 Flash Lite -> 3.6 Flash -> 3 Flash -> 2.5 Flash
+      return [
+        'gemini-3.1-flash-lite',
+        'gemini-3.5-flash-lite',
+        'gemini-3.6-flash',
+        'gemini-3-flash-preview',
+        'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
+        'gemini-flash-lite-latest',
+      ];
+  }
+}
+
+/**
+ * Intelligent Complexity Assessor
+ * วิเคราะห์ระดับความซับซ้อนของคำถามและผลลัพธ์ที่คาดหวังโดยอัตโนมัติ
+ */
+export function determineTaskComplexity(options: {
+  userPrompt: string;
+  systemPrompt?: string;
+  maxTokens?: number;
+  complexityHint?: TaskComplexity;
+}): TaskComplexity {
+  if (options.complexityHint) {
+    return options.complexityHint;
+  }
+
+  const prompt = (options.userPrompt || '').toLowerCase();
+
+  // 1. High Complexity Criteria (คำถาม/คำตอบที่ซับซ้อนสูง):
+  const isFormCreation =
+    prompt.includes('สร้างแบบฟอร์ม') ||
+    prompt.includes('ออกแบบแบบฟอร์ม') ||
+    prompt.includes('ร่างฟอร์ม') ||
+    prompt.includes('สร้างฟอร์ม') ||
+    prompt.includes('ทัศนศึกษา') ||
+    prompt.includes('แบบประเมิน') ||
+    prompt.includes('แบบสำรวจ');
+
+  const isExamCreation =
+    prompt.includes('ออกข้อสอบ') ||
+    prompt.includes('สร้างข้อสอบ') ||
+    prompt.includes('ข้อสอบปรนัย') ||
+    prompt.includes('ข้อสอบอัตนัย') ||
+    prompt.includes('ช้อยส์หลอก') ||
+    prompt.includes('ตรวจข้อสอบ');
+
+  const isDeepAnalytics =
+    prompt.includes('วิเคราะห์ผล') ||
+    prompt.includes('วิเคราะห์แนวโน้ม') ||
+    prompt.includes('swot') ||
+    prompt.includes('สรุปภาพรวมการตอบกลับ') ||
+    prompt.includes('ประเมินความเห็น');
+
+  if (isFormCreation || isExamCreation || isDeepAnalytics) {
+    return 'high';
+  }
+
+  // 2. Medium Complexity Criteria (คำถาม/คำตอบความซับซ้อนปานกลาง เช่น แก้ไขฟอร์ม ตรวจสุขภาพฟอร์ม หรือระเบียบวิชาการ):
+  const isFormModification =
+    prompt.includes('เพิ่ม') ||
+    prompt.includes('แก้') ||
+    prompt.includes('เปลี่ยน') ||
+    prompt.includes('ลบ') ||
+    prompt.includes('ปรับปรุง') ||
+    (prompt.includes('เอา') && prompt.includes('ออก')) ||
+    (prompt.includes('ขอ') && prompt.includes('ด้วย'));
+
+  const isAuditOrRegulation =
+    prompt.includes('ตรวจสุขภาพ') ||
+    prompt.includes('ตรวจฟอร์ม') ||
+    prompt.includes('ตรวจ pdpa') ||
+    prompt.includes('สมบูรณ์ไหม') ||
+    prompt.includes('ระเบียบ สช') ||
+    prompt.includes('ปพ.') ||
+    prompt.includes('orss') ||
+    prompt.includes('gpax') ||
+    prompt.includes('ตารางสอน') ||
+    prompt.includes('สอนแทน') ||
+    prompt.includes('แปลภาษา');
+
+  if (isFormModification || isAuditOrRegulation) {
+    return 'medium';
+  }
+
+  // 3. Low Complexity Criteria (คำถาม/คำตอบความซับซ้อนต่ำ เช่น ทักทาย แนะนำตัว ถามทั่วไป ขอปุ่มนำทาง):
+  return 'low';
+}
 
 interface GemmaCallOptions {
   systemPrompt: string;
@@ -20,10 +141,11 @@ interface GemmaCallOptions {
   maxTokens?: number;
   responseMimeType?: string;
   enableSearchGrounding?: boolean;
+  complexity?: TaskComplexity;
 }
 
 /**
- * Low-level caller to Gemma / Google Generative AI API with fallback hierarchy
+ * Low-level caller to Google Generative AI API with dynamic complexity routing
  */
 export async function callGemma(options: GemmaCallOptions): Promise<string> {
   const apiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
@@ -39,9 +161,26 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
     responseMimeType,
   } = options;
 
+  const complexity = determineTaskComplexity({
+    userPrompt,
+    systemPrompt,
+    maxTokens,
+    complexityHint: options.complexity,
+  });
+
+  const candidateModels = getModelsForComplexity(complexity);
+
+  // Dynamic token allocation based on complexity to prevent schema truncation
+  const effectiveMaxTokens =
+    complexity === 'high'
+      ? Math.max(maxTokens, 4096)
+      : complexity === 'medium'
+      ? Math.max(maxTokens, 2048)
+      : Math.min(maxTokens, 1024);
+
   let lastError: Error | null = null;
 
-  for (const model of GEMMA_MODELS) {
+  for (const model of candidateModels) {
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
@@ -54,7 +193,7 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
         ],
         generationConfig: {
           temperature,
-          maxOutputTokens: maxTokens,
+          maxOutputTokens: effectiveMaxTokens,
         },
       };
 
@@ -62,8 +201,8 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
         requestBody.generationConfig.responseMimeType = 'application/json';
       }
 
-      // Fast response mode: disable thinking tokens on Gemini 3+ models to avoid high latency
-      if (model.includes('gemini-3')) {
+      // Fast response mode: disable thinking tokens on models that support thinkingBudget=0 to avoid high latency
+      if (model === 'gemini-3.1-flash-lite' || model === 'gemini-3-flash-preview') {
         requestBody.generationConfig.thinkingConfig = { thinkingBudget: 0 };
       }
 
@@ -82,7 +221,7 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
         signal: AbortSignal.timeout(18000),
       });
 
-      // If thinkingConfig or search grounding was rejected by model/quota, fallback immediately
+      // If thinkingConfig or search grounding was rejected by model/quota, fallback immediately without them
       if (!res.ok && (requestBody.generationConfig.thinkingConfig || requestBody.tools)) {
         delete requestBody.generationConfig.thinkingConfig;
         delete requestBody.tools;
@@ -219,8 +358,9 @@ Design a complete, comprehensive, and detailed form structure for this requireme
     systemPrompt,
     userPrompt,
     temperature: 0.2,
-    maxTokens: 8192,
+    maxTokens: 4096,
     responseMimeType: 'application/json',
+    complexity: 'high',
   });
 
   return safeParseJson<GeneratedFormDefinition>(
@@ -337,6 +477,7 @@ Analyze this data, extract executive insights, and return the report in JSON.`;
     temperature: 0.2,
     maxTokens: 3500,
     responseMimeType: 'application/json',
+    complexity: 'high',
   });
 
   return safeParseJson<NongFahAnalyticsSummary>(
@@ -617,6 +758,7 @@ Output MUST be strictly valid JSON matching this schema:
       maxTokens: 2048,
       responseMimeType: 'application/json',
       enableSearchGrounding,
+      complexity: 'high',
     });
 
     const parsed = safeParseJson<any>(rawJson, 'Failed to parse AI evaluation JSON');
@@ -723,6 +865,7 @@ Output MUST be strictly valid JSON matching this schema:
       maxTokens: 2048,
       responseMimeType: 'application/json',
       enableSearchGrounding,
+      complexity: 'medium',
     });
 
     const parsed = safeParseJson<any>(rawJson, 'Failed to parse AI choice suggestion');
@@ -805,6 +948,7 @@ Output MUST be strictly valid JSON matching this schema:
     maxTokens: 2048,
     responseMimeType: 'application/json',
     enableSearchGrounding,
+    complexity: 'medium',
   });
 
   const parsed = safeParseJson<any>(rawJson, 'Failed to parse generated choices JSON');
