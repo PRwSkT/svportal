@@ -9,6 +9,7 @@ import {
   DEFAULT_PRINT_PROFILES 
 } from '@/lib/academic/print-alignment';
 import { toast } from 'sonner';
+import { printDocumentViaSandbox } from '@/lib/documents/print-service';
 
 interface PrintAlignmentModalProps {
   isOpen: boolean;
@@ -52,76 +53,25 @@ export function PrintAlignmentModal({
     onClose();
   };
 
-  const handlePrintTestGrid = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast.error('เบราว์เซอร์บล็อกหน้าต่างพิมพ์ กรุณาอนุญาตป็อปอัป');
-      return;
-    }
+  const handlePrintTestGrid = async () => {
+    const contentHtml = `
+      <div style="width: 210mm; height: 297mm; position: relative; box-sizing: border-box; background-image: linear-gradient(to right, #e2e8f0 1px, transparent 1px), linear-gradient(to bottom, #e2e8f0 1px, transparent 1px); background-size: 10mm 10mm; border: 1px solid #94a3b8; font-family: Sarabun, sans-serif;">
+        <div style="position: absolute; inset: 0; background-image: linear-gradient(to right, #94a3b8 1px, transparent 1px), linear-gradient(to bottom, #94a3b8 1px, transparent 1px); background-size: 50mm 50mm;"></div>
+        <div style="position: absolute; left: 105mm; top: 148.5mm; width: 20mm; height: 20mm; transform: translate(-50%, -50%); border-left: 2px solid #dc2626; border-top: 2px solid #dc2626;"></div>
+        <div style="position: absolute; top: 15mm; left: 15mm; background: rgba(255,255,255,0.95); padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 12px; line-height: 1.6; color: #1e293b;">
+          <strong style="color: #7B1C3E; font-size: 13px;">แผ่นทดสอบสอบเทียบพิกัดการพิมพ์ SVPortal (10mm Grid)</strong><br/>
+          1. นำแผ่นนี้ไปวางทาบกับแบบพิมพ์ ปพ. จริงบนโต๊ะไฟหรือกระจกหน้าต่าง<br/>
+          2. อ่านค่าระยะเคลื่อน (มิลลิเมตร) ในแนวนอน (X) และแนวตั้ง (Y)<br/>
+          3. นำค่าที่ได้มากรอกในแถบเลื่อนปรับแต่ง
+        </div>
+      </div>
+    `;
 
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>แผ่นทดสอบสอบเทียบพิกัดเครื่องพิมพ์ (10mm Calibration Grid)</title>
-          <style>
-            @page { size: A4 portrait; margin: 0; }
-            body { margin: 0; padding: 0; font-family: sans-serif; }
-            .grid-container {
-              width: 210mm;
-              height: 297mm;
-              position: relative;
-              box-sizing: border-box;
-              background-image: 
-                linear-gradient(to right, #e2e8f0 1px, transparent 1px),
-                linear-gradient(to bottom, #e2e8f0 1px, transparent 1px);
-              background-size: 10mm 10mm;
-              border: 1px solid #94a3b8;
-            }
-            .major-grid {
-              position: absolute;
-              inset: 0;
-              background-image: 
-                linear-gradient(to right, #94a3b8 1px, transparent 1px),
-                linear-gradient(to bottom, #94a3b8 1px, transparent 1px);
-              background-size: 50mm 50mm;
-            }
-            .center-cross {
-              position: absolute;
-              left: 105mm;
-              top: 148.5mm;
-              width: 20mm;
-              height: 20mm;
-              transform: translate(-50%, -50%);
-              border-left: 2px solid #dc2626;
-              border-top: 2px solid #dc2626;
-            }
-            .header-info {
-              position: absolute;
-              top: 15mm;
-              left: 15mm;
-              background: rgba(255,255,255,0.9);
-              padding: 8px 12px;
-              border: 1px solid #cbd5e1;
-              font-size: 12px;
-            }
-          </style>
-        </head>
-        <body onload="window.print(); window.close();">
-          <div class="grid-container">
-            <div class="major-grid"></div>
-            <div class="center-cross"></div>
-            <div class="header-info">
-              <strong>แผ่นทดสอบสอบเทียบพิกัดการพิมพ์ SVPortal (10mm Grid)</strong><br/>
-              1. นำแผ่นนี้ไปวางทาบกับแบบพิมพ์ ปพ. จริงบนโต๊ะไฟหรือกระจกหน้าต่าง<br/>
-              2. อ่านค่าระยะเคลื่อน (มิลลิเมตร) ในแนวนอน (X) และแนวตั้ง (Y)<br/>
-              3. นำค่าที่ได้มากรอกในแถบเลื่อนปรับแต่ง
-            </div>
-          </div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    await printDocumentViaSandbox({
+      title: 'แผ่นทดสอบสอบเทียบพิกัดเครื่องพิมพ์_10mm_Grid',
+      paperSize: 'A4_PORTRAIT',
+      contentHtml
+    });
   };
 
   return (

@@ -5,10 +5,12 @@ import { syncPaymentToSVPortal, StudentWithFees } from '@/lib/supabase/fees';
 import { getCurrentAcademicYear } from '@/lib/utils';
 import { FeeItem } from '@/types';
 import { ReceiptPrint } from '@/components/ReceiptPrint';
-import html2canvas from 'html2canvas';
+import { printDocumentViaSandbox, openDocumentPreviewInTab } from '@/lib/documents/print-service';
+import { renderReceiptA4OfficialHtml } from '@/components/documents/receipts/ReceiptA4Official';
+import { renderReceiptThermalHtml } from '@/components/documents/receipts/ReceiptThermalSlip';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, User, CreditCard, CheckCircle2, ChevronRight, ChevronLeft, Printer, Banknote, QrCode, Building2 } from 'lucide-react';
+import { Search, User, CreditCard, CheckCircle2, ChevronRight, ChevronLeft, Printer, Banknote, QrCode, Building2, FileDown, ExternalLink } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 type Step = 1 | 2 | 3 | 4;
@@ -145,20 +147,19 @@ export default function FeeCollectionPage() {
   };
 
   const captureAndUploadReceipt = async (paymentId: string, receiptNumber: string) => {
-    if (!receiptRef.current) return;
+    if (!selectedStudent) return;
     
     try {
-      const el = receiptRef.current;
-      const originalDisplay = el.style.display;
-      el.style.display = 'block';
+      const htmlContent = renderReceiptA4OfficialHtml({
+        student: selectedStudent,
+        receiptNumber,
+        items: selectedFees,
+        totalAmount,
+        paymentMethod,
+        date: new Date(),
+      });
       
-      const canvas = await html2canvas(el, { scale: 2 });
-      
-      el.style.display = originalDisplay; // restore
-      
-      const base64Image = canvas.toDataURL('image/png');
-      
-      // Send to API route to upload and backup
+      // Send to API route to backup vector HTML document
       fetch('/api/fees/receipt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -167,7 +168,7 @@ export default function FeeCollectionPage() {
           receipt_number: receiptNumber,
           student_id: selectedStudent?.id,
           total_amount: totalAmount,
-          base64Image
+          htmlContent
         })
       }).catch(console.error); // fire and forget backup
       
@@ -176,9 +177,57 @@ export default function FeeCollectionPage() {
     }
   };
 
-  // Step 4: Receipt
-  const handlePrint = () => {
-    window.print();
+  // Step 4: Vector Print & PDF Handlers
+  const handlePrintA4 = async () => {
+    if (!selectedStudent || !receiptData) return;
+    const html = renderReceiptA4OfficialHtml({
+      student: selectedStudent,
+      receiptNumber: receiptData.number,
+      items: selectedFees,
+      totalAmount,
+      paymentMethod,
+      date: receiptData.date,
+    });
+    await printDocumentViaSandbox({
+      title: `ใบเสร็จรับเงินทางการ_${receiptData.number}_${selectedStudent.name}`,
+      paperSize: 'A4_PORTRAIT',
+      contentHtml: html
+    });
+  };
+
+  const handlePrintThermal = async (rollWidth: '80mm' | '58mm' = '80mm') => {
+    if (!selectedStudent || !receiptData) return;
+    const html = renderReceiptThermalHtml({
+      student: selectedStudent,
+      receiptNumber: receiptData.number,
+      items: selectedFees,
+      totalAmount,
+      paymentMethod,
+      date: receiptData.date,
+      rollWidth
+    });
+    await printDocumentViaSandbox({
+      title: `สลิปใบเสร็จ_${receiptData.number}`,
+      paperSize: rollWidth === '58mm' ? 'THERMAL_58MM' : 'THERMAL_80MM',
+      contentHtml: html
+    });
+  };
+
+  const handlePreviewPdf = () => {
+    if (!selectedStudent || !receiptData) return;
+    const html = renderReceiptA4OfficialHtml({
+      student: selectedStudent,
+      receiptNumber: receiptData.number,
+      items: selectedFees,
+      totalAmount,
+      paymentMethod,
+      date: receiptData.date,
+    });
+    openDocumentPreviewInTab({
+      title: `ใบเสร็จรับเงินทางการ_${receiptData.number}`,
+      paperSize: 'A4_PORTRAIT',
+      contentHtml: html
+    });
   };
 
   const resetFlow = () => {
@@ -604,16 +653,28 @@ export default function FeeCollectionPage() {
                   <p className="text-xl font-medium text-emerald-100">{dict.fees.receiptNumber}: <span className="font-mono bg-black/20 px-3 py-1 rounded-lg ml-2">{receiptData.number}</span></p>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <div className="flex flex-col sm:flex-row flex-wrap gap-3 justify-center">
                   <button 
-                    onClick={handlePrint}
-                    className="px-8 py-4 bg-[#7B1C3E] hover:bg-[#681834] text-white font-black text-lg rounded-2xl flex items-center justify-center gap-3 shadow-lg shadow-[#7B1C3E]/20 transition-all active:scale-95"
+                    onClick={handlePrintA4}
+                    className="px-6 py-4 bg-[#7B1C3E] hover:bg-[#681834] text-white font-black text-base rounded-2xl flex items-center justify-center gap-2.5 shadow-lg shadow-[#7B1C3E]/20 transition-all active:scale-95 cursor-pointer"
                   >
-                    <Printer className="w-6 h-6" /> {dict.fees.printReceipt}
+                    <Printer className="w-5 h-5" /> พิมพ์ใบเสร็จทางการ A4 (เบิกสวัสดิการ)
+                  </button>
+                  <button 
+                    onClick={() => handlePrintThermal('80mm')}
+                    className="px-6 py-4 bg-slate-800 hover:bg-slate-900 text-white font-bold text-base rounded-2xl flex items-center justify-center gap-2.5 shadow-md transition-all active:scale-95 cursor-pointer"
+                  >
+                    <Printer className="w-5 h-5" /> พิมพ์สลิปความร้อน (80mm)
+                  </button>
+                  <button 
+                    onClick={handlePreviewPdf}
+                    className="px-5 py-4 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 font-bold text-base rounded-2xl hover:bg-indigo-100 transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <ExternalLink className="w-5 h-5" /> ดูตัวอย่าง / บันทึก PDF
                   </button>
                   <button 
                     onClick={resetFlow}
-                    className="px-8 py-4 bg-white dark:bg-slate-800 text-slate-800 dark:text-white border-2 border-slate-200 dark:border-slate-700 font-bold text-lg rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all active:scale-95"
+                    className="px-6 py-4 bg-white dark:bg-slate-800 text-slate-800 dark:text-white border-2 border-slate-200 dark:border-slate-700 font-bold text-base rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all active:scale-95 cursor-pointer"
                   >
                     {dict.fees.nextStudent}
                   </button>

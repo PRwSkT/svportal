@@ -6,6 +6,8 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingCart, Search, X, CheckCircle2, Wallet, Banknote, CreditCard, Trash2, Plus, Minus, ScanBarcode, Store, ChevronRight, History, Printer } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { printDocumentViaSandbox } from '@/lib/documents/print-service';
+import { DEFAULT_SCHOOL_IDENTITY } from '@/lib/documents/types';
 
 export default function POSShopPage() {
   const { dict, isThai, formatDate, formatCurrency } = useLanguage();
@@ -294,12 +296,64 @@ export default function POSShopPage() {
 
   const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
 
+  const handlePrintSlip = async (slip: ShopTransaction) => {
+    const formattedDate = formatDate(new Date(slip.created_at), { dateStyle: 'medium', timeStyle: 'short' });
+    const itemsHtml = slip.items.map(item => `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;font-size:11px;margin-bottom:3px;">
+        <span style="flex:1;padding-right:4px;">${item.product.name} (x${item.quantity})</span>
+        <span style="font-family:monospace;white-space:nowrap;">${Number(item.subtotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+      </div>
+    `).join('');
+
+    const slipHtml = `
+      <div style="width:72mm;margin:0 auto;padding:8px;font-family:'Sarabun','Courier New',monospace;color:#000;background:#fff;box-sizing:border-box;">
+        <div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:8px;margin-bottom:8px;">
+          <img src="/logo2.png" alt="Logo" style="height:36px;width:auto;margin:0 auto 4px auto;display:block;filter:grayscale(100%);" />
+          <div style="font-weight:bold;font-size:13px;">${DEFAULT_SCHOOL_IDENTITY.nameTh}</div>
+          <div style="font-size:10px;color:#475569;">ร้านค้าสวัสดิการ / สหกรณ์โรงเรียน</div>
+          <div style="font-size:10px;color:#64748b;">${formattedDate}</div>
+          <div style="font-size:11px;font-weight:bold;margin-top:4px;">รหัสอ้างอิง: ${slip.id.slice(-8).toUpperCase()}</div>
+        </div>
+
+        <div style="border-bottom:1px dashed #000;padding-bottom:6px;margin-bottom:6px;">
+          <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:11px;margin-bottom:4px;">
+            <span>รายการสินค้า</span>
+            <span>รวม (บาท)</span>
+          </div>
+          ${itemsHtml}
+        </div>
+
+        <div style="border-bottom:1px dashed #000;padding-bottom:6px;margin-bottom:6px;line-height:1.5;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;font-weight:bold;font-size:13px;">
+            <span>ยอดชำระสุทธิ:</span>
+            <span style="font-size:15px;font-weight:800;">${Number(slip.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} ฿</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;">
+            <span style="color:#475569;">วิธีชำระ:</span>
+            <span style="font-weight:bold;">${slip.payment_method === 'wallet' ? 'กระเป๋าเงินนักเรียน (e-Wallet)' : 'เงินสด'}</span>
+          </div>
+        </div>
+
+        <div style="text-align:center;font-size:9px;color:#64748b;padding-top:4px;">
+          <div>ขอบคุณที่ใช้บริการร้านค้าโรงเรียนสมคิดวิทยา</div>
+          <div style="font-size:8px;margin-top:2px;">SVPortal Thermal POS Engine</div>
+        </div>
+      </div>
+    `;
+
+    await printDocumentViaSandbox({
+      title: `สลิปร้านค้า_${slip.id.slice(-8).toUpperCase()}`,
+      paperSize: 'THERMAL_80MM',
+      contentHtml: slipHtml
+    });
+  };
+
   if (successSlip) {
     return (
-      <div className="fixed inset-0 bg-white dark:bg-slate-900 z-50 flex flex-col items-center justify-center print:bg-white print:p-0">
-        <div className="w-full max-w-sm border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-xl print:shadow-none print:border-none print:w-full bg-white dark:bg-slate-900">
+      <div className="fixed inset-0 bg-white dark:bg-slate-900 z-50 flex flex-col items-center justify-center p-4">
+        <div className="w-full max-w-sm border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-xl bg-white dark:bg-slate-900">
           <div className="flex flex-col items-center mb-6">
-            <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-950/40 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-3 print:hidden">
+            <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-950/40 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-3">
               <CheckCircle2 className="w-10 h-10" />
             </div>
             <h2 className="text-2xl font-extrabold text-center mb-2 text-slate-900 dark:text-white">{dict.shop.receipt}</h2>
@@ -338,26 +392,24 @@ export default function POSShopPage() {
             </span>
           </div>
 
-          <div className="mt-8 flex gap-4 print:hidden">
-            <button onClick={() => window.print()} className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 py-3 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">{dict.shop.printSlip}</button>
+          <div className="mt-8 flex gap-4">
+            <button 
+              onClick={() => handlePrintSlip(successSlip)} 
+              className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 py-3 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Printer className="w-4 h-4" /> {dict.shop.printSlip}
+            </button>
             <button 
               onClick={() => { 
                 setSuccessSlip(null); 
                 setTimeout(() => barcodeInputRef.current?.focus(), 300); 
               }} 
-              className="flex-1 bg-[#7B1C3E] hover:bg-[#681834] text-white py-3 rounded-xl font-bold transition-colors shadow-md shadow-[#7B1C3E]/20"
+              className="flex-1 bg-[#7B1C3E] hover:bg-[#681834] text-white py-3 rounded-xl font-bold transition-colors shadow-md shadow-[#7B1C3E]/20 cursor-pointer"
             >
               {dict.fees.newTransaction}
             </button>
           </div>
         </div>
-        <style dangerouslySetInnerHTML={{__html: `
-          @media print {
-            body * { visibility: hidden; }
-            .print\\:bg-white, .print\\:bg-white * { visibility: visible; }
-            .print\\:hidden { display: none !important; }
-          }
-        `}} />
       </div>
     );
   }

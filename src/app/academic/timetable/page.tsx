@@ -32,7 +32,8 @@ import {
   Bot,
   CalendarOff,
   Lock,
-  Printer
+  Printer,
+  FileDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { 
@@ -43,6 +44,8 @@ import {
 } from '@/lib/academic/timetable-engine';
 import { TimetableScheduleSlot } from '@/types/academic';
 import { NongFahAcademicChatBox } from '@/components/academic/NongFahAcademicChatBox';
+import { printDocumentViaSandbox, openDocumentPreviewInTab } from '@/lib/documents/print-service';
+import { exportToExcel } from '@/lib/documents/excel-service';
 
 interface ClassItem {
   id: string;
@@ -424,6 +427,110 @@ export default function AcademicTimetablePage() {
   const handleOpenPrintSub = (sub: any) => {
     setPrintingSub(sub);
     setIsPrintSubModalOpen(true);
+  };
+
+  const subSlipPrintRef = React.useRef<HTMLDivElement>(null);
+
+  const handlePrintSubSlip = async () => {
+    if (!subSlipPrintRef.current || !printingSub) return;
+    await printDocumentViaSandbox({
+      title: `ใบมอบหมายสอนแทน_${printingSub.date}_คาบ${printingSub.period_number}`,
+      paperSize: 'A5_LANDSCAPE',
+      contentHtml: subSlipPrintRef.current.innerHTML
+    });
+    toast.success('ส่งคำสั่งพิมพ์ใบมอบหมายงานสอนแทนเรียบร้อยแล้ว');
+  };
+
+  const handlePreviewSubSlipPdf = () => {
+    if (!subSlipPrintRef.current || !printingSub) return;
+    openDocumentPreviewInTab({
+      title: `ใบมอบหมายสอนแทน_${printingSub.date}_คาบ${printingSub.period_number}`,
+      paperSize: 'A5_LANDSCAPE',
+      contentHtml: subSlipPrintRef.current.innerHTML
+    });
+  };
+
+  const handlePrintSubHistory = async () => {
+    if (activeSubstitutions.length === 0) {
+      toast.error('ยังไม่มีข้อมูลการสอนแทนให้พิมพ์');
+      return;
+    }
+    const contentHtml = `
+      <div style="font-family: Sarabun, sans-serif; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="font-size: 18px; margin: 0; color: #7B1C3E;">โรงเรียนสมคิดวิทยา</h2>
+          <h3 style="font-size: 15px; margin: 5px 0;">บันทึกประวัติการจัดสอนแทน (Substitution History)</h3>
+          <p style="font-size: 12px; color: #666; margin: 0;">ปีการศึกษา 2568 • ข้อมูล ณ วันที่ ${new Date().toLocaleDateString('th-TH')}</p>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+          <thead>
+            <tr style="background-color: #f1f5f9; border: 1px solid #cbd5e1;">
+              <th style="border: 1px solid #cbd5e1; padding: 8px;">วันที่</th>
+              <th style="border: 1px solid #cbd5e1; padding: 8px;">คาบ</th>
+              <th style="border: 1px solid #cbd5e1; padding: 8px;">ห้อง</th>
+              <th style="border: 1px solid #cbd5e1; padding: 8px;">วิชา</th>
+              <th style="border: 1px solid #cbd5e1; padding: 8px;">ครูประจำ</th>
+              <th style="border: 1px solid #cbd5e1; padding: 8px;">ครูสอนแทน</th>
+              <th style="border: 1px solid #cbd5e1; padding: 8px;">ใบงาน / คำสั่ง</th>
+              <th style="border: 1px solid #cbd5e1; padding: 8px;">สถานะ</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${activeSubstitutions.map(s => `
+              <tr>
+                <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${s.date}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">คาบ ${s.period_number}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${s.class?.name || '-'}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 6px;">${s.course?.name_th || '-'}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 6px;">${s.original_teacher?.name_th || '-'}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 6px; font-weight: bold;">${s.substitute_teacher?.name_th || '-'}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 6px;">${s.worksheet_info || '-'}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${s.status}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+    await printDocumentViaSandbox({
+      title: `ประวัติการจัดสอนแทน_สมคิดวิทยา`,
+      paperSize: 'A4_LANDSCAPE',
+      contentHtml
+    });
+  };
+
+  const handleExportSubHistoryExcel = async () => {
+    if (activeSubstitutions.length === 0) {
+      toast.error('ยังไม่มีข้อมูลการสอนแทนให้ส่งออก');
+      return;
+    }
+    await exportToExcel({
+      filename: `ประวัติการจัดสอนแทน_สมคิดวิทยา_${new Date().toISOString().split('T')[0]}`,
+      sheetName: 'ประวัติการจัดสอนแทน',
+      title: 'บันทึกประวัติการจัดสอนแทน (Substitution History) - โรงเรียนสมคิดวิทยา',
+      subtitle: `ข้อมูล ณ วันที่ ${new Date().toLocaleDateString('th-TH')}`,
+      columns: [
+        { header: 'วันที่', key: 'date', width: 14 },
+        { header: 'คาบที่', key: 'period', width: 10 },
+        { header: 'ห้องเรียน', key: 'className', width: 14 },
+        { header: 'รายวิชา', key: 'course', width: 25 },
+        { header: 'ครูประจำวิชา', key: 'originalTeacher', width: 22 },
+        { header: 'ครูสอนแทน', key: 'subTeacher', width: 22 },
+        { header: 'ใบงาน / รายละเอียดงานที่มอบหมาย', key: 'worksheet', width: 35 },
+        { header: 'สถานะ', key: 'status', width: 14 },
+      ],
+      data: activeSubstitutions.map(s => ({
+        date: s.date,
+        period: `คาบ ${s.period_number}`,
+        className: s.class?.name || '-',
+        course: s.course?.name_th || '-',
+        originalTeacher: s.original_teacher?.name_th || '-',
+        subTeacher: s.substitute_teacher?.name_th || '-',
+        worksheet: s.worksheet_info || '-',
+        status: s.status,
+      }))
+    });
+    toast.success('ส่งออกไฟล์ Excel เรียบร้อยแล้ว');
   };
 
   // Helper days
@@ -1728,14 +1835,24 @@ export default function AcademicTimetablePage() {
                 <h4 className="font-bold text-slate-900 dark:text-white text-sm">
                   บันทึกประวัติการจัดสอนแทน (Substitution History)
                 </h4>
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>พิมพ์บันทึกสอนแทนรวม</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleExportSubHistoryExcel}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800 text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 transition cursor-pointer"
+                  >
+                    <FileDown className="w-3.5 h-3.5" />
+                    <span>ส่งออก Excel</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePrintSubHistory}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>พิมพ์รายงาน (A4 แนวนอน)</span>
+                  </button>
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
@@ -2989,7 +3106,7 @@ export default function AcademicTimetablePage() {
 
               {/* Printable Official Document Layout */}
               <div className="flex-1 overflow-y-auto p-6 bg-slate-100 dark:bg-slate-950 rounded-2xl flex justify-center border">
-                <div className="w-full max-w-2xl bg-white text-slate-900 p-8 rounded-xl shadow-lg border border-slate-300 font-sans text-xs space-y-5">
+                <div ref={subSlipPrintRef} className="w-full max-w-2xl bg-white text-slate-900 p-8 rounded-xl shadow-lg border border-slate-300 font-sans text-xs space-y-5">
                   {/* Official Header */}
                   <div className="text-center space-y-1 border-b pb-4">
                     <div className="font-bold text-base text-slate-900 tracking-wide">บันทึกข้อความ</div>
@@ -3064,13 +3181,17 @@ export default function AcademicTimetablePage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    window.print();
-                    toast.success('ส่งคำสั่งพิมพ์ใบมอบหมายงานสอนแทนเรียบร้อยแล้ว');
-                  }}
+                  onClick={handlePreviewSubSlipPdf}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <FileDown className="w-4 h-4" /> ดูตัวอย่าง / บันทึก PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePrintSubSlip}
                   className="px-5 py-2 bg-[#7B1C3E] hover:bg-[#631430] text-white rounded-xl text-xs font-bold shadow-md transition flex items-center gap-1.5 cursor-pointer"
                 >
-                  <Printer className="w-4 h-4" /> สั่งพิมพ์ใบมอบงาน (Print Slip)
+                  <Printer className="w-4 h-4" /> สั่งพิมพ์ใบมอบงาน (A5 แนวนอน)
                 </button>
               </div>
             </div>

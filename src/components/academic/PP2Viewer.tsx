@@ -1,9 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { PP2CertificateData } from '@/lib/academic/pp2-engine';
 import { PrintAlignmentProfile, calculateCalibratedStyle, PRINT_CSS_A4_LANDSCAPE } from '@/lib/academic/print-alignment';
-import { Printer, Sliders, Award } from 'lucide-react';
+import { Printer, Sliders, Award, FileDown } from 'lucide-react';
+import { GarudaCrest } from '@/lib/documents/garuda-crest';
+import { printDocumentViaSandbox, openDocumentPreviewInTab } from '@/lib/documents/print-service';
 
 interface PP2ViewerProps {
   data: PP2CertificateData;
@@ -13,9 +15,27 @@ interface PP2ViewerProps {
 
 export function PP2Viewer({ data, profile, onOpenCalibration }: PP2ViewerProps) {
   const isOverlay = profile.mode === 'OVERLAY';
+  const certRef = useRef<HTMLDivElement>(null);
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    if (!certRef.current) {
+      window.print();
+      return;
+    }
+    await printDocumentViaSandbox({
+      title: `ปพ2_ประกาศนียบัตร_${data.fullNameTh}_${data.certificateNumber}`,
+      paperSize: 'A4_LANDSCAPE',
+      contentHtml: certRef.current.innerHTML
+    });
+  };
+
+  const handlePreviewPdf = () => {
+    if (!certRef.current) return;
+    openDocumentPreviewInTab({
+      title: `ปพ2_ประกาศนียบัตร_${data.fullNameTh}_${data.certificateNumber}`,
+      paperSize: 'A4_LANDSCAPE',
+      contentHtml: certRef.current.innerHTML
+    });
   };
 
   return (
@@ -44,6 +64,16 @@ export function PP2Viewer({ data, profile, onOpenCalibration }: PP2ViewerProps) 
 
         <div className="flex items-center gap-2">
           <button
+            type="button"
+            onClick={handlePreviewPdf}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold transition cursor-pointer"
+            title="บันทึกประกาศนียบัตรเป็น PDF เวกเตอร์"
+          >
+            <FileDown className="w-3.5 h-3.5" />
+            <span>บันทึก PDF</span>
+          </button>
+          <button
+            type="button"
             onClick={onOpenCalibration}
             className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold transition cursor-pointer"
           >
@@ -51,6 +81,7 @@ export function PP2Viewer({ data, profile, onOpenCalibration }: PP2ViewerProps) 
             <span>ปรับจูนพิกัดพิมพ์</span>
           </button>
           <button
+            type="button"
             onClick={handlePrint}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#7B1C3E] hover:bg-[#631430] text-white rounded-xl text-xs font-bold shadow-md shadow-[#7B1C3E]/20 transition cursor-pointer"
           >
@@ -63,6 +94,7 @@ export function PP2Viewer({ data, profile, onOpenCalibration }: PP2ViewerProps) 
       {/* A4 Landscape Certificate Sheet (297mm x 210mm) */}
       <div className="overflow-x-auto flex justify-center pb-8">
         <div 
+          ref={certRef}
           className="print-page-landscape bg-white shadow-2xl border border-slate-300 text-slate-900 relative"
           style={{
             width: '297mm',
@@ -83,9 +115,7 @@ export function PP2Viewer({ data, profile, onOpenCalibration }: PP2ViewerProps) 
 
               {/* Embossed Garuda Symbol */}
               <div className="absolute left-[148.5mm] top-[20mm] -translate-x-1/2 text-center">
-                <div className="w-16 h-16 mx-auto mb-2 flex items-center justify-center font-bold text-xs border-2 border-[#D4AF37] rounded-full text-[#7B1C3E] bg-[#D4AF37]/10">
-                  ตราครุฑ
-                </div>
+                <GarudaCrest widthMm={26} heightMm={26} color="#7B1C3E" className="mx-auto mb-2" />
                 <h2 className="text-2xl font-extrabold text-[#7B1C3E] tracking-wide">
                   {data.schoolName}
                 </h2>

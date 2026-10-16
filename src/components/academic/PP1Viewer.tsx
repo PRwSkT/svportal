@@ -3,7 +3,9 @@
 import React, { useState } from 'react';
 import { PP1StudentData } from '@/lib/academic/pp1-engine';
 import { PrintAlignmentProfile, calculateCalibratedStyle, PRINT_CSS_A4_PORTRAIT } from '@/lib/academic/print-alignment';
-import { Printer, Eye, Sliders, ChevronLeft, ChevronRight, FileText, CheckCircle2 } from 'lucide-react';
+import { Printer, Eye, Sliders, ChevronLeft, ChevronRight, FileText, CheckCircle2, FileDown } from 'lucide-react';
+import { GarudaCrest } from '@/lib/documents/garuda-crest';
+import { printDocumentViaSandbox, openDocumentPreviewInTab } from '@/lib/documents/print-service';
 
 interface PP1ViewerProps {
   data: PP1StudentData;
@@ -13,9 +15,28 @@ interface PP1ViewerProps {
 
 export function PP1Viewer({ data, profile, onOpenCalibration }: PP1ViewerProps) {
   const [activePage, setActivePage] = useState<1 | 2>(1);
+  const sheetRef = React.useRef<HTMLDivElement>(null);
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    if (sheetRef.current) {
+      await printDocumentViaSandbox({
+        title: `ปพ1_${data.studentId}_${data.fullNameTh}_หน้า${activePage}`,
+        paperSize: 'A4_PORTRAIT',
+        contentHtml: sheetRef.current.innerHTML
+      });
+    } else {
+      window.print();
+    }
+  };
+
+  const handlePreviewPdf = () => {
+    if (sheetRef.current) {
+      openDocumentPreviewInTab({
+        title: `ปพ1_${data.studentId}_${data.fullNameTh}_หน้า${activePage}`,
+        paperSize: 'A4_PORTRAIT',
+        contentHtml: sheetRef.current.innerHTML
+      });
+    }
   };
 
   const isOverlay = profile.mode === 'OVERLAY';
@@ -64,6 +85,16 @@ export function PP1Viewer({ data, profile, onOpenCalibration }: PP1ViewerProps) 
 
         <div className="flex items-center gap-2">
           <button
+            type="button"
+            onClick={handlePreviewPdf}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold transition cursor-pointer"
+            title="บันทึก ปพ.1 หน้านี้เป็น PDF เวกเตอร์"
+          >
+            <FileDown className="w-3.5 h-3.5" />
+            <span>บันทึก PDF</span>
+          </button>
+          <button
+            type="button"
             onClick={onOpenCalibration}
             className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold transition cursor-pointer"
           >
@@ -71,6 +102,7 @@ export function PP1Viewer({ data, profile, onOpenCalibration }: PP1ViewerProps) 
             <span>ปรับจูนพิกัดพิมพ์</span>
           </button>
           <button
+            type="button"
             onClick={handlePrint}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#7B1C3E] hover:bg-[#631430] text-white rounded-xl text-xs font-bold shadow-md shadow-[#7B1C3E]/20 transition cursor-pointer"
           >
@@ -83,6 +115,7 @@ export function PP1Viewer({ data, profile, onOpenCalibration }: PP1ViewerProps) 
       {/* A4 Sheet Container (210mm x 297mm) */}
       <div className="overflow-x-auto flex justify-center pb-8">
         <div 
+          ref={sheetRef}
           className="print-page bg-white shadow-2xl border border-slate-300 text-slate-900 font-serif relative"
           style={{
             width: '210mm',
@@ -104,9 +137,7 @@ export function PP1Viewer({ data, profile, onOpenCalibration }: PP1ViewerProps) 
 
                   {/* Garuda Crest (Center Top) */}
                   <div className="absolute left-[105mm] top-[14mm] -translate-x-1/2 text-center">
-                    <div className="w-14 h-14 mx-auto mb-1 flex items-center justify-center font-bold text-xs border border-slate-400 rounded-full">
-                      ตราครุฑ
-                    </div>
+                    <GarudaCrest widthMm={24} heightMm={24} className="mx-auto mb-1" />
                     <div className="text-sm font-bold tracking-tight">
                       ระเบียนแสดงผลการเรียนตามหลักสูตรแกนกลางการศึกษาขั้นพื้นฐาน (ปพ.1:บ)
                     </div>

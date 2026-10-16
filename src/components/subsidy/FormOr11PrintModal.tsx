@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
-import { Printer, X } from 'lucide-react';
+import React, { useRef } from 'react';
+import { Printer, X, FileDown } from 'lucide-react';
 import { formatThaiBahtText } from '@/lib/subsidy/free15y';
+import { printDocumentViaSandbox, openDocumentPreviewInTab } from '@/lib/documents/print-service';
 
 interface FormOr11PrintModalProps {
   isOpen: boolean;
@@ -33,6 +34,7 @@ export default function FormOr11PrintModal({
   disbursement,
   schoolName = 'โรงเรียนสมคิดวิทยา'
 }: FormOr11PrintModalProps) {
+  const printRef = useRef<HTMLDivElement>(null);
   if (!isOpen || !disbursement) return null;
 
   const bahtText = formatThaiBahtText(disbursement.totalAmount);
@@ -40,8 +42,22 @@ export default function FormOr11PrintModal({
     ? new Date(disbursement.disbursedAt).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })
     : new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    if (!printRef.current) return;
+    await printDocumentViaSandbox({
+      title: `แบบอร1-1_${disbursement.studentName}_${disbursement.academicYear}`,
+      paperSize: 'A4_PORTRAIT',
+      contentHtml: printRef.current.innerHTML
+    });
+  };
+
+  const handlePreviewPdf = () => {
+    if (!printRef.current) return;
+    openDocumentPreviewInTab({
+      title: `แบบอร1-1_${disbursement.studentName}_${disbursement.academicYear}`,
+      paperSize: 'A4_PORTRAIT',
+      contentHtml: printRef.current.innerHTML
+    });
   };
 
   return (
@@ -60,14 +76,23 @@ export default function FormOr11PrintModal({
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={handlePrint}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition-all active:scale-95 text-sm"
+              type="button"
+              onClick={handlePreviewPdf}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-xl shadow-xs transition-all active:scale-95 text-xs sm:text-sm cursor-pointer"
             >
-              <Printer className="w-4 h-4" /> สั่งพิมพ์ / บันทึกเป็น PDF
+              <FileDown className="w-4 h-4" /> บันทึก PDF
             </button>
             <button
+              type="button"
+              onClick={handlePrint}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition-all active:scale-95 text-xs sm:text-sm cursor-pointer"
+            >
+              <Printer className="w-4 h-4" /> สั่งพิมพ์ (Print)
+            </button>
+            <button
+              type="button"
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-all"
+              className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-all cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -75,7 +100,7 @@ export default function FormOr11PrintModal({
         </div>
 
         {/* Printable Official Form อร.1/1 */}
-        <div className="p-8 sm:p-12 text-slate-900 bg-white font-sans text-sm leading-relaxed print:p-6 print:m-0">
+        <div ref={printRef} className="p-8 sm:p-12 text-slate-900 bg-white font-sans text-sm leading-relaxed print:p-6 print:m-0">
           
           <div className="text-right text-xs font-bold text-slate-500 mb-2">
             แบบ อร.1/1

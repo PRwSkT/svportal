@@ -12,9 +12,11 @@ import {
   ArrowUpRight, 
   ShieldCheck,
   TrendingUp,
-  Download
+  Download,
+  FileDown
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { printDocumentViaSandbox, openDocumentPreviewInTab } from '@/lib/documents/print-service';
 
 interface PP3OrssTableProps {
   summary: PP3ReportSummary;
@@ -50,13 +52,7 @@ export function PP3OrssTable({ summary, onRefresh }: PP3OrssTableProps) {
     }
   };
 
-  const handlePrintLedger = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast.error('กรุณาอนุญาตป็อปอัปในเบราว์เซอร์เพื่อพิมพ์รายงาน');
-      return;
-    }
-
+  const generateLedgerHtml = () => {
     const rowsHtml = summary.records.map((r, i) => `
       <tr>
         <td style="text-align: center; border: 1px solid #000; padding: 4px;">${i + 1}</td>
@@ -72,64 +68,67 @@ export function PP3OrssTable({ summary, onRefresh }: PP3OrssTableProps) {
       </tr>
     `).join('');
 
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>แบบรายงานผู้สำเร็จการศึกษา (ปพ.3:บ) - โรงเรียนสมคิดวิทยา</title>
-          <style>
-            @page { size: A4 landscape; margin: 12mm; }
-            body { font-family: "Sarabun", "TH Sarabun New", sans-serif; font-size: 12px; margin: 0; padding: 0; }
-            table { width: 100%; border-collapse: collapse; }
-            th { border: 1px solid #000; background: #f1f5f9; padding: 6px; font-weight: bold; }
-            .header { text-align: center; margin-bottom: 16px; }
-            .sign-section { margin-top: 24px; display: flex; justify-content: space-around; text-align: center; }
-          </style>
-        </head>
-        <body onload="window.print(); window.close();">
-          <div class="header">
-            <h2 style="margin: 0 0 4px 0;">แบบรายงานผู้สำเร็จการศึกษาตามหลักสูตรแกนกลางการศึกษาขั้นพื้นฐาน (ปพ.3:บ)</h2>
-            <div><strong>โรงเรียน${summary.schoolName}</strong> อำเภอ${summary.district} จังหวัด${summary.province}</div>
-            <div>สังกัดสำนักงานคณะกรรมการส่งเสริมการศึกษาเอกชน (รหัสสถานศึกษา: ${summary.schoolId}) ปีการศึกษา ${summary.academicYear}</div>
-            <div style="font-size: 11px; margin-top: 4px;">อนุมัติการจบการศึกษา ณ วันที่ ${summary.graduationDateTh} | จำนวนผู้สำเร็จการศึกษาทั้งสิ้น ${summary.totalGraduates} คน (ชาย ${summary.maleCount} คน, หญิง ${summary.femaleCount} คน)</div>
-          </div>
+    return `
+      <div style="font-family:'Sarabun','TH Sarabun New',sans-serif;padding:8px;background:#fff;color:#000;">
+        <div style="text-align:center;margin-bottom:16px;">
+          <h2 style="margin:0 0 4px 0;font-size:16px;font-weight:bold;">แบบรายงานผู้สำเร็จการศึกษาตามหลักสูตรแกนกลางการศึกษาขั้นพื้นฐาน (ปพ.3:บ)</h2>
+          <div><strong>โรงเรียน${summary.schoolName}</strong> อำเภอ${summary.district} จังหวัด${summary.province}</div>
+          <div style="font-size:12px;">สังกัดสำนักงานคณะกรรมการส่งเสริมการศึกษาเอกชน (รหัสสถานศึกษา: ${summary.schoolId}) ปีการศึกษา ${summary.academicYear}</div>
+          <div style="font-size:11px;margin-top:4px;color:#475569;">อนุมัติการจบการศึกษา ณ วันที่ ${summary.graduationDateTh} | จำนวนผู้สำเร็จการศึกษาทั้งสิ้น ${summary.totalGraduates} คน (ชาย ${summary.maleCount} คน, หญิง ${summary.femaleCount} คน)</div>
+        </div>
 
-          <table>
-            <thead>
-              <tr>
-                <th style="width: 35px;">ลำดับ</th>
-                <th style="width: 75px;">เลขประจำตัว</th>
-                <th style="width: 105px;">เลขประจำตัวประชาชน</th>
-                <th>ชื่อ - ชื่อสกุล</th>
-                <th style="width: 45px;">เพศ</th>
-                <th style="width: 95px;">วันเดือนปีเกิด</th>
-                <th style="width: 60px;">GPAX</th>
-                <th style="width: 110px;">เลขที่ ปพ.1</th>
-                <th style="width: 100px;">เลขที่ ปพ.2</th>
-                <th style="width: 95px;">การตัดสิน</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsHtml}
-            </tbody>
-          </table>
+        <table style="width:100%;border-collapse:collapse;font-size:11px;">
+          <thead>
+            <tr style="background:#f1f5f9;font-weight:bold;">
+              <th style="border:1px solid #000;padding:6px;width:35px;">ลำดับ</th>
+              <th style="border:1px solid #000;padding:6px;width:75px;">เลขประจำตัว</th>
+              <th style="border:1px solid #000;padding:6px;width:115px;">เลขประจำตัวประชาชน</th>
+              <th style="border:1px solid #000;padding:6px;text-align:left;">ชื่อ - ชื่อสกุล</th>
+              <th style="border:1px solid #000;padding:6px;width:45px;">เพศ</th>
+              <th style="border:1px solid #000;padding:6px;width:95px;">วันเดือนปีเกิด</th>
+              <th style="border:1px solid #000;padding:6px;width:55px;">GPAX</th>
+              <th style="border:1px solid #000;padding:6px;width:110px;">เลขที่ ปพ.1</th>
+              <th style="border:1px solid #000;padding:6px;width:100px;">เลขที่ ปพ.2</th>
+              <th style="border:1px solid #000;padding:6px;width:90px;">การตัดสิน</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
 
-          <div class="sign-section">
-            <div>
-              <div>ลงชื่อ.......................................................... ผู้จัดทำรายงาน</div>
-              <div style="margin-top: 4px;">( ${summary.registrarName} )</div>
-              <div style="font-size: 11px; color: #475569;">นายทะเบียน</div>
-            </div>
-            <div>
-              <div>ลงชื่อ.......................................................... ผู้รับรองรายงาน</div>
-              <div style="margin-top: 4px;">( ${summary.directorName} )</div>
-              <div style="font-size: 11px; color: #475569;">ผู้อำนวยการโรงเรียน${summary.schoolName}</div>
-            </div>
+        <div style="margin-top:24px;display:flex;justify-content:space-around;text-align:center;font-size:11px;">
+          <div>
+            <div>ลงชื่อ.......................................................... ผู้จัดทำรายงาน</div>
+            <div style="margin-top:4px;font-weight:bold;">( ${summary.registrarName} )</div>
+            <div style="color:#64748b;">นายทะเบียน</div>
           </div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+          <div>
+            <div>ลงชื่อ.......................................................... ผู้รับรองรายงาน</div>
+            <div style="margin-top:4px;font-weight:bold;">( ${summary.directorName} )</div>
+            <div style="color:#64748b;">ผู้อำนวยการโรงเรียน${summary.schoolName}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  };
+
+  const handlePrintLedger = async () => {
+    const html = generateLedgerHtml();
+    await printDocumentViaSandbox({
+      title: `แบบรายงานผู้สำเร็จการศึกษา_ปพ3_${summary.academicYear}`,
+      paperSize: 'A4_LANDSCAPE',
+      contentHtml: html
+    });
+  };
+
+  const handlePreviewPdf = () => {
+    const html = generateLedgerHtml();
+    openDocumentPreviewInTab({
+      title: `แบบรายงานผู้สำเร็จการศึกษา_ปพ3_${summary.academicYear}`,
+      paperSize: 'A4_LANDSCAPE',
+      contentHtml: html
+    });
   };
 
   const filteredRecords = summary.records.filter(r => {
@@ -222,16 +221,28 @@ export function PP3OrssTable({ summary, onRefresh }: PP3OrssTableProps) {
           />
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <button
+            type="button"
+            onClick={handlePreviewPdf}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold shadow-xs transition cursor-pointer"
+            title="บันทึกเล่ม ปพ.3 เป็นไฟล์ PDF"
+          >
+            <FileDown className="w-4 h-4" />
+            <span>บันทึก PDF</span>
+          </button>
+
+          <button
+            type="button"
             onClick={handlePrintLedger}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold transition cursor-pointer"
           >
             <Printer className="w-4 h-4 text-slate-500" />
-            <span>พิมพ์เล่ม ปพ.3 (ฉบับลงนาม)</span>
+            <span>พิมพ์เล่ม ปพ.3 (A4 แนวนอน)</span>
           </button>
 
           <button
+            type="button"
             onClick={handleExportExcel}
             disabled={isExporting}
             className="inline-flex items-center gap-2 px-4 py-2 bg-[#7B1C3E] hover:bg-[#631430] text-white rounded-xl text-xs font-bold shadow-md shadow-[#7B1C3E]/20 transition cursor-pointer disabled:opacity-50"

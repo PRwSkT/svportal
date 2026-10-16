@@ -30,9 +30,11 @@ import {
   Sliders,
   Trash2,
   Users,
-  Check
+  Check,
+  FileDown
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { printDocumentViaSandbox, openDocumentPreviewInTab } from '@/lib/documents/print-service';
 
 interface ExamItem {
   id: string;
@@ -116,6 +118,7 @@ export default function AcademicExamsPage() {
   const [isWaterSpillModalOpen, setIsWaterSpillModalOpen] = useState(false);
   const [isSubmissionsDrawerOpen, setIsSubmissionsDrawerOpen] = useState(false);
   const [printDocType, setPrintDocType] = useState<'questions' | 'bubble_sheet'>('questions');
+  const printSheetRef = useRef<HTMLDivElement>(null);
 
   // Answer Key Editor State
   const [editingAnswerKeySet, setEditingAnswerKeySet] = useState<'A' | 'B' | 'C'>('A');
@@ -1057,7 +1060,7 @@ export default function AcademicExamsPage() {
 
             {/* Printable Preview Sheet */}
             <div className="flex-1 overflow-y-auto border rounded-2xl p-6 bg-slate-100 dark:bg-slate-950 flex justify-center">
-              <div className="w-full max-w-2xl bg-white text-slate-900 p-8 rounded-xl shadow-lg border border-slate-300 text-sm font-sans space-y-4">
+              <div ref={printSheetRef} className="w-full max-w-2xl bg-white text-slate-900 p-8 rounded-xl shadow-lg border border-slate-300 text-sm font-sans space-y-4">
                 {printDocType === 'questions' ? (
                   <div>
                     {/* Header */}
@@ -1196,20 +1199,41 @@ export default function AcademicExamsPage() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsPrintModalOpen(false)}
-                  className="px-4 py-2 border rounded-xl text-sm cursor-pointer"
+                  onClick={() => {
+                    if (printSheetRef.current && activeExam) {
+                      openDocumentPreviewInTab({
+                        title: `แบบทดสอบ_${activeExam.exam.title}_ชุด_${selectedPrintSet}`,
+                        paperSize: 'A4_PORTRAIT',
+                        contentHtml: printSheetRef.current.innerHTML
+                      });
+                    }
+                  }}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
-                  ปิด
+                  <FileDown className="w-4 h-4" /> บันทึก PDF
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    window.print();
-                    toast.success('ส่งคำสั่งพิมพ์เอกสารไปยังเครื่องพิมพ์เรียบร้อยแล้ว');
+                  onClick={async () => {
+                    if (printSheetRef.current && activeExam) {
+                      await printDocumentViaSandbox({
+                        title: `แบบทดสอบ_${activeExam.exam.title}_ชุด_${selectedPrintSet}`,
+                        paperSize: 'A4_PORTRAIT',
+                        contentHtml: printSheetRef.current.innerHTML
+                      });
+                      toast.success('ส่งคำสั่งพิมพ์เอกสารไปยังเครื่องพิมพ์เรียบร้อยแล้ว');
+                    }
                   }}
                   className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-md flex items-center gap-1.5 cursor-pointer"
                 >
                   <Printer className="w-4 h-4" /> สั่งพิมพ์ (Print)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPrintModalOpen(false)}
+                  className="px-4 py-2 border rounded-xl text-sm cursor-pointer"
+                >
+                  ปิด
                 </button>
               </div>
             </div>

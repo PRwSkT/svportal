@@ -10,9 +10,9 @@ export async function POST(request: Request) {
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
-    const { payment_id, receipt_number, student_id, total_amount, base64Image } = await request.json();
+    const { payment_id, receipt_number, student_id, total_amount, base64Image, htmlContent } = await request.json();
 
-    if (!payment_id || !base64Image) {
+    if (!payment_id || (!base64Image && !htmlContent)) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
@@ -28,12 +28,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'ไม่พบข้อมูลรายการชำระเงินในระบบ' }, { status: 404 });
     }
 
-    // 2. Upload base64 image to Google Drive as image/receipt
-    const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
-    const buffer = Buffer.from(base64Data, 'base64');
-    
+    // 2. Upload document to Google Drive
+    let buffer: Buffer;
+    let filename: string;
     const verifiedReceiptNo = paymentRecord.receipt_number || receipt_number;
-    const slip_url = await uploadReceiptPDF(buffer, `${verifiedReceiptNo}.png`);
+
+    if (htmlContent) {
+      buffer = Buffer.from(htmlContent, 'utf-8');
+      filename = `${verifiedReceiptNo}.html`;
+    } else {
+      const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
+      buffer = Buffer.from(base64Data, 'base64');
+      filename = `${verifiedReceiptNo}.png`;
+    }
+    
+    let slip_url = '';
+    try {
+      slip_url = await uploadReceiptPDF(buffer, filename);
+    } catch (driveErr) {
+      console.warn('Google Drive backup skipped or errored:', driveErr);
+    }
 
     // 3. Update tuition_payment record with slip_url
     const { error: updateErr } = await supabase

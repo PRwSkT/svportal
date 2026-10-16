@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { KpiEvaluation, SectionScoreSummary, KpiUserContext } from '@/types/kpi';
@@ -32,6 +32,7 @@ import {
   FileText,
   Mail,
   Printer,
+  FileDown,
   Send,
   ShieldCheck,
   Sparkles,
@@ -43,6 +44,7 @@ import {
   AlertTriangle,
   AlertCircle,
 } from 'lucide-react';
+import { printDocumentViaSandbox, openDocumentPreviewInTab } from '@/lib/documents/print-service';
 
 export default function IndividualKpiAnalyticsPage({
   params,
@@ -162,8 +164,28 @@ export default function IndividualKpiAnalyticsPage({
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const printReportRef = useRef<HTMLElement>(null);
+
+  const handlePrint = async () => {
+    if (printReportRef.current) {
+      await printDocumentViaSandbox({
+        title: `รายงานKPI_${p?.name_th || 'บุคลากร'}_${cycle?.title || ''}`,
+        paperSize: 'A4_PORTRAIT',
+        contentHtml: printReportRef.current.innerHTML
+      });
+    } else {
+      window.print();
+    }
+  };
+
+  const handlePreviewPdf = () => {
+    if (printReportRef.current) {
+      openDocumentPreviewInTab({
+        title: `รายงานKPI_${p?.name_th || 'บุคลากร'}_${cycle?.title || ''}`,
+        paperSize: 'A4_PORTRAIT',
+        contentHtml: printReportRef.current.innerHTML
+      });
+    }
   };
 
   const emailHtml = generateAnonymousKpiEmailHtml(evaluation);
@@ -197,18 +219,26 @@ export default function IndividualKpiAnalyticsPage({
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
             <button
+              onClick={handlePreviewPdf}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+            >
+              <FileDown className="w-4 h-4" />
+              <span>ดูตัวอย่าง / PDF</span>
+            </button>
+
+            <button
               onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
             >
               <Printer className="w-4 h-4" />
-              <span>พิมพ์รายงาน</span>
+              <span>พิมพ์รายงาน (A4)</span>
             </button>
 
             {currentUserContext?.canViewAll && (
               <>
                 <button
                   onClick={() => setShowEmailPreviewModal(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
                 >
                   <FileText className="w-4 h-4" />
                   <span>ดูพรีวิวอีเมล</span>
@@ -217,7 +247,7 @@ export default function IndividualKpiAnalyticsPage({
                 <button
                   onClick={() => setShowEmailModal(true)}
                   disabled={!p?.email}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#7B1C3E] hover:bg-[#631430] text-white rounded-xl text-xs font-bold shadow-sm transition-all disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#7B1C3E] hover:bg-[#631430] text-white rounded-xl text-xs font-bold shadow-sm transition-all disabled:opacity-50 cursor-pointer"
                 >
                   <Mail className="w-4 h-4" />
                   <span>{evaluation.email_notified_status === 'sent' ? 'ส่งผลเข้า Gmail อีกครั้ง' : 'ส่งผลเข้า Gmail (ไม่ระบุผู้ประเมิน)'}</span>
@@ -229,7 +259,7 @@ export default function IndividualKpiAnalyticsPage({
       </header>
 
       {/* Main Analytics Container */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
+      <main ref={printReportRef} className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
         {/* Printable Official School Header (Only visible when printing) */}
         <div className="hidden print:block text-center border-b-2 border-slate-900 pb-4 mb-6">
           <Image

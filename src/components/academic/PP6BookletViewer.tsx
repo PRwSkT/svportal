@@ -16,9 +16,13 @@ import {
   BookMarked,
   User,
   Clock,
-  Scale
+  Scale,
+  FileDown,
+  ExternalLink
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { printDocumentViaSandbox, openDocumentPreviewInTab } from '@/lib/documents/print-service';
+import { renderPP6FullBookletHtml } from '@/components/documents/academic/PP6FullBookletPrint';
 
 interface PP6BookletViewerProps {
   report: PP6StudentReport;
@@ -30,8 +34,42 @@ export function PP6BookletViewer({ report, onRefresh }: PP6BookletViewerProps) {
   const [viewMode, setViewMode] = useState<'booklet' | 'mobile_parent'>('booklet');
   const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [teacherComment, setTeacherComment] = useState(report.term2TeacherComment);
+  const [isPrinting, setIsPrinting] = useState(false);
 
-  const handlePrint = () => {
+  const handlePrintFullBooklet = async () => {
+    setIsPrinting(true);
+    const toastId = toast.loading('กำลังจัดเตรียมสมุดพก ปพ.6 ครบ 16 หน้าเพื่อส่งเครื่องพิมพ์...');
+    try {
+      const html = renderPP6FullBookletHtml({
+        ...report,
+        term2TeacherComment: teacherComment
+      });
+      await printDocumentViaSandbox({
+        title: `ปพ6_สมุดพก16หน้า_${report.studentId}_${report.fullName}`,
+        paperSize: 'A5_PORTRAIT',
+        contentHtml: html
+      });
+      toast.success('ส่งคำสั่งพิมพ์สมุดพก 16 หน้าเรียบร้อยแล้ว', { id: toastId });
+    } catch (err: any) {
+      toast.error('เกิดข้อผิดพลาดในการพิมพ์สมุดพก', { id: toastId });
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  const handlePreviewPdf = () => {
+    const html = renderPP6FullBookletHtml({
+      ...report,
+      term2TeacherComment: teacherComment
+    });
+    openDocumentPreviewInTab({
+      title: `ปพ6_สมุดพก16หน้า_${report.studentId}_${report.fullName}`,
+      paperSize: 'A5_PORTRAIT',
+      contentHtml: html
+    });
+  };
+
+  const handlePrintCurrentPage = () => {
     window.print();
   };
 
@@ -131,11 +169,34 @@ export function PP6BookletViewer({ report, onRefresh }: PP6BookletViewerProps) {
           )}
 
           <button
-            onClick={handlePrint}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#7B1C3E] hover:bg-[#631430] text-white rounded-xl text-xs font-bold shadow-md shadow-[#7B1C3E]/20 transition cursor-pointer"
+            type="button"
+            onClick={handlePreviewPdf}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold shadow-xs transition cursor-pointer"
+            title="เปิดดูตัวอย่างสมุดพกครบ 16 หน้าและบันทึกเป็น PDF"
+          >
+            <FileDown className="w-3.5 h-3.5" />
+            <span>บันทึก PDF (16 หน้า)</span>
+          </button>
+
+          <button
+            type="button"
+            disabled={isPrinting}
+            onClick={handlePrintFullBooklet}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#7B1C3E] hover:bg-[#631430] disabled:bg-[#7B1C3E]/50 text-white rounded-xl text-xs font-bold shadow-md shadow-[#7B1C3E]/20 transition cursor-pointer"
+            title="สั่งพิมพ์สมุดพกครบทั้ง 16 หน้าพร้อมกัน"
           >
             <Printer className="w-3.5 h-3.5" />
-            <span>พิมพ์สมุดพก (Print)</span>
+            <span>{isPrinting ? 'กำลังเตรียมพิมพ์...' : 'พิมพ์สมุดพกทั้งเล่ม (16 หน้า)'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePrintCurrentPage}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-medium transition cursor-pointer"
+            title="พิมพ์เฉพาะหน้าปัจจุบันที่แสดงบนจอ"
+          >
+            <Printer className="w-3 h-3 text-slate-400" />
+            <span>พิมพ์เฉพาะหน้านี้ (น.{currentPage})</span>
           </button>
         </div>
       </div>

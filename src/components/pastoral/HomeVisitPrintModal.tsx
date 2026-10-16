@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
-import { Printer, X, MapPin, ExternalLink, ShieldCheck, Heart, User, Calendar } from 'lucide-react';
+import React, { useRef } from 'react';
+import { Printer, X, MapPin, ExternalLink, ShieldCheck, Heart, User, Calendar, FileDown } from 'lucide-react';
 import { HomeVisitRecord, getGoogleMapsUrl } from '@/lib/pastoral/home-visit';
+import { printDocumentViaSandbox, openDocumentPreviewInTab } from '@/lib/documents/print-service';
 
 interface HomeVisitPrintModalProps {
   isOpen: boolean;
@@ -25,12 +26,27 @@ export default function HomeVisitPrintModal({
   student,
   schoolName = 'โรงเรียนสมคิดวิทยา'
 }: HomeVisitPrintModalProps) {
+  const printRef = useRef<HTMLDivElement>(null);
   if (!isOpen || !visit || !student) return null;
 
   const mapsUrl = getGoogleMapsUrl(visit.gpsLat, visit.gpsLng);
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    if (!printRef.current) return;
+    await printDocumentViaSandbox({
+      title: `แบบบันทึกเยี่ยมบ้าน_${student.name}`,
+      paperSize: 'A4_PORTRAIT',
+      contentHtml: printRef.current.innerHTML
+    });
+  };
+
+  const handlePreviewPdf = () => {
+    if (!printRef.current) return;
+    openDocumentPreviewInTab({
+      title: `แบบบันทึกเยี่ยมบ้าน_${student.name}`,
+      paperSize: 'A4_PORTRAIT',
+      contentHtml: printRef.current.innerHTML
+    });
   };
 
   return (
@@ -49,14 +65,23 @@ export default function HomeVisitPrintModal({
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={handlePrint}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition-all active:scale-95 text-sm"
+              type="button"
+              onClick={handlePreviewPdf}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-xl shadow-xs transition-all active:scale-95 text-xs sm:text-sm cursor-pointer"
             >
-              <Printer className="w-4 h-4" /> สั่งพิมพ์ / บันทึกเป็น PDF
+              <FileDown className="w-4 h-4" /> บันทึก PDF
             </button>
             <button
+              type="button"
+              onClick={handlePrint}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition-all active:scale-95 text-xs sm:text-sm cursor-pointer"
+            >
+              <Printer className="w-4 h-4" /> สั่งพิมพ์ (Print)
+            </button>
+            <button
+              type="button"
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+              className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -64,7 +89,7 @@ export default function HomeVisitPrintModal({
         </div>
 
         {/* Printable Document Sheet (A4 Style) */}
-        <div className="p-8 sm:p-12 text-slate-900 bg-white font-sans text-sm leading-relaxed print:p-6 print:m-0">
+        <div ref={printRef} className="p-8 sm:p-12 text-slate-900 bg-white font-sans text-sm leading-relaxed print:p-6 print:m-0">
           
           {/* Header */}
           <div className="text-center border-b-2 border-slate-900 pb-4 mb-6">

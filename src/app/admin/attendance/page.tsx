@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -20,9 +20,12 @@ import {
   Users,
   UserCheck,
   ShieldAlert,
-  Sparkles
+  Sparkles,
+  FileDown
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { printDocumentViaSandbox, openDocumentPreviewInTab } from '@/lib/documents/print-service';
+import { exportToExcel } from '@/lib/documents/excel-service';
 
 type AttendanceRecord = {
   id: string;
@@ -189,6 +192,62 @@ export default function AdminAttendancePage() {
   const latePunches = filteredRecords.filter(r => checkIsLate(r.check_in_time)).length;
   const earlyPunches = filteredRecords.filter(r => checkIsEarlyLeave(r.check_out_time)).length;
   const onTimePunches = filteredRecords.filter(r => r.check_in_time && !checkIsLate(r.check_in_time)).length;
+
+  const printableAreaRef = useRef<HTMLDivElement>(null);
+
+  const handlePrintReport = async () => {
+    if (!printableAreaRef.current) return;
+    await printDocumentViaSandbox({
+      title: `รายงานการลงเวลาบุคลากร_${monthName.replace(/\s+/g, '_')}`,
+      paperSize: 'A4_LANDSCAPE',
+      contentHtml: printableAreaRef.current.innerHTML
+    });
+  };
+
+  const handlePreviewPdf = () => {
+    if (!printableAreaRef.current) return;
+    openDocumentPreviewInTab({
+      title: `รายงานการลงเวลาบุคลากร_${monthName.replace(/\s+/g, '_')}`,
+      paperSize: 'A4_LANDSCAPE',
+      contentHtml: printableAreaRef.current.innerHTML
+    });
+  };
+
+  const handleExportExcel = async () => {
+    if (records.length === 0) {
+      toast.error('ไม่มีข้อมูลการลงเวลาในเดือนนี้');
+      return;
+    }
+    await exportToExcel({
+      filename: `รายงานลงเวลาบุคลากร_${monthName.replace(/\s+/g, '_')}`,
+      sheetName: 'บันทึกเวลาเข้าออกงาน',
+      title: `รายงานการเข้า-ออกงานบุคลากร โรงเรียนสมคิดวิทยา ประจำเดือน ${monthName}`,
+      subtitle: `เกณฑ์เวลา: เข้างานไม่เกิน ${LATE_CUTOFF_TIME} น. • เลิกงานตั้งแต่ ${EARLY_LEAVE_TIME} น.`,
+      columns: [
+        { header: 'วันที่', key: 'date', width: 16 },
+        { header: 'ชื่อ-นามสกุล บุคลากร', key: 'name', width: 28 },
+        { header: 'เวลาเข้างาน', key: 'checkIn', width: 16 },
+        { header: 'เวลาออกงาน', key: 'checkOut', width: 16 },
+        { header: 'สถานะการลงเวลา', key: 'status', width: 24 },
+      ],
+      data: records.map(r => {
+        const inTime = formatTime(r.check_in_time);
+        const outTime = formatTime(r.check_out_time);
+        let status = 'ปกติ';
+        if (!r.check_in_time) status = 'ยังไม่ลงเวลาเข้า';
+        else if (checkIsLate(r.check_in_time)) status = 'มาสาย';
+        if (r.check_out_time && checkIsEarlyLeave(r.check_out_time)) status += ' / ออกก่อนเวลา';
+        return {
+          date: formatDate(r.date),
+          name: r.app_users?.full_name || 'ไม่ระบุ',
+          checkIn: inTime !== '-' ? `${inTime} น.` : '-',
+          checkOut: outTime !== '-' ? `${outTime} น.` : '-',
+          status,
+        };
+      })
+    });
+    toast.success('ส่งออกไฟล์ Excel เรียบร้อยแล้ว');
+  };
 
   // Open Edit Modal
   const openEditModal = (rec: AttendanceRecord) => {
@@ -374,10 +433,24 @@ export default function AdminAttendancePage() {
           </button>
           
           <button
-            onClick={() => window.print()}
-            className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 px-4 py-2.5 rounded-xl font-bold border border-slate-200 dark:border-slate-700 text-xs sm:text-sm transition-all"
+            onClick={handleExportExcel}
+            className="flex items-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/50 px-4 py-2.5 rounded-xl font-bold border border-emerald-200 dark:border-emerald-800 text-xs sm:text-sm transition-all cursor-pointer"
           >
-            <Printer className="w-4 h-4" /> พิมพ์รายงาน
+            <FileDown className="w-4 h-4" /> ส่งออก Excel
+          </button>
+          
+          <button
+            onClick={handlePreviewPdf}
+            className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 px-4 py-2.5 rounded-xl font-bold border border-slate-200 dark:border-slate-700 text-xs sm:text-sm transition-all cursor-pointer"
+          >
+            <FileDown className="w-4 h-4" /> ดูตัวอย่าง / PDF
+          </button>
+
+          <button
+            onClick={handlePrintReport}
+            className="flex items-center gap-2 bg-[#7B1C3E] hover:bg-[#631430] text-white px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm shadow-sm transition-all cursor-pointer"
+          >
+            <Printer className="w-4 h-4" /> พิมพ์รายงาน (A4 แนวนอน)
           </button>
         </div>
       </div>
@@ -453,12 +526,13 @@ export default function AdminAttendancePage() {
         </div>
       </div>
 
-      {/* Print Header (Only visible when printing) */}
-      <div className="hidden print:block text-center mb-8">
-        <h1 className="text-2xl font-bold">รายงานการเข้า-ออกงานบุคลากร</h1>
-        <p className="text-lg mt-1 font-semibold">โรงเรียนสมคิดวิทยา • ประจำเดือน {monthName}</p>
-        <p className="text-sm mt-1 text-slate-600">เวลาเข้างานมาตรฐาน: {LATE_CUTOFF_TIME} น. | เวลาเลิกงานมาตรฐาน: {EARLY_LEAVE_TIME} น.</p>
-      </div>
+      <div ref={printableAreaRef} className="space-y-6">
+        {/* Print Header (Only visible when printing) */}
+        <div className="hidden print:block text-center mb-8">
+          <h1 className="text-2xl font-bold">รายงานการเข้า-ออกงานบุคลากร</h1>
+          <p className="text-lg mt-1 font-semibold">โรงเรียนสมคิดวิทยา • ประจำเดือน {monthName}</p>
+          <p className="text-sm mt-1 text-slate-600">เวลาเข้างานมาตรฐาน: {LATE_CUTOFF_TIME} น. | เวลาเลิกงานมาตรฐาน: {EARLY_LEAVE_TIME} น.</p>
+        </div>
 
       {/* Table Container */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden min-h-[400px] print:shadow-none print:border-none print:bg-transparent print:min-h-0">
@@ -647,6 +721,7 @@ export default function AdminAttendancePage() {
           </div>
         </div>
       )}
+      </div>
 
       {/* MODAL 1: Edit Punch Modal */}
       <AnimatePresence>

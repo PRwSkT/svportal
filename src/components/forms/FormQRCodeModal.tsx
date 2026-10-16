@@ -16,6 +16,7 @@ import {
   QrCode,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { printDocumentViaSandbox } from '@/lib/documents/print-service';
 
 export interface FormQRCodeModalProps {
   isOpen: boolean;
@@ -312,109 +313,31 @@ export function FormQRCodeModal({ isOpen, onClose, formTitle, formSlug }: FormQR
     }
   };
 
-  const handlePrint = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
+  const handlePrint = async () => {
     // Get current QR image from canvas
     const canvas = qrContainerRef.current?.querySelector('canvas');
     const qrDataUrl = canvas ? canvas.toDataURL('image/png') : '';
 
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>พิมพ์ QR Code: ${formTitle}</title>
-          <style>
-            @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap');
-            body {
-              font-family: 'Montserrat', sans-serif, system-ui;
-              margin: 0;
-              padding: 40px;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              min-height: 100vh;
-              background-color: #ffffff;
-              color: #173D66;
-            }
-            .standee {
-              width: 100%;
-              max-width: 480px;
-              border: 3px solid #6E0D22;
-              border-radius: 28px;
-              padding: 40px 32px;
-              text-align: center;
-              box-shadow: 0 10px 25px rgba(0,0,0,0.06);
-            }
-            .header-logo {
-              max-height: 60px;
-              margin-bottom: 16px;
-            }
-            .school-name {
-              font-size: 16px;
-              font-weight: 700;
-              color: #6E0D22;
-              letter-spacing: 0.5px;
-              margin-bottom: 4px;
-            }
-            .title {
-              font-size: 20px;
-              font-weight: 700;
-              color: #0F172A;
-              margin-bottom: 24px;
-              line-height: 1.3;
-            }
-            .qr-box {
-              background: #ffffff;
-              display: inline-block;
-              padding: 16px;
-              border-radius: 20px;
-              border: 1px solid #E2E8F0;
-              margin-bottom: 20px;
-            }
-            .qr-img {
-              width: 280px;
-              height: 280px;
-              display: block;
-            }
-            .instructions {
-              font-size: 14px;
-              font-weight: 600;
-              color: #475569;
-              margin-bottom: 6px;
-            }
-            .url {
-              font-size: 12px;
-              color: #64748B;
-              word-break: break-all;
-            }
-            @media print {
-              body { padding: 0; }
-              .standee { border: 2px solid #6E0D22; box-shadow: none; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="standee">
-            <img src="/qr-generator/logo/sv-logo-social.png" class="header-logo" alt="Somkidvittaya School" />
-            <div class="school-name">โรงเรียนสมคิดวิทยา (SOMKIDVITTAYA SCHOOL)</div>
-            <div class="title">${formTitle}</div>
-            <div class="qr-box">
-              <img src="${qrDataUrl}" class="qr-img" alt="QR Code" />
-            </div>
-            <div class="instructions">สแกนด้วยโทรศัพท์มือถือเพื่อเข้าสู่แบบฟอร์ม</div>
-            <div class="url">${fullFormUrl}</div>
+    const contentHtml = `
+      <div style="font-family: Sarabun, Montserrat, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 80vh; padding: 20px;">
+        <div style="width: 100%; max-width: 480px; border: 3px solid #6E0D22; border-radius: 28px; padding: 40px 32px; text-align: center; box-shadow: none;">
+          <img src="/qr-generator/logo/sv-logo-social.png" style="max-height: 60px; margin-bottom: 16px;" alt="Somkidvittaya School" />
+          <div style="font-size: 16px; font-weight: 700; color: #6E0D22; letter-spacing: 0.5px; margin-bottom: 4px;">โรงเรียนสมคิดวิทยา (SOMKIDVITTAYA SCHOOL)</div>
+          <div style="font-size: 20px; font-weight: 700; color: #0F172A; margin-bottom: 24px; line-height: 1.3;">${formTitle}</div>
+          <div style="background: #ffffff; display: inline-block; padding: 16px; border-radius: 20px; border: 1px solid #E2E8F0; margin-bottom: 20px;">
+            <img src="${qrDataUrl}" style="width: 280px; height: 280px; display: block;" alt="QR Code" />
           </div>
-          <script>
-            window.onload = function() {
-              window.print();
-            };
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+          <div style="font-size: 14px; font-weight: 600; color: #475569; margin-bottom: 6px;">สแกนด้วยโทรศัพท์มือถือเพื่อเข้าสู่แบบฟอร์ม</div>
+          <div style="font-size: 12px; color: #64748B; word-break: break-all;">${fullFormUrl}</div>
+        </div>
+      </div>
+    `;
+
+    await printDocumentViaSandbox({
+      title: `ป้ายQR_${formTitle}`,
+      paperSize: 'A4_PORTRAIT',
+      contentHtml
+    });
   };
 
   if (!isOpen) return null;
