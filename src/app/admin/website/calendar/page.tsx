@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { CalendarEvent } from '@/types';
 import { createClient } from '@/lib/supabase/client';
 import { insertRecord, updateRecord, deleteRecord } from '@/app/admin/website/actions';
@@ -114,17 +115,26 @@ export default function CalendarManager() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center bg-surface/80 backdrop-blur-xl p-6 rounded-3xl shadow-sm border border-white/20">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-surface/80 backdrop-blur-xl p-6 rounded-3xl shadow-sm border border-white/20">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-primary">ปฏิทินกิจกรรม (Calendar)</h1>
-          <p className="text-foreground/60 text-sm mt-1">จัดการปฏิทินวิชาการและวันหยุดต่างๆ</p>
+          <h1 className="text-2xl font-extrabold tracking-tight text-primary">ปฏิทินกิจกรรมโรงเรียน (Website Calendar)</h1>
+          <p className="text-foreground/60 text-sm mt-1">จัดการปฏิทินกิจกรรมวิชาการและวันหยุดที่แสดงบนหน้าเว็บไซต์โรงเรียน</p>
         </div>
-        <button
-          onClick={() => { resetForm(); setShowModal(true); }}
-          className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl font-bold hover:bg-primary/90 shadow-md shadow-primary/20 transition-all active:scale-95 text-sm"
-        >
-          <Plus className="w-4 h-4" /> เพิ่มกิจกรรม
-        </button>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/calendar"
+            className="flex items-center gap-2 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 px-4 py-2.5 rounded-xl font-bold hover:bg-indigo-500/20 border border-indigo-500/30 transition-all text-sm"
+          >
+            <CalendarIcon className="w-4 h-4" />
+            <span>ปฏิทินปฏิบัติงาน & เวรครู</span>
+          </Link>
+          <button
+            onClick={() => { resetForm(); setShowModal(true); }}
+            className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl font-bold hover:bg-primary/90 shadow-md shadow-primary/20 transition-all active:scale-95 text-sm"
+          >
+            <Plus className="w-4 h-4" /> เพิ่มกิจกรรม
+          </button>
+        </div>
       </div>
 
       <div className="bg-surface/80 backdrop-blur-xl rounded-3xl shadow-sm border border-white/20 overflow-hidden min-h-[400px]">

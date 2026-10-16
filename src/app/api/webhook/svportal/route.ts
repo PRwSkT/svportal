@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getAdminClient } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid payload format' }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    const supabase = getAdminClient();
 
     switch (event) {
       case 'student.updated':
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
           id: data.id,
           name: data.name,
           grade: data.grade,
-          status: data.status || 'active',
+          status: data.status || 'กำลังศึกษาอยู่',
           updated_at: new Date().toISOString()
         });
         break;
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
 
       case 'fee.assigned':
         // SVPortal assigned a new fee to a student
-        await supabase.from('student_fees').upsert({
+        await supabase.from('fee_items').upsert({
           id: data.id, 
           student_id: data.student_id,
           fee_type_id: data.fee_type_id,

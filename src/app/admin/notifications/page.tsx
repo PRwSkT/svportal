@@ -149,8 +149,9 @@ export default function AdminNotificationsPage() {
     const finalTitle = customPayload?.title || title;
     const finalBody = customPayload?.body || body;
     const finalRole = customPayload?.recipientRole || targetRole;
-    const finalCategory = customPayload?.category || category;
+    const finalCategory = customPayload?.category || (customPayload?.type?.startsWith('academic') || customPayload?.type === 'attendance_at_risk' ? 'academic' : category);
     const finalUrl = customPayload?.actionUrl || actionUrl;
+    const finalUserId = customPayload?.recipientUserId || undefined;
 
     if (!finalTitle.trim() || !finalBody.trim()) {
       toast.warning('กรุณากรอกหัวข้อและเนื้อหาข้อความแจ้งเตือนให้ครบถ้วน');
@@ -168,6 +169,7 @@ export default function AdminNotificationsPage() {
           title: finalTitle,
           body: finalBody,
           targetRole: finalRole,
+          recipientUserId: finalUserId,
           category: finalCategory,
           actionUrl: finalUrl,
           sendPush: true,
@@ -232,7 +234,7 @@ export default function AdminNotificationsPage() {
             <div className="flex items-start gap-4 mb-4">
               <div className="relative w-12 h-12 flex-shrink-0">
                 <Image
-                  src="/images/nongfah/nongfah-avatar.png?v=5"
+                  src="/images/nongfah/nongfah-avatar.png"
                   alt="น้องฟ้า AI"
                   fill
                   className="object-contain drop-shadow"
@@ -263,23 +265,26 @@ export default function AdminNotificationsPage() {
                 <button
                   type="button"
                   onClick={() => handleNongFahDraft('เตือนครูและบุคลากรทุกคนที่ยังไม่ได้ส่งผลการประเมินตนเอง KPI ไตรมาส 1')}
-                  className="text-xs px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary font-medium transition-colors text-left"
+                  className="text-xs px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary font-medium transition-colors text-left inline-flex items-center gap-1.5"
                 >
-                  📝 เตือนส่งแบบประเมิน KPI
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>เตือนส่งแบบประเมิน KPI</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleNongFahDraft('เตือนผู้ปกครองและนักเรียนให้ตรวจสอบและอัปเดตข้อมูลที่อยู่และเบอร์ติดต่อ')}
-                  className="text-xs px-3 py-1.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 font-medium transition-colors text-left"
+                  className="text-xs px-3 py-1.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 font-medium transition-colors text-left inline-flex items-center gap-1.5"
                 >
-                  👨‍👩‍👧 เตือนอัปเดตข้อมูลผู้ปกครอง
+                  <Users className="w-3.5 h-3.5" />
+                  <span>เตือนอัปเดตข้อมูลผู้ปกครอง</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleNongFahDraft('แจ้งประกาศข่าวสารและปฏิทินกิจกรรมวันสำคัญของโรงเรียนประจำเดือนนี้')}
-                  className="text-xs px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 font-medium transition-colors text-left"
+                  className="text-xs px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 font-medium transition-colors text-left inline-flex items-center gap-1.5"
                 >
-                  📢 ประกาศกิจกรรมโรงเรียน
+                  <Bell className="w-3.5 h-3.5" />
+                  <span>ประกาศกิจกรรมโรงเรียน</span>
                 </button>
               </div>
 
@@ -331,29 +336,53 @@ export default function AdminNotificationsPage() {
               </div>
 
               <div className="divide-y divide-foreground/5 max-h-72 overflow-y-auto pr-1">
-                {smartReminders.map((reminder) => (
-                  <div key={reminder.id} className="py-3 flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                        <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-semibold">
-                          {reminder.type === 'kpi_pending' ? 'KPI' : 'Form'}
-                        </span>
-                        {reminder.recipientName}
-                      </div>
-                      <p className="text-xs text-foreground/70 mt-1">{reminder.title}</p>
-                      <p className="text-[11px] text-foreground/50">{reminder.body}</p>
-                    </div>
+                {smartReminders.map((reminder) => {
+                  const getReminderBadge = (type: string) => {
+                    switch (type) {
+                      case 'academic_pending_head':
+                        return { label: 'ปพ.5 รอตรวจ', cls: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30' };
+                      case 'academic_pending_director':
+                        return { label: 'ปพ.5 รออนุมัติ', cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30' };
+                      case 'attendance_at_risk':
+                        return { label: 'เวลาเรียนเสี่ยง มส.', cls: 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30' };
+                      case 'duty_upcoming':
+                        return { label: 'เวรปฏิบัติหน้าที่', cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30' };
+                      case 'calendar_event':
+                        return { label: 'ปฏิทินปฏิบัติงาน', cls: 'bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30' };
+                      case 'kpi_pending':
+                        return { label: 'KPI', cls: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30' };
+                      case 'form_deadline':
+                        return { label: 'แบบฟอร์ม', cls: 'bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30' };
+                      default:
+                        return { label: 'เตือนความจำ', cls: 'bg-primary/10 text-primary border-primary/20' };
+                    }
+                  };
+                  const badge = getReminderBadge(reminder.type);
 
-                    <button
-                      type="button"
-                      onClick={() => handleSendNotification(reminder)}
-                      disabled={isSending}
-                      className="px-3 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold flex items-center gap-1 shadow-sm flex-shrink-0 transition-all"
-                    >
-                      <Send className="w-3 h-3" /> ส่งเตือน
-                    </button>
-                  </div>
-                ))}
+                  return (
+                    <div key={reminder.id} className="py-3 flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${badge.cls}`}>
+                            {badge.label}
+                          </span>
+                          {reminder.recipientName}
+                        </div>
+                        <p className="text-xs text-foreground/70 mt-1">{reminder.title}</p>
+                        <p className="text-[11px] text-foreground/50">{reminder.body}</p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleSendNotification(reminder)}
+                        disabled={isSending}
+                        className="px-3 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold flex items-center gap-1 shadow-sm flex-shrink-0 transition-all"
+                      >
+                        <Send className="w-3 h-3" /> ส่งเตือน
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -374,6 +403,8 @@ export default function AdminNotificationsPage() {
                 >
                   <option value="all">ทุกคนในระบบ (All Roles)</option>
                   <option value="teachers">ครูและบุคลากร (Teachers & Staff)</option>
+                  <option value="academic staff">ฝ่ายวิชาการ / หัวหน้ากลุ่มสาระ (Academic Staff)</option>
+                  <option value="executive">ผู้บริหาร / ผู้อำนวยการ (Executive)</option>
                   <option value="parents">ผู้ปกครอง (Parents)</option>
                   <option value="students">นักเรียน (Students)</option>
                 </select>
@@ -387,6 +418,8 @@ export default function AdminNotificationsPage() {
                   className="w-full px-3.5 py-2.5 rounded-xl border border-foreground/15 bg-background text-sm font-medium focus:outline-none focus:border-primary"
                 >
                   <option value="general">ทั่วไป (General)</option>
+                  <option value="academic">งานวิชาการและผลการเรียน (Academic)</option>
+                  <option value="urgent">เร่งด่วน / ฉุกเฉิน (Urgent)</option>
                   <option value="kpi">การประเมิน KPI</option>
                   <option value="forms">แบบฟอร์มดิจิทัล (Forms)</option>
                   <option value="announcement">ข่าวสารและประกาศ (Announcement)</option>

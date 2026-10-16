@@ -246,6 +246,24 @@ export default function FormViewerClient({
   const [quizScoreResult, setQuizScoreResult] = useState<QuizSubmissionScore | null>(null);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
+  // Stale-closure prevention refs for async timers & proctoring auto-submit
+  const answersRef = useRef(answers);
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
+
+  const attachmentsRef = useRef(attachments);
+  useEffect(() => {
+    attachmentsRef.current = attachments;
+  }, [attachments]);
+
+  const timeSpentSecondsRef = useRef(timeSpentSeconds);
+  useEffect(() => {
+    timeSpentSecondsRef.current = timeSpentSeconds;
+  }, [timeSpentSeconds]);
+
+  const executeSubmitRef = useRef<(isForced?: boolean, forcedReason?: string) => Promise<void>>(() => Promise.resolve());
+
   // Shuffle questions & choices on client mount if configured
   useEffect(() => {
     if (!isQuiz) return;
@@ -685,15 +703,19 @@ export default function FormViewerClient({
         });
       }
 
+      const currentAnswers = answersRef.current;
+      const currentAttachments = attachmentsRef.current;
+      const currentTimeSpent = timeSpentSecondsRef.current;
+
       const res = await fetch(`/api/forms/${initialForm.slug}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          answers,
-          attachments: Object.values(attachments),
+          answers: currentAnswers,
+          attachments: Object.values(currentAttachments),
           lang,
           proctorLog: isQuiz ? proctorLogRef.current : undefined,
-          timeSpentSeconds: isQuiz ? timeSpentSeconds : undefined,
+          timeSpentSeconds: isQuiz ? currentTimeSpent : undefined,
         }),
       });
 
@@ -724,8 +746,12 @@ export default function FormViewerClient({
     }
   };
 
+  useEffect(() => {
+    executeSubmitRef.current = executeSubmit;
+  });
+
   const handleAutoSubmit = (reason: string) => {
-    executeSubmit(true, reason);
+    executeSubmitRef.current(true, reason);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -957,9 +983,9 @@ export default function FormViewerClient({
                 <span className="text-slate-400 block mb-0.5">การตรวจสอบความซื่อสัตย์</span>
                 <span className="font-semibold inline-flex items-center gap-1">
                   {tabSwitchCount === 0 && copyAttemptCount === 0 ? (
-                    <span className="text-emerald-600">🟢 สมบูรณ์ (ไม่พบข้อสงสัย)</span>
+                    <span className="text-emerald-600 inline-flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> สมบูรณ์ (ไม่พบข้อสงสัย)</span>
                   ) : (
-                    <span className="text-amber-600">⚠️ สลับจอ {tabSwitchCount} ครั้ง</span>
+                    <span className="text-amber-600 inline-flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> สลับจอ {tabSwitchCount} ครั้ง</span>
                   )}
                 </span>
               </div>
@@ -1032,8 +1058,9 @@ export default function FormViewerClient({
                             </div>
                           )}
                           {item.explanation && (
-                            <div className="mt-2 pt-2 border-t border-slate-200/60 text-slate-500 italic">
-                              💡 {item.explanation}
+                            <div className="mt-2 pt-2 border-t border-slate-200/60 text-slate-500 italic flex items-center gap-1.5">
+                              <Info className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                              <span>{item.explanation}</span>
                             </div>
                           )}
                         </div>

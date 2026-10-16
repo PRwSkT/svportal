@@ -864,7 +864,7 @@ export default function FormEditorPage({ params }: { params: Promise<{ id: strin
               title="ให้น้องฟ้าออกแบบโครงร่างฟอร์มให้คุณอัตโนมัติด้วย AI"
             >
               <img
-                src="/images/nongfah/nongfah-avatar.png?v=5"
+                src="/images/nongfah/nongfah-avatar.png"
                 alt="น้องฟ้า"
                 className="w-4 h-4 sm:w-5 sm:h-5 rounded-full object-cover bg-white border border-sky-300 shrink-0"
               />

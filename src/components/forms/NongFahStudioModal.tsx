@@ -99,7 +99,7 @@ export function NongFahStudioModal({
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-11 h-11 rounded-2xl overflow-hidden border-2 border-purple-200 bg-white shadow-xs shrink-0 flex items-center justify-center">
                 <img
-                  src="/images/nongfah/nongfah-avatar.png?v=5"
+                  src="/images/nongfah/nongfah-avatar.png"
                   alt="น้องฟ้า AI Chatbot"
                   className="w-full h-full object-cover"
                 />
@@ -151,7 +151,7 @@ export function NongFahStudioModal({
                 <div className="flex items-center gap-1.5 mb-1.5">
                   <div className="w-5 h-5 rounded-md overflow-hidden bg-sky-50 border border-sky-200 shrink-0">
                     <img
-                      src="/images/nongfah/nongfah-friendly.png?v=5"
+                      src="/images/nongfah/nongfah-friendly.png"
                       alt="น้องฟ้าแนะนำ"
                       className="w-full h-full object-cover"
                     />
@@ -195,7 +195,7 @@ export function NongFahStudioModal({
               <div className="p-6 bg-gradient-to-r from-purple-50/80 via-pink-50/40 to-sky-50/60 border border-purple-200 rounded-3xl flex flex-col items-center justify-center text-center space-y-3 shadow-2xs">
                 <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-purple-300 shadow-md bg-white">
                   <img
-                    src="/images/nongfah/nongfah-thinking.png?v=5"
+                    src="/images/nongfah/nongfah-thinking.png"
                     alt="น้องฟ้ากำลังคิด"
                     className="w-full h-full object-cover"
                   />
@@ -219,7 +219,7 @@ export function NongFahStudioModal({
                   <div className="flex items-center gap-2.5">
                     <div className="w-9 h-9 rounded-xl overflow-hidden border border-emerald-300 shadow-2xs bg-white shrink-0">
                       <img
-                        src="/images/nongfah/nongfah-cheer.png?v=5"
+                        src="/images/nongfah/nongfah-cheer.png"
                         alt="น้องฟ้าออกแบบสำเร็จ"
                         className="w-full h-full object-cover"
                       />

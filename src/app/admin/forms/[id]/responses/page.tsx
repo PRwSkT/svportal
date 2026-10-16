@@ -848,12 +848,12 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
               {/* Quick Action Chips */}
               <div className="mt-3 flex flex-wrap gap-2">
                 {[
-                  { label: '📌 สรุปจุดเด่น & จุดที่ต้องปรับปรุงเร่งด่วน', prompt: 'สรุปจุดเด่นและจุดที่ควรปรับปรุงเร่งด่วนจากผลการตอบฟอร์มนี้' },
-                  { label: '👔 สรุปรายงานนำเสนอผู้บริหาร', prompt: 'ช่วยสรุปผลการสำรวจนี้ให้เป็นรายงานเชิงบริหารสำหรับนำเสนอที่ประชุมผู้บริหารโรงเรียน' },
-                  { label: '⚠️ ตรวจสอบเคสด่วน / สุขภาพนักเรียน', prompt: 'มีกรณีที่ต้องติดตามเร่งด่วน เช่น ปัญหาสุขภาพ การแพ้อาหาร หรือความเดือดร้อนไหม' },
-                  { label: '🎯 จัดกลุ่มข้อเสนอแนะตามประเด็น', prompt: 'ช่วยจัดกลุ่มข้อคิดเห็นและข้อเสนอแนะของผู้ตอบออกเป็นประเด็นสำคัญ พร้อมสถิติ' },
-                  { label: '📊 วิเคราะห์ความพึงพอใจและแนวโน้ม', prompt: 'วิเคราะห์คะแนนความพึงพอใจและการแจกแจงคำตอบในภาพรวมพร้อมแนวโน้ม' },
-                  { label: '💡 ร่างแนวทางแก้ไขตามเสียงสะท้อน', prompt: 'จากผลสำรวจทั้งหมด ช่วยเสนอแนะ Action Plan และแนวทางแก้ไขปัญหาที่ทำได้จริงให้โรงเรียน' },
+                  { label: 'สรุปจุดเด่น & จุดที่ต้องปรับปรุงเร่งด่วน', prompt: 'สรุปจุดเด่นและจุดที่ควรปรับปรุงเร่งด่วนจากผลการตอบฟอร์มนี้' },
+                  { label: 'สรุปรายงานนำเสนอผู้บริหาร', prompt: 'ช่วยสรุปผลการสำรวจนี้ให้เป็นรายงานเชิงบริหารสำหรับนำเสนอที่ประชุมผู้บริหารโรงเรียน' },
+                  { label: 'ตรวจสอบเคสด่วน / สุขภาพนักเรียน', prompt: 'มีกรณีที่ต้องติดตามเร่งด่วน เช่น ปัญหาสุขภาพ การแพ้อาหาร หรือความเดือดร้อนไหม' },
+                  { label: 'จัดกลุ่มข้อเสนอแนะตามประเด็น', prompt: 'ช่วยจัดกลุ่มข้อคิดเห็นและข้อเสนอแนะของผู้ตอบออกเป็นประเด็นสำคัญ พร้อมสถิติ' },
+                  { label: 'วิเคราะห์ความพึงพอใจและแนวโน้ม', prompt: 'วิเคราะห์คะแนนความพึงพอใจและการแจกแจงคำตอบในภาพรวมพร้อมแนวโน้ม' },
+                  { label: 'ร่างแนวทางแก้ไขตามเสียงสะท้อน', prompt: 'จากผลสำรวจทั้งหมด ช่วยเสนอแนะ Action Plan และแนวทางแก้ไขปัญหาที่ทำได้จริงให้โรงเรียน' },
                 ].map((chip, idx) => (
                   <button
                     key={idx}
@@ -931,7 +931,7 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
                               : 'bg-rose-100 text-rose-800 border border-rose-300'
                           }`}
                         >
-                          {selectedResponse.quiz_score.passed ? '🎉 สอบผ่านเกณฑ์' : '❌ ไม่ผ่านเกณฑ์'}
+                          {selectedResponse.quiz_score.passed ? 'สอบผ่านเกณฑ์' : 'ไม่ผ่านเกณฑ์'}
                         </span>
                       )}
                     </div>
@@ -1193,8 +1193,9 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
                                     </div>
                                     <div className="flex flex-wrap gap-1.5">
                                       {breakdownItem.ai_evaluation.key_points_covered.map((pt: string, pIdx: number) => (
-                                        <span key={pIdx} className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md text-[10px]">
-                                          ✓ {pt}
+                                        <span key={pIdx} className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md text-[10px] inline-flex items-center gap-1">
+                                          <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                          <span>{pt}</span>
                                         </span>
                                       ))}
                                     </div>

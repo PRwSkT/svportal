@@ -16,18 +16,9 @@ function getAdminClient() {
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    if (!isSystemAdmin(user.email)) {
-      const { data: role, error: roleError } = await supabase.rpc('get_user_role');
-      if (roleError || role !== 'admin') {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
+    const auth = await requireAuth('admin', 'admin_users');
+    if (auth.error) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
     const supabaseAdmin = getAdminClient();
@@ -91,24 +82,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    // Check if the current user is an admin
-    if (process.env.NODE_ENV !== 'development') {
-      const supabase = await createClient();
-      const { data: authData } = await supabase.auth.getUser();
-      const user = authData?.user;
-      const adminEmails = [
-        'admin@somkidvittaya.ac.th',
-        'peerawat@somkidvittaya.ac.th',
-        'media@somkidvittaya.ac.th',
-        'admin@svportal.com'
-      ];
-      const isHardcodedAdmin = user?.email && adminEmails.includes(user.email);
-      if (!isHardcodedAdmin) {
-        const { data: roleData, error: roleError } = await supabase.rpc('get_user_role');
-        if (roleError || roleData !== 'admin') {
-          return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-        }
-      }
+    const auth = await requireAuth('admin', 'admin_users');
+    if (auth.error) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
     const { email, password, full_name, role, assigned_features, personnel_id } = await request.json();
@@ -164,32 +140,11 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    let user = null;
-    
-    // Check if the current user is an admin
-    if (process.env.NODE_ENV !== 'development') {
-      const supabase = await createClient();
-      const { data: authData, error: userError } = await supabase.auth.getUser();
-      user = authData?.user;
-      
-      if (userError || !user) {
-          return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-      }
-
-      const adminEmails = [
-        'admin@somkidvittaya.ac.th',
-        'peerawat@somkidvittaya.ac.th',
-        'media@somkidvittaya.ac.th',
-        'admin@svportal.com'
-      ];
-      const isHardcodedAdmin = user?.email && adminEmails.includes(user.email);
-      if (!isHardcodedAdmin) {
-        const { data: roleData, error: roleError } = await supabase.rpc('get_user_role');
-        if (roleError || roleData !== 'admin') {
-          return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-        }
-      }
+    const auth = await requireAuth('admin', 'admin_users');
+    if (auth.error) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+    const user = auth.user;
 
     const { pathname } = new URL(request.url);
     // For PATCH /api/admin/users?id=xxx

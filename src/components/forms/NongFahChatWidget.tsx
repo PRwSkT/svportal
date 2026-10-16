@@ -288,7 +288,7 @@ export function NongFahChatWidget({
             >
               <div className="w-7 h-7 rounded-xl overflow-hidden bg-sky-50 border border-sky-200 shrink-0">
                 <img
-                  src="/images/nongfah/nongfah-wave.png?v=5"
+                  src="/images/nongfah/nongfah-wave.png"
                   alt="น้องฟ้าทักทาย"
                   className="w-full h-full object-cover"
                 />
@@ -315,7 +315,7 @@ export function NongFahChatWidget({
 
               <div className="w-full h-full rounded-[22px] bg-white overflow-hidden relative border-2 border-white/60 shadow-inner flex items-center justify-center">
                 <img
-                  src="/images/nongfah/nongfah-avatar.png?v=5"
+                  src="/images/nongfah/nongfah-avatar.png"
                   alt="น้องฟ้า AI Chatbot โรงเรียนสมคิดวิทยา"
                   className="w-full h-full object-cover hover:scale-105 transition-transform"
                 />
@@ -346,7 +346,7 @@ export function NongFahChatWidget({
               <div className="flex items-center gap-3 min-w-0">
                 <div className="relative w-11 h-11 rounded-2xl overflow-hidden bg-white border-2 border-white/40 flex items-center justify-center shrink-0 shadow-xs">
                   <img
-                    src="/images/nongfah/nongfah-avatar.png?v=5"
+                    src="/images/nongfah/nongfah-avatar.png"
                     alt="น้องฟ้า AI"
                     className="w-full h-full object-cover"
                   />
@@ -431,7 +431,7 @@ export function NongFahChatWidget({
                     {!isUser && (
                       <div className="w-8 h-8 rounded-xl overflow-hidden border border-slate-200/90 shadow-2xs shrink-0 mt-0.5 bg-white flex items-center justify-center">
                         <img
-                          src="/images/nongfah/nongfah-avatar.png?v=5"
+                          src="/images/nongfah/nongfah-avatar.png"
                           alt="น้องฟ้า"
                           className="w-full h-full object-cover"
                         />
@@ -698,7 +698,7 @@ export function NongFahChatWidget({
                 <div className="flex items-start gap-2.5">
                   <div className="w-8 h-8 rounded-xl overflow-hidden border border-sky-200 shadow-2xs shrink-0 mt-0.5 bg-white flex items-center justify-center">
                     <img
-                      src="/images/nongfah/nongfah-thinking.png?v=5"
+                      src="/images/nongfah/nongfah-thinking.png"
                       alt="น้องฟ้ากำลังคิด"
                       className="w-full h-full object-cover"
                     />

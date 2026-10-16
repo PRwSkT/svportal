@@ -61,3 +61,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function GET(request: Request) {
+  try {
+    const auth = await requireAuth('cashier', 'pos_shop');
+    if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+    const supabase = await createClient();
+    const { searchParams } = new URL(request.url);
+    const limit = parseInt(searchParams.get('limit') || '30', 10);
+
+    const { data, error } = await supabase
+      .from('shop_transactions')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    return NextResponse.json({ success: true, transactions: data || [] });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

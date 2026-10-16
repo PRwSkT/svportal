@@ -85,28 +85,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'จำนวนเงินปรับยอดต้องไม่เป็น 0' }, { status: 400 });
     }
 
-    if (amount > 0) {
-      const payload = {
-        student_id,
-        amount,
-        channel: 'system',
-        cashier_note: `[Adjustment] ${note || 'Admin adjustment'} (by ${auth.user?.email || auth.user?.id})`,
-        svportal_ref: null,
-      };
-      const { data, error } = await supabase.rpc('topup_wallet', { payload });
-      if (error) throw error;
-      return NextResponse.json(data);
-    } else {
-      const absAmount = Math.abs(amount);
-      const payload = {
-        student_id,
-        amount: absAmount,
-        reference_id: `adj-${Date.now()}`,
-      };
-      const { data, error } = await supabase.rpc('deduct_wallet_balance', { payload });
-      if (error) throw error;
-      return NextResponse.json(data);
-    }
+    const payload = {
+      student_id,
+      amount,
+      cashier_note: `[Adjustment] ${note || 'Admin adjustment'} (by ${auth.user?.email || auth.user?.id})`,
+    };
+
+    const { data, error } = await supabase.rpc('admin_adjust_wallet_balance', { payload });
+    if (error) throw error;
+    return NextResponse.json(data);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

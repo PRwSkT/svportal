@@ -111,11 +111,15 @@ export async function POST(req: NextRequest) {
     const summaryResult = await summarizeResponsesWithNongFah(sanitizedPayload);
 
     // 6. Enrich Nong Fah's Student-Specific Insights with Real Database Data (Safe Server-side Join)
+    const caseMap = sanitizedPayload.caseToStudentIdMap || {};
     const rawStudentInsights = summaryResult.studentSpecificInsights || [];
     const extractedStudentIds = Array.from(
       new Set(
         rawStudentInsights
-          .map((item) => String(item.student_id).replace(/^SID:?/i, '').trim())
+          .map((item) => {
+            const raw = String(item.student_id).replace(/^SID:?/i, '').trim();
+            return caseMap[raw] || raw;
+          })
           .filter(Boolean)
       )
     );
@@ -129,7 +133,8 @@ export async function POST(req: NextRequest) {
       const studentMap = new Map((dbStudents || []).map((s) => [s.id, s]));
 
       summaryResult.studentSpecificInsights = rawStudentInsights.map((item) => {
-        const cleanId = String(item.student_id).replace(/^SID:?/i, '').trim();
+        const raw = String(item.student_id).replace(/^SID:?/i, '').trim();
+        const cleanId = caseMap[raw] || raw;
         const student = studentMap.get(cleanId);
         return {
           ...item,

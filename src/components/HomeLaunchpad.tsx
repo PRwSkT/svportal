@@ -22,7 +22,19 @@ import {
   Globe,
   Clock,
   Award,
-  Bell
+  Bell,
+  BookOpen,
+  CalendarDays,
+  CheckSquare,
+  FileCheck2,
+  Baby,
+  HeartHandshake,
+  Apple,
+  Bus,
+  Stethoscope,
+  ShieldCheck,
+  HandCoins,
+  ScrollText
 } from 'lucide-react';
 import { getRoleConfig } from '@/lib/constants/roles';
 
@@ -50,7 +62,8 @@ export default function HomeLaunchpad() {
       tools: [
         { id: "dashboard", name: dict.nav.dashboard, href: "/dashboard", icon: <LineChart className="w-6 h-6" />, color: "bg-emerald-500 text-white" },
         { id: "pos_fees", name: dict.nav.posFees, href: "/pos/fees", icon: <CreditCard className="w-6 h-6" />, color: "bg-emerald-500/20 text-emerald-600" },
-        { id: "admin_reports", name: dict.nav.adminReports, href: "/admin/reports", icon: <FileText className="w-6 h-6" />, color: "bg-emerald-500/20 text-emerald-600" }
+        { id: "admin_reports", name: dict.nav.adminReports, href: "/admin/reports", icon: <FileText className="w-6 h-6" />, color: "bg-emerald-500/20 text-emerald-600" },
+        { id: "subsidy_free15y", name: language === 'th' ? "เรียนฟรี 15 ปี (อร.11)" : "15Y Free Subsidy", href: "/admin/subsidy/free15y", icon: <HandCoins className="w-6 h-6" />, color: "bg-teal-500/20 text-teal-600" }
       ]
     },
     {
@@ -69,7 +82,11 @@ export default function HomeLaunchpad() {
       icon: <FileText className="w-5 h-5 text-indigo-500" />,
       color: "border-indigo-500/20 bg-indigo-500/5",
       tools: [
-        { id: "admin_students", name: dict.nav.adminStudents, href: "/admin/students", icon: <Users className="w-6 h-6" />, color: "bg-indigo-500/20 text-indigo-600" }
+        { id: "admin_students", name: dict.nav.adminStudents, href: "/admin/students", icon: <Users className="w-6 h-6" />, color: "bg-indigo-500 text-white" },
+        { id: "pastoral_care", name: language === 'th' ? "ดูแลนักเรียน (SDQ)" : "Pastoral Care", href: "/pastoral", icon: <HeartHandshake className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
+        { id: "student_nutrition", name: language === 'th' ? "โภชนาการ & นม" : "Nutrition & Milk", href: "/admin/students/nutrition", icon: <Apple className="w-6 h-6" />, color: "bg-emerald-500/20 text-emerald-600" },
+        { id: "van_safety", name: language === 'th' ? "รถตู้รับ-ส่ง" : "Van Safety", href: "/admin/safety/van", icon: <Bus className="w-6 h-6" />, color: "bg-amber-500/20 text-amber-600" },
+        { id: "school_infirmary", name: language === 'th' ? "ห้องพยาบาล" : "Infirmary", href: "/admin/health/infirmary", icon: <Stethoscope className="w-6 h-6" />, color: "bg-red-500/20 text-red-600" }
       ]
     },
     {
@@ -79,7 +96,8 @@ export default function HomeLaunchpad() {
       tools: [
         { id: "admin_users", name: dict.nav.adminUsers, href: "/admin/users", icon: <Users className="w-6 h-6" />, color: "bg-purple-500/20 text-purple-600" },
         { id: "admin_attendance", name: dict.nav.adminAttendance, href: "/admin/attendance", icon: <Clock className="w-6 h-6" />, color: "bg-purple-500/20 text-purple-600" },
-        { id: "admin_kpi", name: dict.nav.adminKpi, href: "/admin/kpi", icon: <Award className="w-6 h-6" />, color: "bg-[#7B1C3E] text-white" }
+        { id: "admin_kpi", name: dict.nav.adminKpi, href: "/admin/kpi", icon: <Award className="w-6 h-6" />, color: "bg-[#7B1C3E] text-white" },
+        { id: "esar_governance", name: language === 'th' ? "รายงาน e-SAR & ใบอนุญาต" : "e-SAR & Governance", href: "/admin/governance", icon: <ShieldCheck className="w-6 h-6" />, color: "bg-indigo-500/20 text-indigo-600" }
       ]
     },
     {
@@ -96,19 +114,19 @@ export default function HomeLaunchpad() {
       ]
     },
     {
-      title: dict.nav.generalAdmin,
-      icon: <Settings className="w-5 h-5 text-slate-500" />,
-      color: "border-slate-500/20 bg-slate-500/5",
+      title: language === 'th' ? "งานวิชาการและงานวัดผล" : "Academic & Measurement",
+      icon: <GraduationCap className="w-5 h-5 text-indigo-500" />,
+      color: "border-indigo-500/20 bg-indigo-500/5",
       tools: [
-        { id: "settings", name: dict.nav.settings, href: "#", icon: <Settings className="w-6 h-6" />, color: "bg-slate-500/20 text-slate-600" }
-      ]
-    },
-    {
-      title: language === 'th' ? "งานวิชาการ" : "Academic Affairs",
-      icon: <GraduationCap className="w-5 h-5 text-orange-500" />,
-      color: "border-orange-500/20 bg-orange-500/5",
-      tools: [
-        { id: "academic_todo", name: language === 'th' ? "รอการพัฒนา" : "In Development", href: "#", icon: <GraduationCap className="w-6 h-6" />, color: "bg-orange-500/20 text-orange-600" }
+        { id: "academic_hub", name: language === 'th' ? "ศูนย์รวมวิชาการ" : "Academic Hub", href: "/academic", icon: <GraduationCap className="w-6 h-6" />, color: "bg-indigo-500 text-white" },
+        { id: "academic_gradebook", name: language === 'th' ? "Smart Gradebook (ปพ.5)" : "Gradebook (P.P.5)", href: "/academic/gradebook", icon: <BookOpen className="w-6 h-6" />, color: "bg-emerald-500/20 text-emerald-600" },
+        { id: "academic_early_years", name: language === 'th' ? "พัฒนาการปฐมวัย" : "Early Years", href: "/academic/early-years", icon: <Baby className="w-6 h-6" />, color: "bg-pink-500/20 text-pink-600" },
+        { id: "academic_exams", name: language === 'th' ? "คลังข้อสอบ & ตรวจ OMR" : "Exams & OMR", href: "/academic/exams", icon: <CheckSquare className="w-6 h-6" />, color: "bg-amber-500/20 text-amber-600" },
+        { id: "academic_timetable", name: language === 'th' ? "ตารางสอน & จัดสอนแทน" : "Timetable", href: "/academic/timetable", icon: <CalendarDays className="w-6 h-6" />, color: "bg-sky-500/20 text-sky-600" },
+        { id: "academic_documents", name: language === 'th' ? "เอกสาร ปพ.1-3 & ปพ.6" : "Statutory Docs (PP.1-6)", href: "/academic/documents", icon: <ScrollText className="w-6 h-6" />, color: "bg-teal-500/20 text-teal-600" },
+        { id: "academic_opec", name: language === 'th' ? "ส่งออก REGIS (สช.)" : "OPEC REGIS Export", href: "/academic/opec", icon: <FileCheck2 className="w-6 h-6" />, color: "bg-purple-500/20 text-purple-600" },
+        { id: "calendar", name: language === 'th' ? "ปฏิทินปฏิบัติงาน & เวรครู" : "Operational Calendar", href: "/calendar", icon: <CalendarDays className="w-6 h-6" />, color: "bg-indigo-500/20 text-indigo-600" },
+        { id: "admin_academic", name: language === 'th' ? "ตั้งค่าหลักสูตร" : "Academic Setup", href: "/admin/academic", icon: <Settings className="w-6 h-6" />, color: "bg-slate-500/20 text-slate-600" }
       ]
     }
   ];

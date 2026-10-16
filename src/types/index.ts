@@ -14,6 +14,9 @@ export type Student = {
   weight?: number | null;
   disability?: string | null;
   enrolled_date?: string | null;
+  classroom?: string | null;
+  allergies?: string | null;
+  medical_conditions?: string | null;
   wallet_balance: number; // Thai Baht
   status: string; // 'กำลังศึกษาอยู่' etc.
   created_at: string;
@@ -278,14 +281,35 @@ export type AlbumPhoto = {
   created_at: string;
 };
 
+export type CalendarCategory = 
+  | 'academic' 
+  | 'activity' 
+  | 'holiday' 
+  | 'duty' 
+  | 'meeting' 
+  | 'administrative' 
+  | 'other';
+
 export type CalendarEvent = {
   id: string;
   title_th: string;
-  title_en: string;
+  title_en?: string | null;
   start_date: string;
   end_date: string | null;
   is_holiday: boolean;
-  category: string; // 'academic', 'holiday', 'activity'
+  category: CalendarCategory;
+  description?: string | null;
+  location?: string | null;
+  target_role?: string | null; // 'all' | 'teacher' | 'academic staff' | 'executive' | 'parent'
+  assigned_personnel_ids?: string[] | null;
+  assigned_personnel?: Array<{ id: string; name_th: string; role?: string; user_id?: string }> | null;
+  is_duty?: boolean;
+  duty_type?: 'morning_gate' | 'evening_gate' | 'canteen' | 'holiday_watch' | 'academic_duty' | 'other' | null;
+  publish_to_web?: boolean;
+  color_code?: string | null;
+  action_url?: string | null;
+  notification_dispatched_at?: string | null;
+  created_by?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -433,7 +457,7 @@ export interface ProctorViolationItem {
 }
 
 export interface ProctoringLog {
-  integrity_status?: 'clean' | 'suspicious' | 'flagged'; // 🟢 ปลอดภัย, 🟡 มีข้อสงสัย, 🔴 น่าสงสัยสูง
+  integrity_status?: 'clean' | 'suspicious' | 'flagged'; // ปลอดภัย, มีข้อสงสัย, น่าสงสัยสูง
   tab_switch_count: number;
   fullscreen_exit_count: number;
   copy_attempt_count: number;
@@ -492,3 +516,4 @@ export type FormResponse = {
   submitted_at: string;
 };
 
+export * from './academic';

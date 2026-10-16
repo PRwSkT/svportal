@@ -10,7 +10,7 @@ export default async function TestPage() {
   
   // This might fail if the user hasn't created the table or provided the keys, 
   // but it's meant to verify connection attempts.
-  const { data, error } = await supabase.from('transactions').select('*').limit(1);
+  const { data, error } = await supabase.from('wallet_transactions').select('*').limit(1);
 
   return (
     <div className="p-8">

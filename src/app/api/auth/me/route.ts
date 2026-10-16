@@ -19,6 +19,26 @@ export async function GET() {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
 
     if (userError || !user) {
+      if (process.env.SV_PREVIEW_MODE === 'true') {
+        const mockUser = {
+          id: '47d50deb-be67-4a2b-8518-0d62a229f942',
+          email: 'admin@somkidvittaya.ac.th',
+          user_metadata: { full_name: 'อาจารย์ผู้ดูแลระบบ (SV Admin)' }
+        };
+        return NextResponse.json({
+          user: mockUser,
+          appUser: {
+            id: mockUser.id,
+            full_name: 'อาจารย์ผู้ดูแลระบบ (SV Admin)',
+            role: 'admin',
+            is_active: true,
+            assigned_features: [],
+            created_at: new Date().toISOString()
+          },
+          role: 'admin',
+          isSystemAdmin: true
+        });
+      }
       return NextResponse.json({ user: null, appUser: null, role: null }, { status: 401 });
     }
 
@@ -65,7 +85,9 @@ export async function GET() {
               'dashboard', 'pos_fees', 'admin_reports', 'pos_shop', 'admin_products', 
               'pos_wallet_topup', 'admin_wallet_students', 'admin_students', 'admin_users', 
               'admin_attendance', 'admin_website', 'post_assistant', 'audio_remote', 
-              'qr_generator', 'settings', 'academic_todo'
+              'qr_generator', 'settings', 
+              'academic_hub', 'academic_gradebook', 'academic_early_years', 
+              'academic_exams', 'academic_timetable', 'academic_opec', 'admin_academic'
             ] : []
           })
           .select()

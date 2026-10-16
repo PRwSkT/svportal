@@ -4,7 +4,7 @@ import { requireAuth } from '@/lib/auth';
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireAuth('admin', 'admin_students');
+    const auth = await requireAuth('teacher', 'admin_students');
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }

@@ -360,6 +360,7 @@ export async function createForm(payload: {
       thank_you_message: { th: 'โรงเรียนสมคิดวิทยาได้รับข้อมูลของท่านเรียบร้อยแล้ว' },
       created_by: isUuid(context.userId) ? context.userId : null,
       collaborator_ids: [],
+      quiz_settings: (payload as any).quiz_settings || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -475,6 +476,7 @@ export async function saveFormStudio(
       thank_you_title: formPayload.thank_you_title,
       thank_you_message: formPayload.thank_you_message,
       notify_emails: formPayload.notify_emails || null,
+      quiz_settings: formPayload.quiz_settings !== undefined ? formPayload.quiz_settings : null,
       updated_at: new Date().toISOString(),
     };
 
@@ -838,5 +840,91 @@ export async function updateFormCollaborators(
   } catch (err: any) {
     console.error('updateFormCollaborators error:', err);
     return { success: false, error: err?.message || 'ไม่สามารถบันทึกสิทธิ์ผู้ร่วมจัดการได้' };
+  }
+}
+
+/**
+ * Duplicate a form and all its fields (including quiz_settings)
+ */
+export async function duplicateForm(formId: string): Promise<ActionResult<{ newFormId: string }>> {
+  try {
+    const auth = await verifyFormAuth();
+    if (!auth.authorized || !auth.context) return { success: false, error: auth.error };
+
+    const { context } = auth;
+    const supabase = getAdminClient();
+
+    // 1. Fetch source form and fields
+    const [formRes, fieldsRes] = await Promise.all([
+      supabase.from('forms').select('*').eq('id', formId).single(),
+      supabase.from('form_fields').select('*').eq('form_id', formId).order('sort_order', { ascending: true })
+    ]);
+
+    if (formRes.error || !formRes.data) throw new Error('ไม่พบแบบฟอร์มต้นฉบับ');
+
+    const src = formRes.data;
+    const isUuid = (val?: string | null): boolean =>
+      Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val));
+
+    const newSlug = `${src.slug}-copy-${Date.now().toString(36)}`;
+    const newTitle = typeof src.title === 'object' && src.title !== null
+      ? { ...src.title, th: `${src.title.th || 'แบบฟอร์ม'} (สำเนา)` }
+      : { th: `${src.title || 'แบบฟอร์ม'} (สำเนา)` };
+
+    const newForm = {
+      slug: newSlug,
+      title: newTitle,
+      description: src.description,
+      banner_url: src.banner_url,
+      category: src.category,
+      access_type: src.access_type,
+      is_published: false,
+      response_count: 0,
+      thank_you_title: src.thank_you_title,
+      thank_you_message: src.thank_you_message,
+      created_by: isUuid(context.userId) ? context.userId : null,
+      collaborator_ids: [],
+      quiz_settings: src.quiz_settings || null,
+      starts_at: null,
+      ends_at: null,
+      max_responses: src.max_responses || null,
+      allow_multiple: src.allow_multiple ?? true,
+      notify_emails: src.notify_emails || null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data: created, error: createErr } = await supabase
+      .from('forms')
+      .insert([newForm])
+      .select()
+      .single();
+
+    if (createErr) throw createErr;
+
+    // 2. Clone fields
+    if (fieldsRes.data && fieldsRes.data.length > 0) {
+      const clonedFields = fieldsRes.data.map((f: any) => ({
+        form_id: created.id,
+        field_key: f.field_key,
+        label: f.label,
+        help_text: f.help_text,
+        field_type: f.field_type,
+        is_required: f.is_required,
+        options: f.options,
+        validation: f.validation,
+        image_url: f.image_url,
+        quiz_config: f.quiz_config,
+        sort_order: f.sort_order,
+        width: f.width,
+      }));
+
+      await supabase.from('form_fields').insert(clonedFields);
+    }
+
+    return { success: true, data: { newFormId: created.id } };
+  } catch (err: any) {
+    console.error('duplicateForm error:', err);
+    return { success: false, error: err?.message || 'ไม่สามารถคัดลอกแบบฟอร์มได้' };
   }
 }

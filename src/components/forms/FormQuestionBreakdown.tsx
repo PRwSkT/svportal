@@ -172,7 +172,7 @@ export function FormQuestionBreakdown({
       for (let star = 1; star <= 5; star++) {
         const cnt = countMap[String(star)] || 0;
         chartItems.push({
-          label: `${star} ดาว ⭐`,
+          label: `${star} ดาว`,
           value: String(star),
           count: cnt,
           percentage: answered > 0 ? Math.round((cnt / answered) * 100) : 0,

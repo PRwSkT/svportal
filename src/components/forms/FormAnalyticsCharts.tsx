@@ -915,7 +915,7 @@ function FieldAnalyticsCard({
 
     const distData = Object.entries(distMap)
       .map(([val, cnt]) => ({
-        label: field.field_type === 'rating' ? `${val} ดาว ⭐` : `${val}`,
+        label: field.field_type === 'rating' ? `${val} ดาว` : `${val}`,
         score: Number(val),
         count: cnt,
         percentage: count > 0 ? Math.round((cnt / count) * 100) : 0,

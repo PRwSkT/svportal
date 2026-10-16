@@ -7,7 +7,7 @@ import { getStudentById, updateStudent, createStudent, upsertStudentAddress, ups
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Save, User, MapPin, Users, PlusCircle, CheckCircle2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, User, MapPin, Users, PlusCircle, CheckCircle2, Trash2, Heart, ShieldAlert, AlertTriangle } from 'lucide-react';
 import ThaiAddressRow from '@/components/admin/ThaiAddressRow';
 
 export default function StudentDetailPage() {
@@ -25,7 +25,7 @@ export default function StudentDetailPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'address' | 'parents'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'health' | 'address' | 'parents'>('general');
   const [studentType, setStudentType] = useState<'normal' | 'e'>('normal');
 
   useEffect(() => {
@@ -234,6 +234,7 @@ export default function StudentDetailPage() {
         <div className="flex border-b border-foreground/5 bg-foreground/[0.02]">
           {[
             { id: 'general', label: 'ข้อมูลพื้นฐาน', icon: User },
+            { id: 'health', label: 'สุขภาพ & แพ้ยา', icon: Heart },
             { id: 'address', label: 'ข้อมูลที่อยู่', icon: MapPin },
             { id: 'parents', label: 'ข้อมูลผู้ปกครอง', icon: Users }
           ].map(tab => {
@@ -247,6 +248,9 @@ export default function StudentDetailPage() {
               >
                 <Icon className={`w-4 h-4 ${isActive ? 'text-primary' : 'text-foreground/40'}`} />
                 {tab.label}
+                {tab.id === 'health' && student.allergies && (
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                )}
                 {isActive && (
                   <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
                 )}
@@ -323,7 +327,7 @@ export default function StudentDetailPage() {
                     <input type="text" value={student.last_name || ''} onChange={e => setStudent({...student, last_name: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all" />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-foreground/70 mb-2">ระดับชั้น</label>
+                    <label className="block text-sm font-semibold text-foreground/70 mb-2">ระดับชั้น (Grade)</label>
                     <input type="text" list="grade-list" value={student.grade || ''} onChange={e => setStudent({...student, grade: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all" />
                     <datalist id="grade-list">
                       <option value="อ.1" />
@@ -338,6 +342,10 @@ export default function StudentDetailPage() {
                     </datalist>
                   </div>
                   <div>
+                    <label className="block text-sm font-semibold text-foreground/70 mb-2">ห้องเรียน (Classroom)</label>
+                    <input type="text" placeholder="เช่น 1 หรือ ป.3/1" value={student.classroom || ''} onChange={e => setStudent({...student, classroom: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all" />
+                  </div>
+                  <div>
                     <label className="block text-sm font-semibold text-foreground/70 mb-2">วันเกิด</label>
                     <input type="date" value={student.birth_date || ''} onChange={e => setStudent({...student, birth_date: e.target.value})} className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all" />
                   </div>
@@ -350,6 +358,99 @@ export default function StudentDetailPage() {
                       <option value="ลาออก">ลาออก</option>
                       <option value="active">Active</option>
                     </select>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'health' && (
+              <motion.div 
+                key="health"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 10 }}
+                className="space-y-6"
+              >
+                {/* Emergency Health Banner */}
+                <div className="p-4 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 rounded-2xl flex items-start gap-3">
+                  <ShieldAlert className="w-6 h-6 text-rose-600 shrink-0 mt-0.5" />
+                  <div className="text-xs text-rose-900 dark:text-rose-200">
+                    <p className="font-extrabold text-sm mb-0.5">การคุ้มครองความปลอดภัยและระบบห้องพยาบาล (Drug Allergy Guard)</p>
+                    <p>
+                      ข้อมูลประวัติการแพ้ยาและอาหารจะถูกตรวจสอบอัตโนมัติเมื่อครูพยาบาลจ่ายยาในห้องพยาบาล 
+                      และจะแสดงเตือนไปยังผู้ดูแลระบบโภชนาการอาหารกลางวันทันที
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-bold text-rose-700 dark:text-rose-400 mb-1.5 flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4 text-rose-600" />
+                      ประวัติการแพ้ยา / แพ้อาหาร (Allergies)
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder="ระบุชื่อยาหรืออาหารที่แพ้ เช่น แพ้เพนิซิลลิน, แพ้ซัลฟา, แพ้อาหารทะเล, แพ้นมวัว, แพ้ถั่วลิสง (หากไม่มีให้เว้นว่างหรือระบุ 'ไม่มี')"
+                      value={student.allergies || ''}
+                      onChange={e => setStudent({ ...student, allergies: e.target.value })}
+                      className="w-full px-4 py-3 bg-background border border-rose-300 dark:border-rose-800 rounded-xl focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20 outline-none text-foreground text-sm font-medium transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                      โรคประจำตัว (Medical Conditions)
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder="ระบุโรคประจำตัว เช่น โรคหอบหืด, G6PD, โรคหัวใจ, โรคลมชัก, ภูมิแพ้อากาศ (หากไม่มีให้เว้นว่างหรือระบุ 'ไม่มี')"
+                      value={student.medical_conditions || ''}
+                      onChange={e => setStudent({ ...student, medical_conditions: e.target.value })}
+                      className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground text-sm font-medium transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-foreground/70 mb-1.5">
+                      ความต้องการพิเศษ / ความบกพร่อง (Disability)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="เช่น สมาธิสั้น (ADHD), บกพร่องทางการได้ยิน, มีปัญหาการมองเห็น"
+                      value={student.disability || ''}
+                      onChange={e => setStudent({ ...student, disability: e.target.value })}
+                      className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground text-sm transition-all"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 pt-2">
+                    <div>
+                      <label className="block text-sm font-semibold text-foreground/70 mb-1.5">
+                        ส่วนสูงล่าสุด (ซม.)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        placeholder="ซม."
+                        value={student.height || ''}
+                        onChange={e => setStudent({ ...student, height: e.target.value ? Number(e.target.value) : null })}
+                        className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground text-sm font-mono transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-foreground/70 mb-1.5">
+                        น้ำหนักล่าสุด (กก.)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        placeholder="กก."
+                        value={student.weight || ''}
+                        onChange={e => setStudent({ ...student, weight: e.target.value ? Number(e.target.value) : null })}
+                        className="w-full px-4 py-3 bg-background border border-foreground/10 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-foreground text-sm font-mono transition-all"
+                      />
+                    </div>
                   </div>
                 </div>
               </motion.div>

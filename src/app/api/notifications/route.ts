@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getServerUser } from '@/lib/auth';
 import { getAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getServerUser();
 
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '20');
@@ -28,7 +27,14 @@ export async function GET(request: Request) {
 
       const userRole = appUser?.role || 'staff';
 
-      query = query.or(`recipient_user_id.eq.${user.id},recipient_role.eq.all,recipient_role.eq.${userRole}`);
+      const roleConditions = [`recipient_role.eq.all`, `recipient_role.eq.${userRole}`];
+      if (userRole === 'admin') {
+        roleConditions.push('recipient_role.eq.academic staff', 'recipient_role.eq.executive', 'recipient_role.eq.teacher', 'recipient_role.eq.teachers');
+      } else if (userRole === 'teacher') {
+        roleConditions.push('recipient_role.eq.teachers');
+      }
+
+      query = query.or(`recipient_user_id.eq.${user.id},${roleConditions.join(',')}`);
     } else {
       query = query.eq('recipient_role', 'all');
     }
@@ -53,8 +59,7 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getServerUser();
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -66,10 +71,24 @@ export async function PATCH(request: Request) {
     const admin = getAdminClient();
 
     if (markAll) {
+      const { data: appUser } = await admin
+        .from('app_users')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      const userRole = appUser?.role || 'staff';
+      const roleConditions = [`recipient_role.eq.all`, `recipient_role.eq.${userRole}`];
+      if (userRole === 'admin') {
+        roleConditions.push('recipient_role.eq.academic staff', 'recipient_role.eq.executive', 'recipient_role.eq.teacher', 'recipient_role.eq.teachers');
+      } else if (userRole === 'teacher') {
+        roleConditions.push('recipient_role.eq.teachers');
+      }
+
       await admin
         .from('app_notifications')
         .update({ is_read: true })
-        .eq('recipient_user_id', user.id);
+        .or(`recipient_user_id.eq.${user.id},${roleConditions.join(',')}`);
 
       return NextResponse.json({ success: true, markedAll: true });
     }

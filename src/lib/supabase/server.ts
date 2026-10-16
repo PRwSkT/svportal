@@ -10,9 +10,16 @@ export async function createClient() {
     throw new Error('Missing Supabase server environment variables');
   }
 
+  const allCookies = cookieStore.getAll();
+  const hasAuthCookie = allCookies.some((c) => c.name.startsWith('sb-') && c.name.includes('-auth-token'));
+  const isPreviewWithoutSession = process.env.SV_PREVIEW_MODE === 'true' && !hasAuthCookie;
+  const effectiveKey = (isPreviewWithoutSession && process.env.SUPABASE_SERVICE_ROLE_KEY)
+    ? process.env.SUPABASE_SERVICE_ROLE_KEY
+    : anonKey;
+
   return createServerClient(
     url,
-    anonKey,
+    effectiveKey,
     {
       cookies: {
         getAll() {

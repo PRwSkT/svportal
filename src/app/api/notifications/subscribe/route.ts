@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getServerUser } from '@/lib/auth';
 import { getAdminClient } from '@/lib/supabase/admin';
 
 export async function POST(request: Request) {
@@ -11,8 +11,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid subscription object' }, { status: 400 });
     }
 
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getServerUser();
 
     const admin = getAdminClient();
 

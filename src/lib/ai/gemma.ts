@@ -509,6 +509,7 @@ Analyze the message and return strictly JSON.`;
     temperature: 0.2,
     maxTokens: 8192,
     responseMimeType: 'application/json',
+    enableSearchGrounding: true,
   });
 
   return safeParseJson<NongFahChatResponse>(

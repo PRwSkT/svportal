@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AppNav } from "@/components/AppNav";
+import { GlobalNongFahBot } from "@/components/nongfah/GlobalNongFahBot";
 import { Toaster } from "sonner";
 import Image from "next/image";
 import { headers } from "next/headers";
@@ -64,6 +65,7 @@ export default async function RootLayout({
             <main className="flex-1 relative z-10 pb-24 md:pb-10">
               {children}
             </main>
+            <GlobalNongFahBot />
           </AuthProvider>
         </LanguageProvider>
       </body>

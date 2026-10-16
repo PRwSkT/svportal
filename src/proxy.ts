@@ -110,6 +110,11 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
+  // Bypass auth for screenshot preview when SV_PREVIEW_MODE is enabled
+  if (process.env.SV_PREVIEW_MODE === 'true') {
+    return response;
+  }
+
   // Handle protected routes
   if (!user) {
     if (request.nextUrl.pathname.startsWith('/api/')) {
@@ -147,7 +152,8 @@ export async function proxy(request: NextRequest) {
     });
 
     const userRole = appUserData?.role;
-    if (userRole === 'admin') {
+    // Admins and Executives have full access
+    if (userRole === 'admin' || userRole === 'executive') {
       return response;
     }
 
@@ -157,8 +163,45 @@ export async function proxy(request: NextRequest) {
 
     if (path === '/dashboard' || path.startsWith('/api/admin/dashboard')) {
       requiredFeature = 'dashboard';
+    } else if (path.startsWith('/admin/students/pastoral')) {
+      if (userRole === 'teacher' || userRole === 'academic staff' || assignedFeatures.includes('pastoral_care') || assignedFeatures.includes('admin_students')) {
+        return response;
+      }
+      requiredFeature = 'pastoral_care';
+    } else if (path.startsWith('/admin/students/nutrition') || path.startsWith('/api/admin/nutrition')) {
+      if (userRole === 'teacher' || userRole === 'academic staff' || assignedFeatures.includes('student_nutrition') || assignedFeatures.includes('pastoral_care') || assignedFeatures.includes('admin_students')) {
+        return response;
+      }
+      requiredFeature = 'student_nutrition';
     } else if (path.startsWith('/admin/students') || path.startsWith('/api/admin/students')) {
+      if (userRole === 'teacher' || userRole === 'academic staff') {
+        return response;
+      }
       requiredFeature = 'admin_students';
+    } else if (path.startsWith('/admin/subsidy/free15y')) {
+      if (userRole === 'teacher' || userRole === 'academic staff' || assignedFeatures.includes('subsidy_free15y') || assignedFeatures.includes('pos_fees') || assignedFeatures.includes('admin_students')) {
+        return response;
+      }
+      requiredFeature = 'subsidy_free15y';
+    } else if (path.startsWith('/admin/safety/van')) {
+      if (userRole === 'teacher' || userRole === 'staff' || assignedFeatures.includes('van_safety')) {
+        return response;
+      }
+      requiredFeature = 'van_safety';
+    } else if (path.startsWith('/admin/health/infirmary')) {
+      if (userRole === 'teacher' || userRole === 'staff' || assignedFeatures.includes('school_infirmary')) {
+        return response;
+      }
+      requiredFeature = 'school_infirmary';
+    } else if (path.startsWith('/admin/governance')) {
+      requiredFeature = 'esar_governance';
+    } else if (path.startsWith('/admin/academic')) {
+      if (userRole === 'teacher' || userRole === 'academic staff' || assignedFeatures.includes('admin_academic') || assignedFeatures.includes('academic_hub')) {
+        return response;
+      }
+      requiredFeature = 'admin_academic';
+    } else if (path.startsWith('/admin/notifications') || path.startsWith('/api/admin/notifications')) {
+      requiredFeature = 'admin_notifications';
     } else if (path.startsWith('/admin/reports') || path.startsWith('/api/admin/reports')) {
       requiredFeature = 'admin_reports';
     } else if (path.startsWith('/admin/products') || path.startsWith('/api/admin/products')) {
@@ -179,6 +222,9 @@ export async function proxy(request: NextRequest) {
     } else if (path.startsWith('/admin/forms') || path.startsWith('/api/admin/forms')) {
       requiredFeature = 'admin_forms';
     } else if (path.startsWith('/admin/kpi') || path.startsWith('/api/admin/kpi')) {
+      if (userRole === 'teacher' || userRole === 'staff' || assignedFeatures.includes('admin_kpi')) {
+        return response;
+      }
       requiredFeature = 'admin_kpi';
     } else if (path.startsWith('/audio-remote')) {
       requiredFeature = 'audio_remote';

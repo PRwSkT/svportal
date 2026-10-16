@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "SV-Bridge | สช. REGIS Grade Injector",
+  "version": "1.0.0",
+  "description": "สะพานเชื่อมส่งผลการเรียนจาก SV Portal เข้าสู่ระบบ สช. (sso.opec.go.th/regis) อัตโนมัติ 0 คีย์ซ้ำ",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "SV-Bridge สช. REGIS"
+  },
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "*://sso.opec.go.th/*",
+    "*://*.opec.go.th/*",
+    "http://localhost:3000/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://sso.opec.go.th/*",
+        "*://*.opec.go.th/*",
+        "http://localhost:3000/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

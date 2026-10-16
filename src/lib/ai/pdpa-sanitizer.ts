@@ -88,6 +88,7 @@ export interface SanitizedFormAnalysisPayload {
   totalResponses: number;
   fieldsSummary: SanitizedFieldSummary[];
   pseudonymizedStudentCases?: PseudonymizedStudentCase[];
+  caseToStudentIdMap?: Record<string, string>;
 }
 
 /**
@@ -228,6 +229,7 @@ export function prepareResponsesForSummarization(
   });
 
   const pseudonymizedStudentCases: PseudonymizedStudentCase[] = [];
+  const caseToStudentIdMap: Record<string, string> = {};
 
   if (studentIdField) {
     for (const resp of responses.slice(0, 35)) {
@@ -267,11 +269,15 @@ export function prepareResponsesForSummarization(
       }
 
       if (Object.keys(nonPiiAnswers).length > 0) {
+        const pseudoId = `นักเรียน #${pseudonymizedStudentCases.length + 1}`;
+        const subId = `sub_${pseudonymizedStudentCases.length + 1}`;
         pseudonymizedStudentCases.push({
-          studentId: `นักเรียน #${pseudonymizedStudentCases.length + 1}`,
-          submissionId: `sub_${pseudonymizedStudentCases.length + 1}`,
+          studentId: pseudoId,
+          submissionId: subId,
           answers: nonPiiAnswers,
         });
+        caseToStudentIdMap[pseudoId] = cleanSid;
+        caseToStudentIdMap[subId] = cleanSid;
       }
     }
   }
@@ -283,5 +289,6 @@ export function prepareResponsesForSummarization(
     totalResponses,
     fieldsSummary,
     pseudonymizedStudentCases,
+    caseToStudentIdMap,
   };
 }

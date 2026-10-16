@@ -230,11 +230,25 @@ export function NotificationBell() {
                         minute: '2-digit',
                       })}
                     </span>
-                    {notif.category && (
-                      <span className="px-1.5 py-0.5 rounded bg-foreground/5 text-foreground/60 text-[9px] uppercase font-bold">
-                        {notif.category}
-                      </span>
-                    )}
+                    {notif.category && (() => {
+                      const getBadge = (cat: string) => {
+                        switch (cat) {
+                          case 'academic': return { label: 'วิชาการ', cls: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30' };
+                          case 'urgent': return { label: 'เร่งด่วน', cls: 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30 animate-pulse' };
+                          case 'gradebook': return { label: 'ปพ.5', cls: 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30' };
+                          case 'reminder': return { label: 'เตือนความจำ', cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30' };
+                          case 'kpi': return { label: 'KPI', cls: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30' };
+                          case 'forms': return { label: 'แบบฟอร์ม', cls: 'bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30' };
+                          default: return { label: cat, cls: 'bg-foreground/5 text-foreground/60 border-foreground/10' };
+                        }
+                      };
+                      const b = getBadge(notif.category);
+                      return (
+                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold border ${b.cls}`}>
+                          {b.label}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </Link>
               ))

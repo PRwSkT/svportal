@@ -26,7 +26,15 @@ export interface DraftNotificationResult {
 
 export interface SmartReminderItem {
   id: string;
-  type: 'kpi_pending' | 'form_deadline' | 'profile_incomplete';
+  type:
+    | 'kpi_pending'
+    | 'form_deadline'
+    | 'profile_incomplete'
+    | 'academic_pending_head'
+    | 'academic_pending_director'
+    | 'attendance_at_risk'
+    | 'calendar_event'
+    | 'duty_upcoming';
   recipientUserId?: string;
   recipientEmail?: string;
   recipientName: string;
@@ -171,6 +179,140 @@ export async function scanSystemRemindersWithNongFah(): Promise<SmartReminderIte
           actionUrl: `/forms/${f.slug}`,
           urgency: 'urgent',
         });
+      }
+    }
+
+    // 3. Scan Academic Gradebooks pending review (SUBMITTED_TO_HEAD)
+    const { data: pendingHeadGbs } = await supabase
+      .from('academic_gradebooks')
+      .select('id, class:academic_classes(name), course:academic_courses(name_th)')
+      .eq('approval_status', 'SUBMITTED_TO_HEAD')
+      .limit(5);
+
+    if (pendingHeadGbs && pendingHeadGbs.length > 0) {
+      for (const gb of pendingHeadGbs) {
+        const clsName = (gb.class as any)?.name || 'ห้องเรียน';
+        const crsName = (gb.course as any)?.name_th || 'วิชา';
+        reminders.push({
+          id: `gb-head-${gb.id}`,
+          type: 'academic_pending_head',
+          recipientName: 'หัวหน้าแผนกวิชาการ',
+          recipientRole: 'academic staff',
+          title: `[เล่ม ปพ.5 รอตรวจทาน] (${clsName})`,
+          body: `มีผลการเรียนวิชา ${crsName} ห้อง ${clsName} ส่งเข้ามาตรวจทาน กรุณาตรวจสอบความถูกต้องและอนุมัติค่ะ`,
+          actionUrl: `/academic/gradebook?gradebook_id=${gb.id}`,
+          urgency: 'urgent',
+        });
+      }
+    }
+
+    // 4. Scan Academic Gradebooks pending Director final sign-off (APPROVED_BY_HEAD)
+    const { data: pendingDirectorGbs } = await supabase
+      .from('academic_gradebooks')
+      .select('id, class:academic_classes(name), course:academic_courses(name_th)')
+      .eq('approval_status', 'APPROVED_BY_HEAD')
+      .limit(5);
+
+    if (pendingDirectorGbs && pendingDirectorGbs.length > 0) {
+      for (const gb of pendingDirectorGbs) {
+        const clsName = (gb.class as any)?.name || 'ห้องเรียน';
+        const crsName = (gb.course as any)?.name_th || 'วิชา';
+        reminders.push({
+          id: `gb-dir-${gb.id}`,
+          type: 'academic_pending_director',
+          recipientName: 'ผู้อำนวยการ',
+          recipientRole: 'executive',
+          title: `[เล่ม ปพ.5 รอลงนามอนุมัติ] (${clsName})`,
+          body: `ผลการเรียนวิชา ${crsName} ห้อง ${clsName} ผ่านการตรวจทานจากหัวหน้าแล้ว รอผู้อำนวยการลงนามอนุมัติขั้นสุดท้ายค่ะ`,
+          actionUrl: `/academic?tab=review`,
+          urgency: 'urgent',
+        });
+      }
+    }
+
+    // 5. Scan Students at risk of failing attendance rule (80% - 85% attendance)
+    const { data: atRiskStudents } = await supabase
+      .from('academic_student_grades')
+      .select(`
+        id, 
+        attendance_percent, 
+        student:students(name), 
+        gradebook:academic_gradebooks(
+          id, 
+          class:academic_classes(name), 
+          course:academic_courses(name_th),
+          actual_teacher:personnel!academic_gradebooks_actual_teacher_id_fkey(name_th, user_id)
+        )
+      `)
+      .gt('attendance_percent', 0)
+      .lte('attendance_percent', 85)
+      .neq('final_grade', 'มส')
+      .limit(5);
+
+    if (atRiskStudents && atRiskStudents.length > 0) {
+      for (const s of atRiskStudents) {
+        const stdName = (s.student as any)?.name || 'นักเรียน';
+        const gb = (s.gradebook as any);
+        const clsName = gb?.class?.name || '';
+        const crsName = gb?.course?.name_th || '';
+        const teacher = gb?.actual_teacher;
+
+        reminders.push({
+          id: `att-risk-${s.id}`,
+          type: 'attendance_at_risk',
+          recipientUserId: teacher?.user_id || undefined,
+          recipientName: teacher?.name_th || 'ครูผู้สอน',
+          recipientRole: 'teacher',
+          title: `[แจ้งเตือนกลุ่มเสี่ยงติด มส] ${stdName}`,
+          body: `นักเรียน ${stdName} ห้อง ${clsName} วิชา ${crsName} มีเวลาเรียนลดลงแตะ ${s.attendance_percent.toFixed(1)}% เสี่ยงติด มส. ค่ะ`,
+          actionUrl: `/academic/gradebook?gradebook_id=${gb?.id}`,
+          urgency: 'urgent',
+        });
+      }
+    }
+
+    // 6. Scan Upcoming Calendar Events & Duties (within 48 hours)
+    const today = new Date().toISOString().split('T')[0];
+    const twoDaysLater = new Date();
+    twoDaysLater.setDate(twoDaysLater.getDate() + 2);
+    const futureDate = twoDaysLater.toISOString().split('T')[0];
+
+    const { data: upcomingCalEvents } = await supabase
+      .from('calendar_events')
+      .select('*')
+      .gte('start_date', today)
+      .lte('start_date', futureDate)
+      .order('start_date', { ascending: true })
+      .limit(6);
+
+    if (upcomingCalEvents && upcomingCalEvents.length > 0) {
+      for (const ev of upcomingCalEvents) {
+        const isToday = ev.start_date === today;
+        const timeText = isToday ? 'วันนี้' : `วันที่ ${ev.start_date}`;
+
+        if (ev.is_duty) {
+          reminders.push({
+            id: `cal-duty-${ev.id}`,
+            type: 'duty_upcoming',
+            recipientName: 'ครูผู้ปฏิบัติหน้าที่เวร',
+            recipientRole: 'teacher',
+            title: `[แจ้งเตือนเวรปฏิบัติหน้าที่] (${timeText}): ${ev.title_th}`,
+            body: `ท่านมีเวรปฏิบัติหน้าที่: ${ev.title_th} ${ev.location ? `ณ ${ev.location}` : ''} ${ev.description ? `(${ev.description})` : ''}`,
+            actionUrl: `/calendar`,
+            urgency: 'urgent',
+          });
+        } else {
+          reminders.push({
+            id: `cal-event-${ev.id}`,
+            type: 'calendar_event',
+            recipientName: ev.target_role === 'all' ? 'บุคลากรทุกคน' : ev.target_role,
+            recipientRole: ev.target_role || 'all',
+            title: `[ปฏิทินปฏิบัติงาน] (${timeText}): ${ev.title_th}`,
+            body: `${ev.description || 'มีกำหนดการตามปฏิทินปฏิบัติงานโรงเรียน'} ${ev.location ? `ณ ${ev.location}` : ''}`,
+            actionUrl: ev.action_url || `/calendar`,
+            urgency: ev.category === 'academic' ? 'urgent' : 'normal',
+          });
+        }
       }
     }
   } catch (err: any) {

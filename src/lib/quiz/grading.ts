@@ -19,12 +19,34 @@ export function gradeQuizSubmission(
   const breakdown: QuizSubmissionScore['breakdown'] = {};
 
   const inputTypes = ['text', 'textarea', 'number', 'radio', 'checkbox', 'select', 'rating'];
-  const examFields = fields.filter((f) => inputTypes.includes(f.field_type));
+  const examFields = fields.filter((f) => {
+    if (!inputTypes.includes(f.field_type)) return false;
+    // If explicitly configured with 0 points, skip grading (profile/survey field)
+    if (f.quiz_config?.points === 0) return false;
+    // If no points specified and no correct answers provided, check if it's an intro/profile field
+    if (f.quiz_config?.points === undefined && (!f.quiz_config?.correct_answers || f.quiz_config.correct_answers.length === 0)) {
+      const lbl = (f.label?.th || f.label?.en || '').toLowerCase();
+      if (
+        lbl.includes('ชื่อ') ||
+        lbl.includes('นามสกุล') ||
+        lbl.includes('เลขประจำตัว') ||
+        lbl.includes('รหัสนักเรียน') ||
+        lbl.includes('ห้องเรียน') ||
+        lbl.includes('ชั้นเรียน') ||
+        lbl.includes('student') ||
+        lbl.includes('name') ||
+        lbl.includes('id')
+      ) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   for (const field of examFields) {
     const config = field.quiz_config;
     // Default to 1 point if in quiz mode and points not specified
-    const maxPoints = config?.points !== undefined && config.points >= 0 ? config.points : 1;
+    const maxPoints = config?.points !== undefined && config.points > 0 ? config.points : 1;
     maxScore += maxPoints;
 
     const studentAnswer = answers[field.field_key];

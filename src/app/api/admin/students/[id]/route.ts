@@ -7,7 +7,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
-    const auth = await requireAuth('admin', 'admin_students');
+    const auth = await requireAuth('staff', 'admin_students');
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }

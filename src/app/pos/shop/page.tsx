@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Product, CartItem, ShopTransaction, WalletAccount } from '@/types';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, Search, X, CheckCircle2, Wallet, Banknote, CreditCard, Trash2, Plus, Minus, ScanBarcode, Store, ChevronRight } from 'lucide-react';
+import { ShoppingCart, Search, X, CheckCircle2, Wallet, Banknote, CreditCard, Trash2, Plus, Minus, ScanBarcode, Store, ChevronRight, History, Printer } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function POSShopPage() {
@@ -21,6 +21,11 @@ export default function POSShopPage() {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [mobileTab, setMobileTab] = useState<'cart' | 'catalog'>('catalog');
 
+  // History state
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
   // NFC Wallet state
   const [walletAccount, setWalletAccount] = useState<WalletAccount | null>(null);
   const [walletStudentName, setWalletStudentName] = useState('');
@@ -31,11 +36,27 @@ export default function POSShopPage() {
   
   const [successSlip, setSuccessSlip] = useState<ShopTransaction | null>(null);
 
+  const fetchRecentTransactions = async () => {
+    setIsLoadingHistory(true);
+    try {
+      const res = await fetch('/api/pos/checkout?limit=25');
+      if (res.ok) {
+        const data = await res.json();
+        setRecentTransactions(data.transactions || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch recent transactions:', err);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [categories, setCategories] = useState<string[]>(['ALL']);
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const searchTimeout = useRef<NodeJS.Timeout>(null);
+  const checkoutLockRef = useRef(false);
 
   const fetchCatalog = useCallback(async (cat = selectedCategory, q = searchQuery) => {
     setIsSearching(true);
@@ -224,7 +245,8 @@ export default function POSShopPage() {
   }, [cart, isThai]);
 
   const handleCheckout = async () => {
-    if (isCheckingOut) return;
+    if (checkoutLockRef.current || isCheckingOut) return;
+    checkoutLockRef.current = true;
     setIsCheckingOut(true);
     const loadingToast = toast.loading(isThai ? 'กำลังชำระเงิน...' : 'Processing payment...');
     try {
@@ -265,6 +287,7 @@ export default function POSShopPage() {
       
       toast.error(errorMsg, { id: loadingToast, description: msg });
     } finally {
+      checkoutLockRef.current = false;
       setIsCheckingOut(false);
     }
   };
@@ -411,13 +434,27 @@ export default function POSShopPage() {
                 </span>
               </h2>
             </div>
-            <button 
-              onClick={() => setCart([])} 
-              disabled={cart.length === 0}
-              className="text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 font-bold text-xs sm:text-sm px-3.5 py-2 rounded-xl disabled:opacity-40 transition-colors flex items-center gap-1.5"
-            >
-              <Trash2 className="w-4 h-4" /> {dict.shop.clearCart}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  fetchRecentTransactions();
+                  setIsHistoryOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs transition-colors border border-slate-200 dark:border-slate-700 cursor-pointer"
+                title="ดูประวัติการขายและพิมพ์ใบเสร็จซ้ำ"
+              >
+                <History className="w-4 h-4 text-[#7B1C3E]" />
+                <span className="hidden sm:inline">{isThai ? 'ประวัติการขาย' : 'Recent Sales'}</span>
+              </button>
+              <button 
+                onClick={() => setCart([])} 
+                disabled={cart.length === 0}
+                className="text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 font-bold text-xs sm:text-sm px-3.5 py-2 rounded-xl disabled:opacity-40 transition-colors flex items-center gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" /> {dict.shop.clearCart}
+              </button>
+            </div>
           </div>
           
           <div className="flex-1 overflow-auto p-6 space-y-4 bg-slate-50/30 dark:bg-slate-950/20">
@@ -800,7 +837,7 @@ export default function POSShopPage() {
                 </button>
                 <button 
                   onClick={handleCheckout} 
-                  disabled={isCheckingOut || (paymentMethod === 'wallet' && !walletAccount) || (paymentMethod === 'cash' && typeof cashReceived === 'number' && cashReceived < total)}
+                  disabled={isCheckingOut || (paymentMethod === 'wallet' && !walletAccount) || (paymentMethod === 'cash' && (typeof cashReceived !== 'number' || cashReceived < total))}
                   className="flex-1 py-5 text-2xl font-black text-white bg-[#7B1C3E] hover:bg-[#681834] rounded-2xl disabled:opacity-50 disabled:bg-slate-300 flex justify-center items-center shadow-xl shadow-[#7B1C3E]/20 transition-all active:scale-[0.98]"
                 >
                   {isCheckingOut ? (
@@ -809,6 +846,142 @@ export default function POSShopPage() {
                       {isThai ? 'กำลังประมวลผล...' : 'Processing...'}
                     </div>
                   ) : dict.shop.confirmPayment}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Sales History & Reprint Slip Modal */}
+      <AnimatePresence>
+        {isHistoryOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={(e) => { if (e.target === e.currentTarget) setIsHistoryOpen(false); }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-slate-900 w-full max-w-3xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[85vh] cursor-default"
+            >
+              <div className="p-5 sm:p-6 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-[#7B1C3E]/10 dark:bg-[#7B1C3E]/20 flex items-center justify-center text-[#7B1C3E] dark:text-pink-400">
+                    <History className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-slate-900 dark:text-white">
+                      {isThai ? 'ประวัติรายการขายล่าสุด' : 'Recent Sales History'}
+                    </h2>
+                    <p className="text-xs text-slate-500 font-medium">
+                      {isThai ? 'ดูรายการและพิมพ์สลิป/ใบเสร็จซ้ำได้ทันที' : 'Review recent orders and reprint receipts'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsHistoryOpen(false)}
+                  className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-500 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-4 sm:p-6 flex-1 overflow-y-auto">
+                {isLoadingHistory ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                    <div className="w-8 h-8 border-4 border-[#7B1C3E]/30 border-t-[#7B1C3E] rounded-full animate-spin mb-3"></div>
+                    <p className="text-sm font-medium">{isThai ? 'กำลังโหลดประวัติการขาย...' : 'Loading sales history...'}</p>
+                  </div>
+                ) : recentTransactions.length === 0 ? (
+                  <div className="text-center py-16 text-slate-400">
+                    <History className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p className="font-bold text-base">{isThai ? 'ยังไม่มีประวัติการขาย' : 'No recent transactions'}</p>
+                    <p className="text-xs text-slate-400 mt-1">{isThai ? 'เมื่อมีการขาย รายการจะแสดงที่นี่' : 'Completed sales will appear here'}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {recentTransactions.map((tx: any) => {
+                      const itemCount = Array.isArray(tx.items)
+                        ? tx.items.reduce((s: number, i: any) => s + (Number(i.quantity) || 1), 0)
+                        : 0;
+                      return (
+                        <div
+                          key={tx.id}
+                          className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/60 hover:border-[#7B1C3E]/30 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-mono font-bold text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                                #{tx.id.slice(0, 8)}
+                              </span>
+                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                                tx.payment_method === 'wallet'
+                                  ? 'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300'
+                                  : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                              }`}>
+                                {tx.payment_method === 'wallet' ? (isThai ? 'บัตร/กระเป๋าเงิน' : 'Wallet') : (isThai ? 'เงินสด' : 'Cash')}
+                              </span>
+                              {tx.student_id ? (
+                                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+                                  {isThai ? `นักเรียน: ${tx.student_id}` : `Student: ${tx.student_id}`}
+                                </span>
+                              ) : (
+                                <span className="text-[11px] font-medium text-slate-400">
+                                  {isThai ? 'ลูกค้าทั่วไป' : 'Walk-in'}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                              <span>{new Date(tx.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                              <span>•</span>
+                              <span>{new Date(tx.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                              <span>•</span>
+                              <span>{itemCount} {isThai ? 'ชิ้น' : 'items'}</span>
+                            </div>
+                            {Array.isArray(tx.items) && tx.items.length > 0 && (
+                              <p className="text-xs text-slate-600 dark:text-slate-300 truncate max-w-md">
+                                {tx.items.map((i: any) => `${i.product?.name || 'สินค้า'} x${i.quantity}`).join(', ')}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
+                            <span className="text-lg font-black text-[#7B1C3E] dark:text-pink-400">
+                              {formatCurrency(Number(tx.total_amount) || 0)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSuccessSlip(tx);
+                                setIsHistoryOpen(false);
+                                toast.success(isThai ? 'เปิดสลิปสำหรับการพิมพ์ซ้ำ' : 'Receipt opened for reprinting');
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#7B1C3E]/10 hover:bg-[#7B1C3E] text-[#7B1C3E] hover:text-white font-bold text-xs transition-colors cursor-pointer"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                              <span>{isThai ? 'พิมพ์สลิปซ้ำ' : 'Reprint'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsHistoryOpen(false)}
+                  className="px-5 py-2.5 rounded-xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-slate-700 dark:text-slate-200 font-bold text-sm transition-colors cursor-pointer"
+                >
+                  {dict.common.cancel}
                 </button>
               </div>
             </motion.div>

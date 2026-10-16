@@ -6,9 +6,10 @@ import { importStudentsFromCSV } from '@/lib/supabase/students';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Filter, Upload, Plus, UserX, ChevronRight, Download } from 'lucide-react';
+import { Search, Filter, Upload, Plus, UserX, ChevronRight, Download, FileSpreadsheet, Utensils, HeartHandshake, DollarSign, Bus, HeartPulse, Award } from 'lucide-react';
 import ExportModal from '@/components/admin/students/ExportModal';
 import PromotionModal from '@/components/admin/students/PromotionModal';
+import OpecRegisExportModal from '@/components/admin/students/OpecRegisExportModal';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function StudentRecordsPage() {
@@ -17,6 +18,7 @@ export default function StudentRecordsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isPromotionModalOpen, setIsPromotionModalOpen] = useState(false);
+  const [isOpecModalOpen, setIsOpecModalOpen] = useState(false);
   
   // Pagination
   const [page, setPage] = useState(1);
@@ -172,6 +174,25 @@ export default function StudentRecordsPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto">
           <button 
+            onClick={() => setIsOpecModalOpen(true)}
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 bg-gradient-to-r from-[#7B1C3E] to-[#9E1B46] hover:from-[#681834] hover:to-[#88173c] text-white font-extrabold rounded-xl transition-all shadow-md shadow-[#7B1C3E]/20 active:scale-95 text-xs sm:text-sm"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-amber-300" /> 
+            <span>{isThai ? 'ส่งออก สช. REGIS' : 'Export OPEC REGIS'}</span>
+          </button>
+          <Link href="/admin/students/nutrition" className="flex-1 sm:flex-initial">
+            <button className="w-full flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 bg-emerald-50 dark:bg-emerald-950/20 border-2 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-bold rounded-xl hover:bg-emerald-600 hover:text-white transition-all active:scale-95 shadow-sm text-xs sm:text-sm">
+              <Utensils className="w-4 h-4" /> 
+              <span>{isThai ? 'โภชนาการ & PSIS' : 'Nutrition & PSIS'}</span>
+            </button>
+          </Link>
+          <Link href="/admin/students/pastoral" className="flex-1 sm:flex-initial">
+            <button className="w-full flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 bg-rose-50 dark:bg-rose-950/20 border-2 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 font-bold rounded-xl hover:bg-[#7B1C3E] hover:text-white transition-all active:scale-95 shadow-sm text-xs sm:text-sm">
+              <HeartHandshake className="w-4 h-4" /> 
+              <span>{isThai ? 'SDQ & เยี่ยมบ้าน 360°' : 'Pastoral Care 360°'}</span>
+            </button>
+          </Link>
+          <button 
             onClick={() => setIsExportModalOpen(true)}
             className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl hover:border-[#7B1C3E] hover:text-[#7B1C3E] transition-all active:scale-95 text-xs sm:text-sm shadow-sm"
           >
@@ -202,6 +223,39 @@ export default function StudentRecordsPage() {
             </button>
           </Link>
         </div>
+      </div>
+
+      {/* Quick Navigation Services Ribbon */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs hide-scrollbar">
+        <span className="text-slate-400 font-bold whitespace-nowrap pl-1">ศูนย์บริการด่วน:</span>
+        <Link 
+          href="/admin/subsidy/free15y" 
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 font-bold rounded-xl border border-emerald-200/80 dark:border-emerald-800 hover:bg-emerald-100 transition-all whitespace-nowrap"
+        >
+          <DollarSign className="w-3.5 h-3.5" />
+          <span>เซ็นรับเงินเรียนฟรี 15 ปี (แบบ อร.1/1)</span>
+        </Link>
+        <Link 
+          href="/admin/safety/van" 
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 font-bold rounded-xl border border-amber-200/80 dark:border-amber-800 hover:bg-amber-100 transition-all whitespace-nowrap"
+        >
+          <Bus className="w-3.5 h-3.5" />
+          <span>ความปลอดภัยรถรับ-ส่ง (In-Van Safety)</span>
+        </Link>
+        <Link 
+          href="/admin/health/infirmary" 
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 font-bold rounded-xl border border-rose-200/80 dark:border-rose-800 hover:bg-rose-100 transition-all whitespace-nowrap"
+        >
+          <HeartPulse className="w-3.5 h-3.5" />
+          <span>ห้องพยาบาล & เฝ้าระวังโรคระบาด</span>
+        </Link>
+        <Link 
+          href="/admin/governance" 
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 font-bold rounded-xl border border-purple-200/80 dark:border-purple-800 hover:bg-purple-100 transition-all whitespace-nowrap"
+        >
+          <Award className="w-3.5 h-3.5" />
+          <span>e-SAR 93 หน้า & กำกับดูแลโรงเรียน</span>
+        </Link>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800">
@@ -395,6 +449,18 @@ export default function StudentRecordsPage() {
           fetchStudents(1);
           fetchStats();
         }}
+      />
+
+      <OpecRegisExportModal
+        isOpen={isOpecModalOpen}
+        onClose={() => setIsOpecModalOpen(false)}
+        availableGrades={Object.keys(gradeStats.counts).sort((a, b) => {
+          const isAnubanA = a.startsWith('อ.');
+          const isAnubanB = b.startsWith('อ.');
+          if (isAnubanA && !isAnubanB) return -1;
+          if (!isAnubanA && isAnubanB) return 1;
+          return a.localeCompare(b);
+        })}
       />
     </motion.div>
   );

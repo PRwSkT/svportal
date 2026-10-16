@@ -129,7 +129,7 @@ export function NongFahResponsesInsights({
         <div className="flex items-start sm:items-center gap-3.5">
           <div className="w-12 h-12 rounded-2xl overflow-hidden border-2 border-sky-300 shadow-sm shrink-0 bg-white flex items-center justify-center">
             <img
-              src="/images/nongfah/nongfah-avatar.png?v=5"
+              src="/images/nongfah/nongfah-avatar.png"
               alt="น้องฟ้า AI Chatbot"
               className="w-full h-full object-cover"
             />
@@ -189,7 +189,7 @@ export function NongFahResponsesInsights({
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl overflow-hidden border border-sky-200 bg-white shrink-0">
               <img
-                src="/images/nongfah/nongfah-helpful.png?v=5"
+                src="/images/nongfah/nongfah-helpful.png"
                 alt="น้องฟ้า"
                 className="w-full h-full object-cover"
               />
@@ -213,7 +213,7 @@ export function NongFahResponsesInsights({
           <div className="flex items-center gap-2.5 text-xs font-semibold text-sky-800">
             <div className="w-7 h-7 rounded-lg overflow-hidden border border-sky-300 bg-white shrink-0">
               <img
-                src="/images/nongfah/nongfah-thinking.png?v=5"
+                src="/images/nongfah/nongfah-thinking.png"
                 alt="น้องฟ้ากำลังคิด"
                 className="w-full h-full object-cover"
               />

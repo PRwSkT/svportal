@@ -29,6 +29,7 @@ export default function FeeCollectionPage() {
 
   const receiptRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const paymentLockRef = useRef(false);
 
   useEffect(() => {
     if (step === 1) {
@@ -92,6 +93,8 @@ export default function FeeCollectionPage() {
   // Step 3: Payment Method
   const confirmPayment = async () => {
     if (!selectedStudent || selectedFeeIds.size === 0) return;
+    if (paymentLockRef.current || isProcessing) return;
+    paymentLockRef.current = true;
     
     setIsProcessing(true);
     const loadingToast = toast.loading(isThai ? 'กำลังประมวลผลการชำระเงิน...' : 'Processing payment...');
@@ -136,6 +139,7 @@ export default function FeeCollectionPage() {
       console.error('Payment Error:', err);
       toast.error(err.message || (isThai ? 'เกิดข้อผิดพลาดในการชำระเงิน' : 'Payment processing failed'), { id: loadingToast });
     } finally {
+      paymentLockRef.current = false;
       setIsProcessing(false);
     }
   };

@@ -1,21 +1,14 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getServerUser, requireAuth } from '@/lib/auth';
 
 export async function GET(request: Request) {
   try {
-    let userId = '';
+    const user = await getServerUser();
+    let userId = user?.id || (process.env.NODE_ENV === 'development' ? 'dev-user-id' : '');
 
-    // DEV MODE BYPASS
-    if (process.env.NODE_ENV === 'development') {
-      userId = 'dev-user-id';
-    } else {
-      const supabase = await createClient();
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-      if (authError || !user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-      userId = user.id;
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Get today's local date YYYY-MM-DD
@@ -74,22 +67,79 @@ function isPointInPolygon(point: { lat: number, lng: number }, polygon: { lat: n
 
 export async function POST(request: Request) {
   try {
-    let userId = '';
+    const user = await getServerUser();
+    let userId = user?.id || (process.env.NODE_ENV === 'development' ? 'dev-user-id' : '');
 
-    // DEV MODE BYPASS
-    if (process.env.NODE_ENV === 'development') {
-      userId = 'dev-user-id';
-    } else {
-      const supabase = await createClient();
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-      if (authError || !user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-      userId = user.id;
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { action, lat, lng } = await request.json();
+    const body = await request.json();
+
+    // Support Admin/HR Manual Override (punch in/out on behalf of staff, record leave, etc.)
+    if (body.admin_override) {
+      const auth = await requireAuth('admin', 'admin_attendance');
+      if (auth.error) {
+        return NextResponse.json({ error: auth.error }, { status: auth.status });
+      }
+
+      const { target_user_id, date, check_in_time, check_out_time } = body;
+      if (!target_user_id || !date) {
+        return NextResponse.json({ error: 'กรุณาระบุบุคลากรและวันที่' }, { status: 400 });
+      }
+
+      const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (!url || !serviceKey) {
+        throw new Error('Missing Supabase Service Role configuration');
+      }
+      const supabaseAdmin = createSupabaseClient(url, serviceKey);
+
+      // Check if record exists for this user and date
+      const { data: existing } = await supabaseAdmin
+        .from('attendance_records')
+        .select('id')
+        .eq('user_id', target_user_id)
+        .eq('date', date)
+        .maybeSingle();
+
+      const currentTime = new Date().toISOString();
+
+      if (existing) {
+        const { data, error } = await supabaseAdmin
+          .from('attendance_records')
+          .update({
+            check_in_time: check_in_time || null,
+            check_out_time: check_out_time || null,
+            updated_at: currentTime
+          })
+          .eq('id', existing.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        return NextResponse.json({ success: true, record: data, message: 'อัปเดตเวลาเข้า-ออกงานเรียบร้อยแล้ว' });
+      } else {
+        const { data, error } = await supabaseAdmin
+          .from('attendance_records')
+          .insert({
+            user_id: target_user_id,
+            date,
+            check_in_time: check_in_time || null,
+            check_out_time: check_out_time || null,
+            created_at: currentTime,
+            updated_at: currentTime
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        return NextResponse.json({ success: true, record: data, message: 'บันทึกเวลาเข้า-ออกงานเรียบร้อยแล้ว' });
+      }
+    }
+
+    const { action, lat, lng } = body;
 
     if (!['check_in', 'check_out'].includes(action)) {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
@@ -179,6 +229,79 @@ export async function POST(request: Request) {
 
   } catch (err: any) {
     console.error('Attendance POST Error:', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const auth = await requireAuth('admin', 'admin_attendance');
+    if (auth.error) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
+    const { id, check_in_time, check_out_time } = await request.json();
+    if (!id) {
+      return NextResponse.json({ error: 'Missing record id' }, { status: 400 });
+    }
+
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !serviceKey) {
+      throw new Error('Missing Supabase Service Role configuration');
+    }
+    const supabaseAdmin = createSupabaseClient(url, serviceKey);
+
+    const { data, error } = await supabaseAdmin
+      .from('attendance_records')
+      .update({
+        check_in_time: check_in_time !== undefined ? check_in_time : undefined,
+        check_out_time: check_out_time !== undefined ? check_out_time : undefined,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return NextResponse.json({ success: true, record: data });
+  } catch (err: any) {
+    console.error('Attendance PATCH Error:', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const auth = await requireAuth('admin', 'admin_attendance');
+    if (auth.error) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    if (!id) {
+      return NextResponse.json({ error: 'Missing record id' }, { status: 400 });
+    }
+
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !serviceKey) {
+      throw new Error('Missing Supabase Service Role configuration');
+    }
+    const supabaseAdmin = createSupabaseClient(url, serviceKey);
+
+    const { error } = await supabaseAdmin
+      .from('attendance_records')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    console.error('Attendance DELETE Error:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

@@ -33,6 +33,19 @@ import {
   X,
   User as UserIcon,
   Bell,
+  BookOpen,
+  CalendarDays,
+  CheckSquare,
+  FileCheck2,
+  Baby,
+  Settings as SettingsIcon,
+  HeartHandshake,
+  Apple,
+  Bus,
+  Stethoscope,
+  ShieldCheck,
+  HandCoins,
+  ScrollText,
 } from 'lucide-react';
 import { NotificationBell } from '@/components/NotificationBell';
 
@@ -75,25 +88,41 @@ export function AppNav() {
     { id: 'dashboard', href: '/dashboard', label: dict.nav.dashboard, category: dict.nav.financeAccounting, icon: FileBarChart, colorClass: 'text-blue-600 bg-blue-50 border-blue-200' },
     { id: 'pos_fees', href: '/pos/fees', label: dict.nav.posFees, category: dict.nav.financeAccounting, icon: CreditCard, colorClass: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
     { id: 'admin_reports', href: '/admin/reports', label: dict.nav.adminReports, category: dict.nav.financeAccounting, icon: DollarSign, colorClass: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
+    { id: 'subsidy_free15y', href: '/admin/subsidy/free15y', label: language === 'th' ? 'เงินอุดหนุนเรียนฟรี 15 ปี (อร.11)' : '15Y Free Education Subsidy', category: dict.nav.financeAccounting, icon: HandCoins, colorClass: 'text-teal-600 bg-teal-50 border-teal-200' },
     // Co-op Store
     { id: 'pos_shop', href: '/pos/shop', label: dict.nav.posShop, category: dict.nav.coopStore, icon: ShoppingBag, colorClass: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
     { id: 'admin_products', href: '/admin/products', label: dict.nav.adminProducts, category: dict.nav.coopStore, icon: Package, colorClass: 'text-amber-600 bg-amber-50 border-amber-200' },
     { id: 'pos_wallet_topup', href: '/pos/wallet/topup', label: dict.nav.posWalletTopup, category: dict.nav.coopStore, icon: Wallet, colorClass: 'text-teal-600 bg-teal-50 border-teal-200' },
     { id: 'admin_wallet_students', href: '/admin/wallet/students', label: dict.nav.adminWalletStudents, category: dict.nav.coopStore, icon: Wallet, colorClass: 'text-cyan-600 bg-cyan-50 border-cyan-200' },
-    // Registrar
+    // Registrar & Student Care
     { id: 'admin_students', href: '/admin/students', label: dict.nav.adminStudents, category: dict.nav.registrar, icon: GraduationCap, colorClass: 'text-blue-600 bg-blue-50 border-blue-200' },
+    { id: 'pastoral_care', href: '/pastoral', label: language === 'th' ? 'ดูแลช่วยเหลือนักเรียน (SDQ & เยี่ยมบ้าน)' : 'Pastoral Care 360', category: dict.nav.registrar, icon: HeartHandshake, colorClass: 'text-rose-600 bg-rose-50 border-rose-200' },
+    { id: 'student_nutrition', href: '/admin/students/nutrition', label: language === 'th' ? 'ภาวะโภชนาการ & นมโรงเรียน' : 'Nutrition & School Milk', category: dict.nav.registrar, icon: Apple, colorClass: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
+    { id: 'van_safety', href: '/admin/safety/van', label: language === 'th' ? 'ความปลอดภัยรถตู้รับ-ส่ง' : 'School Van Safety', category: dict.nav.registrar, icon: Bus, colorClass: 'text-amber-600 bg-amber-50 border-amber-200' },
+    { id: 'school_infirmary', href: '/admin/health/infirmary', label: language === 'th' ? 'ห้องพยาบาล & แจ้งเตือนแพ้ยา' : 'School Infirmary', category: dict.nav.registrar, icon: Stethoscope, colorClass: 'text-red-600 bg-red-50 border-red-200' },
     // HR & Administration
     { id: 'admin_forms', href: '/admin/forms', label: dict.nav.adminForms, category: dict.nav.hrAdmin, icon: FileText, colorClass: 'text-rose-600 bg-rose-50 border-rose-200' },
     { id: 'admin_kpi', href: '/admin/kpi', label: dict.nav.adminKpi, category: dict.nav.hrAdmin, icon: Award, colorClass: 'text-[#7B1C3E] bg-[#7B1C3E]/10 border-[#7B1C3E]/20' },
-    { id: 'admin_attendance', href: '/attendance', label: dict.nav.adminAttendance, category: dict.nav.hrAdmin, icon: Clock, colorClass: 'text-purple-600 bg-purple-50 border-purple-200' },
+    { id: 'admin_attendance', href: '/admin/attendance', label: dict.nav.adminAttendance, category: dict.nav.hrAdmin, icon: Clock, colorClass: 'text-purple-600 bg-purple-50 border-purple-200' },
     { id: 'admin_users', href: '/admin/users', label: dict.nav.adminUsers, category: dict.nav.hrAdmin, icon: Users, colorClass: 'text-violet-600 bg-violet-50 border-violet-200' },
+    { id: 'esar_governance', href: '/admin/governance', label: language === 'th' ? 'ธรรมาภิบาล & รายงาน e-SAR' : 'Governance & e-SAR', category: dict.nav.hrAdmin, icon: ShieldCheck, colorClass: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
     // PR & Communications
     { id: 'admin_notifications', href: '/admin/notifications', label: 'ระบบแจ้งเตือน AI', category: dict.nav.pr, icon: Bell, colorClass: 'text-rose-600 bg-rose-50 border-rose-200' },
     { id: 'admin_website', href: '/admin/website', label: dict.nav.adminWebsite, category: dict.nav.pr, icon: Globe, colorClass: 'text-sky-600 bg-sky-50 border-sky-200' },
     { id: 'post_assistant', href: '/post-assistant', label: dict.nav.postAssistant, category: dict.nav.pr, icon: Sparkles, colorClass: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
     { id: 'audio_remote', href: '/audio-remote', label: dict.nav.audioRemote, category: dict.nav.pr, icon: Radio, colorClass: 'text-amber-600 bg-amber-50 border-amber-200' },
     { id: 'qr_generator', href: '/qr-generator', label: dict.nav.qrGenerator, category: dict.nav.pr, icon: QrCode, colorClass: 'text-pink-600 bg-pink-50 border-pink-200' },
-  ], [dict]);
+    // Academic Affairs (งานวิชาการและงานวัดผล)
+    { id: 'academic_hub', href: '/academic', label: language === 'th' ? 'ศูนย์รวมวิชาการ' : 'Academic Hub', category: language === 'th' ? 'งานวิชาการ' : 'Academic Affairs', icon: GraduationCap, colorClass: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
+    { id: 'academic_gradebook', href: '/academic/gradebook', label: language === 'th' ? 'Smart Gradebook (ปพ.5)' : 'Gradebook (P.P.5)', category: language === 'th' ? 'งานวิชาการ' : 'Academic Affairs', icon: BookOpen, colorClass: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
+    { id: 'academic_early_years', href: '/academic/early-years', label: language === 'th' ? 'พัฒนาการปฐมวัย' : 'Early Years', category: language === 'th' ? 'งานวิชาการ' : 'Academic Affairs', icon: Baby, colorClass: 'text-pink-600 bg-pink-50 border-pink-200' },
+    { id: 'academic_exams', href: '/academic/exams', label: language === 'th' ? 'คลังข้อสอบ & ตรวจ OMR' : 'Exams & OMR', category: language === 'th' ? 'งานวิชาการ' : 'Academic Affairs', icon: CheckSquare, colorClass: 'text-amber-600 bg-amber-50 border-amber-200' },
+    { id: 'academic_timetable', href: '/academic/timetable', label: language === 'th' ? 'ตารางสอน & จัดสอนแทน' : 'Timetable', category: language === 'th' ? 'งานวิชาการ' : 'Academic Affairs', icon: CalendarDays, colorClass: 'text-sky-600 bg-sky-50 border-sky-200' },
+    { id: 'academic_documents', href: '/academic/documents', label: language === 'th' ? 'ออกเอกสาร ปพ.1-3 & ปพ.6' : 'Statutory Docs (PP.1-6)', category: language === 'th' ? 'งานวิชาการ' : 'Academic Affairs', icon: ScrollText, colorClass: 'text-teal-600 bg-teal-50 border-teal-200' },
+    { id: 'academic_opec', href: '/academic/opec', label: language === 'th' ? 'ส่งออก REGIS (สช.)' : 'OPEC REGIS', category: language === 'th' ? 'งานวิชาการ' : 'Academic Affairs', icon: FileCheck2, colorClass: 'text-purple-600 bg-purple-50 border-purple-200' },
+    { id: 'admin_academic', href: '/admin/academic', label: language === 'th' ? 'ตั้งค่าหลักสูตร & ห้องเรียน' : 'Academic Setup', category: language === 'th' ? 'งานวิชาการ' : 'Academic Affairs', icon: SettingsIcon, colorClass: 'text-slate-600 bg-slate-50 border-slate-200' },
+    { id: 'calendar', href: '/calendar', label: language === 'th' ? 'ปฏิทินปฏิบัติงาน & เวรครู' : 'Operational Calendar', category: language === 'th' ? 'งานวิชาการ' : 'Academic Affairs', icon: CalendarDays, colorClass: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
+  ], [dict, language]);
 
   if (isLoading || !user) return null;
   if (pathname === '/' || pathname === '/login' || pathname.startsWith('/website') || pathname.startsWith('/forms/')) return null;

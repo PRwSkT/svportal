@@ -118,6 +118,25 @@ export default function AdminWalletStudentsPage() {
     }
   }
 
+  async function handleUnlinkCard() {
+    if (!selectedAccount) return;
+    if (!confirm(isThai ? 'ยืนยันการยกเลิกบัตรนี้ (ระงับบัตรสูญหาย)?' : 'Confirm unlinking this card (report lost)?')) return;
+    const loadingToast = toast.loading(isThai ? 'กำลังยกเลิกบัตร...' : 'Unlinking card...');
+    try {
+      const res = await fetch('/api/admin/wallet', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'link_card', student_id: selectedAccount.student_id, card_uid: null })
+      });
+      if (!res.ok) throw new Error('Failed to unlink card');
+      setSelectedAccount(prev => prev ? { ...prev, card_uid: null } : null);
+      await fetchAccounts();
+      toast.success(isThai ? 'ระงับและยกเลิกการผูกบัตรเรียบร้อยแล้ว' : 'Card unlinked successfully', { id: loadingToast });
+    } catch (err: any) {
+      toast.error(isThai ? 'ยกเลิกบัตรไม่สำเร็จ' : 'Failed to unlink card', { id: loadingToast, description: err.message });
+    }
+  }
+
   async function handleSaveLimit() {
     if (!selectedAccount) return;
     const newLimit = limitInput.trim() === '' ? null : parseFloat(limitInput);
@@ -409,12 +428,21 @@ export default function AdminWalletStudentsPage() {
                     <button onClick={handleLinkCard} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-colors shadow-md shadow-emerald-600/20">{dict.wallet.linkCard}</button>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between w-full">
                     {selectedAccount.card_uid ? (
-                       <div className="flex flex-col">
+                      <>
+                        <div className="flex flex-col">
                           <span className="font-mono text-xl font-bold text-slate-900 dark:text-white tracking-wider">{selectedAccount.card_uid}</span>
                           <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 mt-1"><CheckCircle2 className="w-3 h-3"/> Active</span>
-                       </div>
+                        </div>
+                        <button
+                          onClick={handleUnlinkCard}
+                          className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 dark:border-rose-900/50 dark:bg-rose-950/30 rounded-xl text-xs font-bold transition-colors"
+                          title="ยกเลิกการผูกบัตรเพื่อระงับการใช้งานทันที"
+                        >
+                          {isThai ? 'ระงับบัตรหาย' : 'Report Lost'}
+                        </button>
+                      </>
                     ) : (
                       <span className="text-slate-400 font-bold italic">{isThai ? 'ยังไม่ได้ผูกบัตร' : 'No card linked'}</span>
                     )}
@@ -511,9 +539,14 @@ export default function AdminWalletStudentsPage() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className={`font-extrabold ${tx.type === 'purchase' ? 'text-rose-600' : tx.type === 'topup' ? 'text-emerald-600' : 'text-slate-900 dark:text-white'}`}>
-                              {tx.type === 'purchase' ? '-' : '+'}{formatCurrency(tx.amount)}
-                            </p>
+                            {(() => {
+                              const isNegative = tx.balance_after < tx.balance_before || tx.type === 'purchase';
+                              return (
+                                <p className={`font-extrabold ${isNegative ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                  {isNegative ? '-' : '+'}{formatCurrency(tx.amount)}
+                                </p>
+                              );
+                            })()}
                             <p className="text-xs font-bold text-slate-400 mt-0.5">{dict.wallet.currentBalance} {formatCurrency(tx.balance_after)}</p>
                           </div>
                         </motion.div>
