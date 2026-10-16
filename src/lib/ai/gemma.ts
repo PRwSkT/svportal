@@ -7,12 +7,10 @@ import { FormField } from '@/types';
 import { SanitizedFormAnalysisPayload } from './pdpa-sanitizer';
 
 const GEMMA_MODELS = [
+  'gemini-flash-lite-latest',
   'gemini-3-flash-preview',
   'gemini-3.5-flash',
-  'gemini-flash-lite-latest',
-  'gemini-3.5-flash-lite',
   'gemini-flash-latest',
-  'gemini-2.5-flash-lite',
 ];
 
 interface GemmaCallOptions {
@@ -64,6 +62,11 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
         requestBody.generationConfig.responseMimeType = 'application/json';
       }
 
+      // Fast response mode: disable thinking tokens on Gemini 3+ models to avoid high latency
+      if (model.includes('gemini-3')) {
+        requestBody.generationConfig.thinkingConfig = { thinkingBudget: 0 };
+      }
+
       // Note: Google Generative AI API disallows combining search grounding with responseMimeType: 'application/json'
       if (options.enableSearchGrounding && responseMimeType !== 'application/json') {
         requestBody.tools = [{ googleSearch: {} }];
@@ -76,11 +79,12 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
           'X-Goog-Api-Client': 'svportal-forms/1.0',
         },
         body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(14000),
+        signal: AbortSignal.timeout(18000),
       });
 
-      // If search grounding was rejected by model/quota, fallback without tools immediately
-      if (!res.ok && options.enableSearchGrounding && requestBody.tools) {
+      // If thinkingConfig or search grounding was rejected by model/quota, fallback immediately
+      if (!res.ok && (requestBody.generationConfig.thinkingConfig || requestBody.tools)) {
+        delete requestBody.generationConfig.thinkingConfig;
         delete requestBody.tools;
         res = await fetch(url, {
           method: 'POST',
@@ -89,14 +93,14 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
             'X-Goog-Api-Client': 'svportal-forms/1.0',
           },
           body: JSON.stringify(requestBody),
-          signal: AbortSignal.timeout(14000),
+          signal: AbortSignal.timeout(18000),
         });
       }
 
       if (!res.ok) {
         const errorText = await res.text();
-        console.warn(`Model ${model} returned error ${res.status}:`, errorText.slice(0, 150));
-        lastError = new Error(`AI Model (${model}) สถานะ ${res.status}: ${errorText.slice(0, 100)}`);
+        console.warn(`Model ${model} returned error ${res.status}:`, errorText.slice(0, 120));
+        lastError = new Error(`AI Model (${model}) สถานะ ${res.status}`);
         continue;
       }
 
@@ -416,7 +420,7 @@ Strict rules to follow:
    - If the user message asks to create, draft, design, or generate a form from scratch:
      - Set "actionType": "form_generated"
      - In "reply": Give a warm, polite Thai response explaining what form you designed, what fields were included, and how it matches the school's context.
-     - In "generatedForm": Return a complete form definition conforming to the GeneratedFormDefinition schema (typically 10-18 detailed fields with logical section_headers, student info, parent contacts, options, file uploads, consent).
+     - In "generatedForm": Return a complete, practical form definition (typically 8-12 well-structured fields with section_headers, student info, parent contacts, options, consent). For label and options, provide "th" primarily (en is optional, omit zh unless requested) to maximize response speed.
      - Set "modifiedFields": null
      - Set "modificationSummary": null
 8. General Inquiries & Advice:
@@ -521,7 +525,7 @@ Analyze the message, perform the action, and return strictly JSON.`;
     systemPrompt,
     userPrompt,
     temperature: 0.2,
-    maxTokens: 4096,
+    maxTokens: 2500,
     responseMimeType: 'application/json',
     enableSearchGrounding: false,
   });
