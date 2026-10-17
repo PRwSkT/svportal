@@ -89,28 +89,31 @@ export function generateExamSets(
         { key: 'C', text: q.choice_c },
         { key: 'D', text: q.choice_d }
       ];
+      if (q.choice_e) {
+        originalChoices.push({ key: 'E', text: q.choice_e });
+      }
 
-      // Check if D (or any choice) must be pinned
-      const isDPinned = q.pin_choice_position || 
-        isPinnedOption(q.choice_d) || 
-        q.pinned_choice_index === 'D';
+      const lastChoice = originalChoices[originalChoices.length - 1];
+      const isLastPinned = q.pin_choice_position || 
+        isPinnedOption(lastChoice.text) || 
+        q.pinned_choice_index === lastChoice.key;
 
       let shuffledChoices: { key: ChoiceOption; text: string }[];
 
       if (!shuffleChoices || isSetA) {
         shuffledChoices = [...originalChoices];
-      } else if (isDPinned) {
-        // Pin D in place, shuffle only A, B, C
-        const top3 = shuffleArray(originalChoices.slice(0, 3), (sIdx + 1) * 31 + newIndex);
-        shuffledChoices = [...top3, originalChoices[3]];
+      } else if (isLastPinned) {
+        // Pin the last choice in place (e.g. ถูกทุกข้อ), shuffle the rest
+        const rest = shuffleArray(originalChoices.slice(0, originalChoices.length - 1), (sIdx + 1) * 31 + newIndex);
+        shuffledChoices = [...rest, lastChoice];
       } else {
-        // Shuffle all 4 choices
+        // Shuffle all choices
         shuffledChoices = shuffleArray(originalChoices, (sIdx + 1) * 31 + newIndex);
       }
 
-      // Map choice positions: new slot (A,B,C,D) -> which original key was it?
-      const choiceSlots: ChoiceOption[] = ['A', 'B', 'C', 'D'];
-      const choiceMap: Record<ChoiceOption, ChoiceOption> = { A: 'A', B: 'B', C: 'C', D: 'D' };
+      // Map choice positions: new slot (A,B,C,D,E) -> which original key was it?
+      const choiceSlots: ChoiceOption[] = originalChoices.map(c => c.key);
+      const choiceMap: Record<string, ChoiceOption> = {};
       let newCorrectChoice: ChoiceOption = 'A';
 
       choiceSlots.forEach((slot, idx) => {
@@ -290,7 +293,7 @@ export function recalculateAllSubmissions(
  * Evaluates densities of A, B, C, D to find student choice and detects ghost marks
  */
 export function evaluateOMRBubbles(
-  densities: Record<ChoiceOption, number>,
+  densities: Partial<Record<ChoiceOption, number>>,
   options: {
     markThreshold?: number;     // Min density to consider a bubble marked (0.0 to 1.0)
     ambiguityDiff?: number;     // Min difference between 1st & 2nd choice to be confident
@@ -303,7 +306,7 @@ export function evaluateOMRBubbles(
   const markThreshold = options.markThreshold ?? 0.35;
   const ambiguityDiff = options.ambiguityDiff ?? 0.15;
 
-  const choices: ChoiceOption[] = ['A', 'B', 'C', 'D'];
+  const choices: ChoiceOption[] = ['A', 'B', 'C', 'D', 'E'];
   const sorted = choices
     .map(c => ({ choice: c, density: densities[c] || 0 }))
     .sort((a, b) => b.density - a.density);

@@ -1,5 +1,34 @@
 import QRCode from 'qrcode';
+import katex from 'katex';
 import { AcademicExamQuestion } from '@/types/academic';
+
+/**
+ * Safely converts LaTeX expressions ($...$ and $$...$$) into KaTeX HTML for sharp vector printing
+ */
+export function renderMathInHtml(text: string): string {
+  if (!text) return '';
+  try {
+    // Replace display equations $$...$$
+    let res = text.replace(/\$\$([^$]+)\$\$/g, (_, eq) => {
+      try {
+        return katex.renderToString(eq, { displayMode: true, throwOnError: false });
+      } catch {
+        return eq;
+      }
+    });
+    // Replace inline equations $...$
+    res = res.replace(/\$([^$]+)\$/g, (_, eq) => {
+      try {
+        return katex.renderToString(eq, { displayMode: false, throwOnError: false });
+      } catch {
+        return eq;
+      }
+    });
+    return res;
+  } catch {
+    return text;
+  }
+}
 
 export interface ExamPaperMeta {
   id: string;
@@ -161,39 +190,71 @@ export function generateExamPaperHtml(
     const choiceB = getChoiceText('B') || 'ตัวเลือก ข';
     const choiceC = getChoiceText('C') || 'ตัวเลือก ค';
     const choiceD = getChoiceText('D') || 'ตัวเลือก ง';
+    const choiceE = getChoiceText('E');
 
     // Check if choices are short (fits in 2 columns) or long (1 column)
-    const isLongChoice = [choiceA, choiceB, choiceC, choiceD].some(c => c.length > 35);
+    const isLongChoice = [choiceA, choiceB, choiceC, choiceD, choiceE].filter(Boolean).some(c => c.length > 35);
+
+    const isMatching = (q as any).question_type === 'matching';
 
     return `
       <div class="exam-question-item avoid-break">
         <div class="question-header">
           <span class="question-num">ข้อที่ ${qNum}.</span>
-          <div class="question-text">${q.question_text || `คำถามข้อที่ ${qNum}`}</div>
+          <div class="question-text">${renderMathInHtml(q.question_text || `คำถามข้อที่ ${qNum}`)}</div>
         </div>
-        ${(q as any).image_url ? `
+
+        ${q.diagram_svg ? `
+          <div class="question-diagram-box" style="margin: 8px 0; text-align: center; max-width: 100%;">
+            ${q.diagram_svg}
+          </div>
+        ` : (q.question_image_url || (q as any).image_url) ? `
           <div class="question-image-box">
-            <img src="${(q as any).image_url}" alt="รูปประกอบข้อ ${qNum}" />
+            <img src="${q.question_image_url || (q as any).image_url}" alt="รูปประกอบข้อ ${qNum}" />
           </div>
         ` : ''}
-        <div class="choices-container ${isLongChoice ? 'choices-stacked' : 'choices-grid'}">
-          <div class="choice-row">
-            <span class="choice-bullet">ก.</span>
-            <span class="choice-content">${choiceA}</span>
+
+        ${isMatching ? `
+          <div class="matching-container" style="margin: 8px 0; padding: 10px; border: 1px dashed #cbd5e1; border-radius: 6px; background-color: #f8fafc;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 13px;">
+              <div>
+                <strong style="display: block; margin-bottom: 4px; color: #1e293b;">คอลัมน์ A (โจทย์)</strong>
+                <div style="margin-bottom: 4px;">${renderMathInHtml(choiceA)}</div>
+                <div>${renderMathInHtml(choiceB)}</div>
+              </div>
+              <div>
+                <strong style="display: block; margin-bottom: 4px; color: #1e293b;">คอลัมน์ B (ตัวเลือกจับคู่)</strong>
+                <div style="margin-bottom: 4px;">${renderMathInHtml(choiceC)}</div>
+                <div>${renderMathInHtml(choiceD)}</div>
+              </div>
+            </div>
           </div>
-          <div class="choice-row">
-            <span class="choice-bullet">ข.</span>
-            <span class="choice-content">${choiceB}</span>
+        ` : `
+          <div class="choices-container ${isLongChoice ? 'choices-stacked' : 'choices-grid'}">
+            <div class="choice-row">
+              <span class="choice-bullet">ก.</span>
+              <span class="choice-content">${renderMathInHtml(choiceA)}</span>
+            </div>
+            <div class="choice-row">
+              <span class="choice-bullet">ข.</span>
+              <span class="choice-content">${renderMathInHtml(choiceB)}</span>
+            </div>
+            <div class="choice-row">
+              <span class="choice-bullet">ค.</span>
+              <span class="choice-content">${renderMathInHtml(choiceC)}</span>
+            </div>
+            <div class="choice-row">
+              <span class="choice-bullet">ง.</span>
+              <span class="choice-content">${renderMathInHtml(choiceD)}</span>
+            </div>
+            ${choiceE ? `
+              <div class="choice-row">
+                <span class="choice-bullet">จ.</span>
+                <span class="choice-content">${renderMathInHtml(choiceE)}</span>
+              </div>
+            ` : ''}
           </div>
-          <div class="choice-row">
-            <span class="choice-bullet">ค.</span>
-            <span class="choice-content">${choiceC}</span>
-          </div>
-          <div class="choice-row">
-            <span class="choice-bullet">ง.</span>
-            <span class="choice-content">${choiceD}</span>
-          </div>
-        </div>
+        `}
       </div>
     `;
   }).join('');
@@ -204,6 +265,7 @@ export function generateExamPaperHtml(
       <head>
         <meta charset="utf-8" />
         <title>ข้อสอบ_${exam.title}_ชุด_${setName}</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css" />
         <style>
           ${EXAM_PRINT_BASE_CSS}
 
@@ -685,11 +747,11 @@ export async function generateBatchAnswerSheetsHtml(
                 ${isSpare ? '<span class="spare-chip">แผ่นสำรอง</span>' : ''}
               </div>
               <div class="instructions-strip">
-                <span class="inst-icon">✎</span>
+                <span class="inst-icon">[คำชี้แจง]</span>
                 <span class="inst-text"><strong>วิธีฝน:</strong> ใช้ดินสอ 2B ฝนให้ดำเข้มเต็มวงกลม ห้ามพับหรือทำให้กระดาษยับ</span>
                 <div class="sample-bubbles">
                   <span class="sample-circle sample-ok">● ถูก</span>
-                  <span class="sample-circle sample-bad">✕ ผิด</span>
+                  <span class="sample-circle sample-bad">X ผิด</span>
                 </div>
               </div>
             </div>
@@ -729,7 +791,7 @@ export async function generateBatchAnswerSheetsHtml(
         <div class="center-cut-guide">
           <div class="cut-line"></div>
           <div class="cut-badge">
-            <span class="cut-scissors">✂</span>
+            <span class="cut-scissors">[รอยตัด]</span>
             <span class="cut-label">ตัดตามรอยประ (แบ่งครึ่งกระดาษ A4 สำหรับนักเรียน 2 คน)</span>
           </div>
           <div class="cut-line"></div>

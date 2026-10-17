@@ -145,7 +145,8 @@ export async function PUT(
       duration_minutes,
       max_score,
       questions,
-      gradebook_id
+      gradebook_id,
+      status
     } = body;
 
     // Update main exam record
@@ -155,6 +156,7 @@ export async function PUT(
     if (duration_minutes !== undefined) updateData.duration_minutes = duration_minutes;
     if (max_score !== undefined) updateData.max_score = max_score;
     if (gradebook_id !== undefined) updateData.gradebook_id = gradebook_id;
+    if (status !== undefined) updateData.status = status;
 
     if (questions && Array.isArray(questions)) {
       updateData.total_questions = questions.length;
@@ -177,12 +179,16 @@ export async function PUT(
       const qRows = questions.map((q: any, idx: number) => ({
         exam_id: id,
         question_number: q.question_number || (idx + 1),
+        question_type: q.question_type || 'mcq',
         question_text: q.question_text || `ข้อที่ ${idx + 1}`,
+        math_latex: q.math_latex || null,
         question_image_url: q.question_image_url || null,
+        diagram_svg: q.diagram_svg || null,
         choice_a: q.choice_a || 'ตัวเลือก ก',
         choice_b: q.choice_b || 'ตัวเลือก ข',
         choice_c: q.choice_c || 'ตัวเลือก ค',
         choice_d: q.choice_d || 'ตัวเลือก ง',
+        choice_e: q.choice_e || null,
         correct_choice: q.correct_choice || 'A',
         indicator_code: q.indicator_code || null,
         points: q.points ?? 1.0,
@@ -234,6 +240,48 @@ export async function DELETE(
     const { id } = await params;
     const supabase = getAdminClient();
 
+    const url = new URL(req.url);
+    const force = url.searchParams.get('force') === 'true';
+    const action = url.searchParams.get('action'); // 'archive' | 'delete'
+
+    // Check if the user intends to archive rather than hard delete
+    if (action === 'archive') {
+      const { error: archiveError } = await supabase
+        .from('academic_exams')
+        .update({ status: 'archived', updated_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (archiveError) throw archiveError;
+      return NextResponse.json({ success: true, message: 'จัดเก็บข้อสอบเข้าสู่คลังข้อสอบเรียบร้อยแล้ว (Archived)' });
+    }
+
+    // Check submission count to prevent accidental data loss
+    const { count, error: countError } = await supabase
+      .from('academic_exam_submissions')
+      .select('id', { count: 'exact', head: true })
+      .eq('exam_id', id);
+
+    if (countError) throw countError;
+
+    const submissionCount = count || 0;
+    if (submissionCount > 0 && !force) {
+      return NextResponse.json({
+        success: false,
+        blocked: true,
+        submissions_count: submissionCount,
+        message: `ข้อสอบนี้มีผลการสอบของนักเรียนแล้ว ${submissionCount} รายการ เพื่อความปลอดภัย กรุณาเลือกจัดเก็บในคลัง (Archive) หรือยืนยันการลบแบบบังคับ (Force Delete)`
+      }, { status: 409 });
+    }
+
+    // If force delete or no submissions, remove any submissions first if forced
+    if (submissionCount > 0 && force) {
+      await supabase.from('academic_exam_submissions').delete().eq('exam_id', id);
+    }
+
+    // Cascade delete sets and questions explicitly for safety
+    await supabase.from('academic_exam_sets').delete().eq('exam_id', id);
+    await supabase.from('academic_exam_questions').delete().eq('exam_id', id);
+
     const { error } = await supabase
       .from('academic_exams')
       .delete()
@@ -241,7 +289,9 @@ export async function DELETE(
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true, message: 'Exam deleted successfully' });
+    console.info(`[AUDIT] Exam deleted: ${id} by ${auth.user?.id || 'unknown'} (submissions removed: ${submissionCount})`);
+
+    return NextResponse.json({ success: true, message: 'ลบข้อสอบเรียบร้อยแล้ว' });
   } catch (error: any) {
     console.error('Error deleting exam:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

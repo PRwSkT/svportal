@@ -36,6 +36,8 @@ import {
 import { toast } from 'sonner';
 import { printDocumentViaSandbox, openDocumentPreviewInTab } from '@/lib/documents/print-service';
 import { ExamPrintModal } from '@/components/academic/ExamPrintModal';
+import { ExamAuthoringModal } from '@/components/academic/ExamAuthoringModal';
+import { ExamDeleteConfirmModal } from '@/components/academic/ExamDeleteConfirmModal';
 
 interface ExamItem {
   id: string;
@@ -43,6 +45,7 @@ interface ExamItem {
   academic_year: string;
   term: string;
   exam_type: string;
+  status?: string;
   total_questions: number;
   max_score: number;
   duration_minutes: number;
@@ -62,7 +65,7 @@ interface ExamItem {
   sets?: Array<{
     id: string;
     set_name: string;
-    answer_key: Record<string, string>;
+    answer_key?: Record<string, string>;
   }>;
 }
 
@@ -75,8 +78,17 @@ export default function AcademicExamsPage() {
   // Filters
   const [selectedTerm, setSelectedTerm] = useState('1');
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
-  // Create Modal State
+  // Exam Studio Authoring State
+  const [isAuthoringOpen, setIsAuthoringOpen] = useState(false);
+  const [authoringMode, setAuthoringMode] = useState<'create' | 'edit'>('create');
+  const [authoringExamId, setAuthoringExamId] = useState<string | undefined>(undefined);
+
+  // Safe Exam Delete State
+  const [deletingExam, setDeletingExam] = useState<ExamItem | null>(null);
+
+  // Create Modal State (legacy fallback)
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [courseId, setCourseId] = useState('');
@@ -459,9 +471,15 @@ export default function AcademicExamsPage() {
   };
 
   const filteredExams = exams.filter(e => {
-    if (searchQuery && !e.title.toLowerCase().includes(searchQuery.toLowerCase()) && 
-        !e.course?.name_th.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
+    if (statusFilter !== 'all') {
+      const examStatus = e.status || 'ready';
+      if (examStatus !== statusFilter) return false;
+    }
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const matchTitle = e.title?.toLowerCase().includes(q);
+      const matchCourse = e.course?.name_th?.toLowerCase().includes(q) || e.course?.course_code?.toLowerCase().includes(q);
+      if (!matchTitle && !matchCourse) return false;
     }
     return true;
   });
@@ -511,11 +529,15 @@ export default function AcademicExamsPage() {
 
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setIsCreateOpen(true)}
+              onClick={() => {
+                setAuthoringMode('create');
+                setAuthoringExamId(undefined);
+                setIsAuthoringOpen(true);
+              }}
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#7B1C3E] hover:bg-[#631430] text-white rounded-2xl text-xs sm:text-sm font-bold shadow-md shadow-[#7B1C3E]/20 transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>สร้างข้อสอบใหม่</span>
+              <span>สร้างข้อสอบใหม่ (Exam Studio)</span>
             </button>
           </div>
         </div>
@@ -569,7 +591,7 @@ export default function AcademicExamsPage() {
 
         {/* Filter Bar */}
         <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
               <button
                 onClick={() => setSelectedTerm('1')}
@@ -591,6 +613,28 @@ export default function AcademicExamsPage() {
               >
                 ภาคเรียนที่ 2
               </button>
+            </div>
+
+            {/* Status Filter */}
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 text-xs">
+              {[
+                { id: 'all', label: 'ทั้งหมด' },
+                { id: 'ready', label: 'พร้อมสอบ' },
+                { id: 'draft', label: 'ร่างข้อสอบ' },
+                { id: 'archived', label: 'ในคลัง (Archived)' }
+              ].map(st => (
+                <button
+                  key={st.id}
+                  onClick={() => setStatusFilter(st.id)}
+                  className={`px-2.5 py-1 rounded-lg font-medium transition ${
+                    statusFilter === st.id
+                      ? 'bg-white text-slate-900 shadow-sm font-bold'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  {st.label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -627,9 +671,23 @@ export default function AcademicExamsPage() {
               >
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600">
-                      {exam.course?.course_code || 'วิชา'} • ชั้น {exam.course?.grade_level || ''}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600">
+                        {exam.course?.course_code || 'วิชา'} • ชั้น {exam.course?.grade_level || ''}
+                      </span>
+                      <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md ${
+                        exam.status === 'draft' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                        exam.status === 'review' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                        exam.status === 'archived' ? 'bg-stone-200 text-stone-700 border border-stone-300' :
+                        exam.status === 'conducted' ? 'bg-purple-100 text-purple-800 border border-purple-200' :
+                        'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      }`}>
+                        {exam.status === 'draft' ? 'ร่าง' :
+                         exam.status === 'review' ? 'รอตรวจ' :
+                         exam.status === 'archived' ? 'ในคลัง' :
+                         exam.status === 'conducted' ? 'จัดสอบแล้ว' : 'พร้อมสอบ'}
+                      </span>
+                    </div>
                     <span className="text-xs text-slate-500">
                       {exam.exam_type === 'midterm' ? 'กลางภาค' : 'ปลายภาค'}
                     </span>
@@ -690,7 +748,18 @@ export default function AcademicExamsPage() {
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between pt-1 gap-1 flex-wrap">
+                  <div className="flex items-center justify-between pt-1 gap-1 flex-wrap border-t border-slate-100 dark:border-slate-800 mt-1">
+                    <button
+                      onClick={() => {
+                        setAuthoringMode('edit');
+                        setAuthoringExamId(exam.id);
+                        setIsAuthoringOpen(true);
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-1 cursor-pointer"
+                      title="เปิด Exam Studio เพื่อแก้ไขโจทย์ แผนภาพ หรือช้อยส์"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" /> แก้ไขข้อสอบ
+                    </button>
                     <button
                       onClick={async () => {
                         await handleOpenExamDetails(exam);
@@ -699,21 +768,28 @@ export default function AcademicExamsPage() {
                       className="text-xs text-purple-600 hover:text-purple-700 font-semibold flex items-center gap-1 cursor-pointer"
                       title="เปิดหน้าต่างแก้ไขเฉลยคำตอบชุด A/B/C"
                     >
-                      <Edit3 className="w-3.5 h-3.5" /> แก้ไขเฉลย
+                      <CheckCheck className="w-3.5 h-3.5" /> แก้ไขเฉลย
                     </button>
                     <button
                       onClick={() => handleRetroactiveRescore(exam.id)}
                       className="text-xs text-indigo-600 hover:text-indigo-700 flex items-center gap-1 cursor-pointer"
                       title="คำนวณคะแนนใหม่ทั้งสายชั้นใน 1 วินาทีเมื่อแก้ไขเฉลย"
                     >
-                      <RotateCcw className="w-3.5 h-3.5" /> คำนวณใหม่ 1 วิ
+                      <RotateCcw className="w-3.5 h-3.5" /> คำนวณใหม่
                     </button>
                     <button
                       onClick={() => handleSyncGradebook(exam.id)}
                       className="text-xs text-amber-600 hover:text-amber-700 flex items-center gap-1 cursor-pointer"
                       title="ซิงค์คะแนนเข้าเล่ม ปพ.5 ทันที"
                     >
-                      <Database className="w-3.5 h-3.5" /> ซิงค์เข้า ปพ.5
+                      <Database className="w-3.5 h-3.5" /> ซิงค์ ปพ.5
+                    </button>
+                    <button
+                      onClick={() => setDeletingExam(exam)}
+                      className="text-xs text-rose-600 hover:text-rose-700 font-medium flex items-center gap-1 cursor-pointer"
+                      title="ลบข้อสอบหรือจัดเก็บเข้าคลัง"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> ลบ
                     </button>
                   </div>
                 </div>
@@ -723,274 +799,29 @@ export default function AcademicExamsPage() {
         )}
       </div>
 
-      {/* CREATE EXAM MODAL */}
-      {isCreateOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-3xl w-full p-6 space-y-6 shadow-2xl my-8 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b pb-4">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white">สร้างข้อสอบใหม่ & จัดชุดอัตโนมัติ</h2>
-                <p className="text-xs text-slate-500">ระบบจะสร้างชุด A, B, C สลับข้อ/ช้อยส์ และล็อกตำแหน่งตัวเลือกพิเศษให้อัตโนมัติ</p>
-              </div>
-              <button onClick={() => setIsCreateOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
+      {/* EXAM AUTHORING STUDIO (CREATE & EDIT) */}
+      <ExamAuthoringModal
+        isOpen={isAuthoringOpen}
+        mode={authoringMode}
+        examId={authoringExamId}
+        courses={courses}
+        gradebooks={gradebooks}
+        onClose={() => setIsAuthoringOpen(false)}
+        onSaved={() => {
+          fetchInitialData();
+        }}
+      />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">ชื่อการสอบ *</label>
-                <input
-                  type="text"
-                  placeholder="เช่น ข้อสอบวัดผลกลางภาคเรียนที่ 1/2568"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-sm"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">รายวิชา *</label>
-                <select
-                  value={courseId}
-                  onChange={(e) => setCourseId(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-sm"
-                >
-                  {courses.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.course_code} - {c.name_th} ({c.grade_level})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">ประเภทการสอบ</label>
-                <select
-                  value={examType}
-                  onChange={(e) => setExamType(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-sm"
-                >
-                  <option value="midterm">สอบกลางภาค (Midterm)</option>
-                  <option value="final">สอบปลายภาค (Final)</option>
-                  <option value="unit_test">สอบท้ายหน่วย (Unit Test)</option>
-                  <option value="quiz">แบบทดสอบย่อย (Quiz)</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">เล่ม ปพ.5 ที่เชื่อมโยง</label>
-                <select
-                  value={gradebookId}
-                  onChange={(e) => setGradebookId(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-sm"
-                >
-                  <option value="">-- ไม่ระบุ (เลือกภายหลังได้) --</option>
-                  {gradebooks.map(gb => (
-                    <option key={gb.id} value={gb.id}>
-                      ห้อง {gb.class?.name} - {gb.course?.name_th}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">คะแนนเต็ม</label>
-                <input
-                  type="number"
-                  value={maxScore}
-                  onChange={(e) => setMaxScore(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-sm"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">เวลาในการสอบ (นาที)</label>
-                <input
-                  type="number"
-                  value={duration}
-                  onChange={(e) => setDuration(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-sm"
-                />
-              </div>
-            </div>
-
-            {/* Questions Section */}
-            <div className="space-y-4 pt-4 border-t">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                    รายการข้อสอบ ({questions.length} ข้อ)
-                  </h3>
-                  <p className="text-xs text-slate-500">สามารถเพิ่มข้อสอบด้วยตนเอง หรือให้น้องฟ้า AI ช่วยร่างตามตัวชี้วัด สพฐ.</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleAiDraft}
-                    disabled={isAiDrafting}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-linear-to-r from-purple-600 to-indigo-600 text-white rounded-xl text-xs font-medium shadow-xs disabled:opacity-50"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    {isAiDrafting ? 'น้องฟ้ากำลังร่างข้อสอบ...' : 'น้องฟ้าช่วยออกข้อสอบ'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = questions.length + 1;
-                      setQuestions([
-                        ...questions,
-                        {
-                          question_number: next,
-                          question_text: `ข้อที่ ${next}`,
-                          choice_a: 'ตัวเลือก ก',
-                          choice_b: 'ตัวเลือก ข',
-                          choice_c: 'ตัวเลือก ค',
-                          choice_d: 'ตัวเลือก ง',
-                          correct_choice: 'A',
-                          indicator_code: '',
-                          pin_choice_position: false
-                        }
-                      ]);
-                    }}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> เพิ่มข้อ
-                  </button>
-                </div>
-              </div>
-
-              {/* Questions List */}
-              <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-                {questions.map((q, idx) => (
-                  <div key={idx} className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-[#7B1C3E]">ข้อที่ {idx + 1}</span>
-                        <div className="flex items-center bg-slate-200/80 dark:bg-slate-700 rounded-lg p-0.5">
-                          <button
-                            type="button"
-                            onClick={() => moveQuestion(idx, -1)}
-                            disabled={idx === 0}
-                            title="สลับขึ้น"
-                            className="p-1 text-slate-600 dark:text-slate-300 hover:text-[#7B1C3E] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                          >
-                            <ChevronUp className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => moveQuestion(idx, 1)}
-                            disabled={idx === questions.length - 1}
-                            title="สลับลง"
-                            className="p-1 text-slate-600 dark:text-slate-300 hover:text-[#7B1C3E] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                          >
-                            <ChevronDown className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400">
-                          <span>คะแนน:</span>
-                          <input
-                            type="number"
-                            step="0.5"
-                            min="0.5"
-                            value={q.points || 1}
-                            onChange={(e) => {
-                              const updated = [...questions];
-                              updated[idx].points = parseFloat(e.target.value) || 1;
-                              setQuestions(updated);
-                            }}
-                            className="w-12 px-1.5 py-0.5 text-center bg-white dark:bg-slate-900 border rounded text-xs font-semibold"
-                          />
-                        </div>
-                        <label className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-1 rounded-lg border border-amber-200 dark:border-amber-900 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={q.pin_choice_position}
-                            onChange={(e) => {
-                              const updated = [...questions];
-                              updated[idx].pin_choice_position = e.target.checked;
-                              setQuestions(updated);
-                            }}
-                            className="rounded text-amber-600"
-                          />
-                          <Pin className="w-3 h-3" /> ล็อกช้อยส์ ง (เช่น ถูกทุกข้อ)
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => setQuestions(questions.filter((_, i) => i !== idx))}
-                          className="text-red-500 hover:text-red-700 text-xs cursor-pointer px-1"
-                        >
-                          ลบ
-                        </button>
-                      </div>
-                    </div>
-
-                    <input
-                      type="text"
-                      placeholder="โจทย์ข้อสอบ..."
-                      value={q.question_text}
-                      onChange={(e) => {
-                        const updated = [...questions];
-                        updated[idx].question_text = e.target.value;
-                        setQuestions(updated);
-                      }}
-                      className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border rounded-lg text-sm"
-                    />
-
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      {(['A', 'B', 'C', 'D'] as const).map(choiceKey => (
-                        <div key={choiceKey} className="flex items-center gap-2">
-                          <input
-                            type="radio"
-                            name={`correct-${idx}`}
-                            checked={q.correct_choice === choiceKey}
-                            onChange={() => {
-                              const updated = [...questions];
-                              updated[idx].correct_choice = choiceKey;
-                              setQuestions(updated);
-                            }}
-                            className="text-indigo-600"
-                          />
-                          <span className="font-bold text-slate-500">{choiceKey}:</span>
-                          <input
-                            type="text"
-                            value={q[`choice_${choiceKey.toLowerCase()}`]}
-                            onChange={(e) => {
-                              const updated = [...questions];
-                              updated[idx][`choice_${choiceKey.toLowerCase()}`] = e.target.value;
-                              setQuestions(updated);
-                            }}
-                            className="flex-1 px-2 py-1 bg-white dark:bg-slate-900 border rounded text-xs"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-4 border-t">
-              <button
-                type="button"
-                onClick={() => setIsCreateOpen(false)}
-                className="px-4 py-2 border rounded-xl text-sm font-medium text-slate-600"
-              >
-                ยกเลิก
-              </button>
-              <button
-                type="button"
-                onClick={handleCreateExam}
-                className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-md"
-              >
-                บันทึกและสลับชุด A, B, C
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* SAFE EXAM DELETION & ARCHIVE MODAL */}
+      <ExamDeleteConfirmModal
+        isOpen={deletingExam !== null}
+        exam={deletingExam as any}
+        onClose={() => setDeletingExam(null)}
+        onDeleted={() => {
+          fetchInitialData();
+          toast.success('อัปเดตรายการข้อสอบเรียบร้อยแล้ว');
+        }}
+      />
 
       {/* EXAM & BATCH OMR PRINT MODAL */}
       <ExamPrintModal

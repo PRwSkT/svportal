@@ -254,7 +254,9 @@ export interface TeacherSubstitution {
 }
 
 export type ExamType = 'midterm' | 'final' | 'quiz' | 'unit_test';
-export type ChoiceOption = 'A' | 'B' | 'C' | 'D';
+export type ExamStatus = 'draft' | 'review' | 'ready' | 'conducted' | 'archived';
+export type ChoiceOption = 'A' | 'B' | 'C' | 'D' | 'E';
+export type ExamQuestionType = 'mcq' | 'matching' | 'contextual' | 'true_false';
 
 export interface AcademicExam {
   id: string;
@@ -264,6 +266,7 @@ export interface AcademicExam {
   academic_year: string;
   term: string;
   exam_type: ExamType;
+  status?: ExamStatus;
   total_questions: number;
   max_score: number;
   duration_minutes: number;
@@ -288,12 +291,16 @@ export interface AcademicExamQuestion {
   id: string;
   exam_id: string;
   question_number: number;
+  question_type?: ExamQuestionType;
   question_text: string;
+  math_latex?: string | null;
   question_image_url: string | null;
+  diagram_svg?: string | null;
   choice_a: string;
   choice_b: string;
   choice_c: string;
   choice_d: string;
+  choice_e?: string | null;
   correct_choice: ChoiceOption;
   indicator_code: string | null; // e.g. ค 1.1 ป.3/1
   points: number;
@@ -348,7 +355,7 @@ export interface OMRQuestionScanResult {
   questionNumber: number;
   selectedChoice: ChoiceOption | null;
   confidence: number;
-  densities: Record<ChoiceOption, number>;
+  densities: Partial<Record<ChoiceOption, number>>;
   isAmbiguous: boolean; // ghost mark / multiple marks
 }
 

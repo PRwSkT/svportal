@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
         *,
         course:academic_courses(id, course_code, name_th, grade_level, department),
         gradebook:academic_gradebooks(id, class:academic_classes(name)),
-        sets:academic_exam_sets(id, set_name, answer_key)
+        sets:academic_exam_sets(id, set_name)
       `)
       .eq('academic_year', academicYear)
       .order('created_at', { ascending: false });
@@ -73,6 +73,7 @@ export async function POST(req: NextRequest) {
       academic_year = DEFAULT_ACADEMIC_YEAR,
       term = DEFAULT_TERM,
       exam_type = 'midterm',
+      status = 'ready',
       total_questions = 20,
       max_score = 20,
       duration_minutes = 60,
@@ -95,6 +96,7 @@ export async function POST(req: NextRequest) {
         academic_year,
         term,
         exam_type,
+        status,
         total_questions: questions.length || total_questions,
         max_score,
         duration_minutes,
@@ -112,12 +114,16 @@ export async function POST(req: NextRequest) {
       const qRows = questions.map((q: any, idx: number) => ({
         exam_id: exam.id,
         question_number: q.question_number || (idx + 1),
+        question_type: q.question_type || 'mcq',
         question_text: q.question_text || `ข้อที่ ${idx + 1}`,
+        math_latex: q.math_latex || null,
         question_image_url: q.question_image_url || null,
+        diagram_svg: q.diagram_svg || null,
         choice_a: q.choice_a || 'ตัวเลือก ก',
         choice_b: q.choice_b || 'ตัวเลือก ข',
         choice_c: q.choice_c || 'ตัวเลือก ค',
         choice_d: q.choice_d || 'ตัวเลือก ง',
+        choice_e: q.choice_e || null,
         correct_choice: q.correct_choice || 'A',
         indicator_code: q.indicator_code || null,
         points: q.points ?? 1.0,
