@@ -256,7 +256,7 @@ export interface TeacherSubstitution {
 export type ExamType = 'midterm' | 'final' | 'quiz' | 'unit_test';
 export type ExamStatus = 'draft' | 'review' | 'ready' | 'conducted' | 'archived';
 export type ChoiceOption = 'A' | 'B' | 'C' | 'D' | 'E';
-export type ExamQuestionType = 'mcq' | 'matching' | 'contextual' | 'true_false';
+export type ExamQuestionType = 'mcq' | 'matching' | 'contextual' | 'true_false' | 'subjective';
 
 export interface AcademicExam {
   id: string;

@@ -1,6 +1,7 @@
 import QRCode from 'qrcode';
 import katex from 'katex';
 import { AcademicExamQuestion } from '@/types/academic';
+import { parseImageUrlMeta, isImageChoice, parseChoiceContent } from '@/lib/academic/exam-image-utils';
 
 /**
  * Safely converts LaTeX expressions ($...$ and $$...$$) into KaTeX HTML for sharp vector printing
@@ -82,6 +83,7 @@ export interface BatchAnswerSheetsOptions {
   schoolName?: string;
   academicYear?: string;
   term?: string;
+  hasSubjective?: boolean;
 }
 
 /**
@@ -147,6 +149,109 @@ html, body {
     margin-bottom: 24px;
   }
 }
+
+.question-image-box {
+  margin: 8px 0 10px 24px;
+}
+.question-image-box.image-align-center {
+  text-align: center;
+}
+.question-image-box.image-align-left {
+  text-align: left;
+}
+.question-image-box.image-align-right {
+  text-align: right;
+}
+.question-image-box img {
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  object-fit: contain;
+}
+.question-image-box.image-size-sm img {
+  max-width: 32%;
+  max-height: 130px;
+}
+.question-image-box.image-size-md img {
+  max-width: 58%;
+  max-height: 200px;
+}
+.question-image-box.image-size-lg img {
+  max-width: 82%;
+  max-height: 300px;
+}
+.question-image-box.image-size-full img {
+  max-width: 98%;
+  max-height: 450px;
+}
+.image-caption {
+  font-size: 11px;
+  color: #64748b;
+  font-style: italic;
+  margin-top: 4px;
+}
+
+.question-diagram-box {
+  margin: 8px 0;
+  text-align: center;
+  max-width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.question-diagram-box svg {
+  max-width: 100% !important;
+  max-height: 240px !important;
+  height: auto !important;
+  margin: 0 auto;
+  display: block;
+}
+
+.choices-image-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 18px;
+  margin-top: 6px;
+}
+.choice-image-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background-color: #fafbfc;
+  break-inside: avoid;
+}
+.choice-image-card .choice-bullet {
+  font-weight: 700;
+  font-size: 13px;
+  color: #0f172a;
+  min-width: 18px;
+}
+.choice-image-card .choice-image-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.choice-thumbnail-img {
+  max-width: 100%;
+  max-height: 115px;
+  border-radius: 4px;
+  object-fit: contain;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+}
+.choice-image-label {
+  font-size: 11.5px;
+  color: #334155;
+  margin-top: 4px;
+  text-align: center;
+}
+.choice-text-fallback {
+  font-size: 13px;
+  color: #334155;
+}
 `;
 
 /**
@@ -207,6 +312,9 @@ export function generateExamPaperHtml(
     }));
   }
 
+  const hasSubjective = mappedQuestions.some(item => (item.question as any).question_type === 'subjective');
+  const hasMcq = mappedQuestions.some(item => (item.question as any).question_type !== 'subjective');
+
   const renderedQuestionsHtml = mappedQuestions.map((item, idx) => {
     const q = item.question;
     const qNum = idx + 1;
@@ -228,25 +336,96 @@ export function generateExamPaperHtml(
     const isLongChoice = [choiceA, choiceB, choiceC, choiceD, choiceE].filter(Boolean).some(c => c.length > 35);
 
     const isMatching = (q as any).question_type === 'matching';
+    const isSubjective = (q as any).question_type === 'subjective';
+
+    const isFirstSubjective = isSubjective && (idx === 0 || (mappedQuestions[idx - 1]?.question as any).question_type !== 'subjective');
+    const isFirstQuestion = idx === 0;
+
+    const renderSubjectiveAnswerSpace = () => {
+      const spaceFormat = (q as any).choice_b || 'lines_5';
+      const points = q.points || 5;
+
+      let lineCount = 5;
+      if (spaceFormat === 'lines_3') lineCount = 3;
+      else if (spaceFormat === 'lines_8') lineCount = 8;
+      else if (spaceFormat === 'lines_10') lineCount = 10;
+
+      const isBox = spaceFormat === 'blank_box' || spaceFormat === 'grid_box';
+
+      return `
+        <div class="subjective-response-container" style="margin-top: 10px; margin-bottom: 6px;">
+          ${isBox ? `
+            <div class="subjective-workings-box subjective-box ${spaceFormat === 'grid_box' ? 'grid-box' : 'blank-box'}" style="height: ${spaceFormat === 'grid_box' ? '160px' : '130px'}; border: 1.5px dashed #94a3b8; border-radius: 6px; padding: 10px; background-color: ${spaceFormat === 'grid_box' ? '#f8fafc' : '#ffffff'}; position: relative; ${spaceFormat === 'grid_box' ? 'background-image: radial-gradient(#cbd5e1 1px, transparent 1px); background-size: 16px 16px;' : ''}">
+              <span style="font-size: 11px; color: #94a3b8; font-weight: 600;">พื้นที่สำหรับแสดงวิธีทำ / เขียนคำตอบ / วาดภาพ:</span>
+            </div>
+          ` : `
+            <div class="subjective-dotted-lines" style="display: flex; flex-direction: column; gap: 14px; padding: 4px 0;">
+              ${Array.from({ length: lineCount }).map((_, lineIdx) => `
+                <div class="subjective-line" style="border-bottom: 1px dashed #94a3b8; height: 18px; display: flex; align-items: flex-end;">
+                  ${lineIdx === 0 ? '<span style="font-size: 12px; color: #475569; font-weight: 700; padding-right: 8px;">ตอบ:</span>' : ''}
+                </div>
+              `).join('')}
+            </div>
+          `}
+
+          <div style="margin-top: 8px; display: flex; justify-content: flex-end;">
+            <div style="display: inline-flex; align-items: center; gap: 8px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 10px; font-size: 10px; color: #475569; background: #f8fafc;">
+              <span>คะแนนเต็ม: <strong>${points} คะแนน</strong></span>
+              <span>|</span>
+              <span>คะแนนที่ได้: [ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ]</span>
+              <span>|</span>
+              <span>ผู้ตรวจ: ....................</span>
+            </div>
+          </div>
+        </div>
+      `;
+    };
+
+    const sectionHeader = isFirstQuestion && hasSubjective && hasMcq ? `
+      <div class="exam-section-divider avoid-break" style="margin-bottom: 12px; padding: 6px 10px; background: #f8fafc; border-left: 4px solid #1e293b; border-radius: 4px; border: 1px solid #e2e8f0;">
+        <strong style="color: #0f172a; font-size: 13px;">ตอนที่ 1: ข้อสอบปรนัย</strong>
+        <span style="font-size: 11.5px; color: #64748b; margin-left: 8px;">ให้นักเรียนเลือกคำตอบที่ถูกต้องที่สุดแล้วระบายลงในกระดาษคำตอบ OMR</span>
+      </div>
+    ` : isFirstSubjective ? `
+      <div class="exam-section-divider avoid-break" style="margin: 22px 0 12px 0; padding: 8px 12px; background: #fdf2f4; border-left: 4px solid #7B1C3E; border-radius: 4px; border: 1px solid #fecdd3;">
+        <strong style="color: #7B1C3E; font-size: 13.5px;">ตอนที่ 2 ข้อสอบอัตนัย (เขียนตอบ / แสดงวิธีทำ)</strong>
+        <span style="font-size: 12px; color: #475569; margin-left: 8px;">ให้นักเรียนเขียนแสดงวิธีทำหรือตอบคำถามลงในกระดาษข้อสอบนี้</span>
+      </div>
+    ` : '';
 
     return `
-      <div class="exam-question-item avoid-break">
+      ${sectionHeader}
+      <div class="exam-question-item avoid-break ${isSubjective ? 'subjective-question-card' : ''}">
         <div class="question-header">
           <span class="question-num">ข้อที่ ${qNum}.</span>
+          ${isSubjective ? `<span class="subjective-pill" style="margin-left: 6px; font-size: 10.5px; font-weight: 700; color: #7B1C3E; background: #fdf2f4; border: 1px solid #fecdd3; border-radius: 4px; padding: 1px 6px;">[ อัตนัย - ${q.points || 5} คะแนน ]</span>` : ''}
           <div class="question-text">${renderMathInHtml(q.question_text || `คำถามข้อที่ ${qNum}`)}</div>
         </div>
 
-        ${q.diagram_svg ? `
-          <div class="question-diagram-box" style="margin: 8px 0; text-align: center; max-width: 100%;">
-            ${q.diagram_svg}
-          </div>
-        ` : (q.question_image_url || (q as any).image_url) ? `
-          <div class="question-image-box">
-            <img src="${q.question_image_url || (q as any).image_url}" alt="รูปประกอบข้อ ${qNum}" />
-          </div>
-        ` : ''}
+        ${(() => {
+          if (q.diagram_svg) {
+            return `
+              <div class="question-diagram-box" style="margin: 8px 0; text-align: center; max-width: 100%;">
+                ${q.diagram_svg}
+              </div>
+            `;
+          }
+          const rawImgUrl = q.question_image_url || (q as any).image_url;
+          if (rawImgUrl) {
+            const imgMeta = parseImageUrlMeta(rawImgUrl);
+            const alignClass = imgMeta.align === 'left' ? 'image-align-left' : imgMeta.align === 'right' ? 'image-align-right' : 'image-align-center';
+            const sizeClass = `image-size-${imgMeta.size}`;
+            return `
+              <div class="question-image-box ${alignClass} ${sizeClass}">
+                <img src="${imgMeta.url}" alt="รูปประกอบข้อ ${qNum}" />
+                ${imgMeta.caption ? `<div class="image-caption">${imgMeta.caption}</div>` : ''}
+              </div>
+            `;
+          }
+          return '';
+        })()}
 
-        ${isMatching ? `
+        ${isSubjective ? renderSubjectiveAnswerSpace() : isMatching ? `
           <div class="matching-container" style="margin: 8px 0; padding: 10px; border: 1px dashed #cbd5e1; border-radius: 6px; background-color: #f8fafc;">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 13px;">
               <div>
@@ -261,32 +440,64 @@ export function generateExamPaperHtml(
               </div>
             </div>
           </div>
-        ` : `
-          <div class="choices-container ${isLongChoice ? 'choices-stacked' : 'choices-grid'}">
-            <div class="choice-row">
-              <span class="choice-bullet">ก.</span>
-              <span class="choice-content">${renderMathInHtml(choiceA)}</span>
-            </div>
-            <div class="choice-row">
-              <span class="choice-bullet">ข.</span>
-              <span class="choice-content">${renderMathInHtml(choiceB)}</span>
-            </div>
-            <div class="choice-row">
-              <span class="choice-bullet">ค.</span>
-              <span class="choice-content">${renderMathInHtml(choiceC)}</span>
-            </div>
-            <div class="choice-row">
-              <span class="choice-bullet">ง.</span>
-              <span class="choice-content">${renderMathInHtml(choiceD)}</span>
-            </div>
-            ${choiceE ? `
-              <div class="choice-row">
-                <span class="choice-bullet">จ.</span>
-                <span class="choice-content">${renderMathInHtml(choiceE)}</span>
+        ` : (() => {
+          const hasImageChoices = [choiceA, choiceB, choiceC, choiceD, choiceE].some(c => isImageChoice(c));
+          if (hasImageChoices) {
+            const choiceList = [
+              { bullet: 'ก.', text: choiceA },
+              { bullet: 'ข.', text: choiceB },
+              { bullet: 'ค.', text: choiceC },
+              { bullet: 'ง.', text: choiceD },
+              ...(choiceE ? [{ bullet: 'จ.', text: choiceE }] : [])
+            ];
+            return `
+              <div class="choices-container choices-image-grid">
+                ${choiceList.map(item => {
+                  const parsed = parseChoiceContent(item.text);
+                  return `
+                    <div class="choice-image-card">
+                      <span class="choice-bullet">${item.bullet}</span>
+                      <div class="choice-image-content">
+                        ${parsed.isImage ? `
+                          <img src="${parsed.imageUrl}" alt="${item.bullet}" class="choice-thumbnail-img" />
+                          ${parsed.label ? `<div class="choice-image-label">${renderMathInHtml(parsed.label)}</div>` : ''}
+                        ` : `
+                          <div class="choice-text-fallback">${renderMathInHtml(item.text)}</div>
+                        `}
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
               </div>
-            ` : ''}
-          </div>
-        `}
+            `;
+          }
+          return `
+            <div class="choices-container ${isLongChoice ? 'choices-stacked' : 'choices-grid'}">
+              <div class="choice-row">
+                <span class="choice-bullet">ก.</span>
+                <span class="choice-content">${renderMathInHtml(choiceA)}</span>
+              </div>
+              <div class="choice-row">
+                <span class="choice-bullet">ข.</span>
+                <span class="choice-content">${renderMathInHtml(choiceB)}</span>
+              </div>
+              <div class="choice-row">
+                <span class="choice-bullet">ค.</span>
+                <span class="choice-content">${renderMathInHtml(choiceC)}</span>
+              </div>
+              <div class="choice-row">
+                <span class="choice-bullet">ง.</span>
+                <span class="choice-content">${renderMathInHtml(choiceD)}</span>
+              </div>
+              ${choiceE ? `
+                <div class="choice-row">
+                  <span class="choice-bullet">จ.</span>
+                  <span class="choice-content">${renderMathInHtml(choiceE)}</span>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        })()}
       </div>
     `;
   }).join('');
@@ -464,14 +675,51 @@ export function generateExamPaperHtml(
 
           .question-image-box {
             margin: 8px 0 10px 24px;
+          }
+
+          .question-image-box.image-align-center {
             text-align: center;
           }
 
+          .question-image-box.image-align-left {
+            text-align: left;
+          }
+
+          .question-image-box.image-align-right {
+            text-align: right;
+          }
+
           .question-image-box img {
-            max-width: 80%;
-            max-height: 180px;
-            border-radius: 6px;
+            border-radius: 4px;
             border: 1px solid #cbd5e1;
+            object-fit: contain;
+          }
+
+          .question-image-box.image-size-sm img {
+            max-width: 32%;
+            max-height: 130px;
+          }
+
+          .question-image-box.image-size-md img {
+            max-width: 58%;
+            max-height: 200px;
+          }
+
+          .question-image-box.image-size-lg img {
+            max-width: 82%;
+            max-height: 300px;
+          }
+
+          .question-image-box.image-size-full img {
+            max-width: 98%;
+            max-height: 450px;
+          }
+
+          .image-caption {
+            font-size: 11px;
+            color: #64748b;
+            font-style: italic;
+            margin-top: 4px;
           }
 
           .choices-container {
@@ -489,6 +737,59 @@ export function generateExamPaperHtml(
             display: flex;
             flex-direction: column;
             gap: 6px;
+          }
+
+          .choices-image-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px 18px;
+            margin-top: 6px;
+          }
+
+          .choice-image-card {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 6px 8px;
+            background-color: #fafbfc;
+            break-inside: avoid;
+          }
+
+          .choice-image-card .choice-bullet {
+            font-weight: 700;
+            font-size: 13px;
+            color: #0f172a;
+            min-width: 18px;
+          }
+
+          .choice-image-card .choice-image-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+          }
+
+          .choice-thumbnail-img {
+            max-width: 100%;
+            max-height: 115px;
+            border-radius: 4px;
+            object-fit: contain;
+            background-color: #ffffff;
+            border: 1px solid #cbd5e1;
+          }
+
+          .choice-image-label {
+            font-size: 11.5px;
+            color: #334155;
+            margin-top: 4px;
+            text-align: center;
+          }
+
+          .choice-text-fallback {
+            font-size: 13px;
+            color: #334155;
           }
 
           .choice-row {
@@ -599,8 +900,16 @@ export async function generateBatchAnswerSheetsHtml(
     spareSheetsCount = 2,
     schoolName = 'โรงเรียนสมคิดวิทยา',
     academicYear = '2568',
-    term = '1'
+    term = '1',
+    hasSubjective: hasSubjectiveOpt
   } = options;
+
+  const hasSubjective = Boolean(
+    hasSubjectiveOpt || 
+    (exam as any).has_subjective || 
+    (exam as any).hasSubjective || 
+    (exam.title && exam.title.includes('อัตนัย'))
+  );
 
   const totalQuestions = Math.min(Math.max(exam.total_questions || 20, 10), 60);
 
@@ -826,6 +1135,14 @@ export async function generateBatchAnswerSheetsHtml(
           <div class="omr-grid-container grid-cols-${gridColumns}">
             ${columnsHtml.join('')}
           </div>
+
+          ${hasSubjective ? `
+            <!-- Notice: Exam includes Subjective Questions answered on exam paper -->
+            <div class="subjective-notice-strip" style="margin-top: 5px; margin-bottom: 3px; padding: 3px 8px; background: #fffbeb; border: 1px dashed #d97706; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; font-size: 9.5px; color: #92400e;">
+              <span>[ข้อควรทราบ] การสอบนี้ <strong>มีข้อสอบอัตนัย (เขียนตอบ/แสดงวิธีทำ)</strong></span>
+              <span style="font-weight: 600;">ให้นักเรียนเขียนตอบลงในกระดาษข้อสอบโดยตรง</span>
+            </div>
+          ` : ''}
 
           <!-- Signatures & Verification Footer -->
           <div class="sheet-footer">

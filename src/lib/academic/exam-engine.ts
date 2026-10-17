@@ -74,15 +74,36 @@ export function generateExamSets(
 
     // Set A keeps original master order (1..N), variants B/C/D are shuffled
     const isSetA = setName === 'A';
-    const qList = (isSetA || !shuffleQuestions) 
-      ? [...questions] 
-      : shuffleArray(questions, (sIdx + 1) * 777);
+    
+    // Separate MCQ from Subjective questions so Subjective questions remain in Section 2 (at the end)
+    const mcqQuestions = questions.filter(q => q.question_type !== 'subjective');
+    const subjQuestions = questions.filter(q => q.question_type === 'subjective');
+
+    const orderedMcq = (isSetA || !shuffleQuestions) 
+      ? [...mcqQuestions] 
+      : shuffleArray(mcqQuestions, (sIdx + 1) * 777);
+
+    // Subjective questions retain sequential order in Part 2
+    const qList = [...orderedMcq, ...subjQuestions];
 
     const questionMapping: ExamQuestionOrderMapping[] = [];
     const answerKey: Record<string, ChoiceOption> = {};
 
     qList.forEach((q, newIndex) => {
       const newQuestionNumber = newIndex + 1;
+
+      // Handle Subjective (Open-Ended / Written) Question
+      if (q.question_type === 'subjective') {
+        const choiceMap: Record<string, ChoiceOption> = { A: 'A', B: 'B', C: 'C', D: 'D' };
+        questionMapping.push({
+          original_question_number: q.question_number,
+          new_question_number: newQuestionNumber,
+          choice_map: choiceMap
+        });
+        answerKey[newQuestionNumber.toString()] = 'A';
+        return;
+      }
+
       const originalChoices: { key: ChoiceOption; text: string }[] = [
         { key: 'A', text: q.choice_a },
         { key: 'B', text: q.choice_b },
@@ -174,8 +195,20 @@ export function scoreExamAnswers(
     const pt = questionPoints?.[qNum] ?? 1.0;
     maxPoints += pt;
 
-    const isCorrect = studentAns === key;
-    const earned = isCorrect ? pt : 0;
+    let isCorrect = false;
+    let earned = 0;
+
+    // Support numeric points directly awarded for subjective questions
+    const rawVal = studentAns as unknown;
+    const numAns = typeof rawVal === 'number' ? rawVal : (typeof rawVal === 'string' && rawVal.trim() !== '' ? Number(rawVal) : NaN);
+    if (!isNaN(numAns) && typeof rawVal !== 'boolean' && rawVal !== null) {
+      earned = Math.min(Math.max(numAns, 0), pt);
+      isCorrect = earned === pt;
+    } else {
+      isCorrect = studentAns === key;
+      earned = isCorrect ? pt : 0;
+    }
+
     if (isCorrect) correctCount++;
     rawScore += earned;
 
