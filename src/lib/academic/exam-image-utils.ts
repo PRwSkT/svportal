@@ -81,10 +81,15 @@ export function isImageChoice(choiceValue: string | null | undefined): boolean {
   if (!choiceValue || typeof choiceValue !== 'string') return false;
   const trimmed = choiceValue.trim();
   if (trimmed.startsWith('data:image/')) return true;
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-    return trimmed.includes('website-content') || 
-           trimmed.includes('exams/images') || 
-           /\.(png|jpe?g|webp|svg|gif)($|[?#])/i.test(trimmed);
+
+  const bracketMatch = trimmed.match(/^\[(.*?)\]\s*(https?:\/\/.*|data:image\/.*)$/);
+  const candidate = bracketMatch ? bracketMatch[2].trim() : trimmed.split('|')[0].trim();
+
+  if (candidate.startsWith('data:image/')) return true;
+  if (candidate.startsWith('http://') || candidate.startsWith('https://')) {
+    return candidate.includes('website-content') || 
+           candidate.includes('exams/images') || 
+           /\.(png|jpe?g|webp|svg|gif)($|[?#])/i.test(candidate);
   }
   return false;
 }
@@ -105,6 +110,18 @@ export function parseChoiceContent(choiceValue: string | null | undefined): Pars
   }
 
   const trimmed = choiceValue.trim();
+
+  // Support "[label] url" format first
+  const bracketMatch = trimmed.match(/^\[(.*?)\]\s*(https?:\/\/.*|data:image\/.*)$/);
+  if (bracketMatch && isImageChoice(bracketMatch[2].trim())) {
+    return {
+      isImage: true,
+      imageUrl: bracketMatch[2].trim(),
+      labelText: bracketMatch[1].trim(),
+      label: bracketMatch[1].trim()
+    };
+  }
+
   if (trimmed.includes('|')) {
     const parts = trimmed.split('|');
     const first = parts[0].trim();
@@ -112,12 +129,6 @@ export function parseChoiceContent(choiceValue: string | null | undefined): Pars
     if (isImageChoice(first)) {
       return { isImage: true, imageUrl: first, labelText: second, label: second };
     }
-  }
-
-  // Also support "[label] url" format
-  const bracketMatch = trimmed.match(/^\[(.*?)\]\s*(https?:\/\/.*)$/);
-  if (bracketMatch) {
-    return { isImage: true, imageUrl: bracketMatch[2].trim(), labelText: bracketMatch[1].trim(), label: bracketMatch[1].trim() };
   }
 
   if (isImageChoice(trimmed)) {

@@ -9,23 +9,32 @@ import { parseImageUrlMeta, isImageChoice, parseChoiceContent } from '@/lib/acad
 export function renderMathInHtml(text: string): string {
   if (!text) return '';
   try {
-    // Replace display equations $$...$$
-    let res = text.replace(/\$\$([^$]+)\$\$/g, (_, eq) => {
-      try {
-        return katex.renderToString(eq, { displayMode: true, throwOnError: false });
-      } catch {
-        return eq;
-      }
-    });
-    // Replace inline equations $...$
-    res = res.replace(/\$([^$]+)\$/g, (_, eq) => {
-      try {
-        return katex.renderToString(eq, { displayMode: false, throwOnError: false });
-      } catch {
-        return eq;
-      }
-    });
-    return res;
+    if (text.includes('$')) {
+      // Replace display equations $$...$$
+      let res = text.replace(/\$\$([^$]+)\$\$/g, (_, eq) => {
+        try {
+          return katex.renderToString(eq, { displayMode: true, throwOnError: false, strict: 'ignore' });
+        } catch {
+          return eq;
+        }
+      });
+      // Replace inline equations $...$
+      res = res.replace(/\$([^$]+)\$/g, (_, eq) => {
+        try {
+          return katex.renderToString(eq, { displayMode: false, throwOnError: false, strict: 'ignore' });
+        } catch {
+          return eq;
+        }
+      });
+      return res;
+    }
+
+    // Fallback: if text has raw LaTeX commands without $ delimiters
+    if (/\\(frac|sqrt|times|div|pm|cdot|le|ge|neq|approx|pi|theta|alpha|beta|Delta|Omega|sum|int|infty)/.test(text)) {
+      return katex.renderToString(text, { displayMode: false, throwOnError: false, strict: 'ignore' });
+    }
+
+    return text;
   } catch {
     return text;
   }
@@ -355,14 +364,24 @@ export function generateExamPaperHtml(
       return `
         <div class="subjective-response-container" style="margin-top: 10px; margin-bottom: 6px;">
           ${isBox ? `
-            <div class="subjective-workings-box subjective-box ${spaceFormat === 'grid_box' ? 'grid-box' : 'blank-box'}" style="height: ${spaceFormat === 'grid_box' ? '160px' : '130px'}; border: 1.5px dashed #94a3b8; border-radius: 6px; padding: 10px; background-color: ${spaceFormat === 'grid_box' ? '#f8fafc' : '#ffffff'}; position: relative; ${spaceFormat === 'grid_box' ? 'background-image: radial-gradient(#cbd5e1 1px, transparent 1px); background-size: 16px 16px;' : ''}">
-              <span style="font-size: 11px; color: #94a3b8; font-weight: 600;">พื้นที่สำหรับแสดงวิธีทำ / เขียนคำตอบ / วาดภาพ:</span>
+            <div class="subjective-workings-box subjective-box ${spaceFormat === 'grid_box' ? 'grid-box' : 'blank-box'}" style="height: ${spaceFormat === 'grid_box' ? '160px' : '130px'}; border: 1.5px dashed #94a3b8; border-radius: 6px; padding: 10px; background-color: ${spaceFormat === 'grid_box' ? '#f8fafc' : '#ffffff'}; position: relative; overflow: hidden;">
+              ${spaceFormat === 'grid_box' ? `
+                <svg width="100%" height="100%" style="position: absolute; inset: 0; pointer-events: none;" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <pattern id="print-grid-${qNum}" width="18" height="18" patternUnits="userSpaceOnUse">
+                      <path d="M 18 0 L 0 0 0 18" fill="none" stroke="#cbd5e1" stroke-width="0.7" />
+                    </pattern>
+                  </defs>
+                  <rect width="100%" height="100%" fill="url(#print-grid-${qNum})" />
+                </svg>
+              ` : ''}
+              <span style="position: relative; z-index: 1; font-size: 11px; color: #64748b; font-weight: 600; background: rgba(255,255,255,0.85); padding: 1px 4px; border-radius: 3px;">พื้นที่สำหรับแสดงวิธีทำ / เขียนคำตอบ / วาดภาพ:</span>
             </div>
           ` : `
-            <div class="subjective-dotted-lines" style="display: flex; flex-direction: column; gap: 14px; padding: 4px 0;">
+            <div class="subjective-dotted-lines" style="display: flex; flex-direction: column; gap: 10px; padding: 4px 0;">
               ${Array.from({ length: lineCount }).map((_, lineIdx) => `
-                <div class="subjective-line" style="border-bottom: 1px dashed #94a3b8; height: 18px; display: flex; align-items: flex-end;">
-                  ${lineIdx === 0 ? '<span style="font-size: 12px; color: #475569; font-weight: 700; padding-right: 8px;">ตอบ:</span>' : ''}
+                <div class="subjective-line" style="border-bottom: 1px dashed #94a3b8; height: 28px; display: flex; align-items: flex-end;">
+                  ${lineIdx === 0 ? '<span style="font-size: 12px; color: #475569; font-weight: 700; padding-right: 8px; padding-bottom: 2px;">ตอบ:</span>' : ''}
                 </div>
               `).join('')}
             </div>
@@ -393,112 +412,131 @@ export function generateExamPaperHtml(
       </div>
     ` : '';
 
-    return `
-      ${sectionHeader}
-      <div class="exam-question-item avoid-break ${isSubjective ? 'subjective-question-card' : ''}">
-        <div class="question-header">
-          <span class="question-num">ข้อที่ ${qNum}.</span>
-          ${isSubjective ? `<span class="subjective-pill" style="margin-left: 6px; font-size: 10.5px; font-weight: 700; color: #7B1C3E; background: #fdf2f4; border: 1px solid #fecdd3; border-radius: 4px; padding: 1px 6px;">[ อัตนัย - ${q.points || 5} คะแนน ]</span>` : ''}
-          <div class="question-text">${renderMathInHtml(q.question_text || `คำถามข้อที่ ${qNum}`)}</div>
-        </div>
-
-        ${(() => {
-          if (q.diagram_svg) {
-            return `
-              <div class="question-diagram-box" style="margin: 8px 0; text-align: center; max-width: 100%;">
-                ${q.diagram_svg}
-              </div>
-            `;
-          }
-          const rawImgUrl = q.question_image_url || (q as any).image_url;
-          if (rawImgUrl) {
-            const imgMeta = parseImageUrlMeta(rawImgUrl);
-            const alignClass = imgMeta.align === 'left' ? 'image-align-left' : imgMeta.align === 'right' ? 'image-align-right' : 'image-align-center';
-            const sizeClass = `image-size-${imgMeta.size}`;
-            return `
-              <div class="question-image-box ${alignClass} ${sizeClass}">
-                <img src="${imgMeta.url}" alt="รูปประกอบข้อ ${qNum}" />
-                ${imgMeta.caption ? `<div class="image-caption">${imgMeta.caption}</div>` : ''}
-              </div>
-            `;
-          }
-          return '';
-        })()}
-
-        ${isSubjective ? renderSubjectiveAnswerSpace() : isMatching ? `
-          <div class="matching-container" style="margin: 8px 0; padding: 10px; border: 1px dashed #cbd5e1; border-radius: 6px; background-color: #f8fafc;">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 13px;">
-              <div>
-                <strong style="display: block; margin-bottom: 4px; color: #1e293b;">คอลัมน์ A (โจทย์)</strong>
-                <div style="margin-bottom: 4px;">${renderMathInHtml(choiceA)}</div>
-                <div>${renderMathInHtml(choiceB)}</div>
-              </div>
-              <div>
-                <strong style="display: block; margin-bottom: 4px; color: #1e293b;">คอลัมน์ B (ตัวเลือกจับคู่)</strong>
-                <div style="margin-bottom: 4px;">${renderMathInHtml(choiceC)}</div>
-                <div>${renderMathInHtml(choiceD)}</div>
-              </div>
-            </div>
-          </div>
-        ` : (() => {
-          const hasImageChoices = [choiceA, choiceB, choiceC, choiceD, choiceE].some(c => isImageChoice(c));
-          if (hasImageChoices) {
-            const choiceList = [
-              { bullet: 'ก.', text: choiceA },
-              { bullet: 'ข.', text: choiceB },
-              { bullet: 'ค.', text: choiceC },
-              { bullet: 'ง.', text: choiceD },
-              ...(choiceE ? [{ bullet: 'จ.', text: choiceE }] : [])
-            ];
-            return `
-              <div class="choices-container choices-image-grid">
-                ${choiceList.map(item => {
-                  const parsed = parseChoiceContent(item.text);
-                  return `
-                    <div class="choice-image-card">
-                      <span class="choice-bullet">${item.bullet}</span>
-                      <div class="choice-image-content">
-                        ${parsed.isImage ? `
-                          <img src="${parsed.imageUrl}" alt="${item.bullet}" class="choice-thumbnail-img" />
-                          ${parsed.label ? `<div class="choice-image-label">${renderMathInHtml(parsed.label)}</div>` : ''}
-                        ` : `
-                          <div class="choice-text-fallback">${renderMathInHtml(item.text)}</div>
-                        `}
-                      </div>
-                    </div>
-                  `;
-                }).join('')}
-              </div>
-            `;
-          }
-          return `
-            <div class="choices-container ${isLongChoice ? 'choices-stacked' : 'choices-grid'}">
-              <div class="choice-row">
-                <span class="choice-bullet">ก.</span>
-                <span class="choice-content">${renderMathInHtml(choiceA)}</span>
-              </div>
-              <div class="choice-row">
-                <span class="choice-bullet">ข.</span>
-                <span class="choice-content">${renderMathInHtml(choiceB)}</span>
-              </div>
-              <div class="choice-row">
-                <span class="choice-bullet">ค.</span>
-                <span class="choice-content">${renderMathInHtml(choiceC)}</span>
-              </div>
-              <div class="choice-row">
-                <span class="choice-bullet">ง.</span>
-                <span class="choice-content">${renderMathInHtml(choiceD)}</span>
-              </div>
-              ${choiceE ? `
-                <div class="choice-row">
-                  <span class="choice-bullet">จ.</span>
-                  <span class="choice-content">${renderMathInHtml(choiceE)}</span>
-                </div>
-              ` : ''}
-            </div>
-          `;
-        })()}
+    const passageBox = (q as any).passage_text ? `
+      <div class="exam-passage-box avoid-break" style="margin-bottom: 10px; padding: 8px 12px; background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #d97706; border-radius: 6px; font-size: 12.5px; color: #1e293b; line-height: 1.55;">
+        ${(q as any).passage_title ? `<strong style="display: block; color: #92400e; margin-bottom: 3px;">${renderMathInHtml((q as any).passage_title)}</strong>` : ''}
+        <div style="white-space: pre-line;">${renderMathInHtml((q as any).passage_text)}</div>
       </div>
+    ` : '';
+
+    const formatMatchingItem = (text: string, prefix: string) => {
+      const trimmed = (text || '').trim();
+      if (!trimmed) return '';
+      if (/^(\d+\.|[ก-ฮ]\.|[A-Za-z]\.)/.test(trimmed)) return renderMathInHtml(trimmed);
+      return `${prefix} ${renderMathInHtml(trimmed)}`;
+    };
+
+    return `
+      <tr class="question-table-row avoid-break">
+        <td>
+          ${sectionHeader}
+          ${passageBox}
+          <div class="exam-question-item avoid-break ${isSubjective ? 'subjective-question-card' : ''}">
+            <div class="question-header">
+              <span class="question-num">ข้อที่ ${qNum}.</span>
+              ${isSubjective ? `<span class="subjective-pill" style="margin-left: 6px; font-size: 10.5px; font-weight: 700; color: #7B1C3E; background: #fdf2f4; border: 1px solid #fecdd3; border-radius: 4px; padding: 1px 6px;">[ อัตนัย - ${q.points || 5} คะแนน ]</span>` : ''}
+              <div class="question-text">${renderMathInHtml(q.question_text || `คำถามข้อที่ ${qNum}`)}</div>
+            </div>
+
+            ${(() => {
+              if (q.diagram_svg) {
+                return `
+                  <div class="question-diagram-box" style="margin: 8px 0; text-align: center; max-width: 100%;">
+                    ${q.diagram_svg}
+                  </div>
+                `;
+              }
+              const rawImgUrl = q.question_image_url || (q as any).image_url;
+              if (rawImgUrl) {
+                const imgMeta = parseImageUrlMeta(rawImgUrl);
+                const alignClass = imgMeta.align === 'left' ? 'image-align-left' : imgMeta.align === 'right' ? 'image-align-right' : 'image-align-center';
+                const sizeClass = `image-size-${imgMeta.size}`;
+                return `
+                  <div class="question-image-box ${alignClass} ${sizeClass}">
+                    <img src="${imgMeta.url}" alt="รูปประกอบข้อ ${qNum}" />
+                    ${imgMeta.caption ? `<div class="image-caption">${imgMeta.caption}</div>` : ''}
+                  </div>
+                `;
+              }
+              return '';
+            })()}
+
+            ${isSubjective ? renderSubjectiveAnswerSpace() : isMatching ? `
+              <div class="matching-container" style="margin: 8px 0; padding: 10px; border: 1px dashed #cbd5e1; border-radius: 6px; background-color: #f8fafc;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 13px;">
+                  <div>
+                    <strong style="display: block; margin-bottom: 4px; color: #1e293b;">คอลัมน์ A (โจทย์)</strong>
+                    <div style="margin-bottom: 4px;">${formatMatchingItem(choiceA, '1.')}</div>
+                    <div>${formatMatchingItem(choiceB, '2.')}</div>
+                  </div>
+                  <div>
+                    <strong style="display: block; margin-bottom: 4px; color: #1e293b;">คอลัมน์ B (ตัวเลือกจับคู่)</strong>
+                    <div style="margin-bottom: 4px;">${formatMatchingItem(choiceC, 'ก.')}</div>
+                    <div>${formatMatchingItem(choiceD, 'ข.')}</div>
+                  </div>
+                </div>
+              </div>
+            ` : (() => {
+              const hasImageChoices = [choiceA, choiceB, choiceC, choiceD, choiceE].some(c => isImageChoice(c));
+              if (hasImageChoices) {
+                const choiceList = [
+                  { bullet: 'ก.', text: choiceA },
+                  { bullet: 'ข.', text: choiceB },
+                  { bullet: 'ค.', text: choiceC },
+                  { bullet: 'ง.', text: choiceD },
+                  ...(choiceE ? [{ bullet: 'จ.', text: choiceE }] : [])
+                ];
+                return `
+                  <div class="choices-container choices-image-grid">
+                    ${choiceList.map(item => {
+                      const parsed = parseChoiceContent(item.text);
+                      return `
+                        <div class="choice-image-card">
+                          <span class="choice-bullet">${item.bullet}</span>
+                          <div class="choice-image-content">
+                            ${parsed.isImage ? `
+                              <img src="${parsed.imageUrl}" alt="${item.bullet}" class="choice-thumbnail-img" />
+                              ${parsed.label ? `<div class="choice-image-label">${renderMathInHtml(parsed.label)}</div>` : ''}
+                            ` : `
+                              <div class="choice-text-fallback">${renderMathInHtml(item.text)}</div>
+                            `}
+                          </div>
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                `;
+              }
+              return `
+                <div class="choices-container ${isLongChoice ? 'choices-stacked' : 'choices-grid'}">
+                  <div class="choice-row">
+                    <span class="choice-bullet">ก.</span>
+                    <span class="choice-content">${renderMathInHtml(choiceA)}</span>
+                  </div>
+                  <div class="choice-row">
+                    <span class="choice-bullet">ข.</span>
+                    <span class="choice-content">${renderMathInHtml(choiceB)}</span>
+                  </div>
+                  <div class="choice-row">
+                    <span class="choice-bullet">ค.</span>
+                    <span class="choice-content">${renderMathInHtml(choiceC)}</span>
+                  </div>
+                  <div class="choice-row">
+                    <span class="choice-bullet">ง.</span>
+                    <span class="choice-content">${renderMathInHtml(choiceD)}</span>
+                  </div>
+                  ${choiceE ? `
+                    <div class="choice-row">
+                      <span class="choice-bullet">จ.</span>
+                      <span class="choice-content">${renderMathInHtml(choiceE)}</span>
+                    </div>
+                  ` : ''}
+                </div>
+              `;
+            })()}
+          </div>
+        </td>
+      </tr>
     `;
   }).join('');
 
@@ -519,11 +557,28 @@ export function generateExamPaperHtml(
             color: #0f172a;
           }
 
+          @media screen {
+            .exam-paper-container {
+              width: 210mm;
+              max-width: 210mm;
+              min-height: 297mm;
+              padding: 14mm 16mm;
+              background: #ffffff;
+              box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+              border-radius: 4px;
+              margin: 0 auto 24px auto;
+            }
+          }
+
           /* Running Header Table Wrapper for Repeat on Each Page */
           table.exam-layout-table {
             width: 100%;
             border-collapse: collapse;
             border: none;
+          }
+          table.exam-layout-table tr.question-table-row {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
 
           table.exam-layout-table thead {
@@ -772,6 +827,8 @@ export function generateExamPaperHtml(
           }
 
           .choice-thumbnail-img {
+            height: 95px;
+            width: 100%;
             max-width: 100%;
             max-height: 115px;
             border-radius: 4px;
@@ -859,13 +916,10 @@ export function generateExamPaperHtml(
                       <strong>คำชี้แจง:</strong> ให้นักเรียนอ่านโจทย์และตัวเลือกให้รอบคอบ เลือกคำตอบที่ถูกต้องที่สุดเพียงข้อเดียว แล้วใช้ดินสอ 2B ฝนลงในกระดาษคำตอบ OMR ให้เต็มวงกลม (ห้ามขีดเขียนลงในกระดาษคำตอบนอกเหนือจากที่กำหนด)
                     </div>
                   </div>
-
-                  <!-- 1-Column Sequential Question List -->
-                  <div class="questions-stream">
-                    ${renderedQuestionsHtml}
-                  </div>
                 </td>
               </tr>
+              <!-- 1-Column Sequential Question List Rows -->
+              ${renderedQuestionsHtml}
             </tbody>
             <tfoot>
               <tr>

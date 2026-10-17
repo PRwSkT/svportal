@@ -93,6 +93,11 @@ export type CanvasElementType =
   | 'protractor'
   | 'axes_xy'
   | 'number_line'
+  | 'analog_clock'
+  | 'fraction_bar'
+  | 'fraction_circle'
+  | 'bar_chart'
+  | 'ruler_cm'
   // Science & Experiments
   | 'circuit_bulb'
   | 'circuit_battery'
@@ -108,6 +113,8 @@ export type CanvasElementType =
   | 'science_beaker'
   | 'science_test_tube'
   | 'science_flask'
+  | 'thermometer'
+  | 'balance_scale'
   // Diagrams, Social & Logic
   | 'compass_rose'
   | 'venn_2'
@@ -118,6 +125,7 @@ export type CanvasElementType =
   | 'flowchart_data'
   | 'speech_bubble'
   | 'timeline'
+  | 'table_grid'
   // Text, Callout & Overlays
   | 'text_label'
   | 'math_label'
@@ -184,6 +192,9 @@ export function InStudioDiagramBuilderModal({
   useEffect(() => {
     elementsRef.current = elements;
   }, [elements]);
+
+  // Ref for Inspector text input so double-clicking an element focuses it immediately
+  const inspectorTextInputRef = useRef<HTMLInputElement | null>(null);
 
   // Canvas Settings
   const [showGrid, setShowGrid] = useState<boolean>(true);
@@ -341,6 +352,21 @@ export function InStudioDiagramBuilderModal({
         base.height = 120;
         base.extraProps = { orientation: 'bottom-left', showRightAngle: true, ...customProps.extraProps };
         break;
+      case 'parallelogram':
+        base.width = 160;
+        base.height = 100;
+        base.extraProps = { slant: 32, ...customProps.extraProps };
+        break;
+      case 'trapezoid':
+        base.width = 160;
+        base.height = 100;
+        base.extraProps = { topInset: 32, ...customProps.extraProps };
+        break;
+      case 'dimension_line':
+        base.width = 180;
+        base.height = 36;
+        base.text = customProps.text || '10 cm';
+        break;
       case 'angle_arc':
         base.width = 120;
         base.height = 100;
@@ -358,7 +384,37 @@ export function InStudioDiagramBuilderModal({
         base.width = 240;
         base.height = 200;
         base.fill = 'none';
-        base.extraProps = { showGrid: false, showArrows: true, xLabel: 'X', yLabel: 'Y', originLabel: 'O', ...customProps.extraProps };
+        base.extraProps = { showGrid: true, showArrows: true, xLabel: 'X', yLabel: 'Y', originLabel: 'O', ...customProps.extraProps };
+        break;
+      case 'analog_clock':
+        base.width = 140;
+        base.height = 140;
+        base.fill = '#ffffff';
+        base.extraProps = { hour: 3, minute: 15, showNumbers: true, showMinuteTicks: true, ...customProps.extraProps };
+        break;
+      case 'fraction_bar':
+        base.width = 240;
+        base.height = 56;
+        base.fill = '#ffffff';
+        base.extraProps = { totalParts: 4, shadedParts: 3, shadedColor: '#3b82f6', showLabels: false, ...customProps.extraProps };
+        break;
+      case 'fraction_circle':
+        base.width = 130;
+        base.height = 130;
+        base.fill = '#ffffff';
+        base.extraProps = { totalParts: 4, shadedParts: 1, shadedColor: '#3b82f6', ...customProps.extraProps };
+        break;
+      case 'bar_chart':
+        base.width = 280;
+        base.height = 190;
+        base.fill = '#3b82f6';
+        base.extraProps = { data: '15, 30, 20, 40', labels: 'ม.1, ม.2, ม.3, ม.4', chartTitle: 'แผนภูมิแท่งแสดงจำนวน', showValues: true, yAxisMax: 50, ...customProps.extraProps };
+        break;
+      case 'ruler_cm':
+        base.width = 320;
+        base.height = 65;
+        base.fill = '#fefce8';
+        base.extraProps = { cmLength: 10, showMm: true, measureObjectLength: 6.5, objectLabel: 'ดินสอ', ...customProps.extraProps };
         break;
       case 'circuit_bulb':
         base.width = 50;
@@ -402,6 +458,18 @@ export function InStudioDiagramBuilderModal({
         base.fill = '#e0f2fe';
         base.extraProps = { liquidLevel: 50, liquidColor: '#bae6fd', ...customProps.extraProps };
         break;
+      case 'thermometer':
+        base.width = 65;
+        base.height = 180;
+        base.fill = '#ffffff';
+        base.extraProps = { temperature: 37, minTemp: 0, maxTemp: 100, unit: '°C', liquidColor: '#ef4444', ...customProps.extraProps };
+        break;
+      case 'balance_scale':
+        base.width = 240;
+        base.height = 150;
+        base.fill = '#f8fafc';
+        base.extraProps = { tilt: 'even', leftWeight: '500 g', rightWeight: '500 g', ...customProps.extraProps };
+        break;
       case 'science_incline':
         base.width = 170;
         base.height = 110;
@@ -412,6 +480,30 @@ export function InStudioDiagramBuilderModal({
         base.width = 110;
         base.height = 42;
         base.extraProps = { flipped: false, ...customProps.extraProps };
+        break;
+      case 'flowchart_terminator':
+        base.width = 140;
+        base.height = 54;
+        base.fill = '#dbeafe';
+        base.text = customProps.text || 'เริ่มต้น / สิ้นสุด';
+        break;
+      case 'flowchart_process':
+        base.width = 150;
+        base.height = 60;
+        base.fill = '#f8fafc';
+        base.text = customProps.text || 'ประมวลผล';
+        break;
+      case 'flowchart_decision':
+        base.width = 150;
+        base.height = 90;
+        base.fill = '#fef9c3';
+        base.text = customProps.text || 'เงื่อนไข?';
+        break;
+      case 'flowchart_data':
+        base.width = 150;
+        base.height = 60;
+        base.fill = '#dcfce7';
+        base.text = customProps.text || 'รับข้อมูล';
         break;
       case 'speech_bubble':
         base.width = 160;
@@ -437,6 +529,12 @@ export function InStudioDiagramBuilderModal({
         base.height = 60;
         base.fill = 'none';
         base.extraProps = { pointCount: 4, ...customProps.extraProps };
+        break;
+      case 'table_grid':
+        base.width = 280;
+        base.height = 140;
+        base.fill = '#ffffff';
+        base.extraProps = { rows: 3, cols: 3, hasHeader: true, dataMatrix: 'หัวข้อ 1, หัวข้อ 2, หัวข้อ 3|ข้อมูล A1, ข้อมูล A2, ข้อมูล A3|ข้อมูล B1, ข้อมูล B2, ข้อมูล B3', ...customProps.extraProps };
         break;
       case 'text_label':
       case 'math_label':
@@ -901,23 +999,24 @@ export function InStudioDiagramBuilderModal({
         let anchorLocalStart = { x: 0, y: 0 };
         let newW = elementStart.width;
         let newH = elementStart.height;
+        const minH = ['line', 'arrow'].includes(el.type) ? 4 : 20;
 
         if (dragHandle === 'se') {
           anchorLocalStart = { x: -elementStart.width / 2, y: -elementStart.height / 2 }; // NW is invariant
           newW = Math.max(20, Math.round(elementStart.width + localDx));
-          newH = Math.max(20, Math.round(elementStart.height + localDy));
+          newH = Math.max(minH, Math.round(elementStart.height + localDy));
         } else if (dragHandle === 'sw') {
           anchorLocalStart = { x: elementStart.width / 2, y: -elementStart.height / 2 }; // NE is invariant
           newW = Math.max(20, Math.round(elementStart.width - localDx));
-          newH = Math.max(20, Math.round(elementStart.height + localDy));
+          newH = Math.max(minH, Math.round(elementStart.height + localDy));
         } else if (dragHandle === 'ne') {
           anchorLocalStart = { x: -elementStart.width / 2, y: elementStart.height / 2 }; // SW is invariant
           newW = Math.max(20, Math.round(elementStart.width + localDx));
-          newH = Math.max(20, Math.round(elementStart.height - localDy));
+          newH = Math.max(minH, Math.round(elementStart.height - localDy));
         } else if (dragHandle === 'nw') {
           anchorLocalStart = { x: elementStart.width / 2, y: elementStart.height / 2 }; // SE is invariant
           newW = Math.max(20, Math.round(elementStart.width - localDx));
-          newH = Math.max(20, Math.round(elementStart.height - localDy));
+          newH = Math.max(minH, Math.round(elementStart.height - localDy));
         }
 
         // Stationary world anchor point before resize
@@ -1047,6 +1146,8 @@ export function InStudioDiagramBuilderModal({
       }
     } catch (err: any) {
       toast.error(err.message || 'เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ', { id: toastId });
+    } finally {
+      e.target.value = '';
     }
   };
 
@@ -1604,8 +1705,351 @@ export function InStudioDiagramBuilderModal({
       case 'science_flask': {
         const neckW = el.width * 0.28;
         const neckH = el.height * 0.35;
+        const bodyH = el.height - neckH;
+        const liquidPct = el.extraProps?.liquidLevel ?? 50;
+        const liquidCol = el.extraProps?.liquidColor || '#bae6fd';
+        const liqH = bodyH * (liquidPct / 100);
+        const liqTopY = el.y + el.height - liqH;
+        const tRatio = Math.max(0, Math.min(1, (liqTopY - (el.y + neckH)) / bodyH));
+        const liqTopHalfW = (neckW / 2) + ((el.width / 2) - (neckW / 2)) * tRatio;
         const d = `M ${cx - neckW / 2} ${el.y} L ${cx - neckW / 2} ${el.y + neckH} L ${el.x} ${el.y + el.height} L ${el.x + el.width} ${el.y + el.height} L ${cx + neckW / 2} ${el.y + neckH} L ${cx + neckW / 2} ${el.y} Z`;
-        return <path d={d} fill={el.fill} stroke={el.stroke} strokeWidth={2} strokeLinejoin="round" />;
+        return (
+          <g>
+            {liquidPct > 0 && (
+              <polygon
+                points={`${cx - liqTopHalfW + 2},${liqTopY} ${cx + liqTopHalfW - 2},${liqTopY} ${el.x + el.width - 2},${el.y + el.height - 2} ${el.x + 2},${el.y + el.height - 2}`}
+                fill={liquidCol}
+                opacity={0.78}
+              />
+            )}
+            <path d={d} fill="none" stroke={el.stroke} strokeWidth={2} strokeLinejoin="round" />
+          </g>
+        );
+      }
+
+      case 'thermometer': {
+        const temp = el.extraProps?.temperature ?? 37;
+        const minT = el.extraProps?.minTemp ?? 0;
+        const maxT = el.extraProps?.maxTemp ?? 100;
+        const unit = el.extraProps?.unit || '°C';
+        const liqCol = el.extraProps?.liquidColor || '#ef4444';
+        const bulbR = Math.min(16, el.width * 0.26);
+        const tubeW = bulbR * 0.95;
+        const tubeTop = el.y + 12;
+        const tubeBot = el.y + el.height - bulbR * 2;
+        const tubeH = Math.max(20, tubeBot - tubeTop);
+        const pct = Math.max(0, Math.min(1, (temp - minT) / Math.max(1, maxT - minT)));
+        const fillH = tubeH * pct;
+        return (
+          <g>
+            <rect x={cx - tubeW / 2} y={tubeTop} width={tubeW} height={tubeH + bulbR * 0.5} rx={tubeW / 2} fill={el.fill} stroke={el.stroke} strokeWidth={el.strokeWidth} />
+            <circle cx={cx} cy={el.y + el.height - bulbR} r={bulbR} fill={liqCol} stroke={el.stroke} strokeWidth={el.strokeWidth} />
+            <rect x={cx - (tubeW - 6) / 2} y={tubeBot - fillH} width={Math.max(4, tubeW - 6)} height={fillH + bulbR * 0.5} fill={liqCol} />
+            {[0, 0.25, 0.5, 0.75, 1].map((f, idx) => {
+              const ty = tubeBot - f * tubeH;
+              const val = Math.round(minT + f * (maxT - minT));
+              return (
+                <g key={idx}>
+                  <line x1={cx + tubeW / 2} y1={ty} x2={cx + tubeW / 2 + 6} y2={ty} stroke={el.stroke} strokeWidth={1.5} />
+                  <text x={cx + tubeW / 2 + 9} y={ty + 3} fontSize={9} fontWeight="bold" fill="#334155" fontFamily="sans-serif">{val}{unit}</text>
+                </g>
+              );
+            })}
+          </g>
+        );
+      }
+
+      case 'balance_scale': {
+        const tilt = el.extraProps?.tilt || 'even';
+        const leftW = el.extraProps?.leftWeight || '500 g';
+        const rightW = el.extraProps?.rightWeight || '500 g';
+        const tiltDeg = tilt === 'left' ? -10 : tilt === 'right' ? 10 : 0;
+        const pivotY = el.y + el.height * 0.35;
+        const baseY = el.y + el.height - 8;
+        const beamHalf = el.width * 0.42;
+        return (
+          <g>
+            <rect x={cx - 32} y={baseY} width={64} height={8} rx={3} fill="#475569" />
+            <line x1={cx} y1={pivotY} x2={cx} y2={baseY} stroke="#475569" strokeWidth={4} />
+            <polygon points={`${cx - 8},${baseY} ${cx + 8},${baseY} ${cx},${pivotY}`} fill="#64748b" />
+            <g transform={`rotate(${tiltDeg} ${cx} ${pivotY})`}>
+              <line x1={cx - beamHalf} y1={pivotY} x2={cx + beamHalf} y2={pivotY} stroke="#0f172a" strokeWidth={3.5} />
+              <circle cx={cx} cy={pivotY} r={4.5} fill="#f59e0b" stroke="#0f172a" strokeWidth={1.5} />
+              {/* Left Pan */}
+              <line x1={cx - beamHalf} y1={pivotY} x2={cx - beamHalf - 16} y2={pivotY + 38} stroke="#64748b" strokeWidth={1.5} />
+              <line x1={cx - beamHalf} y1={pivotY} x2={cx - beamHalf + 16} y2={pivotY + 38} stroke="#64748b" strokeWidth={1.5} />
+              <path d={`M ${cx - beamHalf - 22} ${pivotY + 38} Q ${cx - beamHalf} ${pivotY + 46} ${cx - beamHalf + 22} ${pivotY + 38} Z`} fill="#cbd5e1" stroke="#0f172a" strokeWidth={1.5} />
+              <rect x={cx - beamHalf - 14} y={pivotY + 20} width={28} height={18} rx={2} fill="#fef08a" stroke="#0f172a" strokeWidth={1.5} />
+              <text x={cx - beamHalf} y={pivotY + 32} fontSize={9} fontWeight="bold" fill="#0f172a" textAnchor="middle" fontFamily="sans-serif">{leftW}</text>
+              {/* Right Pan */}
+              <line x1={cx + beamHalf} y1={pivotY} x2={cx + beamHalf - 16} y2={pivotY + 38} stroke="#64748b" strokeWidth={1.5} />
+              <line x1={cx + beamHalf} y1={pivotY} x2={cx + beamHalf + 16} y2={pivotY + 38} stroke="#64748b" strokeWidth={1.5} />
+              <path d={`M ${cx + beamHalf - 22} ${pivotY + 38} Q ${cx + beamHalf} ${pivotY + 46} ${cx + beamHalf + 22} ${pivotY + 38} Z`} fill="#cbd5e1" stroke="#0f172a" strokeWidth={1.5} />
+              <rect x={cx + beamHalf - 14} y={pivotY + 20} width={28} height={18} rx={2} fill="#bae6fd" stroke="#0f172a" strokeWidth={1.5} />
+              <text x={cx + beamHalf} y={pivotY + 32} fontSize={9} fontWeight="bold" fill="#0f172a" textAnchor="middle" fontFamily="sans-serif">{rightW}</text>
+            </g>
+          </g>
+        );
+      }
+
+      case 'analog_clock': {
+        const r = Math.min(el.width, el.height) / 2;
+        const hr = (el.extraProps?.hour ?? 3) % 12;
+        const min = (el.extraProps?.minute ?? 15) % 60;
+        const showNums = el.extraProps?.showNumbers !== false;
+        const showTicks = el.extraProps?.showMinuteTicks !== false;
+        const minDeg = min * 6 - 90;
+        const hrDeg = (hr + min / 60) * 30 - 90;
+        const hrRad = (hrDeg * Math.PI) / 180;
+        const minRad = (minDeg * Math.PI) / 180;
+        return (
+          <g>
+            <circle cx={cx} cy={cy} r={r} fill={el.fill} stroke={el.stroke} strokeWidth={el.strokeWidth + 0.5} />
+            {showTicks && Array.from({ length: 12 }).map((_, i) => {
+              const a = (i * 30 - 90) * (Math.PI / 180);
+              return (
+                <line
+                  key={i}
+                  x1={cx + (r - 6) * Math.cos(a)}
+                  y1={cy + (r - 6) * Math.sin(a)}
+                  x2={cx + (r - 2) * Math.cos(a)}
+                  y2={cy + (r - 2) * Math.sin(a)}
+                  stroke={el.stroke}
+                  strokeWidth={2}
+                />
+              );
+            })}
+            {showNums && Array.from({ length: 12 }).map((_, i) => {
+              const num = i === 0 ? 12 : i;
+              const a = (i * 30 - 90) * (Math.PI / 180);
+              return (
+                <text
+                  key={num}
+                  x={cx + (r - 16) * Math.cos(a)}
+                  y={cy + (r - 16) * Math.sin(a)}
+                  fontSize={Math.max(9, Math.round(r * 0.17))}
+                  fontWeight="bold"
+                  fill="#0f172a"
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontFamily="sans-serif"
+                >
+                  {num}
+                </text>
+              );
+            })}
+            <line x1={cx} y1={cy} x2={cx + r * 0.5 * Math.cos(hrRad)} y2={cy + r * 0.5 * Math.sin(hrRad)} stroke="#0f172a" strokeWidth={3.5} strokeLinecap="round" />
+            <line x1={cx} y1={cy} x2={cx + r * 0.72 * Math.cos(minRad)} y2={cy + r * 0.72 * Math.sin(minRad)} stroke="#dc2626" strokeWidth={2.2} strokeLinecap="round" />
+            <circle cx={cx} cy={cy} r={3.5} fill="#0f172a" />
+          </g>
+        );
+      }
+
+      case 'fraction_bar': {
+        const total = Math.max(1, el.extraProps?.totalParts ?? 4);
+        const shaded = Math.max(0, Math.min(total, el.extraProps?.shadedParts ?? 3));
+        const shadedCol = el.extraProps?.shadedColor || '#3b82f6';
+        const showLabels = Boolean(el.extraProps?.showLabels);
+        const partW = el.width / total;
+        return (
+          <g>
+            {Array.from({ length: total }).map((_, i) => (
+              <g key={i}>
+                <rect
+                  x={el.x + i * partW}
+                  y={el.y}
+                  width={partW}
+                  height={el.height}
+                  fill={i < shaded ? shadedCol : el.fill}
+                  fillOpacity={i < shaded ? 0.85 : 1}
+                  stroke={el.stroke}
+                  strokeWidth={el.strokeWidth}
+                />
+                {showLabels && (
+                  <text
+                    x={el.x + (i + 0.5) * partW}
+                    y={cy}
+                    fontSize={11}
+                    fontWeight="bold"
+                    fill={i < shaded ? '#ffffff' : '#0f172a'}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fontFamily="sans-serif"
+                  >
+                    1/{total}
+                  </text>
+                )}
+              </g>
+            ))}
+          </g>
+        );
+      }
+
+      case 'fraction_circle': {
+        const total = Math.max(2, el.extraProps?.totalParts ?? 4);
+        const shaded = Math.max(0, Math.min(total, el.extraProps?.shadedParts ?? 1));
+        const shadedCol = el.extraProps?.shadedColor || '#3b82f6';
+        const r = Math.min(el.width, el.height) / 2;
+        return (
+          <g>
+            {Array.from({ length: total }).map((_, i) => {
+              const startAngle = (i * 360) / total - 90;
+              const endAngle = ((i + 1) * 360) / total - 90;
+              const sRad = (startAngle * Math.PI) / 180;
+              const eRad = (endAngle * Math.PI) / 180;
+              const x1 = cx + r * Math.cos(sRad);
+              const y1 = cy + r * Math.sin(sRad);
+              const x2 = cx + r * Math.cos(eRad);
+              const y2 = cy + r * Math.sin(eRad);
+              const largeArc = 360 / total > 180 ? 1 : 0;
+              const d = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+              return (
+                <path
+                  key={i}
+                  d={d}
+                  fill={i < shaded ? shadedCol : el.fill}
+                  fillOpacity={i < shaded ? 0.85 : 1}
+                  stroke={el.stroke}
+                  strokeWidth={el.strokeWidth}
+                  strokeLinejoin="round"
+                />
+              );
+            })}
+          </g>
+        );
+      }
+
+      case 'bar_chart': {
+        const rawVals = String(el.extraProps?.data || '15, 30, 20, 40').split(',').map(v => parseFloat(v.trim()) || 0);
+        const rawLabs = String(el.extraProps?.labels || 'A, B, C, D').split(',').map(v => v.trim());
+        const title = el.extraProps?.chartTitle || '';
+        const showVals = el.extraProps?.showValues !== false;
+        const maxVal = Math.max(el.extraProps?.yAxisMax || 0, ...rawVals, 10);
+        const padL = 32;
+        const padR = 12;
+        const padT = title ? 26 : 14;
+        const padB = 24;
+        const plotW = Math.max(40, el.width - padL - padR);
+        const plotH = Math.max(30, el.height - padT - padB);
+        const slotW = plotW / Math.max(1, rawVals.length);
+        const barW = Math.max(8, slotW * 0.58);
+        return (
+          <g>
+            <rect x={el.x} y={el.y} width={el.width} height={el.height} rx={6} fill="#ffffff" stroke="#cbd5e1" strokeWidth={1.2} />
+            {title && (
+              <text x={cx} y={el.y + 16} fontSize={12} fontWeight="bold" fill="#0f172a" textAnchor="middle" fontFamily="sans-serif">{title}</text>
+            )}
+            {[0, 0.5, 1].map((f, idx) => {
+              const gy = el.y + padT + plotH * (1 - f);
+              return (
+                <g key={idx}>
+                  <line x1={el.x + padL} y1={gy} x2={el.x + el.width - padR} y2={gy} stroke="#e2e8f0" strokeWidth={1} strokeDasharray="3,3" />
+                  <text x={el.x + padL - 5} y={gy + 3} fontSize={9} fill="#64748b" textAnchor="end" fontFamily="sans-serif">{Math.round(maxVal * f)}</text>
+                </g>
+              );
+            })}
+            <line x1={el.x + padL} y1={el.y + padT} x2={el.x + padL} y2={el.y + padT + plotH} stroke="#334155" strokeWidth={1.8} />
+            <line x1={el.x + padL} y1={el.y + padT + plotH} x2={el.x + el.width - padR} y2={el.y + padT + plotH} stroke="#334155" strokeWidth={1.8} />
+            {rawVals.map((v, i) => {
+              const bh = Math.max(2, (v / maxVal) * plotH);
+              const bx = el.x + padL + i * slotW + (slotW - barW) / 2;
+              const by = el.y + padT + plotH - bh;
+              return (
+                <g key={i}>
+                  <rect x={bx} y={by} width={barW} height={bh} rx={2} fill={el.fill === '#f8fafc' ? '#3b82f6' : el.fill} stroke={el.stroke} strokeWidth={1.2} />
+                  {showVals && (
+                    <text x={bx + barW / 2} y={by - 4} fontSize={9.5} fontWeight="bold" fill="#1e293b" textAnchor="middle" fontFamily="sans-serif">{v}</text>
+                  )}
+                  <text x={bx + barW / 2} y={el.y + padT + plotH + 14} fontSize={10} fontWeight="bold" fill="#334155" textAnchor="middle" fontFamily="sans-serif">{rawLabs[i] || `${i + 1}`}</text>
+                </g>
+              );
+            })}
+          </g>
+        );
+      }
+
+      case 'ruler_cm': {
+        const cmLen = Math.max(2, Math.min(20, el.extraProps?.cmLength ?? 10));
+        const showMm = el.extraProps?.showMm !== false;
+        const objLen = el.extraProps?.measureObjectLength ?? 0;
+        const objLab = el.extraProps?.objectLabel || '';
+        const rulerY = objLen > 0 ? el.y + el.height * 0.45 : el.y;
+        const rulerH = objLen > 0 ? el.height * 0.55 : el.height;
+        const padX = 12;
+        const scaleW = el.width - padX * 2;
+        const cmStep = scaleW / cmLen;
+        return (
+          <g>
+            {objLen > 0 && (
+              <g>
+                <rect x={el.x + padX} y={el.y + 4} width={Math.min(scaleW, objLen * cmStep)} height={Math.max(12, el.height * 0.32)} rx={3} fill="#93c5fd" stroke="#1e3a8a" strokeWidth={1.5} />
+                <line x1={el.x + padX + Math.min(scaleW, objLen * cmStep)} y1={el.y + 4} x2={el.x + padX + Math.min(scaleW, objLen * cmStep)} y2={rulerY} stroke="#dc2626" strokeWidth={1.5} strokeDasharray="3,2" />
+                {objLab && (
+                  <text x={el.x + padX + Math.min(scaleW, objLen * cmStep) / 2} y={el.y + 4 + Math.max(12, el.height * 0.32) / 2} fontSize={10} fontWeight="bold" fill="#1e3a8a" textAnchor="middle" dominantBaseline="central" fontFamily="sans-serif">{objLab}</text>
+                )}
+              </g>
+            )}
+            <rect x={el.x} y={rulerY} width={el.width} height={rulerH} rx={3} fill={el.fill} stroke={el.stroke} strokeWidth={el.strokeWidth} />
+            {Array.from({ length: cmLen * (showMm ? 10 : 1) + 1 }).map((_, idx) => {
+              const isCm = showMm ? idx % 10 === 0 : true;
+              const isHalfCm = showMm ? idx % 5 === 0 && !isCm : false;
+              const tx = el.x + padX + (idx / (showMm ? 10 : 1)) * cmStep;
+              const tickH = isCm ? rulerH * 0.42 : isHalfCm ? rulerH * 0.28 : rulerH * 0.16;
+              return (
+                <g key={idx}>
+                  <line x1={tx} y1={rulerY} x2={tx} y2={rulerY + tickH} stroke={el.stroke} strokeWidth={isCm ? 1.5 : 0.8} />
+                  {isCm && (
+                    <text x={tx} y={rulerY + tickH + 10} fontSize={9.5} fontWeight="bold" fill="#0f172a" textAnchor="middle" fontFamily="sans-serif">
+                      {showMm ? idx / 10 : idx}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+            <text x={el.x + el.width - 10} y={rulerY + rulerH - 5} fontSize={8.5} fontWeight="bold" fill="#475569" textAnchor="end" fontFamily="sans-serif">cm</text>
+          </g>
+        );
+      }
+
+      case 'table_grid': {
+        const rows = Math.max(1, Math.min(8, el.extraProps?.rows ?? 3));
+        const cols = Math.max(1, Math.min(8, el.extraProps?.cols ?? 3));
+        const hasHeader = el.extraProps?.hasHeader !== false;
+        const rawMatrix = String(el.extraProps?.dataMatrix || '').split('|').map(r => r.split(',').map(c => c.trim()));
+        const cellW = el.width / cols;
+        const cellH = el.height / rows;
+        return (
+          <g>
+            <rect x={el.x} y={el.y} width={el.width} height={el.height} fill={el.fill} stroke={el.stroke} strokeWidth={el.strokeWidth} />
+            {hasHeader && (
+              <rect x={el.x} y={el.y} width={el.width} height={cellH} fill="#e2e8f0" stroke={el.stroke} strokeWidth={el.strokeWidth} />
+            )}
+            {Array.from({ length: rows }).map((_, rIdx) =>
+              Array.from({ length: cols }).map((__, cIdx) => {
+                const cellText = rawMatrix[rIdx]?.[cIdx] || '';
+                return (
+                  <g key={`${rIdx}-${cIdx}`}>
+                    <rect x={el.x + cIdx * cellW} y={el.y + rIdx * cellH} width={cellW} height={cellH} fill="none" stroke={el.stroke} strokeWidth={1} />
+                    {cellText && (
+                      <text
+                        x={el.x + (cIdx + 0.5) * cellW}
+                        y={el.y + (rIdx + 0.5) * cellH}
+                        fontSize={el.fontSize || 12}
+                        fontWeight={rIdx === 0 && hasHeader ? 'bold' : 'normal'}
+                        fill="#0f172a"
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        fontFamily={el.fontFamily || 'Sarabun, sans-serif'}
+                      >
+                        {cellText}
+                      </text>
+                    )}
+                  </g>
+                );
+              })
+            )}
+          </g>
+        );
       }
 
       // --- Diagrams, Social & Logic ---
@@ -1647,14 +2091,17 @@ export function InStudioDiagramBuilderModal({
 
       case 'venn_3': {
         const r = el.width * 0.32;
+        const labA = el.extraProps?.labelA || 'A';
+        const labB = el.extraProps?.labelB || 'B';
+        const labC = el.extraProps?.labelC || 'C';
         return (
           <g>
             <circle cx={cx - r * 0.5} cy={cy - r * 0.3} r={r} fill="none" stroke="#2563eb" strokeWidth={1.8} />
             <circle cx={cx + r * 0.5} cy={cy - r * 0.3} r={r} fill="none" stroke="#dc2626" strokeWidth={1.8} />
             <circle cx={cx} cy={cy + r * 0.5} r={r} fill="none" stroke="#16a34a" strokeWidth={1.8} />
-            <text x={cx - r} y={cy - r * 0.6} fontSize={13} fontWeight="bold" fill="#2563eb" fontFamily="sans-serif">A</text>
-            <text x={cx + r * 0.8} y={cy - r * 0.6} fontSize={13} fontWeight="bold" fill="#dc2626" fontFamily="sans-serif">B</text>
-            <text x={cx} y={cy + r * 1.1} fontSize={13} fontWeight="bold" fill="#16a34a" textAnchor="middle" fontFamily="sans-serif">C</text>
+            <text x={cx - r} y={cy - r * 0.6} fontSize={13} fontWeight="bold" fill="#2563eb" fontFamily="sans-serif">{labA}</text>
+            <text x={cx + r * 0.8} y={cy - r * 0.6} fontSize={13} fontWeight="bold" fill="#dc2626" fontFamily="sans-serif">{labB}</text>
+            <text x={cx} y={cy + r * 1.1} fontSize={13} fontWeight="bold" fill="#16a34a" textAnchor="middle" fontFamily="sans-serif">{labC}</text>
           </g>
         );
       }
@@ -1664,7 +2111,7 @@ export function InStudioDiagramBuilderModal({
           <g>
             <rect x={el.x} y={el.y} width={el.width} height={el.height} rx={el.height / 2} fill={el.fill} stroke={el.stroke} strokeWidth={el.strokeWidth} />
             {el.text && (
-              <text x={cx} y={cy + 5} fontSize={el.fontSize || 13} fontWeight="bold" fill="#0f172a" textAnchor="middle" fontFamily={el.fontFamily || 'sans-serif'}>
+              <text x={cx} y={cy} dominantBaseline="central" fontSize={el.fontSize || 13} fontWeight="bold" fill="#0f172a" textAnchor="middle" fontFamily={el.fontFamily || 'sans-serif'}>
                 {el.text}
               </text>
             )}
@@ -1676,7 +2123,7 @@ export function InStudioDiagramBuilderModal({
           <g>
             <rect x={el.x} y={el.y} width={el.width} height={el.height} fill={el.fill} stroke={el.stroke} strokeWidth={el.strokeWidth} />
             {el.text && (
-              <text x={cx} y={cy + 5} fontSize={el.fontSize || 13} fontWeight="bold" fill="#0f172a" textAnchor="middle" fontFamily={el.fontFamily || 'sans-serif'}>
+              <text x={cx} y={cy} dominantBaseline="central" fontSize={el.fontSize || 13} fontWeight="bold" fill="#0f172a" textAnchor="middle" fontFamily={el.fontFamily || 'sans-serif'}>
                 {el.text}
               </text>
             )}
@@ -1689,7 +2136,7 @@ export function InStudioDiagramBuilderModal({
           <g>
             <polygon points={pts} fill={el.fill} stroke={el.stroke} strokeWidth={el.strokeWidth} />
             {el.text && (
-              <text x={cx} y={cy + 4} fontSize={el.fontSize || 12} fontWeight="bold" fill="#0f172a" textAnchor="middle" fontFamily={el.fontFamily || 'sans-serif'}>
+              <text x={cx} y={cy} dominantBaseline="central" fontSize={el.fontSize || 12} fontWeight="bold" fill="#0f172a" textAnchor="middle" fontFamily={el.fontFamily || 'sans-serif'}>
                 {el.text}
               </text>
             )}
@@ -1704,7 +2151,7 @@ export function InStudioDiagramBuilderModal({
           <g>
             <polygon points={pts} fill={el.fill} stroke={el.stroke} strokeWidth={el.strokeWidth} />
             {el.text && (
-              <text x={cx} y={cy + 5} fontSize={el.fontSize || 13} fontWeight="bold" fill="#0f172a" textAnchor="middle" fontFamily={el.fontFamily || 'sans-serif'}>
+              <text x={cx} y={cy} dominantBaseline="central" fontSize={el.fontSize || 13} fontWeight="bold" fill="#0f172a" textAnchor="middle" fontFamily={el.fontFamily || 'sans-serif'}>
                 {el.text}
               </text>
             )}
@@ -1713,15 +2160,22 @@ export function InStudioDiagramBuilderModal({
       }
 
       case 'speech_bubble': {
-        const tailW = 16;
+        const tailDir = el.extraProps?.tailDirection || 'bottom-left';
         const tailH = 18;
         const r = 12;
-        const d = `M ${el.x + r} ${el.y} L ${el.x + el.width - r} ${el.y} A ${r} ${r} 0 0 1 ${el.x + el.width} ${el.y + r} L ${el.x + el.width} ${el.y + el.height - tailH - r} A ${r} ${r} 0 0 1 ${el.x + el.width - r} ${el.y + el.height - tailH} L ${el.x + 36} ${el.y + el.height - tailH} L ${el.x + 14} ${el.y + el.height} L ${el.x + 22} ${el.y + el.height - tailH} L ${el.x + r} ${el.y + el.height - tailH} A ${r} ${r} 0 0 1 ${el.x} ${el.y + el.height - tailH - r} L ${el.x} ${el.y + r} A ${r} ${r} 0 0 1 ${el.x + r} ${el.y} Z`;
+        const boxH = el.height - tailH;
+        const boxY = tailDir.startsWith('top') ? el.y + tailH : el.y;
+        const tailBaseX1 = tailDir.endsWith('right') ? el.x + el.width - 36 : el.x + 22;
+        const tailBaseX2 = tailDir.endsWith('right') ? el.x + el.width - 22 : el.x + 36;
+        const tailTipX = tailDir.endsWith('right') ? el.x + el.width - 14 : el.x + 14;
+        const tailTipY = tailDir.startsWith('top') ? el.y : el.y + el.height;
+        const tailAttachY = tailDir.startsWith('top') ? boxY : boxY + boxH;
         return (
           <g>
-            <path d={d} fill={el.fill} stroke={el.stroke} strokeWidth={el.strokeWidth} strokeLinejoin="round" />
+            <rect x={el.x} y={boxY} width={el.width} height={boxH} rx={r} fill={el.fill} stroke={el.stroke} strokeWidth={el.strokeWidth} />
+            <polygon points={`${tailBaseX1},${tailAttachY} ${tailTipX},${tailTipY} ${tailBaseX2},${tailAttachY}`} fill={el.fill} stroke={el.stroke} strokeWidth={el.strokeWidth} strokeLinejoin="round" />
             {el.text && (
-              <text x={cx} y={el.y + (el.height - tailH) * 0.58} fontSize={el.fontSize || 13} fontWeight="bold" fill="#0f172a" textAnchor="middle" fontFamily={el.fontFamily || 'sans-serif'}>
+              <text x={cx} y={boxY + boxH / 2} dominantBaseline="central" fontSize={el.fontSize || 13} fontWeight="bold" fill="#0f172a" textAnchor="middle" fontFamily={el.fontFamily || 'sans-serif'}>
                 {el.text}
               </text>
             )}
@@ -1754,11 +2208,12 @@ export function InStudioDiagramBuilderModal({
         return (
           <text 
             x={el.textAlign === 'center' ? cx : el.textAlign === 'right' ? el.x + el.width - 4 : el.x + 4} 
-            y={el.y + el.height * 0.72} 
+            y={cy}
+            dominantBaseline="central"
             fontSize={el.fontSize || 14} 
             fontWeight={el.fontWeight || 'bold'} 
-            fill={el.stroke || '#0f172a'} 
-            fontFamily={el.fontFamily || 'sans-serif'}
+            fill={el.stroke && el.stroke !== 'none' ? el.stroke : '#0f172a'} 
+            fontFamily={el.fontFamily || 'Sarabun, sans-serif'}
             textAnchor={el.textAlign === 'center' ? 'middle' : el.textAlign === 'right' ? 'end' : 'start'}
           >
             {el.text || ''}
@@ -2005,10 +2460,14 @@ export function InStudioDiagramBuilderModal({
         const yLab = escapeXml(el.extraProps?.yLabel || 'Y');
         const oLab = escapeXml(el.extraProps?.originLabel || 'O');
 
+        const gridMarkup = showGridLines
+          ? [-3, -2, -1, 1, 2, 3].map(i => `<line x1="${cx + i * (el.width / 8)}" y1="${el.y}" x2="${cx + i * (el.width / 8)}" y2="${el.y + el.height}" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="3,3"/>\n<line x1="${el.x}" y1="${cy + i * (el.height / 8)}" x2="${el.x + el.width}" y2="${cy + i * (el.height / 8)}" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="3,3"/>`).join('\n')
+          : '';
         const arrowX = showArrows ? `<polygon points="${el.x + el.width - 6},${cy - 4} ${el.x + el.width},${cy} ${el.x + el.width - 6},${cy + 4}" fill="#334155"/>` : '';
         const arrowY = showArrows ? `<polygon points="${cx - 4},${el.y + 6} ${cx},${el.y} ${cx + 4},${el.y + 6}" fill="#334155"/>` : '';
 
-        return `<line x1="${el.x}" y1="${cy}" x2="${el.x + el.width}" y2="${cy}" stroke="#334155" stroke-width="2"/>
+        return `${gridMarkup}
+<line x1="${el.x}" y1="${cy}" x2="${el.x + el.width}" y2="${cy}" stroke="#334155" stroke-width="2"/>
 <line x1="${cx}" y1="${el.y}" x2="${cx}" y2="${el.y + el.height}" stroke="#334155" stroke-width="2"/>
 ${arrowX}
 ${arrowY}
@@ -2056,6 +2515,125 @@ ${arrowY}
 <polygon points="${el.x + el.width - 6},${cy - 4} ${el.x + el.width},${cy} ${el.x + el.width - 6},${cy + 4}" fill="#1e293b"/>
 ${ticks}
 ${markerMarkup}`;
+      }
+
+      case 'analog_clock': {
+        const r = Math.min(el.width, el.height) / 2;
+        const hr = (el.extraProps?.hour ?? 3) % 12;
+        const min = (el.extraProps?.minute ?? 15) % 60;
+        const showNums = el.extraProps?.showNumbers !== false;
+        const showTicks = el.extraProps?.showMinuteTicks !== false;
+        const minDeg = min * 6 - 90;
+        const hrDeg = (hr + min / 60) * 30 - 90;
+        const hrRad = (hrDeg * Math.PI) / 180;
+        const minRad = (minDeg * Math.PI) / 180;
+        const ticksStr = showTicks ? Array.from({ length: 12 }).map((_, i) => {
+          const a = (i * 30 - 90) * (Math.PI / 180);
+          return `<line x1="${cx + (r - 6) * Math.cos(a)}" y1="${cy + (r - 6) * Math.sin(a)}" x2="${cx + (r - 2) * Math.cos(a)}" y2="${cy + (r - 2) * Math.sin(a)}" stroke="${el.stroke}" stroke-width="2"/>`;
+        }).join('\n') : '';
+        const numsStr = showNums ? Array.from({ length: 12 }).map((_, i) => {
+          const num = i === 0 ? 12 : i;
+          const a = (i * 30 - 90) * (Math.PI / 180);
+          return `<text x="${cx + (r - 16) * Math.cos(a)}" y="${cy + (r - 16) * Math.sin(a)}" font-size="${Math.max(9, Math.round(r * 0.17))}" font-weight="bold" fill="#0f172a" text-anchor="middle" dominant-baseline="central" font-family="sans-serif">${num}</text>`;
+        }).join('\n') : '';
+        return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth + 0.5}"/>
+${ticksStr}
+${numsStr}
+<line x1="${cx}" y1="${cy}" x2="${cx + r * 0.5 * Math.cos(hrRad)}" y2="${cy + r * 0.5 * Math.sin(hrRad)}" stroke="#0f172a" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="${cx}" y1="${cy}" x2="${cx + r * 0.72 * Math.cos(minRad)}" y2="${cy + r * 0.72 * Math.sin(minRad)}" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<circle cx="${cx}" cy="${cy}" r="3.5" fill="#0f172a"/>`;
+      }
+
+      case 'fraction_bar': {
+        const total = Math.max(1, el.extraProps?.totalParts ?? 4);
+        const shaded = Math.max(0, Math.min(total, el.extraProps?.shadedParts ?? 3));
+        const shadedCol = el.extraProps?.shadedColor || '#3b82f6';
+        const showLabels = Boolean(el.extraProps?.showLabels);
+        const partW = el.width / total;
+        return Array.from({ length: total }).map((_, i) => {
+          const rectTag = `<rect x="${el.x + i * partW}" y="${el.y}" width="${partW}" height="${el.height}" fill="${i < shaded ? shadedCol : el.fill}" fill-opacity="${i < shaded ? 0.85 : 1}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"/>`;
+          const txtTag = showLabels ? `<text x="${el.x + (i + 0.5) * partW}" y="${cy}" font-size="11" font-weight="bold" fill="${i < shaded ? '#ffffff' : '#0f172a'}" text-anchor="middle" dominant-baseline="central" font-family="sans-serif">1/${total}</text>` : '';
+          return `${rectTag}${txtTag}`;
+        }).join('\n');
+      }
+
+      case 'fraction_circle': {
+        const total = Math.max(2, el.extraProps?.totalParts ?? 4);
+        const shaded = Math.max(0, Math.min(total, el.extraProps?.shadedParts ?? 1));
+        const shadedCol = el.extraProps?.shadedColor || '#3b82f6';
+        const r = Math.min(el.width, el.height) / 2;
+        return Array.from({ length: total }).map((_, i) => {
+          const startAngle = (i * 360) / total - 90;
+          const endAngle = ((i + 1) * 360) / total - 90;
+          const sRad = (startAngle * Math.PI) / 180;
+          const eRad = (endAngle * Math.PI) / 180;
+          const x1 = cx + r * Math.cos(sRad);
+          const y1 = cy + r * Math.sin(sRad);
+          const x2 = cx + r * Math.cos(eRad);
+          const y2 = cy + r * Math.sin(eRad);
+          const largeArc = 360 / total > 180 ? 1 : 0;
+          const d = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+          return `<path d="${d}" fill="${i < shaded ? shadedCol : el.fill}" fill-opacity="${i < shaded ? 0.85 : 1}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" stroke-linejoin="round"/>`;
+        }).join('\n');
+      }
+
+      case 'bar_chart': {
+        const rawVals = String(el.extraProps?.data || '15, 30, 20, 40').split(',').map(v => parseFloat(v.trim()) || 0);
+        const rawLabs = String(el.extraProps?.labels || 'A, B, C, D').split(',').map(v => v.trim());
+        const title = escapeXml(el.extraProps?.chartTitle || '');
+        const showVals = el.extraProps?.showValues !== false;
+        const maxVal = Math.max(el.extraProps?.yAxisMax || 0, ...rawVals, 10);
+        const padL = 32;
+        const padR = 12;
+        const padT = title ? 26 : 14;
+        const padB = 24;
+        const plotW = Math.max(40, el.width - padL - padR);
+        const plotH = Math.max(30, el.height - padT - padB);
+        const slotW = plotW / Math.max(1, rawVals.length);
+        const barW = Math.max(8, slotW * 0.58);
+        const gridStr = [0, 0.5, 1].map(f => {
+          const gy = el.y + padT + plotH * (1 - f);
+          return `<line x1="${el.x + padL}" y1="${gy}" x2="${el.x + el.width - padR}" y2="${gy}" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="3,3"/>\n<text x="${el.x + padL - 5}" y="${gy + 3}" font-size="9" fill="#64748b" text-anchor="end" font-family="sans-serif">${Math.round(maxVal * f)}</text>`;
+        }).join('\n');
+        const barsStr = rawVals.map((v, i) => {
+          const bh = Math.max(2, (v / maxVal) * plotH);
+          const bx = el.x + padL + i * slotW + (slotW - barW) / 2;
+          const by = el.y + padT + plotH - bh;
+          const vTag = showVals ? `<text x="${bx + barW / 2}" y="${by - 4}" font-size="9.5" font-weight="bold" fill="#1e293b" text-anchor="middle" font-family="sans-serif">${v}</text>` : '';
+          return `<rect x="${bx}" y="${by}" width="${barW}" height="${bh}" rx="2" fill="${el.fill === '#f8fafc' ? '#3b82f6' : el.fill}" stroke="${el.stroke}" stroke-width="1.2"/>${vTag}<text x="${bx + barW / 2}" y="${el.y + padT + plotH + 14}" font-size="10" font-weight="bold" fill="#334155" text-anchor="middle" font-family="sans-serif">${escapeXml(rawLabs[i] || `${i + 1}`)}</text>`;
+        }).join('\n');
+        return `<rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2"/>
+${title ? `<text x="${cx}" y="${el.y + 16}" font-size="12" font-weight="bold" fill="#0f172a" text-anchor="middle" font-family="sans-serif">${title}</text>` : ''}
+${gridStr}
+<line x1="${el.x + padL}" y1="${el.y + padT}" x2="${el.x + padL}" y2="${el.y + padT + plotH}" stroke="#334155" stroke-width="1.8"/>
+<line x1="${el.x + padL}" y1="${el.y + padT + plotH}" x2="${el.x + el.width - padR}" y2="${el.y + padT + plotH}" stroke="#334155" stroke-width="1.8"/>
+${barsStr}`;
+      }
+
+      case 'ruler_cm': {
+        const cmLen = Math.max(2, Math.min(20, el.extraProps?.cmLength ?? 10));
+        const showMm = el.extraProps?.showMm !== false;
+        const objLen = el.extraProps?.measureObjectLength ?? 0;
+        const objLab = escapeXml(el.extraProps?.objectLabel || '');
+        const rulerY = objLen > 0 ? el.y + el.height * 0.45 : el.y;
+        const rulerH = objLen > 0 ? el.height * 0.55 : el.height;
+        const padX = 12;
+        const scaleW = el.width - padX * 2;
+        const cmStep = scaleW / cmLen;
+        const objStr = objLen > 0 ? `<rect x="${el.x + padX}" y="${el.y + 4}" width="${Math.min(scaleW, objLen * cmStep)}" height="${Math.max(12, el.height * 0.32)}" rx="3" fill="#93c5fd" stroke="#1e3a8a" stroke-width="1.5"/>
+<line x1="${el.x + padX + Math.min(scaleW, objLen * cmStep)}" y1="${el.y + 4}" x2="${el.x + padX + Math.min(scaleW, objLen * cmStep)}" y2="${rulerY}" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="3,2"/>
+${objLab ? `<text x="${el.x + padX + Math.min(scaleW, objLen * cmStep) / 2}" y="${el.y + 4 + Math.max(12, el.height * 0.32) / 2}" font-size="10" font-weight="bold" fill="#1e3a8a" text-anchor="middle" dominant-baseline="central" font-family="sans-serif">${objLab}</text>` : ''}` : '';
+        const ticksStr = Array.from({ length: cmLen * (showMm ? 10 : 1) + 1 }).map((_, idx) => {
+          const isCm = showMm ? idx % 10 === 0 : true;
+          const isHalfCm = showMm ? idx % 5 === 0 && !isCm : false;
+          const tx = el.x + padX + (idx / (showMm ? 10 : 1)) * cmStep;
+          const tickH = isCm ? rulerH * 0.42 : isHalfCm ? rulerH * 0.28 : rulerH * 0.16;
+          return `<line x1="${tx}" y1="${rulerY}" x2="${tx}" y2="${rulerY + tickH}" stroke="${el.stroke}" stroke-width="${isCm ? 1.5 : 0.8}"/>${isCm ? `<text x="${tx}" y="${rulerY + tickH + 10}" font-size="9.5" font-weight="bold" fill="#0f172a" text-anchor="middle" font-family="sans-serif">${showMm ? idx / 10 : idx}</text>` : ''}`;
+        }).join('\n');
+        return `${objStr}
+<rect x="${el.x}" y="${rulerY}" width="${el.width}" height="${rulerH}" rx="3" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"/>
+${ticksStr}
+<text x="${el.x + el.width - 10}" y="${rulerY + rulerH - 5}" font-size="8.5" font-weight="bold" fill="#475569" text-anchor="end" font-family="sans-serif">cm</text>`;
       }
 
       // --- Science & Circuits ---
@@ -2199,8 +2777,69 @@ ${markerMarkup}`;
       case 'science_flask': {
         const neckW = el.width * 0.28;
         const neckH = el.height * 0.35;
+        const bodyH = el.height - neckH;
+        const liquidPct = el.extraProps?.liquidLevel ?? 50;
+        const liquidCol = el.extraProps?.liquidColor || '#bae6fd';
+        const liqH = bodyH * (liquidPct / 100);
+        const liqTopY = el.y + el.height - liqH;
+        const tRatio = Math.max(0, Math.min(1, (liqTopY - (el.y + neckH)) / bodyH));
+        const liqTopHalfW = (neckW / 2) + ((el.width / 2) - (neckW / 2)) * tRatio;
+        const liqTag = liquidPct > 0
+          ? `<polygon points="${cx - liqTopHalfW + 2},${liqTopY} ${cx + liqTopHalfW - 2},${liqTopY} ${el.x + el.width - 2},${el.y + el.height - 2} ${el.x + 2},${el.y + el.height - 2}" fill="${liquidCol}" opacity="0.78"/>`
+          : '';
         const d = `M ${cx - neckW / 2} ${el.y} L ${cx - neckW / 2} ${el.y + neckH} L ${el.x} ${el.y + el.height} L ${el.x + el.width} ${el.y + el.height} L ${cx + neckW / 2} ${el.y + neckH} L ${cx + neckW / 2} ${el.y} Z`;
-        return `<path d="${d}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="2" stroke-linejoin="round"/>`;
+        return `${liqTag}\n<path d="${d}" fill="none" stroke="${el.stroke}" stroke-width="2" stroke-linejoin="round"/>`;
+      }
+
+      case 'thermometer': {
+        const temp = el.extraProps?.temperature ?? 37;
+        const minT = el.extraProps?.minTemp ?? 0;
+        const maxT = el.extraProps?.maxTemp ?? 100;
+        const unit = escapeXml(el.extraProps?.unit || '°C');
+        const liqCol = el.extraProps?.liquidColor || '#ef4444';
+        const bulbR = Math.min(16, el.width * 0.26);
+        const tubeW = bulbR * 0.95;
+        const tubeTop = el.y + 12;
+        const tubeBot = el.y + el.height - bulbR * 2;
+        const tubeH = Math.max(20, tubeBot - tubeTop);
+        const pct = Math.max(0, Math.min(1, (temp - minT) / Math.max(1, maxT - minT)));
+        const fillH = tubeH * pct;
+        const ticksStr = [0, 0.25, 0.5, 0.75, 1].map(f => {
+          const ty = tubeBot - f * tubeH;
+          const val = Math.round(minT + f * (maxT - minT));
+          return `<line x1="${cx + tubeW / 2}" y1="${ty}" x2="${cx + tubeW / 2 + 6}" y2="${ty}" stroke="${el.stroke}" stroke-width="1.5"/>\n<text x="${cx + tubeW / 2 + 9}" y="${ty + 3}" font-size="9" font-weight="bold" fill="#334155" font-family="sans-serif">${val}${unit}</text>`;
+        }).join('\n');
+        return `<rect x="${cx - tubeW / 2}" y="${tubeTop}" width="${tubeW}" height="${tubeH + bulbR * 0.5}" rx="${tubeW / 2}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"/>
+<circle cx="${cx}" cy="${el.y + el.height - bulbR}" r="${bulbR}" fill="${liqCol}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"/>
+<rect x="${cx - (tubeW - 6) / 2}" y="${tubeBot - fillH}" width="${Math.max(4, tubeW - 6)}" height="${fillH + bulbR * 0.5}" fill="${liqCol}"/>
+${ticksStr}`;
+      }
+
+      case 'balance_scale': {
+        const tilt = el.extraProps?.tilt || 'even';
+        const leftW = escapeXml(el.extraProps?.leftWeight || '500 g');
+        const rightW = escapeXml(el.extraProps?.rightWeight || '500 g');
+        const tiltDeg = tilt === 'left' ? -10 : tilt === 'right' ? 10 : 0;
+        const pivotY = el.y + el.height * 0.35;
+        const baseY = el.y + el.height - 8;
+        const beamHalf = el.width * 0.42;
+        return `<rect x="${cx - 32}" y="${baseY}" width="64" height="8" rx="3" fill="#475569"/>
+<line x1="${cx}" y1="${pivotY}" x2="${cx}" y2="${baseY}" stroke="#475569" stroke-width="4"/>
+<polygon points="${cx - 8},${baseY} ${cx + 8},${baseY} ${cx},${pivotY}" fill="#64748b"/>
+<g transform="rotate(${tiltDeg} ${cx} ${pivotY})">
+  <line x1="${cx - beamHalf}" y1="${pivotY}" x2="${cx + beamHalf}" y2="${pivotY}" stroke="#0f172a" stroke-width="3.5"/>
+  <circle cx="${cx}" cy="${pivotY}" r="4.5" fill="#f59e0b" stroke="#0f172a" stroke-width="1.5"/>
+  <line x1="${cx - beamHalf}" y1="${pivotY}" x2="${cx - beamHalf - 16}" y2="${pivotY + 38}" stroke="#64748b" stroke-width="1.5"/>
+  <line x1="${cx - beamHalf}" y1="${pivotY}" x2="${cx - beamHalf + 16}" y2="${pivotY + 38}" stroke="#64748b" stroke-width="1.5"/>
+  <path d="M ${cx - beamHalf - 22} ${pivotY + 38} Q ${cx - beamHalf} ${pivotY + 46} ${cx - beamHalf + 22} ${pivotY + 38} Z" fill="#cbd5e1" stroke="#0f172a" stroke-width="1.5"/>
+  <rect x="${cx - beamHalf - 14}" y="${pivotY + 20}" width="28" height="18" rx="2" fill="#fef08a" stroke="#0f172a" stroke-width="1.5"/>
+  <text x="${cx - beamHalf}" y="${pivotY + 32}" font-size="9" font-weight="bold" fill="#0f172a" text-anchor="middle" font-family="sans-serif">${leftW}</text>
+  <line x1="${cx + beamHalf}" y1="${pivotY}" x2="${cx + beamHalf - 16}" y2="${pivotY + 38}" stroke="#64748b" stroke-width="1.5"/>
+  <line x1="${cx + beamHalf}" y1="${pivotY}" x2="${cx + beamHalf + 16}" y2="${pivotY + 38}" stroke="#64748b" stroke-width="1.5"/>
+  <path d="M ${cx + beamHalf - 22} ${pivotY + 38} Q ${cx + beamHalf} ${pivotY + 46} ${cx + beamHalf + 22} ${pivotY + 38} Z" fill="#cbd5e1" stroke="#0f172a" stroke-width="1.5"/>
+  <rect x="${cx + beamHalf - 14}" y="${pivotY + 20}" width="28" height="18" rx="2" fill="#bae6fd" stroke="#0f172a" stroke-width="1.5"/>
+  <text x="${cx + beamHalf}" y="${pivotY + 32}" font-size="9" font-weight="bold" fill="#0f172a" text-anchor="middle" font-family="sans-serif">${rightW}</text>
+</g>`;
       }
 
       // --- Diagrams & Logic ---
@@ -2236,42 +2875,52 @@ ${intersectTag}
 
       case 'venn_3': {
         const r = el.width * 0.32;
+        const labA = escapeXml(el.extraProps?.labelA || 'A');
+        const labB = escapeXml(el.extraProps?.labelB || 'B');
+        const labC = escapeXml(el.extraProps?.labelC || 'C');
         return `<circle cx="${cx - r * 0.5}" cy="${cy - r * 0.3}" r="${r}" fill="none" stroke="#2563eb" stroke-width="1.8"/>
 <circle cx="${cx + r * 0.5}" cy="${cy - r * 0.3}" r="${r}" fill="none" stroke="#dc2626" stroke-width="1.8"/>
 <circle cx="${cx}" cy="${cy + r * 0.5}" r="${r}" fill="none" stroke="#16a34a" stroke-width="1.8"/>
-<text x="${cx - r}" y="${cy - r * 0.6}" font-size="13" font-weight="bold" fill="#2563eb" font-family="sans-serif">A</text>
-<text x="${cx + r * 0.8}" y="${cy - r * 0.6}" font-size="13" font-weight="bold" fill="#dc2626" font-family="sans-serif">B</text>
-<text x="${cx}" y="${cy + r * 1.1}" font-size="13" font-weight="bold" fill="#16a34a" text-anchor="middle" font-family="sans-serif">C</text>`;
+<text x="${cx - r}" y="${cy - r * 0.6}" font-size="13" font-weight="bold" fill="#2563eb" font-family="sans-serif">${labA}</text>
+<text x="${cx + r * 0.8}" y="${cy - r * 0.6}" font-size="13" font-weight="bold" fill="#dc2626" font-family="sans-serif">${labB}</text>
+<text x="${cx}" y="${cy + r * 1.1}" font-size="13" font-weight="bold" fill="#16a34a" text-anchor="middle" font-family="sans-serif">${labC}</text>`;
       }
 
       case 'flowchart_terminator':
         return `<rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.height / 2}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"/>
-${safeText ? `<text x="${cx}" y="${cy + 5}" font-size="${el.fontSize || 13}" font-weight="bold" fill="#0f172a" text-anchor="middle" font-family="${el.fontFamily || 'sans-serif'}">${safeText}</text>` : ''}`;
+${safeText ? `<text x="${cx}" y="${cy}" dominant-baseline="central" font-size="${el.fontSize || 13}" font-weight="bold" fill="#0f172a" text-anchor="middle" font-family="${el.fontFamily || 'sans-serif'}">${safeText}</text>` : ''}`;
 
       case 'flowchart_process':
         return `<rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"/>
-${safeText ? `<text x="${cx}" y="${cy + 5}" font-size="${el.fontSize || 13}" font-weight="bold" fill="#0f172a" text-anchor="middle" font-family="${el.fontFamily || 'sans-serif'}">${safeText}</text>` : ''}`;
+${safeText ? `<text x="${cx}" y="${cy}" dominant-baseline="central" font-size="${el.fontSize || 13}" font-weight="bold" fill="#0f172a" text-anchor="middle" font-family="${el.fontFamily || 'sans-serif'}">${safeText}</text>` : ''}`;
 
       case 'flowchart_decision': {
         const pts = `${cx},${el.y} ${el.x + el.width},${cy} ${cx},${el.y + el.height} ${el.x},${cy}`;
         return `<polygon points="${pts}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"/>
-${safeText ? `<text x="${cx}" y="${cy + 4}" font-size="${el.fontSize || 12}" font-weight="bold" fill="#0f172a" text-anchor="middle" font-family="${el.fontFamily || 'sans-serif'}">${safeText}</text>` : ''}`;
+${safeText ? `<text x="${cx}" y="${cy}" dominant-baseline="central" font-size="${el.fontSize || 12}" font-weight="bold" fill="#0f172a" text-anchor="middle" font-family="${el.fontFamily || 'sans-serif'}">${safeText}</text>` : ''}`;
       }
 
       case 'flowchart_data': {
         const offset = el.width * 0.2;
         const pts = `${el.x + offset},${el.y} ${el.x + el.width},${el.y} ${el.x + el.width - offset},${el.y + el.height} ${el.x},${el.y + el.height}`;
         return `<polygon points="${pts}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"/>
-${safeText ? `<text x="${cx}" y="${cy + 5}" font-size="${el.fontSize || 13}" font-weight="bold" fill="#0f172a" text-anchor="middle" font-family="${el.fontFamily || 'sans-serif'}">${safeText}</text>` : ''}`;
+${safeText ? `<text x="${cx}" y="${cy}" dominant-baseline="central" font-size="${el.fontSize || 13}" font-weight="bold" fill="#0f172a" text-anchor="middle" font-family="${el.fontFamily || 'sans-serif'}">${safeText}</text>` : ''}`;
       }
 
       case 'speech_bubble': {
-        const tailW = 16;
+        const tailDir = el.extraProps?.tailDirection || 'bottom-left';
         const tailH = 18;
         const r = 12;
-        const d = `M ${el.x + r} ${el.y} L ${el.x + el.width - r} ${el.y} A ${r} ${r} 0 0 1 ${el.x + el.width} ${el.y + r} L ${el.x + el.width} ${el.y + el.height - tailH - r} A ${r} ${r} 0 0 1 ${el.x + el.width - r} ${el.y + el.height - tailH} L ${el.x + 36} ${el.y + el.height - tailH} L ${el.x + 14} ${el.y + el.height} L ${el.x + 22} ${el.y + el.height - tailH} L ${el.x + r} ${el.y + el.height - tailH} A ${r} ${r} 0 0 1 ${el.x} ${el.y + el.height - tailH - r} L ${el.x} ${el.y + r} A ${r} ${r} 0 0 1 ${el.x + r} ${el.y} Z`;
-        return `<path d="${d}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" stroke-linejoin="round"/>
-${safeText ? `<text x="${cx}" y="${el.y + (el.height - tailH) * 0.58}" font-size="${el.fontSize || 13}" font-weight="bold" fill="#0f172a" text-anchor="middle" font-family="${el.fontFamily || 'sans-serif'}">${safeText}</text>` : ''}`;
+        const boxH = el.height - tailH;
+        const boxY = tailDir.startsWith('top') ? el.y + tailH : el.y;
+        const tailBaseX1 = tailDir.endsWith('right') ? el.x + el.width - 36 : el.x + 22;
+        const tailBaseX2 = tailDir.endsWith('right') ? el.x + el.width - 22 : el.x + 36;
+        const tailTipX = tailDir.endsWith('right') ? el.x + el.width - 14 : el.x + 14;
+        const tailTipY = tailDir.startsWith('top') ? el.y : el.y + el.height;
+        const tailAttachY = tailDir.startsWith('top') ? boxY : boxY + boxH;
+        return `<rect x="${el.x}" y="${boxY}" width="${el.width}" height="${boxH}" rx="${r}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"/>
+<polygon points="${tailBaseX1},${tailAttachY} ${tailTipX},${tailTipY} ${tailBaseX2},${tailAttachY}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" stroke-linejoin="round"/>
+${safeText ? `<text x="${cx}" y="${boxY + boxH / 2}" dominant-baseline="central" font-size="${el.fontSize || 13}" font-weight="bold" fill="#0f172a" text-anchor="middle" font-family="${el.fontFamily || 'sans-serif'}">${safeText}</text>` : ''}`;
       }
 
       case 'timeline': {
@@ -2287,15 +2936,34 @@ ${safeText ? `<text x="${cx}" y="${el.y + (el.height - tailH) * 0.58}" font-size
 ${ptsMarkup}`;
       }
 
+      case 'table_grid': {
+        const rows = Math.max(1, Math.min(8, el.extraProps?.rows ?? 3));
+        const cols = Math.max(1, Math.min(8, el.extraProps?.cols ?? 3));
+        const hasHeader = el.extraProps?.hasHeader !== false;
+        const rawMatrix = String(el.extraProps?.dataMatrix || '').split('|').map(r => r.split(',').map(c => c.trim()));
+        const cellW = el.width / cols;
+        const cellH = el.height / rows;
+        const cellsStr = Array.from({ length: rows }).map((_, rIdx) =>
+          Array.from({ length: cols }).map((__, cIdx) => {
+            const cellText = escapeXml(rawMatrix[rIdx]?.[cIdx] || '');
+            const txtTag = cellText ? `<text x="${el.x + (cIdx + 0.5) * cellW}" y="${el.y + (rIdx + 0.5) * cellH}" font-size="${el.fontSize || 12}" font-weight="${rIdx === 0 && hasHeader ? 'bold' : 'normal'}" fill="#0f172a" text-anchor="middle" dominant-baseline="central" font-family="${el.fontFamily || 'Sarabun, sans-serif'}">${cellText}</text>` : '';
+            return `<rect x="${el.x + cIdx * cellW}" y="${el.y + rIdx * cellH}" width="${cellW}" height="${cellH}" fill="none" stroke="${el.stroke}" stroke-width="1"/>${txtTag}`;
+          }).join('\n')
+        ).join('\n');
+        return `<rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"/>
+${hasHeader ? `<rect x="${el.x}" y="${el.y}" width="${el.width}" height="${cellH}" fill="#e2e8f0" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"/>` : ''}
+${cellsStr}`;
+      }
+
       case 'text_label':
       case 'math_label': {
         const anchor = el.textAlign === 'center' ? 'middle' : el.textAlign === 'right' ? 'end' : 'start';
         const tx = el.textAlign === 'center' ? cx : el.textAlign === 'right' ? el.x + el.width - 4 : el.x + 4;
-        return `<text x="${tx}" y="${el.y + el.height * 0.72}" font-size="${el.fontSize || 14}" font-weight="${el.fontWeight || 'bold'}" fill="${el.stroke || '#0f172a'}" font-family="${el.fontFamily || 'sans-serif'}" text-anchor="${anchor}">${safeText}</text>`;
+        return `<text x="${tx}" y="${cy}" dominant-baseline="central" font-size="${el.fontSize || 14}" font-weight="${el.fontWeight || 'bold'}" fill="${el.stroke && el.stroke !== 'none' ? el.stroke : '#0f172a'}" font-family="${el.fontFamily || 'Sarabun, sans-serif'}" text-anchor="${anchor}">${safeText}</text>`;
       }
 
       case 'image_overlay':
-        return `<image href="${el.imageUrl}" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" preserveAspectRatio="xMidYMid meet"/>`;
+        return `<image href="${escapeXml(el.imageUrl || '')}" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" preserveAspectRatio="xMidYMid meet"/>`;
 
       default:
         return `<rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"/>`;
@@ -2744,6 +3412,11 @@ ${ptsMarkup}`;
                       { type: 'protractor', label: 'ไม้โปรแทรกเตอร์', icon: <Compass className="w-3.5 h-3.5 text-sky-600" /> },
                       { type: 'axes_xy', label: 'แกนพิกัดฉาก X-Y', icon: <Grid3X3 className="w-3.5 h-3.5 text-cyan-600" /> },
                       { type: 'number_line', label: 'เส้นจำนวน', icon: <Minus className="w-3.5 h-3.5 text-amber-600" /> },
+                      { type: 'analog_clock', label: 'นาฬิกาเข็ม', icon: <Clock className="w-3.5 h-3.5 text-rose-600" /> },
+                      { type: 'fraction_bar', label: 'แถบเศษส่วน', icon: <Grid className="w-3.5 h-3.5 text-blue-600" /> },
+                      { type: 'fraction_circle', label: 'วงกลมเศษส่วน', icon: <Circle className="w-3.5 h-3.5 text-indigo-600" /> },
+                      { type: 'bar_chart', label: 'แผนภูมิแท่ง', icon: <Activity className="w-3.5 h-3.5 text-emerald-600" /> },
+                      { type: 'ruler_cm', label: 'ไม้บรรทัดวัดขนาด', icon: <SlidersHorizontal className="w-3.5 h-3.5 text-amber-700" /> },
                       { type: 'text_label', label: 'ป้ายข้อความ', icon: <Type className="w-3.5 h-3.5 text-indigo-600" /> },
                     ].map(item => (
                       <button
@@ -2774,10 +3447,13 @@ ${ptsMarkup}`;
                       { type: 'science_beaker', label: 'บีกเกอร์', icon: <FlaskConical className="w-3.5 h-3.5 text-sky-600" /> },
                       { type: 'science_test_tube', label: 'หลอดทดลอง', icon: <FlaskConical className="w-3.5 h-3.5 text-emerald-600" /> },
                       { type: 'science_flask', label: 'ขวดรูปชมพู่', icon: <FlaskConical className="w-3.5 h-3.5 text-purple-600" /> },
+                      { type: 'thermometer', label: 'เทอร์โมมิเตอร์', icon: <Gauge className="w-3.5 h-3.5 text-red-600" /> },
+                      { type: 'balance_scale', label: 'ตาชั่งสองแขน', icon: <Sliders className="w-3.5 h-3.5 text-amber-600" /> },
                       { type: 'science_incline', label: 'พื้นเอียง & มวล', icon: <Triangle className="w-3.5 h-3.5 text-amber-700" /> },
                       { type: 'science_magnet', label: 'แม่เหล็กแท่ง N-S', icon: <Magnet className="w-3.5 h-3.5 text-rose-600" /> },
                       { type: 'science_pulley', label: 'รอกเดี่ยว & ตุ้มน้ำหนัก', icon: <Circle className="w-3.5 h-3.5 text-stone-600" /> },
                       { type: 'science_lever', label: 'คานดีดคานงัด', icon: <Minus className="w-3.5 h-3.5 text-orange-600" /> },
+                      { type: 'science_spring', label: 'สปริงยืดหยุ่น', icon: <Activity className="w-3.5 h-3.5 text-indigo-600" /> },
                     ].map(item => (
                       <button
                         key={item.type}
@@ -2801,11 +3477,13 @@ ${ptsMarkup}`;
                       { type: 'flowchart_terminator', label: 'Start / Stop', icon: <Box className="w-3.5 h-3.5 text-blue-600" /> },
                       { type: 'flowchart_process', label: 'กระบวนการ (Process)', icon: <Square className="w-3.5 h-3.5 text-indigo-600" /> },
                       { type: 'flowchart_decision', label: 'การตัดสินใจ (Decision)', icon: <Square className="w-3.5 h-3.5 text-amber-600 rotate-45" /> },
+                      { type: 'flowchart_data', label: 'รับ/แสดงข้อมูล (I/O)', icon: <Square className="w-3.5 h-3.5 text-emerald-600 skew-x-12" /> },
                       { type: 'speech_bubble', label: 'กล่องบทสนทนา', icon: <MessageSquare className="w-3.5 h-3.5 text-teal-600" /> },
                       { type: 'venn_2', label: 'เวนน์ 2 วง', icon: <Layers className="w-3.5 h-3.5 text-rose-600" /> },
                       { type: 'venn_3', label: 'เวนน์ 3 วง', icon: <Layers className="w-3.5 h-3.5 text-purple-600" /> },
                       { type: 'compass_rose', label: 'เข็มทิศ 4 ทิศ', icon: <Compass className="w-3.5 h-3.5 text-red-600" /> },
                       { type: 'timeline', label: 'เส้นเวลา (Timeline)', icon: <Clock className="w-3.5 h-3.5 text-stone-700" /> },
+                      { type: 'table_grid', label: 'ตารางข้อมูล (Table)', icon: <Grid3X3 className="w-3.5 h-3.5 text-blue-700" /> },
                     ].map(item => (
                       <button
                         key={item.type}
@@ -2979,6 +3657,14 @@ ${ptsMarkup}`;
                       transform={transform}
                       className="cursor-pointer group"
                       onMouseDown={(e) => handleMouseDown(e, 'move', el.id)}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedId(el.id);
+                        setTimeout(() => {
+                          inspectorTextInputRef.current?.focus();
+                          inspectorTextInputRef.current?.select();
+                        }, 30);
+                      }}
                     >
                       {/* Render Element */}
                       {renderSvgElement(el)}
@@ -3078,6 +3764,7 @@ ${ptsMarkup}`;
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-stone-600 block">ข้อความกำกับ:</label>
                   <input
+                    ref={inspectorTextInputRef}
                     type="text"
                     value={selectedElement.text || ''}
                     onChange={(e) => updateSelectedField('text', e.target.value)}
@@ -3175,6 +3862,282 @@ ${ptsMarkup}`;
                       checked={selectedElement.extraProps?.showRightAngle !== false}
                       onChange={(e) => updateSelectedExtraProp('showRightAngle', e.target.checked)}
                       className="accent-blue-600 rounded"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Parallelogram & Trapezoid Controls */}
+              {selectedElement.type === 'parallelogram' && (
+                <div className="p-2.5 bg-stone-50 rounded-xl border border-stone-200 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-stone-800">ความเอียงด้านขนาน:</span>
+                    <span className="font-bold text-blue-600">{selectedElement.extraProps?.slant ?? 32} px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={80}
+                    value={selectedElement.extraProps?.slant ?? 32}
+                    onChange={(e) => updateSelectedExtraProp('slant', parseInt(e.target.value))}
+                    className="w-full accent-blue-600"
+                  />
+                </div>
+              )}
+
+              {selectedElement.type === 'trapezoid' && (
+                <div className="p-2.5 bg-stone-50 rounded-xl border border-stone-200 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-stone-800">ระยะหุบด้านบนคางหมู:</span>
+                    <span className="font-bold text-blue-600">{selectedElement.extraProps?.topInset ?? 32} px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={80}
+                    value={selectedElement.extraProps?.topInset ?? 32}
+                    onChange={(e) => updateSelectedExtraProp('topInset', parseInt(e.target.value))}
+                    className="w-full accent-blue-600"
+                  />
+                </div>
+              )}
+
+              {/* Coordinate Axes X-Y Specific Controls */}
+              {selectedElement.type === 'axes_xy' && (
+                <div className="p-2.5 bg-stone-50 rounded-xl border border-stone-200 space-y-2">
+                  <span className="text-xs font-bold text-stone-800 block">ตั้งค่าแกนพิกัดฉาก:</span>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-stone-600">แสดงเส้นตาราง (Grid)</span>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(selectedElement.extraProps?.showGrid)}
+                      onChange={(e) => updateSelectedExtraProp('showGrid', e.target.checked)}
+                      className="accent-blue-600 rounded"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-stone-600">แสดงหัวลูกศรปลายแกน</span>
+                    <input
+                      type="checkbox"
+                      checked={selectedElement.extraProps?.showArrows !== false}
+                      onChange={(e) => updateSelectedExtraProp('showArrows', e.target.checked)}
+                      className="accent-blue-600 rounded"
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5 pt-1 text-xs">
+                    <div>
+                      <label className="text-[10px] text-stone-500 block">แกน X</label>
+                      <input
+                        type="text"
+                        value={selectedElement.extraProps?.xLabel ?? 'X'}
+                        onChange={(e) => updateSelectedExtraProp('xLabel', e.target.value)}
+                        className="w-full px-1.5 py-1 border border-stone-300 rounded"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-stone-500 block">แกน Y</label>
+                      <input
+                        type="text"
+                        value={selectedElement.extraProps?.yLabel ?? 'Y'}
+                        onChange={(e) => updateSelectedExtraProp('yLabel', e.target.value)}
+                        className="w-full px-1.5 py-1 border border-stone-300 rounded"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-stone-500 block">จุดกำเนิด</label>
+                      <input
+                        type="text"
+                        value={selectedElement.extraProps?.originLabel ?? 'O'}
+                        onChange={(e) => updateSelectedExtraProp('originLabel', e.target.value)}
+                        className="w-full px-1.5 py-1 border border-stone-300 rounded"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Analog Clock Controls */}
+              {selectedElement.type === 'analog_clock' && (
+                <div className="p-2.5 bg-rose-50/50 rounded-xl border border-rose-200 space-y-2.5">
+                  <span className="text-xs font-bold text-rose-900 block">ตั้งเวลานาฬิกา ({selectedElement.extraProps?.hour ?? 3}:{String(selectedElement.extraProps?.minute ?? 15).padStart(2, '0')})</span>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <label className="text-[10px] text-stone-600 font-semibold block">เข็มสั้น (ชั่วโมง 1-12)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={12}
+                        value={selectedElement.extraProps?.hour ?? 3}
+                        onChange={(e) => updateSelectedExtraProp('hour', Math.max(1, Math.min(12, parseInt(e.target.value) || 12)))}
+                        className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-stone-600 font-semibold block">เข็มยาว (นาที 0-59)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={59}
+                        step={5}
+                        value={selectedElement.extraProps?.minute ?? 15}
+                        onChange={(e) => updateSelectedExtraProp('minute', Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
+                        className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-stone-600">แสดงตัวเลข 1-12</span>
+                    <input
+                      type="checkbox"
+                      checked={selectedElement.extraProps?.showNumbers !== false}
+                      onChange={(e) => updateSelectedExtraProp('showNumbers', e.target.checked)}
+                      className="accent-rose-600 rounded"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Fraction Bar & Fraction Circle Controls */}
+              {['fraction_bar', 'fraction_circle'].includes(selectedElement.type) && (
+                <div className="p-2.5 bg-blue-50/50 rounded-xl border border-blue-200 space-y-2.5">
+                  <span className="text-xs font-bold text-blue-900 block">
+                    ตั้งค่าเศษส่วน ({selectedElement.extraProps?.shadedParts ?? 1}/{selectedElement.extraProps?.totalParts ?? 4})
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <label className="text-[10px] text-stone-600 font-semibold block">ตัวเศษ (ส่วนที่แรเงา)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={selectedElement.extraProps?.totalParts ?? 4}
+                        value={selectedElement.extraProps?.shadedParts ?? 1}
+                        onChange={(e) => updateSelectedExtraProp('shadedParts', Math.max(0, parseInt(e.target.value) || 0))}
+                        className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-stone-600 font-semibold block">ตัวส่วน (จำนวนช่อง)</label>
+                      <input
+                        type="number"
+                        min={2}
+                        max={16}
+                        value={selectedElement.extraProps?.totalParts ?? 4}
+                        onChange={(e) => updateSelectedExtraProp('totalParts', Math.max(2, Math.min(16, parseInt(e.target.value) || 2)))}
+                        className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-stone-600">สีส่วนที่แรเงา:</span>
+                    <input
+                      type="color"
+                      value={selectedElement.extraProps?.shadedColor || '#3b82f6'}
+                      onChange={(e) => updateSelectedExtraProp('shadedColor', e.target.value)}
+                      className="w-6 h-5 rounded cursor-pointer border-0 p-0"
+                    />
+                  </div>
+                  {selectedElement.type === 'fraction_bar' && (
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-stone-600">แสดงป้าย 1/n ในแต่ละช่อง</span>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(selectedElement.extraProps?.showLabels)}
+                        onChange={(e) => updateSelectedExtraProp('showLabels', e.target.checked)}
+                        className="accent-blue-600 rounded"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Bar Chart Controls */}
+              {selectedElement.type === 'bar_chart' && (
+                <div className="p-2.5 bg-emerald-50/50 rounded-xl border border-emerald-200 space-y-2 text-xs">
+                  <span className="font-bold text-emerald-900 block">ข้อมูลแผนภูมิแท่ง:</span>
+                  <div>
+                    <label className="text-[10px] text-stone-600 font-semibold block">ชื่อแผนภูมิ</label>
+                    <input
+                      type="text"
+                      value={selectedElement.extraProps?.chartTitle ?? ''}
+                      onChange={(e) => updateSelectedExtraProp('chartTitle', e.target.value)}
+                      className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-stone-600 font-semibold block">ค่าข้อมูล (คั่นด้วยลูกน้ำ ,)</label>
+                    <input
+                      type="text"
+                      value={selectedElement.extraProps?.data ?? '15, 30, 20, 40'}
+                      onChange={(e) => updateSelectedExtraProp('data', e.target.value)}
+                      className="w-full px-2 py-1 border border-stone-300 rounded bg-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-stone-600 font-semibold block">ป้ายกำกับแกน X (คั่นด้วยลูกน้ำ ,)</label>
+                    <input
+                      type="text"
+                      value={selectedElement.extraProps?.labels ?? 'ม.1, ม.2, ม.3, ม.4'}
+                      onChange={(e) => updateSelectedExtraProp('labels', e.target.value)}
+                      className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] pt-1">
+                    <span className="text-stone-600">แสดงตัวเลขบนยอดแท่ง</span>
+                    <input
+                      type="checkbox"
+                      checked={selectedElement.extraProps?.showValues !== false}
+                      onChange={(e) => updateSelectedExtraProp('showValues', e.target.checked)}
+                      className="accent-emerald-600 rounded"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Ruler CM Controls */}
+              {selectedElement.type === 'ruler_cm' && (
+                <div className="p-2.5 bg-amber-50/50 rounded-xl border border-amber-200 space-y-2 text-xs">
+                  <span className="font-bold text-amber-900 block">ตั้งค่าไม้บรรทัดวัดความยาว:</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-stone-600 block">ความยาวรวม (cm)</label>
+                      <input
+                        type="number"
+                        min={5}
+                        max={20}
+                        value={selectedElement.extraProps?.cmLength ?? 10}
+                        onChange={(e) => updateSelectedExtraProp('cmLength', Math.max(5, Math.min(20, parseInt(e.target.value) || 10)))}
+                        className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-stone-600 block">วัตถุที่วัดยาว (cm)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={20}
+                        step={0.5}
+                        value={selectedElement.extraProps?.measureObjectLength ?? 6.5}
+                        onChange={(e) => updateSelectedExtraProp('measureObjectLength', Math.max(0, parseFloat(e.target.value) || 0))}
+                        className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-stone-600 block">ชื่อวัตถุที่วัด (เว้นว่างได้)</label>
+                    <input
+                      type="text"
+                      value={selectedElement.extraProps?.objectLabel ?? 'ดินสอ'}
+                      onChange={(e) => updateSelectedExtraProp('objectLabel', e.target.value)}
+                      className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-stone-600">แสดงขีดมิลลิเมตร (mm)</span>
+                    <input
+                      type="checkbox"
+                      checked={selectedElement.extraProps?.showMm !== false}
+                      onChange={(e) => updateSelectedExtraProp('showMm', e.target.checked)}
+                      className="accent-amber-600 rounded"
                     />
                   </div>
                 </div>
@@ -3288,6 +4251,114 @@ ${ptsMarkup}`;
                 </div>
               )}
 
+              {selectedElement.type === 'circuit_resistor' && (
+                <div className="p-2.5 bg-stone-50 rounded-xl border border-stone-200 space-y-1.5">
+                  <label className="text-xs font-bold text-stone-800 block">ค่าความต้านทาน (Ω):</label>
+                  <input
+                    type="text"
+                    value={selectedElement.extraProps?.resistorValue ?? '10 Ω'}
+                    onChange={(e) => updateSelectedExtraProp('resistorValue', e.target.value)}
+                    className="w-full px-2 py-1 text-xs border border-stone-300 rounded bg-white"
+                  />
+                </div>
+              )}
+
+              {/* Thermometer Controls */}
+              {selectedElement.type === 'thermometer' && (
+                <div className="p-2.5 bg-rose-50/50 rounded-xl border border-rose-200 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-rose-900">อุณหภูมิที่อ่านได้:</span>
+                    <span className="font-bold text-rose-700">{selectedElement.extraProps?.temperature ?? 37}{selectedElement.extraProps?.unit || '°C'}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={selectedElement.extraProps?.minTemp ?? 0}
+                    max={selectedElement.extraProps?.maxTemp ?? 100}
+                    value={selectedElement.extraProps?.temperature ?? 37}
+                    onChange={(e) => updateSelectedExtraProp('temperature', parseInt(e.target.value))}
+                    className="w-full accent-rose-600"
+                  />
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <div>
+                      <label className="text-[10px] text-stone-500 block">ต่ำสุด</label>
+                      <input
+                        type="number"
+                        value={selectedElement.extraProps?.minTemp ?? 0}
+                        onChange={(e) => updateSelectedExtraProp('minTemp', parseInt(e.target.value) || 0)}
+                        className="w-full px-1.5 py-1 border border-stone-300 rounded bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-stone-500 block">สูงสุด</label>
+                      <input
+                        type="number"
+                        value={selectedElement.extraProps?.maxTemp ?? 100}
+                        onChange={(e) => updateSelectedExtraProp('maxTemp', parseInt(e.target.value) || 100)}
+                        className="w-full px-1.5 py-1 border border-stone-300 rounded bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-stone-500 block">หน่วย</label>
+                      <select
+                        value={selectedElement.extraProps?.unit || '°C'}
+                        onChange={(e) => updateSelectedExtraProp('unit', e.target.value)}
+                        className="w-full px-1 py-1 border border-stone-300 rounded bg-white"
+                      >
+                        <option value="°C">°C</option>
+                        <option value="°F">°F</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Balance Scale Controls */}
+              {selectedElement.type === 'balance_scale' && (
+                <div className="p-2.5 bg-amber-50/50 rounded-xl border border-amber-200 space-y-2 text-xs">
+                  <span className="font-bold text-amber-900 block">ตั้งค่าตาชั่งสองแขน:</span>
+                  <div className="grid grid-cols-3 gap-1">
+                    {[
+                      { id: 'left', label: 'เอียงซ้าย' },
+                      { id: 'even', label: 'สมดุล' },
+                      { id: 'right', label: 'เอียงขวา' },
+                    ].map(opt => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => updateSelectedExtraProp('tilt', opt.id)}
+                        className={`py-1 rounded text-[11px] font-bold border ${
+                          (selectedElement.extraProps?.tilt || 'even') === opt.id
+                            ? 'border-amber-600 bg-amber-100 text-amber-900'
+                            : 'border-stone-200 bg-white text-stone-600'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5 pt-1">
+                    <div>
+                      <label className="text-[10px] text-stone-500 block">จานซ้าย</label>
+                      <input
+                        type="text"
+                        value={selectedElement.extraProps?.leftWeight ?? '500 g'}
+                        onChange={(e) => updateSelectedExtraProp('leftWeight', e.target.value)}
+                        className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-stone-500 block">จานขวา</label>
+                      <input
+                        type="text"
+                        value={selectedElement.extraProps?.rightWeight ?? '500 g'}
+                        onChange={(e) => updateSelectedExtraProp('rightWeight', e.target.value)}
+                        className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Science Lab Glassware Liquid Level & Color */}
               {['science_beaker', 'science_test_tube', 'science_flask'].includes(selectedElement.type) && (
                 <div className="p-2.5 bg-sky-50/50 rounded-xl border border-sky-200 space-y-2.5">
@@ -3370,12 +4441,33 @@ ${ptsMarkup}`;
 
               {/* Venn Diagram Specifics */}
               {selectedElement.type === 'venn_2' && (
-                <div className="p-2.5 bg-stone-50 rounded-xl border border-stone-200 space-y-2">
-                  <span className="text-xs font-bold text-stone-800 block">แรเงาส่วนเซต:</span>
+                <div className="p-2.5 bg-stone-50 rounded-xl border border-stone-200 space-y-2 text-xs">
+                  <span className="font-bold text-stone-800 block">ตั้งค่าเวนน์ 2 วง:</span>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <div>
+                      <label className="text-[10px] text-stone-500 block">ป้ายวงซ้าย</label>
+                      <input
+                        type="text"
+                        value={selectedElement.extraProps?.labelA ?? 'A'}
+                        onChange={(e) => updateSelectedExtraProp('labelA', e.target.value)}
+                        className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-stone-500 block">ป้ายวงขวา</label>
+                      <input
+                        type="text"
+                        value={selectedElement.extraProps?.labelB ?? 'B'}
+                        onChange={(e) => updateSelectedExtraProp('labelB', e.target.value)}
+                        className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                      />
+                    </div>
+                  </div>
+                  <span className="font-bold text-stone-800 block pt-1">แรเงาส่วนเซต:</span>
                   <select
                     value={selectedElement.extraProps?.highlightRegion || 'none'}
                     onChange={(e) => updateSelectedExtraProp('highlightRegion', e.target.value)}
-                    className="w-full px-2 py-1 text-xs border border-stone-300 rounded"
+                    className="w-full px-2 py-1 text-xs border border-stone-300 rounded bg-white"
                   >
                     <option value="none">ไม่แรเงา (None)</option>
                     <option value="intersection">อินเตอร์เซกชัน (A ∩ B)</option>
@@ -3383,6 +4475,136 @@ ${ptsMarkup}`;
                     <option value="a_only">เฉพาะเซต A (A - B)</option>
                     <option value="b_only">เฉพาะเซต B (B - A)</option>
                   </select>
+                </div>
+              )}
+
+              {selectedElement.type === 'venn_3' && (
+                <div className="p-2.5 bg-stone-50 rounded-xl border border-stone-200 space-y-2 text-xs">
+                  <span className="font-bold text-stone-800 block">ป้ายชื่อเซตเวนน์ 3 วง:</span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <div>
+                      <label className="text-[10px] text-stone-500 block">วงที่ 1</label>
+                      <input
+                        type="text"
+                        value={selectedElement.extraProps?.labelA ?? 'A'}
+                        onChange={(e) => updateSelectedExtraProp('labelA', e.target.value)}
+                        className="w-full px-1.5 py-1 border border-stone-300 rounded bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-stone-500 block">วงที่ 2</label>
+                      <input
+                        type="text"
+                        value={selectedElement.extraProps?.labelB ?? 'B'}
+                        onChange={(e) => updateSelectedExtraProp('labelB', e.target.value)}
+                        className="w-full px-1.5 py-1 border border-stone-300 rounded bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-stone-500 block">วงที่ 3</label>
+                      <input
+                        type="text"
+                        value={selectedElement.extraProps?.labelC ?? 'C'}
+                        onChange={(e) => updateSelectedExtraProp('labelC', e.target.value)}
+                        className="w-full px-1.5 py-1 border border-stone-300 rounded bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Speech Bubble Tail Direction */}
+              {selectedElement.type === 'speech_bubble' && (
+                <div className="p-2.5 bg-stone-50 rounded-xl border border-stone-200 space-y-2 text-xs">
+                  <span className="font-bold text-stone-800 block">ตำแหน่งหางบอลลูนคำพูด:</span>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[
+                      { id: 'bottom-left', label: 'ล่างซ้าย' },
+                      { id: 'bottom-right', label: 'ล่างขวา' },
+                      { id: 'top-left', label: 'บนซ้าย' },
+                      { id: 'top-right', label: 'บนขวา' },
+                    ].map(dir => (
+                      <button
+                        key={dir.id}
+                        type="button"
+                        onClick={() => updateSelectedExtraProp('tailDirection', dir.id)}
+                        className={`p-1.5 rounded-lg text-[11px] font-medium border ${
+                          (selectedElement.extraProps?.tailDirection || 'bottom-left') === dir.id
+                            ? 'border-blue-600 bg-blue-50 text-blue-700 font-bold'
+                            : 'border-stone-200 bg-white text-stone-700'
+                        }`}
+                      >
+                        {dir.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Timeline Point Count */}
+              {selectedElement.type === 'timeline' && (
+                <div className="p-2.5 bg-stone-50 rounded-xl border border-stone-200 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-stone-800">จำนวนจุดเหตุการณ์:</span>
+                    <span className="font-bold text-blue-600">{selectedElement.extraProps?.pointCount ?? 4} จุด</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={2}
+                    max={8}
+                    value={selectedElement.extraProps?.pointCount ?? 4}
+                    onChange={(e) => updateSelectedExtraProp('pointCount', parseInt(e.target.value))}
+                    className="w-full accent-blue-600"
+                  />
+                </div>
+              )}
+
+              {/* Table Grid Controls */}
+              {selectedElement.type === 'table_grid' && (
+                <div className="p-2.5 bg-blue-50/50 rounded-xl border border-blue-200 space-y-2 text-xs">
+                  <span className="font-bold text-blue-900 block">ตั้งค่าตารางข้อมูล:</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-stone-600 block">จำนวนแถว (Rows)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={8}
+                        value={selectedElement.extraProps?.rows ?? 3}
+                        onChange={(e) => updateSelectedExtraProp('rows', Math.max(1, Math.min(8, parseInt(e.target.value) || 3)))}
+                        className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-stone-600 block">จำนวนคอลัมน์ (Cols)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={8}
+                        value={selectedElement.extraProps?.cols ?? 3}
+                        onChange={(e) => updateSelectedExtraProp('cols', Math.max(1, Math.min(8, parseInt(e.target.value) || 3)))}
+                        className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-stone-600">เน้นสีแถวหัวตาราง</span>
+                    <input
+                      type="checkbox"
+                      checked={selectedElement.extraProps?.hasHeader !== false}
+                      onChange={(e) => updateSelectedExtraProp('hasHeader', e.target.checked)}
+                      className="accent-blue-600 rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-stone-600 block mb-0.5">ข้อมูลในตาราง (คั่นคอลัมน์ด้วย , คั่นแถวด้วย |)</label>
+                    <textarea
+                      rows={3}
+                      value={selectedElement.extraProps?.dataMatrix ?? ''}
+                      onChange={(e) => updateSelectedExtraProp('dataMatrix', e.target.value)}
+                      className="w-full px-2 py-1 border border-stone-300 rounded bg-white text-[11px]"
+                    />
+                  </div>
                 </div>
               )}
             </div>

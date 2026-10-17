@@ -141,6 +141,10 @@ export async function PUT(
 
     const {
       title,
+      course_id,
+      academic_year,
+      term,
+      exam_type,
       instructions,
       duration_minutes,
       max_score,
@@ -152,10 +156,14 @@ export async function PUT(
     // Update main exam record
     const updateData: any = { updated_at: new Date().toISOString() };
     if (title !== undefined) updateData.title = title;
+    if (course_id !== undefined) updateData.course_id = course_id || null;
+    if (academic_year !== undefined) updateData.academic_year = academic_year;
+    if (term !== undefined) updateData.term = term;
+    if (exam_type !== undefined) updateData.exam_type = exam_type;
     if (instructions !== undefined) updateData.instructions = instructions;
     if (duration_minutes !== undefined) updateData.duration_minutes = duration_minutes;
     if (max_score !== undefined) updateData.max_score = max_score;
-    if (gradebook_id !== undefined) updateData.gradebook_id = gradebook_id;
+    if (gradebook_id !== undefined) updateData.gradebook_id = gradebook_id || null;
     if (status !== undefined) updateData.status = status;
 
     if (questions && Array.isArray(questions)) {

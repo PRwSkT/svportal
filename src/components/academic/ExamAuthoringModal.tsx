@@ -79,6 +79,7 @@ export function ExamAuthoringModal({
 
   // Sub-modal states
   const [mathTarget, setMathTarget] = useState<{ qIdx: number; field: 'question_text' | 'choice_a' | 'choice_b' | 'choice_c' | 'choice_d' | 'choice_e' } | null>(null);
+  const [activeSymbolField, setActiveSymbolField] = useState<{ qIdx: number; field: 'question_text' | 'choice_a' | 'choice_b' | 'choice_c' | 'choice_d' | 'choice_e' } | null>(null);
   const [diagramTargetIdx, setDiagramTargetIdx] = useState<number | null>(null);
 
   // Nano Banana AI Diagram Prompt Modal
@@ -916,6 +917,7 @@ export function ExamAuthoringModal({
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
                                 if (file) handleUploadImageFile(file, idx);
+                                e.target.value = '';
                               }}
                             />
                           </label>
@@ -957,11 +959,55 @@ export function ExamAuthoringModal({
 
                       <textarea
                         value={q.question_text}
+                        onFocus={() => setActiveSymbolField({ qIdx: idx, field: 'question_text' })}
                         onChange={(e) => updateQuestionField(idx, 'question_text', e.target.value)}
                         rows={2}
                         className="w-full px-3 py-2 text-sm border border-stone-300 rounded-xl focus:ring-1 focus:ring-primary"
                         placeholder="พิมพ์ข้อความโจทย์..."
                       />
+
+                      {/* Quick Math & Science Symbol Chip Bar */}
+                      <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                        <span className="text-[10px] font-semibold text-stone-400 mr-1">
+                          แทรกสัญลักษณ์ด่วน ({activeSymbolField?.qIdx === idx && activeSymbolField.field !== 'question_text' ? `ช้อยส์ ${activeSymbolField.field.replace('choice_', '').toUpperCase()}` : 'โจทย์'}):
+                        </span>
+                        {[
+                          { label: '+', insert: ' + ' },
+                          { label: '−', insert: ' - ' },
+                          { label: '×', insert: ' × ' },
+                          { label: '÷', insert: ' ÷ ' },
+                          { label: '±', insert: ' ± ' },
+                          { label: '≠', insert: ' ≠ ' },
+                          { label: '≤', insert: ' ≤ ' },
+                          { label: '≥', insert: ' ≥ ' },
+                          { label: '≈', insert: ' ≈ ' },
+                          { label: '°', insert: '°' },
+                          { label: '°C', insert: '°C' },
+                          { label: '²', insert: '²' },
+                          { label: '³', insert: '³' },
+                          { label: 'π', insert: 'π' },
+                          { label: '√x', insert: '$\\sqrt{x}$' },
+                          { label: 'a/b', insert: '$\\frac{a}{b}$' },
+                          { label: 'xⁿ', insert: '$x^{n}$' },
+                          { label: 'Ω', insert: 'Ω' },
+                          { label: 'µ', insert: 'µ' },
+                          { label: '→', insert: ' → ' },
+                        ].map((sym) => (
+                          <button
+                            key={sym.label}
+                            type="button"
+                            onClick={() => {
+                              const targetField = activeSymbolField?.qIdx === idx ? activeSymbolField.field : 'question_text';
+                              const currentVal = String((q as any)[targetField] || '');
+                              updateQuestionField(idx, targetField as any, currentVal + sym.insert);
+                            }}
+                            className="px-1.5 py-0.5 text-[11px] font-mono font-medium bg-stone-100 hover:bg-amber-100 text-stone-700 hover:text-amber-900 border border-stone-200 rounded transition-colors"
+                            title={`แทรก ${sym.insert}`}
+                          >
+                            {sym.label}
+                          </button>
+                        ))}
+                      </div>
 
                       {/* Live Equation / Math Preview if present */}
                       {q.question_text && (q.question_text.includes('$') || q.question_text.includes('\\')) && (
@@ -1176,7 +1222,7 @@ export function ExamAuthoringModal({
                                     <img
                                       src={parsed.imageUrl || ''}
                                       alt={choice.label}
-                                      className="h-10 w-16 object-contain rounded border border-stone-200 bg-stone-50"
+                                      className="h-16 w-24 object-contain rounded border border-stone-200 bg-stone-50"
                                     />
                                     <input
                                       type="text"
@@ -1198,37 +1244,46 @@ export function ExamAuthoringModal({
                                     </button>
                                   </div>
                                 ) : (
-                                  <div className="flex-1 flex items-center gap-1.5">
-                                    <input
-                                      type="text"
-                                      value={rawVal}
-                                      onChange={(e) => updateQuestionField(idx, choice.field as any, e.target.value)}
-                                      className="flex-1 px-2.5 py-1 text-xs border border-stone-300 rounded-lg bg-white"
-                                      placeholder={`ข้อความตัวเลือก ${choice.label}`}
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => setMathTarget({ qIdx: idx, field: choice.field as any })}
-                                      className="p-1 text-stone-400 hover:text-stone-700 rounded hover:bg-stone-200"
-                                      title="แทรกสูตรในตัวเลือก"
-                                    >
-                                      <Calculator className="w-3.5 h-3.5" />
-                                    </button>
-                                    <label 
-                                      className="p-1 text-stone-400 hover:text-purple-600 rounded hover:bg-stone-200 cursor-pointer"
-                                      title="แทรกรูปภาพเป็นตัวเลือก"
-                                    >
-                                      <ImagePlus className="w-3.5 h-3.5" />
+                                  <div className="flex-1 flex flex-col gap-1">
+                                    <div className="flex items-center gap-1.5">
                                       <input
-                                        type="file"
-                                        accept="image/*"
-                                        className="hidden"
-                                        onChange={(e) => {
-                                          const file = e.target.files?.[0];
-                                          if (file) handleUploadImageFile(file, idx, choice.field as any);
-                                        }}
+                                        type="text"
+                                        value={rawVal}
+                                        onFocus={() => setActiveSymbolField({ qIdx: idx, field: choice.field as any })}
+                                        onChange={(e) => updateQuestionField(idx, choice.field as any, e.target.value)}
+                                        className="flex-1 px-2.5 py-1 text-xs border border-stone-300 rounded-lg bg-white"
+                                        placeholder={`ข้อความตัวเลือก ${choice.label}`}
                                       />
-                                    </label>
+                                      <button
+                                        type="button"
+                                        onClick={() => setMathTarget({ qIdx: idx, field: choice.field as any })}
+                                        className="p-1 text-stone-400 hover:text-stone-700 rounded hover:bg-stone-200"
+                                        title="แทรกสูตรในตัวเลือก"
+                                      >
+                                        <Calculator className="w-3.5 h-3.5" />
+                                      </button>
+                                      <label 
+                                        className="p-1 text-stone-400 hover:text-purple-600 rounded hover:bg-stone-200 cursor-pointer"
+                                        title="แทรกรูปภาพเป็นตัวเลือก"
+                                      >
+                                        <ImagePlus className="w-3.5 h-3.5" />
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          className="hidden"
+                                          onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) handleUploadImageFile(file, idx, choice.field as any);
+                                            e.target.value = '';
+                                          }}
+                                        />
+                                      </label>
+                                    </div>
+                                    {rawVal && (rawVal.includes('$') || rawVal.includes('\\')) && (
+                                      <div className="px-2 py-1 bg-white/90 border border-stone-200 rounded text-[11px] text-stone-700">
+                                        <KaTeXInline content={rawVal} />
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                               </div>

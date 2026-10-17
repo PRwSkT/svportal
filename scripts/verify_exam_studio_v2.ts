@@ -494,7 +494,43 @@ async function runVerification() {
   }
   console.log('PASS: Print engine diagram responsive styling verified.');
 
-  console.log('\nALL VERIFICATION CHECKS (INCLUDING CANVA & WORD EXAM STUDIO) PASSED SUCCESSFULLY!');
+  console.log('\n=== 9. QA AUDIT & EDUCATIONAL TOOLSET V3 VERIFICATION ===');
+  // 1. Verify bracketed caption image choice [label] url does not lose image status
+  const bracketChoiceVal = '[รูปที่ 1: เซลล์พืช] https://supabase.co/storage/v1/object/public/website-content/exams/images/plant.png';
+  if (!isImageChoice(bracketChoiceVal)) {
+    throw new Error('isImageChoice returned false for bracketed caption [label] url format');
+  }
+  const parsedBracketChoice = parseChoiceContent(bracketChoiceVal);
+  if (!parsedBracketChoice.isImage || parsedBracketChoice.label !== 'รูปที่ 1: เซลล์พืช' || !parsedBracketChoice.imageUrl?.startsWith('https://')) {
+    throw new Error('parseChoiceContent failed to parse [label] url format');
+  }
+  console.log('PASS: Bracketed image choice [label] url preserves image detection and caption.');
+
+  // 2. Verify matching questions do NOT shuffle choices in Set B and Set C
+  for (const s of sets) {
+    const matchingMap = s.question_order_mapping.find(m => m.original_question_number === 2);
+    if (!matchingMap) throw new Error('Matching question missing from set mapping');
+    const mappedValues = `${matchingMap.choice_map.A},${matchingMap.choice_map.B},${matchingMap.choice_map.C},${matchingMap.choice_map.D}`;
+    if (mappedValues !== 'A,B,C,D') {
+      throw new Error(`Matching question choices were scrambled in Set ${s.set_name}: ${mappedValues}`);
+    }
+  }
+  console.log('PASS: Matching question Column A and Column B pairs are preserved without scrambling across Sets A, B, C.');
+
+  // 3. Verify unwrapped LaTeX rendering in renderMathInHtml
+  const unwrappedMath = renderMathInHtml('จงหาค่าของ \\frac{3}{4} + \\sqrt{16}');
+  if (!unwrappedMath.includes('katex')) {
+    throw new Error('renderMathInHtml failed to render unwrapped LaTeX commands');
+  }
+  console.log('PASS: Unwrapped LaTeX commands (\\frac, \\sqrt) automatically render via KaTeX.');
+
+  // 4. Verify print engine table row pagination and inline SVG grid box
+  if (!printExamHtml.includes('class="question-table-row avoid-break"')) {
+    throw new Error('Print engine did not wrap questions in <tr class="question-table-row avoid-break">');
+  }
+  console.log('PASS: Multi-page A4 print table row pagination verified.');
+
+  console.log('\nALL VERIFICATION CHECKS (INCLUDING QA AUDIT & EDUCATIONAL TOOLSET V3) PASSED SUCCESSFULLY!');
 }
 
 runVerification().catch(err => {

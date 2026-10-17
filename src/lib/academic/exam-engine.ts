@@ -92,15 +92,16 @@ export function generateExamSets(
     qList.forEach((q, newIndex) => {
       const newQuestionNumber = newIndex + 1;
 
-      // Handle Subjective (Open-Ended / Written) Question
-      if (q.question_type === 'subjective') {
+      // Handle Subjective (Open-Ended / Written) or Matching Question (preserve column structure)
+      if (q.question_type === 'subjective' || q.question_type === 'matching') {
         const choiceMap: Record<string, ChoiceOption> = { A: 'A', B: 'B', C: 'C', D: 'D' };
+        if (q.choice_e) choiceMap.E = 'E';
         questionMapping.push({
           original_question_number: q.question_number,
           new_question_number: newQuestionNumber,
           choice_map: choiceMap
         });
-        answerKey[newQuestionNumber.toString()] = 'A';
+        answerKey[newQuestionNumber.toString()] = q.question_type === 'matching' ? (q.correct_choice || 'A') : 'A';
         return;
       }
 
