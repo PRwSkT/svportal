@@ -99,7 +99,16 @@ export function determineTaskComplexity(options: {
     prompt.includes('สรุปภาพรวมการตอบกลับ') ||
     prompt.includes('ประเมินความเห็น');
 
-  if (isFormCreation || isExamCreation || isDeepAnalytics) {
+  const isDatabaseSync =
+    prompt.includes('ฐานข้อมูล') ||
+    prompt.includes('database') ||
+    prompt.includes('ซิงค์') ||
+    prompt.includes('อัปเดตข้อมูลนักเรียน') ||
+    prompt.includes('นำข้อมูล') ||
+    prompt.includes('กรอกด้วยฟอร์แมท') ||
+    prompt.includes('แก้ไขในdatabase');
+
+  if (isFormCreation || isExamCreation || isDeepAnalytics || isDatabaseSync) {
     return 'high';
   }
 
@@ -501,6 +510,7 @@ export interface NongFahChatContext {
   totalResponses?: number;
   responsesSummary?: SanitizedFormAnalysisPayload;
   lastGeneratedForm?: GeneratedFormDefinition | null;
+  syncOpportunities?: any[];
   currentFields?: Array<{
     field_key: string;
     field_type: string;
@@ -514,10 +524,16 @@ export interface NongFahChatContext {
 
 export interface NongFahChatResponse {
   reply: string;
-  actionType: 'form_generated' | 'form_modified' | 'chat';
+  actionType: 'form_generated' | 'form_modified' | 'database_sync' | 'chat';
   generatedForm?: GeneratedFormDefinition | null;
   modifiedFields?: FormField[] | null;
   modificationSummary?: string | null;
+  databaseSyncPayload?: {
+    formId: string;
+    totalMatched: number;
+    totalPending: number;
+    syncItems: any[];
+  } | null;
   suggestions?: string[];
 }
 
@@ -584,12 +600,18 @@ Strict rules to follow:
       - Strictly NO emojis in your response.
       - Set "generatedForm": null
       - Set "modifiedFields": null
-11. In "suggestions": Provide 2-4 short, helpful follow-up phrases that the user can click.
+11. Student Database Synchronization & Profile Updates (เมื่อผู้ใช้ขอให้อัปเดตข้อมูลนักเรียนเข้าฐานข้อมูล หรือซิงค์ข้อมูลผลสำรวจเข้าสู่ระบบ เช่น "ช่วยวิเคราะห์ผลตอบกลับแล้วเอาไปอัปเดตข้อมูลนักเรียนในระบบให้หน่อย", "ซิงค์เข้าฐานข้อมูล", "นำข้อมูลเข้า database", "อัปเดตประวัตินักเรียน"):
+    - คุณสามารถเข้าถึงข้อมูลการจับคู่นักเรียนและ diffs ที่ระบบวิเคราะห์และคัดกรองแล้วใน "DATABASE SYNC OPPORTUNITIES"
+    - ตั้ง "actionType": "database_sync"
+    - ใน "reply": ให้คำตอบเชิงวิเคราะห์อย่างสุภาพ สรุปจำนวนนักเรียนที่พร้อมนำเข้าฐานข้อมูล (เช่น มีข้อมูลเบอร์โทรศัพท์ผู้ปกครองใหม่, วันเกิด, หรือข้อมูลสุขภาพ/แพ้อาหาร) ระบุอย่างชัดเจนว่าระบบได้ปรับฟอร์แมทเบอร์โทรศัพท์ 10 หลัก วันเกิด คัดกรองคำว่าไม่มี/ไม่แพ้ออกให้เรียบร้อยแล้ว และขอให้คุณครูตรวจสอบความแตกต่างและกดยืนยันอัปเดตเข้าฐานข้อมูลได้ทันทีค่ะ
+    - ตั้ง "generatedForm": null
+    - ตั้ง "modifiedFields": null
+12. In "suggestions": Provide 2-4 short, helpful follow-up phrases that the user can click.
 
 JSON schema:
 {
   "reply": "string (polite Thai response, strictly no emojis)",
-  "actionType": "form_generated" | "form_modified" | "chat",
+  "actionType": "form_generated" | "form_modified" | "database_sync" | "chat",
   "modificationSummary": "string (if form_modified) or null",
   "modifiedFields": [
     {
@@ -655,7 +677,26 @@ ${
 === END OF FORM RESPONSES DATA ===\n`
     : '';
 
-  const userPrompt = `${contextNote}${fieldsSummary}${lastFormText}${responsesDataText}
+  const syncOpportunitiesText = context?.syncOpportunities && context.syncOpportunities.length > 0
+    ? `\n=== DATABASE SYNC OPPORTUNITIES (${context.syncOpportunities.length} students matched) ===
+Total Matched Students: ${context.syncOpportunities.length}
+Matched Records and Diffs:
+${JSON.stringify(
+  context.syncOpportunities.map((item: any) => ({
+    studentId: item.studentId,
+    studentName: item.studentName,
+    studentGrade: item.studentGrade,
+    syncType: item.syncType,
+    diffsCount: item.diffs?.length || 0,
+    diffs: (item.diffs || []).map((d: any) => `${d.labelTh}: ${d.oldValue} -> ${d.newValue}`),
+  })),
+  null,
+  2
+)}
+=== END OF DATABASE SYNC OPPORTUNITIES ===\n`
+    : '';
+
+  const userPrompt = `${contextNote}${fieldsSummary}${lastFormText}${responsesDataText}${syncOpportunitiesText}
 Conversation History:
 ${conversationHistoryText || '(No previous history)'}
 
@@ -671,10 +712,32 @@ Analyze the message, perform the action, and return strictly JSON.`;
     enableSearchGrounding: false,
   });
 
-  return safeParseJson<NongFahChatResponse>(
+  const resObj = safeParseJson<NongFahChatResponse>(
     rawJson,
     'ผลลัพธ์จากน้องฟ้า AI ไม่อยู่ในรูปแบบ JSON ที่ถูกต้อง กรุณาลองใหม่อีกครั้ง'
   );
+
+  // If user requested database sync or model outputted database_sync, enrich with real payload
+  const isSyncIntent =
+    resObj.actionType === 'database_sync' ||
+    message.includes('ฐานข้อมูล') ||
+    message.includes('database') ||
+    message.includes('ซิงค์') ||
+    message.includes('อัปเดตข้อมูลนักเรียน') ||
+    message.includes('กรอกข้อมูล') ||
+    message.includes('นำข้อมูล');
+
+  if (isSyncIntent && context?.syncOpportunities && context.syncOpportunities.length > 0) {
+    resObj.actionType = 'database_sync';
+    resObj.databaseSyncPayload = {
+      formId: context.formId || '',
+      totalMatched: context.syncOpportunities.length,
+      totalPending: context.syncOpportunities.filter((i: any) => !i.isAlreadySynced).length,
+      syncItems: context.syncOpportunities,
+    };
+  }
+
+  return resObj;
 }
 
 /**

@@ -36,6 +36,9 @@ export function StudentDbSyncSection({ formId }: StudentDbSyncSectionProps) {
 
   useEffect(() => {
     loadSyncItems();
+    const handleExternalSync = () => loadSyncItems();
+    window.addEventListener('student-database-synced', handleExternalSync);
+    return () => window.removeEventListener('student-database-synced', handleExternalSync);
   }, [formId]);
 
   const handleSyncItem = async (item: PendingStudentSyncItem) => {
@@ -45,17 +48,7 @@ export function StudentDbSyncSection({ formId }: StudentDbSyncSectionProps) {
       if (item.syncType === 'update_existing') {
         const updates: Record<string, any> = {};
         for (const diff of item.diffs) {
-          if (diff.field === 'height') {
-            updates.height = diff.newValue;
-          } else if (diff.field === 'weight') {
-            updates.weight = diff.newValue;
-          } else if (diff.field === 'disability') {
-            updates.disability = diff.newValue;
-          } else if (diff.field === 'religion') {
-            updates.religion = diff.newValue;
-          } else if (diff.field === 'parent_phone') {
-            updates.parent_phone = diff.newValue;
-          }
+          updates[diff.field] = diff.newValue;
         }
 
         body = {
@@ -91,6 +84,7 @@ export function StudentDbSyncSection({ formId }: StudentDbSyncSectionProps) {
             : i
         )
       );
+      window.dispatchEvent(new CustomEvent('student-database-synced'));
     } catch (err: any) {
       console.error('Sync failed:', err);
       toast.error('ซิงค์ข้อมูลไม่สำเร็จ', { description: err?.message });
@@ -107,51 +101,44 @@ export function StudentDbSyncSection({ formId }: StudentDbSyncSectionProps) {
     }
 
     setIsSyncingAll(true);
-    let successCount = 0;
-
-    for (const item of pendingItems) {
-      try {
-        let body: any = {};
-        if (item.syncType === 'update_existing') {
-          const updates: Record<string, any> = {};
-          for (const diff of item.diffs) {
-            if (diff.field === 'height') updates.height = diff.newValue;
-            else if (diff.field === 'weight') updates.weight = diff.newValue;
-            else if (diff.field === 'disability') updates.disability = diff.newValue;
-            else if (diff.field === 'religion') updates.religion = diff.newValue;
-            else if (diff.field === 'parent_phone') updates.parent_phone = diff.newValue;
-          }
-          body = {
-            action: 'sync_update',
-            responseId: item.responseId,
-            studentId: item.studentId,
-            updates,
-          };
-        } else {
-          body = {
-            action: 'sync_create_student',
-            responseId: item.responseId,
-            newStudentPayload: item.newStudentPayload,
-          };
+    try {
+      const batchItems = pendingItems.map((item) => {
+        const updates: Record<string, any> = {};
+        for (const diff of item.diffs) {
+          updates[diff.field] = diff.newValue;
         }
+        return {
+          responseId: item.responseId,
+          studentId: item.studentId,
+          syncType: item.syncType,
+          updates,
+          newStudentPayload: item.newStudentPayload,
+        };
+      });
 
-        const res = await fetch('/api/admin/forms/sync-student', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
+      const res = await fetch('/api/admin/forms/sync-student', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'sync_batch',
+          batchItems,
+        }),
+      });
 
-        if (res.ok) {
-          successCount++;
-        }
-      } catch (err) {
-        console.error('Batch sync item error:', err);
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'การซิงค์ข้อมูลไม่สำเร็จ');
       }
-    }
 
-    setIsSyncingAll(false);
-    toast.success(`ซิงค์ข้อมูลสำเร็จทั้งหมด ${successCount} รายการ`);
-    await loadSyncItems();
+      toast.success(json.message || `ซิงค์ข้อมูลสำเร็จทั้งหมด ${pendingItems.length} รายการ`);
+      await loadSyncItems();
+      window.dispatchEvent(new CustomEvent('student-database-synced'));
+    } catch (err: any) {
+      console.error('Batch sync error:', err);
+      toast.error('เกิดข้อผิดพลาดในการซิงค์ข้อมูล', { description: err?.message });
+    } finally {
+      setIsSyncingAll(false);
+    }
   };
 
   const pendingCount = items.filter((i) => !i.isAlreadySynced).length;
@@ -191,7 +178,22 @@ export function StudentDbSyncSection({ formId }: StudentDbSyncSectionProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+        <div className="flex flex-wrap items-center gap-2 self-end sm:self-center shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              const event = new CustomEvent('open-nongfah-chat', {
+                detail: { prompt: 'ช่วยวิเคราะห์ผลตอบกลับแล้วเอาไปอัปเดตข้อมูลนักเรียนในระบบให้หน่อย' }
+              });
+              window.dispatchEvent(event);
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 text-purple-900 border border-purple-200 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
+            title="ให้น้องฟ้า AI วิเคราะห์ผลและแนะนำการซิงค์ผ่านแชท"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+            <span>ให้น้องฟ้าช่วยวิเคราะห์ & ซิงค์</span>
+          </button>
+
           <button
             type="button"
             onClick={loadSyncItems}

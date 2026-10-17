@@ -67,33 +67,16 @@ export async function GET(req: NextRequest) {
     const fields = fieldsRes.data || [];
     const responses = respRes.data || [];
 
-    // 2. Fetch existing students referenced in responses
-    const studentIds: string[] = [];
-    for (const r of responses) {
-      const answers = r.answers || {};
-      for (const val of Object.values(answers)) {
-        if (typeof val === 'string' && /^\d{4,5}$/.test(val.trim())) {
-          studentIds.push(val.trim());
-        }
-      }
-    }
+    // 2. Fetch all school students and parents for intelligent multi-tier matching
+    const { data: dbStudents, error: studentsErr } = await supabase
+      .from('students')
+      .select('*, student_parents(*)')
+      .order('id', { ascending: true });
 
-    const uniqueIds = Array.from(new Set(studentIds));
-    const existingStudentsMap = new Map<string, any>();
-
-    if (uniqueIds.length > 0) {
-      const { data: dbStudents } = await supabase
-        .from('students')
-        .select('*, student_parents(*)')
-        .in('id', uniqueIds);
-
-      for (const s of dbStudents || []) {
-        existingStudentsMap.set(s.id, s);
-      }
-    }
+    if (studentsErr) throw studentsErr;
 
     // 3. Analyze Sync Opportunities
-    const syncItems = analyzeStudentSyncOpportunities(form, fields, responses, existingStudentsMap);
+    const syncItems = analyzeStudentSyncOpportunities(form, fields, responses, dbStudents || []);
 
     return NextResponse.json({
       success: true,
@@ -138,48 +121,71 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { action, responseId, studentId, updates, newStudentPayload } = body;
+    const { action, responseId, studentId, updates, newStudentPayload, batchItems } = body;
 
-    // 1. Update Existing Student
-    if (action === 'sync_update') {
-      if (!studentId || !updates) {
-        return NextResponse.json({ success: false, error: 'ข้อมูลไม่ครบถ้วน' }, { status: 400 });
-      }
-
+    // Helper: Execute single student update
+    const applySingleStudentUpdate = async (
+      sId: string,
+      sUpdates: Record<string, any>,
+      rId?: string
+    ) => {
       const studentUpdates: Record<string, any> = {
         updated_at: new Date().toISOString(),
       };
 
-      if (updates.height !== undefined) {
-        const h = Number(String(updates.height).replace(/[^\d.]/g, ''));
+      if (sUpdates.allergies !== undefined) {
+        studentUpdates.allergies = sUpdates.allergies ? String(sUpdates.allergies).trim() : null;
+      }
+      if (sUpdates.medical_conditions !== undefined) {
+        studentUpdates.medical_conditions = sUpdates.medical_conditions
+          ? String(sUpdates.medical_conditions).trim()
+          : null;
+      }
+      if (sUpdates.birth_date !== undefined) {
+        studentUpdates.birth_date = sUpdates.birth_date || null;
+      }
+      if (sUpdates.citizen_id !== undefined) {
+        studentUpdates.citizen_id = sUpdates.citizen_id ? String(sUpdates.citizen_id).replace(/\D/g, '') : null;
+      }
+      if (sUpdates.gender !== undefined) {
+        studentUpdates.gender = sUpdates.gender ? String(sUpdates.gender).trim() : null;
+      }
+      if (sUpdates.height !== undefined) {
+        const h = Number(String(sUpdates.height).replace(/[^\d.]/g, ''));
         studentUpdates.height = isNaN(h) ? null : h;
       }
-      if (updates.weight !== undefined) {
-        const w = Number(String(updates.weight).replace(/[^\d.]/g, ''));
+      if (sUpdates.weight !== undefined) {
+        const w = Number(String(sUpdates.weight).replace(/[^\d.]/g, ''));
         studentUpdates.weight = isNaN(w) ? null : w;
       }
-      if (updates.disability !== undefined) {
-        studentUpdates.disability = String(updates.disability).trim();
+      if (sUpdates.disability !== undefined) {
+        studentUpdates.disability = String(sUpdates.disability).trim();
       }
-      if (updates.religion !== undefined) {
-        studentUpdates.religion = String(updates.religion).trim();
+      if (sUpdates.religion !== undefined) {
+        studentUpdates.religion = String(sUpdates.religion).trim();
+      }
+      if (sUpdates.grade !== undefined) {
+        studentUpdates.grade = String(sUpdates.grade).trim();
+      }
+      if (sUpdates.classroom !== undefined) {
+        studentUpdates.classroom = String(sUpdates.classroom).trim();
       }
 
       // Execute Student Update
       const { error: updateErr } = await supabase
         .from('students')
         .update(studentUpdates)
-        .eq('id', studentId);
+        .eq('id', sId);
 
       if (updateErr) throw updateErr;
 
       // Update Parent Phone if provided
-      if (updates.parent_phone) {
-        const cleanPhone = String(updates.parent_phone).replace(/[-\s]/g, '').trim();
+      if (sUpdates.parent_phone) {
+        const cleanPhone = String(sUpdates.parent_phone).replace(/\D/g, '').trim();
         const { data: existingParents } = await supabase
           .from('student_parents')
           .select('id')
-          .eq('student_id', studentId)
+          .eq('student_id', sId)
           .limit(1);
 
         if (existingParents && existingParents.length > 0) {
@@ -189,7 +195,7 @@ export async function POST(req: NextRequest) {
             .eq('id', existingParents[0].id);
         } else {
           await supabase.from('student_parents').insert({
-            student_id: studentId,
+            student_id: sId,
             relationship: 'ผู้ปกครอง',
             phone_number: cleanPhone,
           });
@@ -197,11 +203,11 @@ export async function POST(req: NextRequest) {
       }
 
       // Mark Response as Synced
-      if (responseId) {
+      if (rId) {
         const { data: curResp } = await supabase
           .from('form_responses')
           .select('answers')
-          .eq('id', responseId)
+          .eq('id', rId)
           .single();
 
         if (curResp) {
@@ -212,23 +218,112 @@ export async function POST(req: NextRequest) {
           await supabase
             .from('form_responses')
             .update({ answers: updatedAnswers })
-            .eq('id', responseId);
+            .eq('id', rId);
+        }
+      }
+    };
+
+    // 1. Single Update
+    if (action === 'sync_update') {
+      if (!studentId || !updates) {
+        return NextResponse.json({ success: false, error: 'ข้อมูลไม่ครบถ้วน' }, { status: 400 });
+      }
+
+      await applySingleStudentUpdate(studentId, updates, responseId);
+
+      return NextResponse.json({
+        success: true,
+        message: `อัปเดตข้อมูลนักเรียนรหัส ${studentId} เข้าฐานข้อมูลเรียบร้อยแล้ว`,
+      });
+    }
+
+    // 2. Batch Update (Multi-student atomic sync)
+    if (action === 'sync_batch') {
+      const itemsToSync: any[] = Array.isArray(batchItems) ? batchItems : [];
+      if (itemsToSync.length === 0) {
+        return NextResponse.json({ success: false, error: 'ไม่มีรายการที่ต้องซิงค์' }, { status: 400 });
+      }
+
+      let successCount = 0;
+      const errors: string[] = [];
+
+      for (const item of itemsToSync) {
+        try {
+          if (item.syncType === 'update_existing' && item.studentId) {
+            await applySingleStudentUpdate(item.studentId, item.updates || {}, item.responseId);
+            successCount++;
+          } else if (item.syncType === 'create_new' && item.newStudentPayload) {
+            const { data: nextId, error: idErr } = await supabase.rpc('get_next_student_id', {
+              p_type: 'normal',
+            });
+            if (idErr || !nextId) throw new Error(idErr?.message || 'ไม่สามารถสร้างรหัสนักเรียนใหม่');
+
+            const insertData = {
+              id: String(nextId),
+              name: item.newStudentPayload.name.trim(),
+              grade: item.newStudentPayload.grade || 'อ.1/1',
+              citizen_id: item.newStudentPayload.citizen_id || null,
+              gender: item.newStudentPayload.gender || null,
+              birth_date: item.newStudentPayload.birth_date || null,
+              allergies: item.newStudentPayload.allergies || null,
+              medical_conditions: item.newStudentPayload.medical_conditions || null,
+              status: item.newStudentPayload.status || 'นักเรียนเข้าใหม่',
+              wallet_balance: 0,
+            };
+
+            await supabase.from('students').insert([insertData]);
+
+            if (item.newStudentPayload.parent_phone) {
+              await supabase.from('student_parents').insert({
+                student_id: String(nextId),
+                relationship: 'ผู้ปกครอง',
+                phone_number: item.newStudentPayload.parent_phone,
+              });
+            }
+
+            if (item.responseId) {
+              const { data: curResp } = await supabase
+                .from('form_responses')
+                .select('answers')
+                .eq('id', item.responseId)
+                .single();
+
+              if (curResp) {
+                await supabase
+                  .from('form_responses')
+                  .update({
+                    answers: {
+                      ...(curResp.answers || {}),
+                      _db_synced_at: new Date().toISOString(),
+                      _created_student_id: String(nextId),
+                    },
+                  })
+                  .eq('id', item.responseId);
+              }
+            }
+
+            successCount++;
+          }
+        } catch (itemErr: any) {
+          console.error('Batch sync error on item:', item.responseId, itemErr);
+          errors.push(itemErr?.message || 'เกิดข้อผิดพลาดกับรายการ');
         }
       }
 
       return NextResponse.json({
         success: true,
-        message: `อัปเดตข้อมูลนักเรียนรหัส ${studentId} เรียบร้อยแล้ว`,
+        count: successCount,
+        message: `อัปเดตและซิงค์ข้อมูลนักเรียนเข้าฐานข้อมูลสำเร็จทั้งหมด ${successCount} รายการ`,
+        errors: errors.length > 0 ? errors : undefined,
       });
     }
 
-    // 2. Create New Student from Admission Form
+    // 3. Create New Student from Admission Form
     if (action === 'sync_create_student') {
       if (!newStudentPayload || !newStudentPayload.name) {
         return NextResponse.json({ success: false, error: 'ข้อมูลนักเรียนใหม่ไม่ครบถ้วน' }, { status: 400 });
       }
 
-      // Generate next student ID via RPC
       const { data: nextId, error: idErr } = await supabase.rpc('get_next_student_id', {
         p_type: 'normal',
       });
@@ -244,6 +339,8 @@ export async function POST(req: NextRequest) {
         citizen_id: newStudentPayload.citizen_id || null,
         gender: newStudentPayload.gender || null,
         birth_date: newStudentPayload.birth_date || null,
+        allergies: newStudentPayload.allergies || null,
+        medical_conditions: newStudentPayload.medical_conditions || null,
         status: newStudentPayload.status || 'นักเรียนเข้าใหม่',
         wallet_balance: 0,
       };
@@ -255,6 +352,14 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (insertErr) throw insertErr;
+
+      if (newStudentPayload.parent_phone) {
+        await supabase.from('student_parents').insert({
+          student_id: String(nextId),
+          relationship: 'ผู้ปกครอง',
+          phone_number: String(newStudentPayload.parent_phone).replace(/\D/g, ''),
+        });
+      }
 
       // Mark Response as Synced
       if (responseId) {

@@ -26,14 +26,15 @@ export async function POST(req: NextRequest) {
     const history = Array.isArray(body?.history) ? body.history : [];
     const context = body?.context || {};
 
-    // If on responses page and formId is provided, enrich context with real sanitized responses data
+    // If on responses page and formId is provided, enrich context with real sanitized responses data & database sync opportunities
     if (context.formId && (context.page === 'responses' || !context.responsesSummary)) {
       try {
         const supabase = getAdminClient();
-        const [formRes, fieldsRes, responsesRes] = await Promise.all([
+        const [formRes, fieldsRes, responsesRes, studentsRes] = await Promise.all([
           supabase.from('forms').select('*').eq('id', context.formId).maybeSingle(),
           supabase.from('form_fields').select('*').eq('form_id', context.formId).order('sort_order'),
           supabase.from('form_responses').select('*').eq('form_id', context.formId),
+          supabase.from('students').select('*, student_parents(*)').order('id', { ascending: true }),
         ]);
 
         if (formRes.data && fieldsRes.data) {
@@ -46,6 +47,16 @@ export async function POST(req: NextRequest) {
           context.responsesSummary = sanitizedPayload;
           context.formTitle = formRes.data.title?.th || formRes.data.title?.en || context.formTitle;
           context.totalResponses = responsesData.length;
+
+          // Analyze database sync opportunities for student profile updates
+          const { analyzeStudentSyncOpportunities } = await import('@/lib/forms/database-sync');
+          const syncOpportunities = analyzeStudentSyncOpportunities(
+            formRes.data,
+            fieldsRes.data,
+            responsesData,
+            studentsRes.data || []
+          );
+          context.syncOpportunities = syncOpportunities;
         }
       } catch (enrichErr) {
         console.warn('[NongFah Chat] Could not enrich context with responses data:', enrichErr);

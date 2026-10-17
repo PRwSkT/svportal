@@ -18,18 +18,28 @@ import {
   Loader2,
   ListPlus,
   Plus,
+  Database,
+  ArrowRight,
+  UserCheck,
 } from 'lucide-react';
 import { GeneratedFormDefinition } from '@/lib/ai/gemma';
 import { FormField } from '@/types';
+import { toast } from 'sonner';
 
 interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  actionType?: 'form_generated' | 'form_modified' | 'chat';
+  actionType?: 'form_generated' | 'form_modified' | 'database_sync' | 'chat';
   generatedForm?: GeneratedFormDefinition | null;
   modifiedFields?: FormField[] | null;
   modificationSummary?: string | null;
+  databaseSyncPayload?: {
+    formId: string;
+    totalMatched: number;
+    totalPending: number;
+    syncItems: any[];
+  } | null;
   suggestions?: string[];
   timestamp: Date;
 }
@@ -54,11 +64,11 @@ const CONTEXT_SUGGESTIONS: Record<string, string[]> = {
     'เพิ่มช่องแนบหลักฐานการชำระเงิน (สลิปโอนเงิน)',
   ],
   responses: [
+    'ช่วยวิเคราะห์ผลตอบกลับแล้วเอาไปอัปเดตข้อมูลนักเรียนในระบบให้หน่อย',
     'สรุปจุดเด่นและจุดที่ควรปรับปรุงเร่งด่วน',
+    'มีนักเรียนที่มีเรื่องเร่งด่วนหรือแพ้อาหารไหม',
     'จัดกลุ่มข้อเสนอแนะและเสียงสะท้อนของผู้ตอบ',
     'สรุปรายงานสำหรับนำเสนอที่ประชุมผู้บริหาร',
-    'วิเคราะห์คะแนนความพึงพอใจและแนวโน้ม',
-    'มีนักเรียนที่มีเรื่องเร่งด่วนหรือแพ้อาหารไหม',
     'ช่วยเสนอแนวทางแก้ไขปัญหาตามข้อเสนอแนะ',
   ],
   list: [
@@ -87,6 +97,9 @@ export function NongFahChatWidget({
   const [appliedModifiedId, setAppliedModifiedId] = useState<string | null>(null);
   const [expandedFieldListId, setExpandedFieldListId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isSyncingDb, setIsSyncingDb] = useState(false);
+  const [syncedDbMsgId, setSyncedDbMsgId] = useState<string | null>(null);
+  const [expandedSyncMsgId, setExpandedSyncMsgId] = useState<string | null>(null);
 
   const activeDefaultSuggestions = CONTEXT_SUGGESTIONS[pageContext] || CONTEXT_SUGGESTIONS.list;
 
@@ -218,6 +231,7 @@ export function NongFahChatWidget({
         generatedForm: json.data?.generatedForm || null,
         modifiedFields: json.data?.modifiedFields || null,
         modificationSummary: json.data?.modificationSummary || null,
+        databaseSyncPayload: json.data?.databaseSyncPayload || null,
         suggestions: json.data?.suggestions || activeDefaultSuggestions,
         timestamp: new Date(),
       };
@@ -299,6 +313,72 @@ export function NongFahChatWidget({
     navigator.clipboard.writeText(JSON.stringify(formDef, null, 2));
     setCopiedId(msgId);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleBatchSync = async (msgId: string, payload: any) => {
+    if (!payload?.syncItems || payload.syncItems.length === 0 || isSyncingDb) return;
+
+    setIsSyncingDb(true);
+    try {
+      const batchItems = (payload.syncItems || []).map((item: any) => {
+        const updates: Record<string, any> = {};
+        for (const diff of item.diffs || []) {
+          updates[diff.field] = diff.newValue;
+        }
+        return {
+          responseId: item.responseId,
+          studentId: item.studentId,
+          syncType: item.syncType,
+          updates,
+          newStudentPayload: item.newStudentPayload,
+        };
+      });
+
+      const res = await fetch('/api/admin/forms/sync-student', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'sync_batch',
+          batchItems,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'การซิงค์ข้อมูลไม่สำเร็จ');
+      }
+
+      toast.success(json.message || 'ซิงค์ข้อมูลเข้าฐานข้อมูลนักเรียนเรียบร้อยแล้ว');
+      setSyncedDbMsgId(msgId);
+
+      // Dispatch custom event so StudentDbSyncSection and tables update immediately
+      window.dispatchEvent(new CustomEvent('student-database-synced'));
+
+      // Update local message payload so it marks items as synced
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id === msgId && m.databaseSyncPayload) {
+            return {
+              ...m,
+              databaseSyncPayload: {
+                ...m.databaseSyncPayload,
+                totalPending: 0,
+                syncItems: m.databaseSyncPayload.syncItems.map((si: any) => ({
+                  ...si,
+                  isAlreadySynced: true,
+                })),
+              },
+            };
+          }
+          return m;
+        })
+      );
+    } catch (err: any) {
+      console.error('Batch sync failed:', err);
+      toast.error('ซิงค์ข้อมูลไม่สำเร็จ', { description: err?.message });
+    } finally {
+      setIsSyncingDb(false);
+    }
   };
 
   return (
@@ -703,6 +783,107 @@ export function NongFahChatWidget({
                               </button>
                             </div>
                           )}
+                        </div>
+                      )}
+
+                      {/* Embedded Interactive Database Sync Card */}
+                      {msg.databaseSyncPayload && (
+                        <div className="mt-3 pt-3 border-t border-purple-200/80 bg-purple-50/70 rounded-2xl p-3 sm:p-3.5 space-y-2.5 text-slate-800">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md bg-purple-200/80 text-purple-900 mb-1">
+                                <Database className="w-3 h-3 text-purple-700" />
+                                <span>พร้อมซิงค์เข้าฐานข้อมูลนักเรียน</span>
+                              </span>
+                              <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">
+                                ตรวจพบข้อมูลตรงกับฐานข้อมูล {msg.databaseSyncPayload.totalMatched} คน
+                              </h4>
+                              <p className="text-[11px] text-slate-600 mt-0.5">
+                                ปรับฟอร์แมทเบอร์โทร 10 หลัก วันเกิด และคัดกรองข้อมูลสุขภาพเรียบร้อยแล้ว
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Collapsible preview of student diffs */}
+                          <div className="bg-white/95 rounded-xl border border-purple-100 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedSyncMsgId(
+                                  expandedSyncMsgId === msg.id ? null : msg.id
+                                )
+                              }
+                              className="w-full px-2.5 py-1.5 flex items-center justify-between text-[11px] font-bold text-purple-900 hover:bg-purple-50/50 transition-colors cursor-pointer"
+                            >
+                              <span>
+                                {expandedSyncMsgId === msg.id
+                                  ? 'ซ่อนรายละเอียดนักเรียน'
+                                  : `ดูรายชื่อและข้อมูลที่ตรวจพบ (${msg.databaseSyncPayload.syncItems?.length || 0} คน)`}
+                              </span>
+                              {expandedSyncMsgId === msg.id ? (
+                                <ChevronUp className="w-3.5 h-3.5" />
+                              ) : (
+                                <ChevronDown className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+
+                            {expandedSyncMsgId === msg.id && (
+                              <div className="px-2.5 py-2 border-t border-purple-100 max-h-56 overflow-y-auto space-y-2 divide-y divide-slate-100">
+                                {msg.databaseSyncPayload.syncItems.map((item: any, idx: number) => (
+                                  <div key={item.responseId || idx} className="pt-1.5 first:pt-0">
+                                    <div className="flex items-center justify-between text-[11px]">
+                                      <span className="font-bold text-slate-900 truncate">
+                                        {idx + 1}. {item.studentName}
+                                      </span>
+                                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 border border-purple-200 shrink-0">
+                                        รหัส {item.studentId || '-'} ({item.studentGrade || '-'})
+                                      </span>
+                                    </div>
+                                    <div className="mt-1 flex flex-wrap gap-1">
+                                      {(item.diffs || []).map((d: any, dIdx: number) => (
+                                        <span
+                                          key={dIdx}
+                                          className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-slate-50 border border-slate-200 text-slate-700"
+                                        >
+                                          <span className="font-medium text-slate-500">{d.labelTh}:</span>
+                                          <span className="font-bold text-purple-800">{d.newValue}</span>
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Action Button: Batch Sync */}
+                          <div className="pt-1">
+                            {syncedDbMsgId === msg.id || (msg.databaseSyncPayload.totalPending === 0 && !isSyncingDb) ? (
+                              <div className="w-full py-2 px-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5">
+                                <Check className="w-4 h-4 text-emerald-600" />
+                                <span>อัปเดตข้อมูลเข้าสู่ระบบเรียบร้อยแล้วทั้งหมด</span>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={isSyncingDb}
+                                onClick={() => handleBatchSync(msg.id, msg.databaseSyncPayload)}
+                                className="w-full py-2.5 px-3 bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 hover:opacity-95 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                              >
+                                {isSyncingDb ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                                    <span>กำลังอัปเดตข้อมูลเข้าสู่ฐานข้อมูล...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Database className="w-4 h-4 text-purple-200" />
+                                    <span>ยืนยันอัปเดตเข้าฐานข้อมูลทันที ({msg.databaseSyncPayload.totalPending || msg.databaseSyncPayload.totalMatched} คน)</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       )}
 
