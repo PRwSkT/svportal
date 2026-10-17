@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { analyzeStudentSyncOpportunities } from '@/lib/forms/database-sync';
+import { parseThaiAddress } from '@/lib/forms/data-cleansing';
 import { getServerUser } from '@/lib/auth';
 import { isSystemAdmin } from '@/lib/constants/auth';
 
@@ -170,6 +171,24 @@ export async function POST(req: NextRequest) {
       if (sUpdates.classroom !== undefined) {
         studentUpdates.classroom = String(sUpdates.classroom).trim();
       }
+      if (sUpdates.nickname !== undefined) {
+        studentUpdates.nickname = sUpdates.nickname ? String(sUpdates.nickname).trim() : null;
+      }
+      if (sUpdates.name_en !== undefined) {
+        studentUpdates.name_en = sUpdates.name_en ? String(sUpdates.name_en).trim() : null;
+      }
+      if (sUpdates.blood_group !== undefined) {
+        studentUpdates.blood_group = sUpdates.blood_group ? String(sUpdates.blood_group).trim().toUpperCase() : null;
+      }
+      if (sUpdates.ethnicity !== undefined) {
+        studentUpdates.ethnicity = sUpdates.ethnicity ? String(sUpdates.ethnicity).trim() : null;
+      }
+      if (sUpdates.current_address !== undefined || sUpdates.address !== undefined) {
+        studentUpdates.current_address = sUpdates.current_address || sUpdates.address || null;
+      }
+      if (sUpdates.line_id !== undefined) {
+        studentUpdates.line_id = sUpdates.line_id ? String(sUpdates.line_id).trim() : null;
+      }
 
       // Execute Student Update
       const { error: updateErr } = await supabase
@@ -179,25 +198,78 @@ export async function POST(req: NextRequest) {
 
       if (updateErr) throw updateErr;
 
-      // Update Parent Phone if provided
-      if (sUpdates.parent_phone) {
-        const cleanPhone = String(sUpdates.parent_phone).replace(/\D/g, '').trim();
+      // Upsert Student Addresses
+      if (sUpdates.address_parsed || sUpdates.address || sUpdates.current_address) {
+        const addr = sUpdates.address_parsed || parseThaiAddress(sUpdates.address || sUpdates.current_address);
+        if (addr) {
+          const { data: existingAddr } = await supabase
+            .from('student_addresses')
+            .select('id')
+            .eq('student_id', sId)
+            .limit(1);
+
+          const addrData: any = {
+            student_id: sId,
+            house_number: addr.house_number || null,
+            moo: addr.moo || null,
+            soi: addr.soi || null,
+            road: addr.road || null,
+            sub_district: addr.sub_district || null,
+            district: addr.district || null,
+            province: addr.province || null,
+            zip_code: addr.zip_code || null,
+            updated_at: new Date().toISOString(),
+          };
+
+          if (existingAddr && existingAddr.length > 0) {
+            await supabase.from('student_addresses').update(addrData).eq('id', existingAddr[0].id);
+          } else {
+            await supabase.from('student_addresses').insert(addrData);
+          }
+        }
+      }
+
+      // Upsert Student Parents (Relationship, Names, Phone, Line ID)
+      const pUpdates = sUpdates.parentUpdates || {};
+      const parentPhone = sUpdates.parent_phone || pUpdates.phone_number;
+      const parentName = sUpdates.parent_name || (pUpdates.first_name ? `${pUpdates.first_name} ${pUpdates.last_name || ''}` : '');
+      const parentRel = sUpdates.parent_relation || pUpdates.relationship || 'ผู้ปกครอง';
+      const parentLine = sUpdates.parent_line || pUpdates.line_id;
+
+      if (parentPhone || parentName || parentLine) {
+        const cleanPhone = parentPhone ? String(parentPhone).replace(/\D/g, '').trim() : null;
+        const nameParts = parentName ? String(parentName).trim().split(' ').filter(Boolean) : [];
+        const firstName = nameParts[0] || null;
+        const lastName = nameParts.slice(1).join(' ') || null;
+
         const { data: existingParents } = await supabase
           .from('student_parents')
           .select('id')
           .eq('student_id', sId)
           .limit(1);
 
+        const parentPayload: any = {
+          updated_at: new Date().toISOString(),
+        };
+        if (cleanPhone) parentPayload.phone_number = cleanPhone;
+        if (firstName) parentPayload.first_name = firstName;
+        if (lastName) parentPayload.last_name = lastName;
+        if (parentRel) parentPayload.relationship = parentRel;
+        if (parentLine) parentPayload.line_id = parentLine;
+
         if (existingParents && existingParents.length > 0) {
           await supabase
             .from('student_parents')
-            .update({ phone_number: cleanPhone, updated_at: new Date().toISOString() })
+            .update(parentPayload)
             .eq('id', existingParents[0].id);
         } else {
           await supabase.from('student_parents').insert({
             student_id: sId,
-            relationship: 'ผู้ปกครอง',
-            phone_number: cleanPhone,
+            relationship: parentRel || 'ผู้ปกครอง',
+            first_name: firstName || 'ผู้ปกครอง',
+            last_name: lastName || '',
+            phone_number: cleanPhone || '',
+            line_id: parentLine || null,
           });
         }
       }

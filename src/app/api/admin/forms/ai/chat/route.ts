@@ -3,6 +3,8 @@ import { chatWithNongFah } from '@/lib/ai/gemma';
 import { sanitizeTextForAI, prepareResponsesForSummarization } from '@/lib/ai/pdpa-sanitizer';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { getServerUser } from '@/lib/auth';
+import { getCollectiveMemoryContext, recordTeacherConversation } from '@/lib/ai/collective-memory';
+import { analyzeAndCleanseFormResponses } from '@/lib/forms/data-cleansing';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,15 +28,26 @@ export async function POST(req: NextRequest) {
     const history = Array.isArray(body?.history) ? body.history : [];
     const context = body?.context || {};
 
-    // If on responses page and formId is provided, enrich context with real sanitized responses data & database sync opportunities
+    // Fetch collective teacher memory for forms
+    try {
+      context.collectiveMemoryContext = await getCollectiveMemoryContext('forms');
+    } catch (memErr) {
+      console.warn('[Forms Chat] Collective memory lookup failed:', memErr);
+    }
+
+    // If on responses page and formId is provided, enrich context with real sanitized responses data, database sync opportunities, and data cleansing analysis
     if (context.formId && (context.page === 'responses' || !context.responsesSummary)) {
       try {
         const supabase = getAdminClient();
-        const [formRes, fieldsRes, responsesRes, studentsRes] = await Promise.all([
+        const [formRes, fieldsRes, responsesRes, studentsRes, cleansingAnalysis] = await Promise.all([
           supabase.from('forms').select('*').eq('id', context.formId).maybeSingle(),
           supabase.from('form_fields').select('*').eq('form_id', context.formId).order('sort_order'),
           supabase.from('form_responses').select('*').eq('form_id', context.formId),
           supabase.from('students').select('*, student_parents(*)').order('id', { ascending: true }),
+          analyzeAndCleanseFormResponses(context.formId).catch((err) => {
+            console.warn('[Forms Chat] Cleansing analysis failed:', err);
+            return null;
+          }),
         ]);
 
         if (formRes.data && fieldsRes.data) {
@@ -57,6 +70,9 @@ export async function POST(req: NextRequest) {
             studentsRes.data || []
           );
           context.syncOpportunities = syncOpportunities;
+          if (cleansingAnalysis) {
+            context.cleansingAnalysis = cleansingAnalysis;
+          }
         }
       } catch (enrichErr) {
         console.warn('[NongFah Chat] Could not enrich context with responses data:', enrichErr);
@@ -65,6 +81,21 @@ export async function POST(req: NextRequest) {
 
     const { cleanText: sanitizedMessage } = sanitizeTextForAI(message);
     const chatResponse = await chatWithNongFah(sanitizedMessage, history, context);
+
+    // Record conversation asynchronously for Nong Fah to learn from teachers across the school
+    recordTeacherConversation({
+      userEmail: (user as any)?.email,
+      userName: (user as any)?.name || (user as any)?.email?.split('@')[0],
+      userRole: (user as any)?.role || 'teacher',
+      pathname: context.formId ? `/admin/forms/${context.formId}` : '/admin/forms',
+      userPrompt: sanitizedMessage,
+      aiResponse: chatResponse.reply,
+      actionType: chatResponse.actionType,
+      actionPayload:
+        chatResponse.actionType === 'data_cleansing'
+          ? chatResponse.dataCleansingPayload
+          : chatResponse.databaseSyncPayload,
+    }).catch((err) => console.warn('[Record Conversation Warning]:', err));
 
     return NextResponse.json({
       success: true,

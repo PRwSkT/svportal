@@ -30,7 +30,7 @@ interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  actionType?: 'form_generated' | 'form_modified' | 'database_sync' | 'chat';
+  actionType?: 'form_generated' | 'form_modified' | 'database_sync' | 'data_cleansing' | 'chat';
   generatedForm?: GeneratedFormDefinition | null;
   modifiedFields?: FormField[] | null;
   modificationSummary?: string | null;
@@ -39,6 +39,19 @@ interface ChatMessage {
     totalMatched: number;
     totalPending: number;
     syncItems: any[];
+  } | null;
+  dataCleansingPayload?: {
+    formId: string;
+    totalResponses: number;
+    totalNeedingCleansing: number;
+    stats: {
+      studentIdsEnriched: number;
+      phonesFormatted: number;
+      namesCleaned: number;
+      allergiesStandardized: number;
+      classroomsAligned: number;
+    };
+    items: any[];
   } | null;
   suggestions?: string[];
   timestamp: Date;
@@ -64,12 +77,13 @@ const CONTEXT_SUGGESTIONS: Record<string, string[]> = {
     'เพิ่มช่องแนบหลักฐานการชำระเงิน (สลิปโอนเงิน)',
   ],
   responses: [
+    'ช่วยคลีนและทำความสะอาดข้อมูลการตอบกลับ (Data Cleansing)',
     'ช่วยวิเคราะห์ผลตอบกลับแล้วเอาไปอัปเดตข้อมูลนักเรียนในระบบให้หน่อย',
+    'ดึงรหัสนักเรียนจากฐานข้อมูลมาเติมในคำตอบที่ขาด',
     'สรุปจุดเด่นและจุดที่ควรปรับปรุงเร่งด่วน',
     'มีนักเรียนที่มีเรื่องเร่งด่วนหรือแพ้อาหารไหม',
     'จัดกลุ่มข้อเสนอแนะและเสียงสะท้อนของผู้ตอบ',
     'สรุปรายงานสำหรับนำเสนอที่ประชุมผู้บริหาร',
-    'ช่วยเสนอแนวทางแก้ไขปัญหาตามข้อเสนอแนะ',
   ],
   list: [
     'ช่วยสร้างฟอร์มลงทะเบียนเรียนพิเศษ ซัมเมอร์(ตุลาคม)',
@@ -100,6 +114,9 @@ export function NongFahChatWidget({
   const [isSyncingDb, setIsSyncingDb] = useState(false);
   const [syncedDbMsgId, setSyncedDbMsgId] = useState<string | null>(null);
   const [expandedSyncMsgId, setExpandedSyncMsgId] = useState<string | null>(null);
+  const [isCleansing, setIsCleansing] = useState(false);
+  const [cleansedMsgId, setCleansedMsgId] = useState<string | null>(null);
+  const [expandedCleansingMsgId, setExpandedCleansingMsgId] = useState<string | null>(null);
 
   const activeDefaultSuggestions = CONTEXT_SUGGESTIONS[pageContext] || CONTEXT_SUGGESTIONS.list;
 
@@ -232,6 +249,7 @@ export function NongFahChatWidget({
         modifiedFields: json.data?.modifiedFields || null,
         modificationSummary: json.data?.modificationSummary || null,
         databaseSyncPayload: json.data?.databaseSyncPayload || null,
+        dataCleansingPayload: json.data?.dataCleansingPayload || null,
         suggestions: json.data?.suggestions || activeDefaultSuggestions,
         timestamp: new Date(),
       };
@@ -378,6 +396,64 @@ export function NongFahChatWidget({
       toast.error('ซิงค์ข้อมูลไม่สำเร็จ', { description: err?.message });
     } finally {
       setIsSyncingDb(false);
+    }
+  };
+
+  const handleBatchCleanse = async (msgId: string, payload: any) => {
+    if (!payload?.items || payload.items.length === 0 || isCleansing) return;
+
+    setIsCleansing(true);
+    try {
+      const itemsToCleanse = payload.items
+        .filter((i: any) => i.changes && i.changes.length > 0)
+        .map((i: any) => ({
+          responseId: i.responseId,
+          cleanedAnswers: i.cleanedAnswers,
+        }));
+
+      const res = await fetch('/api/admin/forms/cleanse-responses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          formId: payload.formId,
+          items: itemsToCleanse,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'การทำความสะอาดข้อมูลไม่สำเร็จ');
+      }
+
+      toast.success(json.message || 'ทำความสะอาดและปรับฟอร์แมตข้อมูลในฟอร์มเรียบร้อยแล้ว');
+      setCleansedMsgId(msgId);
+
+      window.dispatchEvent(new CustomEvent('form-responses-cleansed'));
+      window.dispatchEvent(new CustomEvent('student-database-synced'));
+
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id === msgId && m.dataCleansingPayload) {
+            return {
+              ...m,
+              dataCleansingPayload: {
+                ...m.dataCleansingPayload,
+                totalNeedingCleansing: 0,
+                items: m.dataCleansingPayload.items.map((ci: any) => ({
+                  ...ci,
+                  isAlreadyCleaned: true,
+                })),
+              },
+            };
+          }
+          return m;
+        })
+      );
+    } catch (err: any) {
+      console.error('Cleansing failed:', err);
+      toast.error('ทำความสะอาดข้อมูลไม่สำเร็จ', { description: err?.message });
+    } finally {
+      setIsCleansing(false);
     }
   };
 
@@ -879,6 +955,142 @@ export function NongFahChatWidget({
                                   <>
                                     <Database className="w-4 h-4 text-purple-200" />
                                     <span>ยืนยันอัปเดตเข้าฐานข้อมูลทันที ({msg.databaseSyncPayload.totalPending || msg.databaseSyncPayload.totalMatched} คน)</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Embedded Interactive Data Cleansing Card */}
+                      {msg.dataCleansingPayload && (
+                        <div className="mt-3 pt-3 border-t border-sky-200/80 bg-sky-50/70 rounded-2xl p-3 sm:p-3.5 space-y-2.5 text-slate-800">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md bg-sky-200/80 text-sky-900 mb-1">
+                                <Sparkles className="w-3 h-3 text-sky-700" />
+                                <span>ทำความสะอาดข้อมูลด้วยน้องฟ้า AI</span>
+                              </span>
+                              <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">
+                                พบข้อมูลที่ต้องปรับฟอร์แมต {msg.dataCleansingPayload.totalNeedingCleansing} จาก {msg.dataCleansingPayload.totalResponses} รายการ
+                              </h4>
+                              <p className="text-[11px] text-slate-600 mt-0.5">
+                                เชื่อมโยงและดึงข้อมูลที่ถูกต้องจากฐานข้อมูลโรงเรียนสมคิดวิทยา
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Quick Stats Badges */}
+                          <div className="flex flex-wrap gap-1.5 pt-0.5">
+                            {msg.dataCleansingPayload.stats.studentIdsEnriched > 0 && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-100/90 text-emerald-800 border border-emerald-200">
+                                เติมรหัสนักเรียนจาก DB: {msg.dataCleansingPayload.stats.studentIdsEnriched}
+                              </span>
+                            )}
+                            {msg.dataCleansingPayload.stats.phonesFormatted > 0 && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-sky-100/90 text-sky-800 border border-sky-200">
+                                เบอร์โทร 10 หลัก: {msg.dataCleansingPayload.stats.phonesFormatted}
+                              </span>
+                            )}
+                            {msg.dataCleansingPayload.stats.namesCleaned > 0 && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-purple-100/90 text-purple-800 border border-purple-200">
+                                ชื่อ-สกุล: {msg.dataCleansingPayload.stats.namesCleaned}
+                              </span>
+                            )}
+                            {msg.dataCleansingPayload.stats.allergiesStandardized > 0 && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-100/90 text-amber-800 border border-amber-200">
+                                มาตรฐานการแพ้: {msg.dataCleansingPayload.stats.allergiesStandardized}
+                              </span>
+                            )}
+                            {msg.dataCleansingPayload.stats.classroomsAligned > 0 && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-indigo-100/90 text-indigo-800 border border-indigo-200">
+                                ห้องเรียน: {msg.dataCleansingPayload.stats.classroomsAligned}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Collapsible preview of cleansed items */}
+                          <div className="bg-white/95 rounded-xl border border-sky-100 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedCleansingMsgId(
+                                  expandedCleansingMsgId === msg.id ? null : msg.id
+                                )
+                              }
+                              className="w-full px-2.5 py-1.5 flex items-center justify-between text-[11px] font-bold text-sky-900 hover:bg-sky-50/50 transition-colors cursor-pointer"
+                            >
+                              <span>
+                                {expandedCleansingMsgId === msg.id
+                                  ? 'ซ่อนรายละเอียดการปรับฟอร์แมต'
+                                  : `ดูรายการที่จะปรับปรุง (${msg.dataCleansingPayload.items.filter((i: any) => i.changes.length > 0).length} คน)`}
+                              </span>
+                              {expandedCleansingMsgId === msg.id ? (
+                                <ChevronUp className="w-3.5 h-3.5" />
+                              ) : (
+                                <ChevronDown className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+
+                            {expandedCleansingMsgId === msg.id && (
+                              <div className="px-2.5 py-2 border-t border-sky-100 max-h-56 overflow-y-auto space-y-2 divide-y divide-slate-100">
+                                {msg.dataCleansingPayload.items
+                                  .filter((item: any) => item.changes.length > 0)
+                                  .slice(0, 15)
+                                  .map((item: any, idx: number) => (
+                                    <div key={item.responseId || idx} className="pt-1.5 first:pt-0">
+                                      <div className="flex items-center justify-between text-[11px]">
+                                        <span className="font-bold text-slate-900 truncate">
+                                          {idx + 1}. {item.studentName}
+                                        </span>
+                                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-sky-50 text-sky-700 border border-sky-200 shrink-0">
+                                          รหัส {item.matchedStudentId || 'ดึงจาก DB'}
+                                        </span>
+                                      </div>
+                                      <div className="mt-1 flex flex-col gap-1">
+                                        {(item.changes || []).map((ch: any, cIdx: number) => (
+                                          <div
+                                            key={cIdx}
+                                            className="text-[10px] px-2 py-0.5 rounded-md bg-slate-50 border border-slate-200 text-slate-700 flex flex-wrap items-center gap-1"
+                                          >
+                                            <span className="font-medium text-slate-500">{ch.fieldLabel}:</span>
+                                            <span className="line-through text-slate-400">{String(ch.oldValue || '(ว่าง)')}</span>
+                                            <ArrowRight className="w-2.5 h-2.5 text-slate-400" />
+                                            <span className="font-bold text-emerald-700">{String(ch.newValue)}</span>
+                                            <span className="text-[9px] text-slate-400">({ch.reason})</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Action Button: Execute Cleansing */}
+                          <div className="pt-1">
+                            {cleansedMsgId === msg.id || (msg.dataCleansingPayload.totalNeedingCleansing === 0 && !isCleansing) ? (
+                              <div className="w-full py-2 px-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5">
+                                <Check className="w-4 h-4 text-emerald-600" />
+                                <span>ทำความสะอาดและแก้ไขข้อมูลในฟอร์มเรียบร้อยแล้ว</span>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={isCleansing}
+                                onClick={() => handleBatchCleanse(msg.id, msg.dataCleansingPayload)}
+                                className="w-full py-2.5 px-3 bg-gradient-to-r from-emerald-600 via-teal-700 to-emerald-700 hover:opacity-95 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                              >
+                                {isCleansing ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                                    <span>กำลังปรับปรุงและทำความสะอาดข้อมูล...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Sparkles className="w-4 h-4 text-emerald-200" />
+                                    <span>ยืนยันทำความสะอาดและแก้ไขข้อมูลในฟอร์มทันที ({msg.dataCleansingPayload.totalNeedingCleansing} รายการ)</span>
                                   </>
                                 )}
                               </button>

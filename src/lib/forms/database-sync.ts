@@ -1,4 +1,5 @@
 import { FormDefinition, FormField, FormResponse } from '@/types';
+import { parseThaiAddress } from './data-cleansing';
 
 export interface FieldDiff {
   field: string;
@@ -16,6 +17,26 @@ export interface PendingStudentSyncItem {
   studentName?: string;
   studentGrade?: string;
   diffs: FieldDiff[];
+  updates?: Record<string, any>;
+  parentUpdates?: {
+    relationship?: string;
+    prefix?: string;
+    first_name?: string;
+    last_name?: string;
+    phone_number?: string;
+    line_id?: string;
+  };
+  addressUpdates?: {
+    house_number?: string;
+    moo?: string;
+    soi?: string;
+    road?: string;
+    sub_district?: string;
+    district?: string;
+    province?: string;
+    zip_code?: string;
+    full_address?: string;
+  };
   newStudentPayload?: {
     name: string;
     grade: string;
@@ -82,6 +103,12 @@ export function mapFieldToStudentColumn(label: string, fieldKey: string): string
       return 'parent_phone';
     }
     if (
+      text.includes('line') ||
+      text.includes('ไลน์')
+    ) {
+      return 'parent_line';
+    }
+    if (
       text.includes('ความเกี่ยวข้อง') ||
       text.includes('ความสัมพันธ์') ||
       text.includes('relation')
@@ -94,6 +121,26 @@ export function mapFieldToStudentColumn(label: string, fieldKey: string): string
     ) {
       return 'parent_name';
     }
+  }
+
+  // Address
+  if (text.includes('ที่อยู่') || text.includes('address')) {
+    return 'address';
+  }
+
+  // Blood Group
+  if (text.includes('กรุ๊ปเลือด') || text.includes('หมู่โลหิต') || text.includes('blood')) {
+    return 'blood_group';
+  }
+
+  // Ethnicity
+  if (text.includes('เชื้อชาติ') || text.includes('ethnicity')) {
+    return 'ethnicity';
+  }
+
+  // Student Line ID
+  if (text.includes('line') || text.includes('ไลน์')) {
+    return 'line_id';
   }
 
   // 2. Student ID / Student Code
@@ -691,9 +738,146 @@ export function analyzeStudentSyncOpportunities(
             });
           }
         }
+
+        // 11. Nickname (ชื่อเล่น)
+        else if (col === 'nickname') {
+          const strVal = String(normVal || '').trim();
+          if (strVal && strVal !== (dbStudent.nickname || '')) {
+            diffs.push({
+              field: 'nickname',
+              labelTh: 'ชื่อเล่น',
+              oldValue: dbStudent.nickname || 'ยังไม่มีข้อมูล',
+              newValue: strVal,
+              rawFormValue: rawVal,
+            });
+          }
+        }
+
+        // 12. English Name
+        else if (col === 'name_en') {
+          const strVal = String(normVal || '').trim();
+          if (strVal && strVal !== (dbStudent.name_en || '')) {
+            diffs.push({
+              field: 'name_en',
+              labelTh: 'ชื่อ-นามสกุลภาษาอังกฤษ',
+              oldValue: dbStudent.name_en || 'ยังไม่มีข้อมูล',
+              newValue: strVal,
+              rawFormValue: rawVal,
+            });
+          }
+        }
+
+        // 13. Blood Group
+        else if (col === 'blood_group') {
+          const strVal = String(normVal || '').trim().toUpperCase();
+          if (strVal && strVal !== (dbStudent.blood_group || '')) {
+            diffs.push({
+              field: 'blood_group',
+              labelTh: 'หมู่โลหิต',
+              oldValue: dbStudent.blood_group || 'ยังไม่มีข้อมูล',
+              newValue: strVal,
+              rawFormValue: rawVal,
+            });
+          }
+        }
+
+        // 14. Ethnicity
+        else if (col === 'ethnicity') {
+          const strVal = String(normVal || '').trim();
+          if (strVal && strVal !== (dbStudent.ethnicity || '')) {
+            diffs.push({
+              field: 'ethnicity',
+              labelTh: 'เชื้อชาติ',
+              oldValue: dbStudent.ethnicity || 'ยังไม่มีข้อมูล',
+              newValue: strVal,
+              rawFormValue: rawVal,
+            });
+          }
+        }
+
+        // 15. Student Line ID
+        else if (col === 'line_id') {
+          const strVal = String(normVal || '').trim();
+          if (strVal && strVal !== (dbStudent.line_id || '')) {
+            diffs.push({
+              field: 'line_id',
+              labelTh: 'Line ID',
+              oldValue: dbStudent.line_id || 'ยังไม่มีข้อมูล',
+              newValue: strVal,
+              rawFormValue: rawVal,
+            });
+          }
+        }
+
+        // 16. Parent Line ID
+        else if (col === 'parent_line') {
+          const strVal = String(normVal || '').trim();
+          const curParentLine = dbStudent.student_parents?.[0]?.line_id || '';
+          if (strVal && strVal !== curParentLine) {
+            diffs.push({
+              field: 'parent_line',
+              labelTh: 'Line ID ผู้ปกครอง',
+              oldValue: curParentLine || 'ยังไม่มีข้อมูล',
+              newValue: strVal,
+              rawFormValue: rawVal,
+            });
+          }
+        }
+
+        // 17. Current Address
+        else if (col === 'address') {
+          const strVal = String(normVal || '').trim();
+          if (strVal && strVal !== (dbStudent.current_address || '')) {
+            diffs.push({
+              field: 'current_address',
+              labelTh: 'ที่อยู่ปัจจุบัน',
+              oldValue: dbStudent.current_address || 'ยังไม่มีข้อมูล',
+              newValue: strVal,
+              rawFormValue: rawVal,
+            });
+          }
+        }
       }
 
       if (diffs.length > 0) {
+        const updates: Record<string, any> = {};
+        for (const d of diffs) {
+          updates[d.field] = d.newValue;
+        }
+
+        let parentUpdates: any = undefined;
+        let addressUpdates: any = undefined;
+
+        for (const [fKey, col] of columnMapping.entries()) {
+          const val = rawAnswers[fKey];
+          if (!val) continue;
+          if (col === 'parent_phone') {
+            parentUpdates = parentUpdates || {};
+            parentUpdates.phone_number = normalizeStudentFieldValue('parent_phone', val);
+          } else if (col === 'parent_name') {
+            parentUpdates = parentUpdates || {};
+            const cleanName = String(val).trim();
+            const parts = cleanName.split(' ').filter(Boolean);
+            parentUpdates.first_name = parts[0] || cleanName;
+            parentUpdates.last_name = parts.slice(1).join(' ') || '';
+          } else if (col === 'parent_relation') {
+            parentUpdates = parentUpdates || {};
+            const r = String(val).toLowerCase();
+            parentUpdates.relationship = r.includes('mother') ? 'มารดา' : r.includes('father') ? 'บิดา' : 'ผู้ปกครอง';
+          } else if (col === 'parent_line') {
+            parentUpdates = parentUpdates || {};
+            parentUpdates.line_id = String(val).trim();
+          } else if (col === 'address') {
+            addressUpdates = parseThaiAddress(String(val));
+            updates.current_address = String(val).trim();
+            updates.address_parsed = addressUpdates;
+          }
+        }
+
+        if (parentUpdates) {
+          updates.parentUpdates = parentUpdates;
+        }
+
         syncItems.push({
           responseId: resp.id,
           submittedAt: resp.submitted_at,
@@ -702,6 +886,9 @@ export function analyzeStudentSyncOpportunities(
           studentName: dbStudent.name,
           studentGrade: dbStudent.grade,
           diffs,
+          updates,
+          parentUpdates,
+          addressUpdates,
           isAlreadySynced,
           syncedAt,
         });

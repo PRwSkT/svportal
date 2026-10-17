@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { callGemma } from '@/lib/ai/gemma';
 import { sanitizeTextForAI } from '@/lib/ai/pdpa-sanitizer';
 import { getServerUser } from '@/lib/auth';
+import { getCollectiveMemoryContext, recordTeacherConversation } from '@/lib/ai/collective-memory';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +33,14 @@ export async function POST(req: NextRequest) {
     const pathname: string = context.pathname || '/';
     const pageTitle: string = context.pageTitle || '';
     const extraInfo: any = context.extraInfo || {};
+
+    // Fetch collective teacher memory
+    let collectiveMemoryText = '';
+    try {
+      collectiveMemoryText = await getCollectiveMemoryContext();
+    } catch (memErr) {
+      console.warn('[Universal Chat] Collective memory lookup failed:', memErr);
+    }
 
     // 1. Determine active school department module from pathname
     let moduleContextName = 'ทั่วไป / ภาพรวมโรงเรียน';
@@ -254,6 +263,7 @@ export async function POST(req: NextRequest) {
 1. ห้ามใช้ Emoji หรือ Emoticon ทุกชนิดเด็ดขาด (Strictly ZERO EMOJIS) ไม่ว่าจะเป็นรูปภาพหรือสัญลักษณ์อีโมจิ
 2. คุณต้อง "ฉลาดและรู้บริบทหน้าที่คุณครูกำลังเปิดอยู่จริง" (Context-Aware):
 ${moduleContextGuidance}
+${collectiveMemoryText ? `\n${collectiveMemoryText}\n` : ''}
 3. ทันโลก ทันเหตุการณ์: คุณมีความรอบรู้ข้อมูลข่าวสารการศึกษา นโยบายกระทรวงศึกษาธิการ กฎหมาย PDPA และระเบียบ สช. ล่าสุดของปี 2568-2569
 4. ให้คำตอบที่ชัดเจน กระชับ มีขั้นตอนนำไปปฏิบัติได้จริง หากคุณครูถามหรือสั่งงานที่ตรงกับหน้าที่เปิดอยู่ ให้ช่วยแนะนำหรือร่างเนื้อหาให้ทันที
 5. ภาษาในการตอบ: ภาษาไทยเป็นหลัก หากมีศัพท์วิชาการภาษาอังกฤษหรือจีนสามารถระบุประกอบได้อย่างถูกต้อง (ชื่อโรงเรียนภาษาจีนคือ Somkidvittaya学校)
@@ -307,6 +317,13 @@ ${moduleContextGuidance}
 
     fullUserPrompt += `\n[ข้อความคำถาม/คำสั่งล่าสุดของคุณครู]:\n"${sanitizedMessage}"\n\nกรุณาตอบเป็น JSON ตามโครงสร้างที่กำหนด`;
 
+    // Detect search grounding need (real-time facts, regulations, news)
+    const searchKeywords = [
+      'ข่าว', 'ล่าสุด', 'วันนี้', 'ระเบียบ', 'สช', 'สพฐ', 'กระทรวง', 'กฎหมาย', 'พ.ศ.',
+      'สภาพอากาศ', 'ค้นหา', 'ค้นเว็บ', 'อัปเดต', 'google', 'เช็กข่าว', 'ประกาศศธ'
+    ];
+    const shouldGround = searchKeywords.some(kw => (message || '').toLowerCase().includes(kw));
+
     // 5. Call Gemma / Gemini with optimized model chain and JSON response
     const rawAiResponse = await callGemma({
       systemPrompt,
@@ -314,7 +331,7 @@ ${moduleContextGuidance}
       temperature: 0.2,
       maxTokens: 2048,
       responseMimeType: 'application/json',
-      enableSearchGrounding: false,
+      enableSearchGrounding: shouldGround,
     });
 
     // 6. Safe Parse JSON
@@ -339,6 +356,18 @@ ${moduleContextGuidance}
     if (!Array.isArray(parsed.suggestions) || parsed.suggestions.length === 0) {
       parsed.suggestions = defaultSuggestions;
     }
+
+    // Record conversation asynchronously for school-wide collective memory
+    recordTeacherConversation({
+      userEmail: (user as any)?.email,
+      userName,
+      userRole,
+      pathname,
+      userPrompt: sanitizedMessage,
+      aiResponse: parsed.reply,
+      actionType: parsed.actionType || 'chat',
+      actionPayload: parsed.actionButton || null,
+    }).catch(err => console.warn('[Record Universal Conversation Warning]:', err));
 
     return NextResponse.json({
       success: true,

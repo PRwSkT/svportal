@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { FormQRCodeModal } from '@/components/forms/FormQRCodeModal';
 import { NongFahResponsesInsights } from '@/components/forms/NongFahResponsesInsights';
+import { FormDataCleansingSection } from '@/components/forms/FormDataCleansingSection';
 import { StudentDbSyncSection } from '@/components/forms/StudentDbSyncSection';
 import { NongFahChatWidget, triggerNongFahPrompt } from '@/components/forms/NongFahChatWidget';
 import { FormAnalyticsCharts } from '@/components/forms/FormAnalyticsCharts';
@@ -384,6 +385,19 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('ai');
+                  triggerNongFahPrompt('ช่วยวิเคราะห์และทำความสะอาดข้อมูลการตอบกลับ (Data Cleansing) เติมรหัสนักเรียนจากฐานข้อมูล และจัดฟอร์แมตเบอร์โทรศัพท์ให้หน่อย');
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-900 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                title="ทำความสะอาดข้อมูลและดึงรหัสจากฐานข้อมูลด้วย AI"
+              >
+                <Sparkles className="w-4 h-4 text-sky-600" />
+                <span>คลีนข้อมูลด้วย AI</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => triggerNongFahPrompt()}
@@ -848,6 +862,7 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
               {/* Quick Action Chips */}
               <div className="mt-3 flex flex-wrap gap-2">
                 {[
+                  { label: 'ทำความสะอาดข้อมูลด้วย AI (Data Cleansing)', prompt: 'ช่วยวิเคราะห์และทำความสะอาดข้อมูลการตอบกลับ (Data Cleansing) เติมรหัสนักเรียนจากฐานข้อมูล และจัดฟอร์แมตเบอร์โทรศัพท์ให้หน่อย' },
                   { label: 'ซิงค์ข้อมูลผลสำรวจเข้าฐานข้อมูลนักเรียน', prompt: 'ช่วยวิเคราะห์ผลตอบกลับแล้วเอาไปอัปเดตข้อมูลนักเรียนในระบบให้หน่อย' },
                   { label: 'สรุปจุดเด่น & จุดที่ต้องปรับปรุงเร่งด่วน', prompt: 'สรุปจุดเด่นและจุดที่ควรปรับปรุงเร่งด่วนจากผลการตอบฟอร์มนี้' },
                   { label: 'สรุปรายงานนำเสนอผู้บริหาร', prompt: 'ช่วยสรุปผลการสำรวจนี้ให้เป็นรายงานเชิงบริหารสำหรับนำเสนอที่ประชุมผู้บริหารโรงเรียน' },
@@ -867,6 +882,10 @@ export default function FormResponsesPage({ params }: { params: Promise<{ id: st
                 ))}
               </div>
             </div>
+
+            <FormDataCleansingSection
+              formId={form.id}
+            />
 
             <NongFahResponsesInsights
               formId={form.id}

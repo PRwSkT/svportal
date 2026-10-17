@@ -108,7 +108,15 @@ export function determineTaskComplexity(options: {
     prompt.includes('กรอกด้วยฟอร์แมท') ||
     prompt.includes('แก้ไขในdatabase');
 
-  if (isFormCreation || isExamCreation || isDeepAnalytics || isDatabaseSync) {
+  const isDataCleansing =
+    prompt.includes('คลีน') ||
+    prompt.includes('cleansing') ||
+    prompt.includes('ทำความสะอาด') ||
+    prompt.includes('ปรับฟอร์แมต') ||
+    prompt.includes('เติมรหัส') ||
+    prompt.includes('จัดระเบียบข้อมูล');
+
+  if (isFormCreation || isExamCreation || isDeepAnalytics || isDatabaseSync || isDataCleansing) {
     return 'high';
   }
 
@@ -206,7 +214,7 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
         },
       };
 
-      if (responseMimeType === 'application/json') {
+      if (responseMimeType === 'application/json' && !options.enableSearchGrounding) {
         requestBody.generationConfig.responseMimeType = 'application/json';
       }
 
@@ -216,7 +224,7 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
       }
 
       // Note: Google Generative AI API disallows combining search grounding with responseMimeType: 'application/json'
-      if (options.enableSearchGrounding && responseMimeType !== 'application/json') {
+      if (options.enableSearchGrounding) {
         requestBody.tools = [{ googleSearch: {} }];
       }
 
@@ -231,9 +239,15 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
       });
 
       // If thinkingConfig or search grounding was rejected by model/quota, fallback immediately without them
-      if (!res.ok && (requestBody.generationConfig.thinkingConfig || requestBody.tools)) {
-        delete requestBody.generationConfig.thinkingConfig;
+      if (!res.ok && (requestBody.generationConfig?.thinkingConfig || requestBody.tools)) {
+        if (requestBody.generationConfig) {
+          delete requestBody.generationConfig.thinkingConfig;
+        }
         delete requestBody.tools;
+        if (responseMimeType === 'application/json') {
+          requestBody.generationConfig = requestBody.generationConfig || {};
+          requestBody.generationConfig.responseMimeType = 'application/json';
+        }
         res = await fetch(url, {
           method: 'POST',
           headers: {
@@ -511,6 +525,8 @@ export interface NongFahChatContext {
   responsesSummary?: SanitizedFormAnalysisPayload;
   lastGeneratedForm?: GeneratedFormDefinition | null;
   syncOpportunities?: any[];
+  cleansingAnalysis?: any;
+  collectiveMemoryContext?: string;
   currentFields?: Array<{
     field_key: string;
     field_type: string;
@@ -524,7 +540,7 @@ export interface NongFahChatContext {
 
 export interface NongFahChatResponse {
   reply: string;
-  actionType: 'form_generated' | 'form_modified' | 'database_sync' | 'chat';
+  actionType: 'form_generated' | 'form_modified' | 'database_sync' | 'data_cleansing' | 'chat';
   generatedForm?: GeneratedFormDefinition | null;
   modifiedFields?: FormField[] | null;
   modificationSummary?: string | null;
@@ -533,6 +549,19 @@ export interface NongFahChatResponse {
     totalMatched: number;
     totalPending: number;
     syncItems: any[];
+  } | null;
+  dataCleansingPayload?: {
+    formId: string;
+    totalResponses: number;
+    totalNeedingCleansing: number;
+    stats: {
+      studentIdsEnriched: number;
+      phonesFormatted: number;
+      namesCleaned: number;
+      allergiesStandardized: number;
+      classroomsAligned: number;
+    };
+    items: any[];
   } | null;
   suggestions?: string[];
 }
@@ -606,12 +635,18 @@ Strict rules to follow:
     - ใน "reply": ให้คำตอบเชิงวิเคราะห์อย่างสุภาพ สรุปจำนวนนักเรียนที่พร้อมนำเข้าฐานข้อมูล (เช่น มีข้อมูลเบอร์โทรศัพท์ผู้ปกครองใหม่, วันเกิด, หรือข้อมูลสุขภาพ/แพ้อาหาร) ระบุอย่างชัดเจนว่าระบบได้ปรับฟอร์แมทเบอร์โทรศัพท์ 10 หลัก วันเกิด คัดกรองคำว่าไม่มี/ไม่แพ้ออกให้เรียบร้อยแล้ว และขอให้คุณครูตรวจสอบความแตกต่างและกดยืนยันอัปเดตเข้าฐานข้อมูลได้ทันทีค่ะ
     - ตั้ง "generatedForm": null
     - ตั้ง "modifiedFields": null
-12. In "suggestions": Provide 2-4 short, helpful follow-up phrases that the user can click.
+12. Form Response Data Cleansing & Database Enrichment (เมื่อผู้ใช้ขอให้ช่วยคลีนข้อมูล, ทำความสะอาดข้อมูล, ปรับฟอร์แมตข้อมูลตอบกลับ, แก้ไขข้อมูลผู้ปกครอง, ดึงข้อมูลจากฐานข้อมูลมาใส่ในฟอร์ม หรือมีคำว่า "data cleansing", "คลีนข้อมูล", "ทำความสะอาด", "จัดระเบียบข้อมูล", "เติมรหัสนักเรียน"):
+    - คุณมีสิทธิ์เข้าถึงข้อมูลการวิเคราะห์และทำความสะอาดข้อมูลใน "FORM DATA CLEANSING ANALYSIS"
+    - ตั้ง "actionType": "data_cleansing"
+    - ใน "reply": อธิบายอย่างสุภาพว่าหนูฟ้าได้ตรวจสอบผลการตอบกลับและนำข้อมูลนักเรียนจากฐานข้อมูลโรงเรียนมาช่วยเติมเต็มและจัดฟอร์แมตมาตรฐานให้เรียบร้อยแล้ว เช่น เติมรหัสนักเรียนที่ตกหล่น ปรับเบอร์โทรศัพท์ 10 หลัก ปรับห้องเรียน และจัดมาตรฐานข้อมูลการแพ้ โดยคุณครูสามารถตรวจสอบรายการและกด "ยืนยันทำความสะอาดและแก้ไขข้อมูลในฟอร์มทันที" ได้เลยค่ะ
+    - ตั้ง "generatedForm": null
+    - ตั้ง "modifiedFields": null
+13. In "suggestions": Provide 2-4 short, helpful follow-up phrases that the user can click.
 
 JSON schema:
 {
   "reply": "string (polite Thai response, strictly no emojis)",
-  "actionType": "form_generated" | "form_modified" | "database_sync" | "chat",
+  "actionType": "form_generated" | "form_modified" | "database_sync" | "data_cleansing" | "chat",
   "modificationSummary": "string (if form_modified) or null",
   "modifiedFields": [
     {
@@ -655,6 +690,8 @@ JSON schema:
     ? `\nCurrent Context: Form "${context.formTitle}" (Page Context: ${context.page || 'editor'})`
     : '';
 
+  const collectiveMemoryText = context?.collectiveMemoryContext || '';
+
   const fieldsSummary = context?.currentFields && context.currentFields.length > 0
     ? `\nCurrently Existing Form Fields (${context.currentFields.length} fields):\n${JSON.stringify(context.currentFields, null, 2)}`
     : '';
@@ -696,12 +733,44 @@ ${JSON.stringify(
 === END OF DATABASE SYNC OPPORTUNITIES ===\n`
     : '';
 
-  const userPrompt = `${contextNote}${fieldsSummary}${lastFormText}${responsesDataText}${syncOpportunitiesText}
+  const cleansingAnalysisText = context?.cleansingAnalysis
+    ? `\n=== FORM DATA CLEANSING ANALYSIS ===
+Total Responses: ${context.cleansingAnalysis.totalResponses}
+Total Needing Cleansing: ${context.cleansingAnalysis.totalNeedingCleansing}
+Cleansing Stats:
+- Student IDs Enriched from DB: ${context.cleansingAnalysis.stats.studentIdsEnriched}
+- Phone Numbers Formatted: ${context.cleansingAnalysis.stats.phonesFormatted}
+- Names Cleaned: ${context.cleansingAnalysis.stats.namesCleaned}
+- Allergies Standardized: ${context.cleansingAnalysis.stats.allergiesStandardized}
+- Classrooms Aligned: ${context.cleansingAnalysis.stats.classroomsAligned}
+Sample Cleaned Items:
+${JSON.stringify(
+  context.cleansingAnalysis.items.slice(0, 10).map((i: any) => ({
+    responseId: i.responseId,
+    studentName: i.studentName,
+    matchedStudentId: i.matchedStudentId,
+    changesCount: i.changes.length,
+    changes: i.changes.map((c: any) => `${c.fieldLabel}: "${c.oldValue}" -> "${c.newValue}" (${c.reason})`),
+  })),
+  null,
+  2
+)}
+=== END FORM DATA CLEANSING ANALYSIS ===\n`
+    : '';
+
+  const userPrompt = `${contextNote}${collectiveMemoryText}${fieldsSummary}${lastFormText}${responsesDataText}${syncOpportunitiesText}${cleansingAnalysisText}
 Conversation History:
 ${conversationHistoryText || '(No previous history)'}
 
 Current User Message: "${message.trim()}"
 Analyze the message, perform the action, and return strictly JSON.`;
+
+  // Auto-detect search grounding
+  const searchKeywords = [
+    'ข่าว', 'ล่าสุด', 'วันนี้', 'ระเบียบ', 'สช', 'สพฐ', 'กระทรวง', 'กฎหมาย', 'พ.ศ.',
+    'สภาพอากาศ', 'ค้นหา', 'ค้นเว็บ', 'อัปเดต', 'google', 'เช็กข่าว', 'ประกาศศธ'
+  ];
+  const shouldGround = searchKeywords.some(kw => message.toLowerCase().includes(kw));
 
   const rawJson = await callGemma({
     systemPrompt,
@@ -709,7 +778,7 @@ Analyze the message, perform the action, and return strictly JSON.`;
     temperature: 0.2,
     maxTokens: 2500,
     responseMimeType: 'application/json',
-    enableSearchGrounding: false,
+    enableSearchGrounding: shouldGround,
   });
 
   const resObj = safeParseJson<NongFahChatResponse>(
@@ -734,6 +803,27 @@ Analyze the message, perform the action, and return strictly JSON.`;
       totalMatched: context.syncOpportunities.length,
       totalPending: context.syncOpportunities.filter((i: any) => !i.isAlreadySynced).length,
       syncItems: context.syncOpportunities,
+    };
+  }
+
+  // If user requested data cleansing or model outputted data_cleansing, enrich with real payload
+  const isCleansingIntent =
+    resObj.actionType === 'data_cleansing' ||
+    message.includes('คลีน') ||
+    message.includes('cleansing') ||
+    message.includes('ทำความสะอาด') ||
+    message.includes('จัดฟอร์แมต') ||
+    message.includes('ปรับฟอร์แมต') ||
+    (message.includes('แก้ไข') && message.includes('ตอบกลับ'));
+
+  if (isCleansingIntent && context?.cleansingAnalysis) {
+    resObj.actionType = 'data_cleansing';
+    resObj.dataCleansingPayload = {
+      formId: context.formId || context.cleansingAnalysis.formId,
+      totalResponses: context.cleansingAnalysis.totalResponses,
+      totalNeedingCleansing: context.cleansingAnalysis.totalNeedingCleansing,
+      stats: context.cleansingAnalysis.stats,
+      items: context.cleansingAnalysis.items,
     };
   }
 
