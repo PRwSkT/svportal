@@ -49,7 +49,7 @@ export function ExamPrintModal({
   const [selectedGrade, setSelectedGrade] = useState<string>('');
   const [students, setStudents] = useState<StudentRosterItem[]>([]);
   const [isLoadingStudents, setIsLoadingStudents] = useState<boolean>(false);
-  const [setDistribution, setSetDistribution] = useState<'alternate_ab' | 'all_a' | 'all_b' | 'by_set'>('alternate_ab');
+  const [setDistribution, setSetDistribution] = useState<'alternate_abc' | 'alternate_ab' | 'all_a' | 'all_b' | 'all_c' | 'by_set_3' | 'by_set'>('alternate_abc');
   const [spareSheetsCount, setSpareSheetsCount] = useState<number>(2);
 
   // Live preview HTML state
@@ -113,7 +113,7 @@ export function ExamPrintModal({
       try {
         const examData = exam.exam || exam;
         const questionsList = exam.questions || examData.questions || [];
-        const variantSets = exam.variant_sets || examData.variant_sets || [];
+        const variantSets = exam.sets || examData.sets || exam.variant_sets || examData.variant_sets || [];
         const currentVariant = variantSets.find((v: any) => v.set_name === selectedSet);
 
         if (activeTab === 'questions') {
@@ -188,8 +188,8 @@ export function ExamPrintModal({
 
   const examData = exam.exam || exam;
   const questionsList = exam.questions || examData.questions || [];
-  const variantSets = exam.variant_sets || examData.variant_sets || [];
-  const availableSets = variantSets.length > 0 ? variantSets.map((s: any) => s.set_name) : ['A', 'B'];
+  const variantSets = exam.sets || examData.sets || exam.variant_sets || examData.variant_sets || [];
+  const availableSets: string[] = variantSets.length > 0 ? variantSets.map((s: any) => s.set_name) : ['A', 'B', 'C'];
 
   // Calculate paper counts
   const effectiveStudentsCount = students.length;
@@ -339,6 +339,24 @@ export function ExamPrintModal({
                   </label>
                   <div className="space-y-1.5 text-xs">
                     <label className={`flex items-start gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                      setDistribution === 'alternate_abc'
+                        ? 'border-[#7B1C3E] bg-rose-50/60 dark:bg-rose-950/30 text-slate-900 dark:text-white'
+                        : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="setDistribution"
+                        checked={setDistribution === 'alternate_abc'}
+                        onChange={() => setSetDistribution('alternate_abc')}
+                        className="mt-0.5 text-[#7B1C3E]"
+                      />
+                      <div>
+                        <div className="font-bold">สลับ 3 ชุด A / B / C อัตโนมัติ (แนะนำ)</div>
+                        <div className="text-[11px] text-slate-500">เลขที่ 1=ชุด A, 2=ชุด B, 3=ชุด C, 4=ชุด A ป้องกันการทุจริตรอบทิศทาง</div>
+                      </div>
+                    </label>
+
+                    <label className={`flex items-start gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
                       setDistribution === 'alternate_ab'
                         ? 'border-[#7B1C3E] bg-rose-50/60 dark:bg-rose-950/30 text-slate-900 dark:text-white'
                         : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
@@ -351,8 +369,26 @@ export function ExamPrintModal({
                         className="mt-0.5 text-[#7B1C3E]"
                       />
                       <div>
-                        <div className="font-bold">สลับชุด A / B อัตโนมัติ (แนะนำ)</div>
+                        <div className="font-bold">สลับ 2 ชุด A / B อัตโนมัติ</div>
                         <div className="text-[11px] text-slate-500">เลขที่คี่ได้ ชุด A, เลขที่คู่ได้ ชุด B กันการทุจริตข้ามโต๊ะ</div>
+                      </div>
+                    </label>
+
+                    <label className={`flex items-start gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                      setDistribution === 'by_set_3'
+                        ? 'border-[#7B1C3E] bg-rose-50/60 dark:bg-rose-950/30 text-slate-900 dark:text-white'
+                        : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="setDistribution"
+                        checked={setDistribution === 'by_set_3'}
+                        onChange={() => setSetDistribution('by_set_3')}
+                        className="mt-0.5 text-[#7B1C3E]"
+                      />
+                      <div>
+                        <div className="font-bold">แบ่ง 3 กลุ่มตามแถว (ชุด A, B, C)</div>
+                        <div className="text-[11px] text-slate-500">จัดแยกเป็น 3 กองตามแถวที่นั่งซ้าย กลาง ขวา</div>
                       </div>
                     </label>
 
@@ -371,6 +407,42 @@ export function ExamPrintModal({
                       <div>
                         <div className="font-bold">ชุด A ทั้งหมด (All Set A)</div>
                         <div className="text-[11px] text-slate-500">นักเรียนทุกคนได้รับข้อสอบชุด A เหมือนกัน</div>
+                      </div>
+                    </label>
+
+                    <label className={`flex items-start gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                      setDistribution === 'all_b'
+                        ? 'border-[#7B1C3E] bg-rose-50/60 dark:bg-rose-950/30 text-slate-900 dark:text-white'
+                        : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="setDistribution"
+                        checked={setDistribution === 'all_b'}
+                        onChange={() => setSetDistribution('all_b')}
+                        className="mt-0.5 text-[#7B1C3E]"
+                      />
+                      <div>
+                        <div className="font-bold">ชุด B ทั้งหมด (All Set B)</div>
+                        <div className="text-[11px] text-slate-500">นักเรียนทุกคนได้รับข้อสอบชุด B เหมือนกัน</div>
+                      </div>
+                    </label>
+
+                    <label className={`flex items-start gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                      setDistribution === 'all_c'
+                        ? 'border-[#7B1C3E] bg-rose-50/60 dark:bg-rose-950/30 text-slate-900 dark:text-white'
+                        : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="setDistribution"
+                        checked={setDistribution === 'all_c'}
+                        onChange={() => setSetDistribution('all_c')}
+                        className="mt-0.5 text-[#7B1C3E]"
+                      />
+                      <div>
+                        <div className="font-bold">ชุด C ทั้งหมด (All Set C)</div>
+                        <div className="text-[11px] text-slate-500">นักเรียนทุกคนได้รับข้อสอบชุด C เหมือนกัน</div>
                       </div>
                     </label>
 
@@ -456,10 +528,30 @@ export function ExamPrintModal({
                   </div>
                   <div className="max-h-36 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-xl divide-y text-[11px] bg-white dark:bg-slate-800">
                     {students.map((s, idx) => {
-                      let assignedSet: 'A' | 'B' = 'A';
-                      if (setDistribution === 'alternate_ab') assignedSet = idx % 2 === 0 ? 'A' : 'B';
-                      else if (setDistribution === 'all_b') assignedSet = 'B';
-                      else if (setDistribution === 'by_set') assignedSet = idx < Math.ceil(students.length / 2) ? 'A' : 'B';
+                      let assignedSet: 'A' | 'B' | 'C' = 'A';
+                      if (setDistribution === 'alternate_abc') {
+                        const mod = idx % 3;
+                        assignedSet = mod === 0 ? 'A' : mod === 1 ? 'B' : 'C';
+                      } else if (setDistribution === 'alternate_ab') {
+                        assignedSet = idx % 2 === 0 ? 'A' : 'B';
+                      } else if (setDistribution === 'all_b') {
+                        assignedSet = 'B';
+                      } else if (setDistribution === 'all_c') {
+                        assignedSet = 'C';
+                      } else if (setDistribution === 'by_set_3') {
+                        const oneThird = Math.ceil(students.length / 3);
+                        if (idx < oneThird) assignedSet = 'A';
+                        else if (idx < oneThird * 2) assignedSet = 'B';
+                        else assignedSet = 'C';
+                      } else if (setDistribution === 'by_set') {
+                        assignedSet = idx < Math.ceil(students.length / 2) ? 'A' : 'B';
+                      }
+
+                      const badgeClass = assignedSet === 'A'
+                        ? 'bg-rose-100 text-[#7B1C3E] dark:bg-rose-950 dark:text-rose-300'
+                        : assignedSet === 'B'
+                        ? 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300'
+                        : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300';
 
                       return (
                         <div key={s.id || idx} className="p-1.5 px-2.5 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700/50">
@@ -469,11 +561,7 @@ export function ExamPrintModal({
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             <span className="text-[10px] font-mono text-slate-400">{s.id}</span>
-                            <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
-                              assignedSet === 'A'
-                                ? 'bg-rose-100 text-[#7B1C3E] dark:bg-rose-950 dark:text-rose-300'
-                                : 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300'
-                            }`}>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${badgeClass}`}>
                               ชุด {assignedSet}
                             </span>
                           </div>
@@ -491,19 +579,19 @@ export function ExamPrintModal({
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                     เลือกชุดข้อสอบที่จะพิมพ์
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     {availableSets.map((setName: string) => (
                       <button
                         key={setName}
                         type="button"
                         onClick={() => setSelectedSet(setName)}
-                        className={`py-3 px-4 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-between ${
+                        className={`py-3 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-between ${
                           selectedSet === setName
                             ? 'bg-[#7B1C3E] text-white border-[#7B1C3E] shadow-sm'
                             : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300'
                         }`}
                       >
-                        <span>ข้อสอบชุด {setName}</span>
+                        <span>ชุด {setName}</span>
                         {selectedSet === setName && <CheckCircle2 className="w-4 h-4 text-white" />}
                       </button>
                     ))}

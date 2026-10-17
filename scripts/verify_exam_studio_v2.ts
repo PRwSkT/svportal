@@ -1,4 +1,4 @@
-import { generateExamPaperHtml, renderMathInHtml } from '../src/lib/academic/exam-print-engine';
+import { generateExamPaperHtml, renderMathInHtml, generateBatchAnswerSheetsHtml } from '../src/lib/academic/exam-print-engine';
 import { generateExamSets, evaluateOMRBubbles } from '../src/lib/academic/exam-engine';
 import { AcademicExamQuestion } from '../src/types/academic';
 
@@ -126,7 +126,104 @@ async function runVerification() {
   }
   console.log('PASS: Exam sets A, B, C generated successfully with choice pinning protection.');
 
-  console.log('\n=== 4. OMR SCANNER 5-CHOICE COMPATIBILITY ===');
+  console.log('\n=== 4. 3-SET (A/B/C) QUESTION & CHOICE SHUFFLING VERIFICATION ===');
+  const htmlSetA = generateExamPaperHtml(
+    {
+      id: 'mock-exam-1',
+      title: 'ข้อสอบชุด A-B-C',
+      total_questions: 3,
+      duration_minutes: 60,
+      max_score: 4
+    },
+    mockQuestions,
+    {
+      setName: 'A',
+      variantSet: sets[0]
+    }
+  );
+
+  const htmlSetB = generateExamPaperHtml(
+    {
+      id: 'mock-exam-1',
+      title: 'ข้อสอบชุด A-B-C',
+      total_questions: 3,
+      duration_minutes: 60,
+      max_score: 4
+    },
+    mockQuestions,
+    {
+      setName: 'B',
+      variantSet: sets[1]
+    }
+  );
+
+  const htmlSetC = generateExamPaperHtml(
+    {
+      id: 'mock-exam-1',
+      title: 'ข้อสอบชุด A-B-C',
+      total_questions: 3,
+      duration_minutes: 60,
+      max_score: 4
+    },
+    mockQuestions,
+    {
+      setName: 'C',
+      variantSet: sets[2]
+    }
+  );
+
+  if (!htmlSetA.includes('ข้อสอบชุด A') || !htmlSetB.includes('ข้อสอบชุด B') || !htmlSetC.includes('ข้อสอบชุด C')) {
+    throw new Error('Exam header sets (A, B, C) missing from paper output');
+  }
+
+  // Verify that Set B question or choice ordering differs from Set A
+  if (htmlSetA === htmlSetB) {
+    throw new Error('Set A and Set B HTML are identical! Questions and choices were not shuffled.');
+  }
+
+  // Check that the first question in Set B matches the question mapped in sets[1].question_order_mapping[0]
+  const setBMapping0 = sets[1].question_order_mapping[0];
+  const origQuestion0 = mockQuestions.find(q => q.question_number === setBMapping0.original_question_number);
+  const renderedText = renderMathInHtml(origQuestion0!.question_text);
+  if (!htmlSetB.includes(renderedText)) {
+    throw new Error('Mapped question for Set B was not rendered in HTML');
+  }
+  console.log('PASS: Set A, Set B, and Set C render distinct, correctly shuffled questions and choices.');
+
+  console.log('\n=== 5. BATCH OMR 3-SET (ALTERNATE_ABC) DISTRIBUTION VERIFICATION ===');
+  const mockStudents = [
+    { id: '1001', name: 'เด็กชายสมชาย ใจดี', grade: 'ป.6/1', roll_number: 1 },
+    { id: '1002', name: 'เด็กหญิงสมหญิง รักเรียน', grade: 'ป.6/1', roll_number: 2 },
+    { id: '1003', name: 'เด็กชายมานะ อดทน', grade: 'ป.6/1', roll_number: 3 },
+    { id: '1004', name: 'เด็กหญิงปิติ ชูใจ', grade: 'ป.6/1', roll_number: 4 }
+  ];
+
+  const batchHtml = await generateBatchAnswerSheetsHtml({
+    exam: {
+      id: 'mock-exam-1',
+      title: 'ข้อสอบจำลอง',
+      total_questions: 3,
+      duration_minutes: 60,
+      max_score: 4
+    },
+    students: mockStudents,
+    setDistribution: 'alternate_abc',
+    spareSheetsCount: 3
+  });
+
+  if (!batchHtml.includes('set-badge-tag set-A') || !batchHtml.includes('set-badge-tag set-B') || !batchHtml.includes('set-badge-tag set-C')) {
+    throw new Error('Batch OMR HTML does not contain Set A, B, and C badges');
+  }
+
+  if (!batchHtml.includes('SV-OMR-V2 | ID:mock-exa-A-1001') || 
+      !batchHtml.includes('SV-OMR-V2 | ID:mock-exa-B-1002') || 
+      !batchHtml.includes('SV-OMR-V2 | ID:mock-exa-C-1003') || 
+      !batchHtml.includes('SV-OMR-V2 | ID:mock-exa-A-1004')) {
+    throw new Error('Batch OMR alternate_abc student set mapping is incorrect in rendered output');
+  }
+  console.log('PASS: Batch OMR successfully distributed Sets A, B, and C alternately across student roster.');
+
+  console.log('\n=== 6. OMR SCANNER 5-CHOICE COMPATIBILITY ===');
   const bubbleEval = evaluateOMRBubbles({
     A: 0.05,
     B: 0.10,

@@ -57,9 +57,10 @@ export interface ExamPaperOptions {
   setName?: string;
   variantSet?: {
     set_name: string;
-    question_order_mapping?: number[];
-    choice_map?: Record<string, Record<string, string>>;
+    question_order_mapping?: any;
+    choice_map?: any;
     answer_key?: Record<string, string>;
+    [key: string]: any;
   };
 }
 
@@ -76,7 +77,7 @@ export interface StudentRosterItem {
 export interface BatchAnswerSheetsOptions {
   exam: ExamPaperMeta;
   students: StudentRosterItem[];
-  setDistribution?: 'alternate_ab' | 'all_a' | 'all_b' | 'by_set';
+  setDistribution?: 'alternate_abc' | 'alternate_ab' | 'all_a' | 'all_b' | 'all_c' | 'by_set_3' | 'by_set';
   spareSheetsCount?: number;
   schoolName?: string;
   academicYear?: string;
@@ -166,23 +167,54 @@ export function generateExamPaperHtml(
   const gradeLevel = exam.course?.grade_level || exam.gradebook?.class?.name || 'ประถมศึกษาปีที่ 3';
 
   // Apply question order and choice shuffling if variantSet is provided
-  let orderedQuestions = [...questions];
   const variantSet = options.variantSet;
 
-  if (variantSet?.question_order_mapping && Array.isArray(variantSet.question_order_mapping)) {
-    orderedQuestions = variantSet.question_order_mapping
-      .map((origIdx: number) => questions[origIdx])
-      .filter(Boolean);
-    if (orderedQuestions.length === 0) orderedQuestions = [...questions];
+  interface MappedQuestionItem {
+    question: AcademicExamQuestion;
+    choiceMap: Record<string, string>;
   }
 
-  const renderedQuestionsHtml = orderedQuestions.map((q, idx) => {
+  let mappedQuestions: MappedQuestionItem[] = [];
+
+  if (variantSet?.question_order_mapping && Array.isArray(variantSet.question_order_mapping) && variantSet.question_order_mapping.length > 0) {
+    const mapping = variantSet.question_order_mapping;
+
+    // Check Format 1: Array of objects { original_question_number, new_question_number, choice_map }
+    if (typeof mapping[0] === 'object' && mapping[0] !== null && 'original_question_number' in mapping[0]) {
+      mappedQuestions = mapping.map((m: any) => {
+        const found = questions.find(q => q.question_number === m.original_question_number)
+          || questions[(m.original_question_number || 1) - 1];
+        return {
+          question: found,
+          choiceMap: m.choice_map || { A: 'A', B: 'B', C: 'C', D: 'D' }
+        };
+      }).filter(item => Boolean(item.question));
+    } else if (typeof mapping[0] === 'number') {
+      // Check Format 2: Array of numbers (original 0-based indices)
+      mappedQuestions = mapping.map((origIdx: number) => {
+        const q = questions[origIdx];
+        const choiceMap = variantSet?.choice_map?.[origIdx] || { A: 'A', B: 'B', C: 'C', D: 'D' };
+        return { question: q, choiceMap };
+      }).filter(item => Boolean(item.question));
+    }
+  }
+
+  // Fallback to original questions list if no variant mapping was found or empty
+  if (mappedQuestions.length === 0) {
+    mappedQuestions = questions.map((q, idx) => ({
+      question: q,
+      choiceMap: variantSet?.choice_map?.[idx] || { A: 'A', B: 'B', C: 'C', D: 'D' }
+    }));
+  }
+
+  const renderedQuestionsHtml = mappedQuestions.map((item, idx) => {
+    const q = item.question;
     const qNum = idx + 1;
-    const origIdx = questions.indexOf(q);
-    const choiceMap = variantSet?.choice_map?.[origIdx] || { A: 'A', B: 'B', C: 'C', D: 'D' };
+    const choiceMap = item.choiceMap;
 
     const getChoiceText = (letter: string) => {
-      const mappedLetter = (choiceMap[letter] || letter).toLowerCase();
+      const origKey = (choiceMap && choiceMap[letter]) ? choiceMap[letter] : letter;
+      const mappedLetter = origKey.toLowerCase();
       return (q as any)[`choice_${mappedLetter}`] || (q as any)[`choice_${letter.toLowerCase()}`] || '';
     };
 
@@ -515,7 +547,7 @@ export function generateExamPaperHtml(
                       <div class="exam-info-item"><strong>ภาคเรียน:</strong> ${term}/${academicYear}</div>
                       <div class="exam-info-item"><strong>เวลาสอบ:</strong> ${exam.duration_minutes} นาที</div>
                       <div class="exam-info-item"><strong>คะแนนเต็ม:</strong> ${exam.max_score} คะแนน</div>
-                      <div class="exam-info-item"><strong>จำนวนข้อสอบ:</strong> ${orderedQuestions.length} ข้อ</div>
+                      <div class="exam-info-item"><strong>จำนวนข้อสอบ:</strong> ${mappedQuestions.length} ข้อ</div>
                     </div>
                     <div class="student-fill-box">
                       <div class="dotted-line-field">ชื่อ-นามสกุล: ................................................................</div>
@@ -539,7 +571,7 @@ export function generateExamPaperHtml(
                 <td>
                   <div class="running-footer">
                     <span>${schoolName} - แบบวัดผลสัมฤทธิ์ทางการเรียน</span>
-                    <span>ข้อสอบชุด ${setName} (จำนวน ${orderedQuestions.length} ข้อ)</span>
+                    <span>ข้อสอบชุด ${setName} (จำนวน ${mappedQuestions.length} ข้อ)</span>
                   </div>
                 </td>
               </tr>
@@ -563,7 +595,7 @@ export async function generateBatchAnswerSheetsHtml(
   const {
     exam,
     students,
-    setDistribution = 'alternate_ab',
+    setDistribution = 'alternate_abc',
     spareSheetsCount = 2,
     schoolName = 'โรงเรียนสมคิดวิทยา',
     academicYear = '2568',
@@ -572,20 +604,34 @@ export async function generateBatchAnswerSheetsHtml(
 
   const totalQuestions = Math.min(Math.max(exam.total_questions || 20, 10), 60);
 
-  // Assign Sets to Students
+  // Assign Sets to Students (Supports 3-set A/B/C rotation, 2-set A/B rotation, and block partitioning)
   const assignedList: Array<{
     student: StudentRosterItem | null;
-    setName: 'A' | 'B';
+    setName: 'A' | 'B' | 'C' | 'D';
     isSpare?: boolean;
     indexNumber: number;
   }> = [];
 
   students.forEach((student, idx) => {
-    let assignedSet: 'A' | 'B' = 'A';
-    if (setDistribution === 'alternate_ab') {
+    let assignedSet: 'A' | 'B' | 'C' = 'A';
+    if (setDistribution === 'alternate_abc') {
+      const mod = idx % 3;
+      assignedSet = mod === 0 ? 'A' : mod === 1 ? 'B' : 'C';
+    } else if (setDistribution === 'alternate_ab') {
       assignedSet = idx % 2 === 0 ? 'A' : 'B';
     } else if (setDistribution === 'all_b') {
       assignedSet = 'B';
+    } else if (setDistribution === 'all_c') {
+      assignedSet = 'C';
+    } else if (setDistribution === 'by_set_3') {
+      const oneThird = Math.ceil(students.length / 3);
+      if (idx < oneThird) {
+        assignedSet = 'A';
+      } else if (idx < oneThird * 2) {
+        assignedSet = 'B';
+      } else {
+        assignedSet = 'C';
+      }
     } else if (setDistribution === 'by_set') {
       const half = Math.ceil(students.length / 2);
       assignedSet = idx < half ? 'A' : 'B';
@@ -603,7 +649,18 @@ export async function generateBatchAnswerSheetsHtml(
 
   // Add Spare Sheets (if requested)
   for (let i = 0; i < spareSheetsCount; i++) {
-    const spareSet: 'A' | 'B' = i % 2 === 0 ? 'A' : 'B';
+    let spareSet: 'A' | 'B' | 'C' = 'A';
+    if (setDistribution === 'alternate_abc' || setDistribution === 'by_set_3') {
+      const mod = i % 3;
+      spareSet = mod === 0 ? 'A' : mod === 1 ? 'B' : 'C';
+    } else if (setDistribution === 'all_b') {
+      spareSet = 'B';
+    } else if (setDistribution === 'all_c') {
+      spareSet = 'C';
+    } else {
+      spareSet = i % 2 === 0 ? 'A' : 'B';
+    }
+
     assignedList.push({
       student: null,
       setName: spareSet,
@@ -922,6 +979,18 @@ export async function generateBatchAnswerSheetsHtml(
             background: #0284c7;
             color: #ffffff;
             border: 1.5px solid #0284c7;
+          }
+
+          .set-C {
+            background: #059669;
+            color: #ffffff;
+            border: 1.5px solid #059669;
+          }
+
+          .set-D {
+            background: #d97706;
+            color: #ffffff;
+            border: 1.5px solid #d97706;
           }
 
           .exam-id-tag {
