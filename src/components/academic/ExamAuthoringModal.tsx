@@ -596,17 +596,17 @@ export function ExamAuthoringModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center p-3 md:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="bg-white rounded-2xl shadow-2xl border border-stone-200 w-full max-w-6xl overflow-hidden flex flex-col max-h-[96vh]">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-2 sm:p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="bg-white rounded-2xl shadow-2xl border border-stone-200 w-full max-w-6xl overflow-hidden flex flex-col max-h-[94vh]">
         {/* Header */}
-        <div className="px-6 py-4 bg-stone-900 text-white flex items-center justify-between shrink-0">
+        <div className="px-6 py-3.5 bg-stone-900 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/20 text-rose-300 flex items-center justify-center font-bold">
               <FileText className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-lg leading-tight">
+                <h3 className="font-bold text-base sm:text-lg leading-tight">
                   {mode === 'edit' ? 'สตูดิโอแก้ไขข้อสอบ (Edit Exam Studio)' : 'สตูดิโอออกข้อสอบมาตรฐานระดับสูง (Next-Gen Exam Studio)'}
                 </h3>
                 <span className="px-2.5 py-0.5 text-[11px] rounded-full font-semibold bg-primary/30 text-rose-200 border border-primary/40">
@@ -620,31 +620,33 @@ export function ExamAuthoringModal({
           </div>
           <button
             onClick={onClose}
-            className="text-stone-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+            className="text-stone-300 hover:text-white px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center gap-1 text-xs font-semibold"
+            title="ปิดหน้าต่าง"
           >
-            <X className="w-6 h-6" />
+            <X className="w-4 h-4" />
+            <span>ปิด</span>
           </button>
         </div>
 
         {/* Top Control Bar: Metadata */}
-        <div className="p-4 bg-stone-50 border-b border-stone-200 grid grid-cols-2 md:grid-cols-6 gap-3 shrink-0 text-xs">
-          <div className="col-span-2">
+        <div className="p-3.5 bg-stone-50 border-b border-stone-200 grid grid-cols-2 md:grid-cols-12 gap-2.5 shrink-0 text-xs">
+          <div className="col-span-2 md:col-span-4">
             <label className="block text-stone-600 font-semibold mb-1">ชื่อการสอบ / รหัสชุดข้อสอบ</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="เช่น การสอบกลางภาค วิชาคณิตศาสตร์พื้นฐาน ป.3"
-              className="w-full px-3 py-1.5 border border-stone-300 rounded-lg font-medium text-stone-900 focus:ring-1 focus:ring-primary"
+              className="w-full px-3 py-1.5 border border-stone-300 rounded-lg font-medium text-stone-900 bg-white focus:ring-1 focus:ring-primary"
             />
           </div>
 
-          <div>
+          <div className="col-span-2 md:col-span-4">
             <label className="block text-stone-600 font-semibold mb-1">รายวิชา</label>
             <select
               value={courseId}
               onChange={(e) => setCourseId(e.target.value)}
-              className="w-full px-2 py-1.5 border border-stone-300 rounded-lg text-stone-900"
+              className="w-full px-2.5 py-1.5 border border-stone-300 rounded-lg text-stone-900 bg-white"
             >
               <option value="">-- เลือกรายวิชา --</option>
               {courses.map(c => (
@@ -655,12 +657,12 @@ export function ExamAuthoringModal({
             </select>
           </div>
 
-          <div>
+          <div className="col-span-1 md:col-span-2">
             <label className="block text-stone-600 font-semibold mb-1">สมุด ปพ.5 ที่เชื่อมโยง</label>
             <select
               value={gradebookId}
               onChange={(e) => setGradebookId(e.target.value)}
-              className="w-full px-2 py-1.5 border border-stone-300 rounded-lg text-stone-900"
+              className="w-full px-2 py-1.5 border border-stone-300 rounded-lg text-stone-900 bg-white"
             >
               <option value="">-- ไม่เชื่อมโยง ปพ.5 --</option>
               {gradebooks.map(g => (
@@ -671,12 +673,12 @@ export function ExamAuthoringModal({
             </select>
           </div>
 
-          <div>
+          <div className="col-span-1 md:col-span-2">
             <label className="block text-stone-600 font-semibold mb-1">ประเภทการสอบ</label>
             <select
               value={examType}
               onChange={(e) => setExamType(e.target.value)}
-              className="w-full px-2 py-1.5 border border-stone-300 rounded-lg text-stone-900"
+              className="w-full px-2 py-1.5 border border-stone-300 rounded-lg text-stone-900 bg-white"
             >
               <option value="midterm">สอบกลางภาค</option>
               <option value="final">สอบปลายภาค</option>
@@ -685,12 +687,47 @@ export function ExamAuthoringModal({
             </select>
           </div>
 
-          <div>
+          <div className="col-span-2 md:col-span-6">
+            <label className="block text-stone-600 font-semibold mb-1">คำชี้แจงบนหัวกระดาษข้อสอบ</label>
+            <input
+              type="text"
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              placeholder="เช่น ให้นักเรียนเลือกคำตอบที่ถูกต้องที่สุดเพียงข้อเดียว..."
+              className="w-full px-3 py-1.5 border border-stone-300 rounded-lg text-stone-800 bg-white focus:ring-1 focus:ring-primary"
+            />
+          </div>
+
+          <div className="col-span-1 md:col-span-2">
+            <label className="block text-stone-600 font-semibold mb-1">เวลาสอบ (นาที)</label>
+            <input
+              type="number"
+              min={5}
+              max={300}
+              value={durationMinutes}
+              onChange={(e) => setDurationMinutes(Math.max(5, parseInt(e.target.value) || 60))}
+              className="w-full px-2.5 py-1.5 border border-stone-300 rounded-lg text-stone-900 bg-white font-semibold"
+            />
+          </div>
+
+          <div className="col-span-1 md:col-span-2">
+            <label className="block text-stone-600 font-semibold mb-1">คะแนนเต็ม</label>
+            <input
+              type="number"
+              min={1}
+              max={500}
+              value={maxScore}
+              onChange={(e) => setMaxScore(Math.max(1, parseInt(e.target.value) || 20))}
+              className="w-full px-2.5 py-1.5 border border-stone-300 rounded-lg text-stone-900 bg-white font-semibold"
+            />
+          </div>
+
+          <div className="col-span-2 md:col-span-2">
             <label className="block text-stone-600 font-semibold mb-1">สถานะข้อสอบ</label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as ExamStatus)}
-              className="w-full px-2 py-1.5 border border-stone-300 rounded-lg font-semibold text-stone-900"
+              className="w-full px-2 py-1.5 border border-stone-300 rounded-lg font-semibold text-stone-900 bg-white"
             >
               <option value="draft">ร่าง (Draft)</option>
               <option value="review">รอตรวจสอบ (Review)</option>

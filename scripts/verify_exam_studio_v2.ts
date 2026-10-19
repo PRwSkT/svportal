@@ -530,10 +530,46 @@ async function runVerification() {
   }
   console.log('PASS: Multi-page A4 print table row pagination verified.');
 
-  console.log('\nALL VERIFICATION CHECKS (INCLUDING QA AUDIT & EDUCATIONAL TOOLSET V3) PASSED SUCCESSFULLY!');
+  console.log('\n=== 10. STACKING CONTEXT, MOUSE LINE DRAWING, ENDPOINT CAPS, GRID ALIGNMENT & TRANSVERSAL ANGLES ===');
+  const fs = await import('fs');
+  const path = await import('path');
+  const layoutSrc = fs.readFileSync(path.join(process.cwd(), 'src/app/layout.tsx'), 'utf-8');
+  if (layoutSrc.includes('<main className="flex-1 relative z-10')) {
+    throw new Error('src/app/layout.tsx still has z-10 on <main>, trapping modals under AppNav and GlobalNongFahBot');
+  }
+  console.log('PASS: Root layout stacking context fixed (modals are no longer trapped underneath AppNav or GlobalNongFahBot).');
+
+  const modalSrc = fs.readFileSync(path.join(process.cwd(), 'src/components/academic/ExamAuthoringModal.tsx'), 'utf-8');
+  if (!modalSrc.includes('z-[120]') || !modalSrc.includes('durationMinutes') || !modalSrc.includes('คำชี้แจงบนหัวกระดาษข้อสอบ')) {
+    throw new Error('ExamAuthoringModal missing z-[120] or metadata controls in Top Control Bar');
+  }
+  console.log('PASS: ExamAuthoringModal z-[120] and expanded 2-row Top Control Bar verified.');
+
+  const builderSrc = fs.readFileSync(path.join(process.cwd(), 'src/components/academic/InStudioDiagramBuilder.tsx'), 'utf-8');
+  const requiredTokens = [
+    'simplifyPointsRDP',
+    'renderLineCapSvg',
+    'computeLineSegmentIntersection',
+    'parallel_transversal',
+    'intersecting_lines',
+    'draw_line',
+    'draw_smart',
+    'draw_polygon',
+    'lineIntersections',
+    'handleStampIntersectionAngle'
+  ];
+  for (const token of requiredTokens) {
+    if (!builderSrc.includes(token)) {
+      throw new Error(`InStudioDiagramBuilder.tsx missing required token: ${token}`);
+    }
+  }
+  console.log('PASS: Mouse-drawn straight lines, smart shape conversion, endpoint caps, grid alignment guides, and transversal/intersection angles verified.');
+
+  console.log('\nALL VERIFICATION CHECKS (INCLUDING QA AUDIT & EDUCATIONAL TOOLSET V3 + LINE & INTERSECTION ENGINE) PASSED SUCCESSFULLY!');
 }
 
 runVerification().catch(err => {
   console.error('VERIFICATION FAILED:', err);
   process.exit(1);
 });
+

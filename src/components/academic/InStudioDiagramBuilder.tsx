@@ -77,6 +77,7 @@ export type CanvasElementType =
   | 'pentagon'
   | 'hexagon'
   | 'star_5'
+  | 'polygon_custom'
   // 3D Solids
   | 'cube_3d'
   | 'box_3d'
@@ -88,6 +89,8 @@ export type CanvasElementType =
   // Lines, Measurements & Math Tools
   | 'line'
   | 'arrow'
+  | 'parallel_transversal'
+  | 'intersecting_lines'
   | 'dimension_line'
   | 'angle_arc'
   | 'protractor'
@@ -171,6 +174,450 @@ export function escapeXml(unsafe: string): string {
   });
 }
 
+// Ramer-Douglas-Peucker Polyline Simplification for Smart Freehand-to-Straight Shape conversion
+function perpendicularDistance(pt: { x: number; y: number }, lineStart: { x: number; y: number }, lineEnd: { x: number; y: number }): number {
+  const dx = lineEnd.x - lineStart.x;
+  const dy = lineEnd.y - lineStart.y;
+  const mag = Math.hypot(dx, dy);
+  if (mag < 1e-6) return Math.hypot(pt.x - lineStart.x, pt.y - lineStart.y);
+  const u = ((pt.x - lineStart.x) * dx + (pt.y - lineStart.y) * dy) / (mag * mag);
+  const projX = lineStart.x + u * dx;
+  const projY = lineStart.y + u * dy;
+  return Math.hypot(pt.x - projX, pt.y - projY);
+}
+
+function simplifyPointsRDP(points: { x: number; y: number }[], epsilon: number): { x: number; y: number }[] {
+  if (points.length <= 2) return points;
+  let dmax = 0;
+  let index = 0;
+  const end = points.length - 1;
+  for (let i = 1; i < end; i++) {
+    const d = perpendicularDistance(points[i], points[0], points[end]);
+    if (d > dmax) {
+      index = i;
+      dmax = d;
+    }
+  }
+  if (dmax > epsilon) {
+    const rec1 = simplifyPointsRDP(points.slice(0, index + 1), epsilon);
+    const rec2 = simplifyPointsRDP(points.slice(index), epsilon);
+    return [...rec1.slice(0, rec1.length - 1), ...rec2];
+  }
+  return [points[0], points[end]];
+}
+
+// Render Endpoint Cap SVG Markup at (x, y) pointing along outward angleRad
+function renderLineCapSvg(x: number, y: number, angleRad: number, capType: string, stroke: string, strokeWidth: number): string {
+  if (!capType || capType === 'none') return '';
+  const cos = Math.cos(angleRad);
+  const sin = Math.sin(angleRad);
+  const sz = Math.max(8, strokeWidth * 3.2);
+
+  if (capType === 'arrow') {
+    const bx = x - sz * cos;
+    const by = y - sz * sin;
+    const hw = sz * 0.55;
+    const p1x = bx - hw * sin;
+    const p1y = by + hw * cos;
+    const p2x = bx + hw * sin;
+    const p2y = by - hw * cos;
+    return `<polygon points="${x},${y} ${p1x},${p1y} ${p2x},${p2y}" fill="${stroke}"/>`;
+  }
+  if (capType === 'open_arrow') {
+    const bx = x - sz * cos;
+    const by = y - sz * sin;
+    const hw = sz * 0.55;
+    const p1x = bx - hw * sin;
+    const p1y = by + hw * cos;
+    const p2x = bx + hw * sin;
+    const p2y = by - hw * cos;
+    return `<polyline points="${p1x},${p1y} ${x},${y} ${p2x},${p2y}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  }
+  if (capType === 'dot') {
+    const r = Math.max(4, strokeWidth * 1.8);
+    return `<circle cx="${x}" cy="${y}" r="${r}" fill="${stroke}"/>`;
+  }
+  if (capType === 'hollow_dot') {
+    const r = Math.max(4.5, strokeWidth * 1.8);
+    return `<circle cx="${x}" cy="${y}" r="${r}" fill="#ffffff" stroke="${stroke}" stroke-width="${Math.max(1.8, strokeWidth)}"/>`;
+  }
+  if (capType === 'bar') {
+    const hw = Math.max(7, strokeWidth * 2.8);
+    const p1x = x - hw * sin;
+    const p1y = y + hw * cos;
+    const p2x = x + hw * sin;
+    const p2y = y - hw * cos;
+    return `<line x1="${p1x}" y1="${p1y}" x2="${p2x}" y2="${p2y}" stroke="${stroke}" stroke-width="${Math.max(2, strokeWidth)}" stroke-linecap="round"/>`;
+  }
+  if (capType === 'diamond') {
+    const r = Math.max(5, strokeWidth * 2.2);
+    const tx = x + r * 0.4 * cos;
+    const ty = y + r * 0.4 * sin;
+    const bx = x - r * 1.2 * cos;
+    const by = y - r * 1.2 * sin;
+    const mx = (tx + bx) / 2;
+    const my = (ty + by) / 2;
+    const s1x = mx - r * 0.65 * sin;
+    const s1y = my + r * 0.65 * cos;
+    const s2x = mx + r * 0.65 * sin;
+    const s2y = my - r * 0.65 * cos;
+    return `<polygon points="${tx},${ty} ${s1x},${s1y} ${bx},${by} ${s2x},${s2y}" fill="${stroke}"/>`;
+  }
+  return '';
+}
+
+// Compute exact intersection point and acute/obtuse angles between two 2D line segments
+function computeLineSegmentIntersection(
+  p1: { x: number; y: number },
+  p2: { x: number; y: number },
+  p3: { x: number; y: number },
+  p4: { x: number; y: number }
+): { x: number; y: number; acuteDeg: number; obtuseDeg: number; bisectorRad: number } | null {
+  const s1x = p2.x - p1.x;
+  const s1y = p2.y - p1.y;
+  const s2x = p4.x - p3.x;
+  const s2y = p4.y - p3.y;
+  const denom = -s2x * s1y + s1x * s2y;
+  if (Math.abs(denom) < 1e-4) return null;
+
+  const s = (-s1y * (p1.x - p3.x) + s1x * (p1.y - p3.y)) / denom;
+  const t = (s2x * (p1.y - p3.y) - s2y * (p1.x - p3.x)) / denom;
+
+  if (s >= 0.02 && s <= 0.98 && t >= 0.02 && t <= 0.98) {
+    const ix = Math.round(p1.x + t * s1x);
+    const iy = Math.round(p1.y + t * s1y);
+    const a1 = Math.atan2(s1y, s1x);
+    const a2 = Math.atan2(s2y, s2x);
+    let diffDeg = Math.abs((a1 - a2) * (180 / Math.PI)) % 180;
+    if (diffDeg > 90) diffDeg = 180 - diffDeg;
+    const acuteDeg = Math.max(1, Math.round(diffDeg));
+    const obtuseDeg = 180 - acuteDeg;
+    return { x: ix, y: iy, acuteDeg, obtuseDeg, bisectorRad: (a1 + a2) / 2 };
+  }
+  return null;
+}
+
+// Helper: Render an angle arc and label centered at (cx, cy) from startDeg to endDeg (clockwise in SVG screen coords)
+function renderArcBetweenAnglesSvg(
+  cx: number,
+  cy: number,
+  radius: number,
+  startDeg: number,
+  endDeg: number,
+  color: string,
+  label?: string,
+  doubleArc?: boolean
+): string {
+  const sRad = (startDeg * Math.PI) / 180;
+  const eRad = (endDeg * Math.PI) / 180;
+  const x1 = Number((cx + radius * Math.cos(sRad)).toFixed(1));
+  const y1 = Number((cy + radius * Math.sin(sRad)).toFixed(1));
+  const x2 = Number((cx + radius * Math.cos(eRad)).toFixed(1));
+  const y2 = Number((cy + radius * Math.sin(eRad)).toFixed(1));
+  let sweepDiff = endDeg - startDeg;
+  while (sweepDiff < 0) sweepDiff += 360;
+  const largeArc = sweepDiff > 180 ? 1 : 0;
+  let markup = `<path d="M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z" fill="${color}" fill-opacity="0.12" stroke="none"/>`;
+  markup += `<path d="M ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}" fill="none" stroke="${color}" stroke-width="1.8"/>`;
+  if (doubleArc) {
+    const r2 = radius - 4.5;
+    const dx1 = Number((cx + r2 * Math.cos(sRad)).toFixed(1));
+    const dy1 = Number((cy + r2 * Math.sin(sRad)).toFixed(1));
+    const dx2 = Number((cx + r2 * Math.cos(eRad)).toFixed(1));
+    const dy2 = Number((cy + r2 * Math.sin(eRad)).toFixed(1));
+    markup += `<path d="M ${dx1} ${dy1} A ${r2} ${r2} 0 ${largeArc} 1 ${dx2} ${dy2}" fill="none" stroke="${color}" stroke-width="1.5"/>`;
+  }
+  if (label) {
+    const midRad = ((startDeg + sweepDiff / 2) * Math.PI) / 180;
+    const labelDist = radius + 14;
+    const lx = Number((cx + labelDist * Math.cos(midRad)).toFixed(1));
+    const ly = Number((cy + labelDist * Math.sin(midRad)).toFixed(1));
+    markup += `<text x="${lx}" y="${ly}" font-size="12" font-weight="bold" fill="${color}" text-anchor="middle" dominant-baseline="central" font-family="Sarabun, sans-serif">${escapeXml(label)}</text>`;
+  }
+  return markup;
+}
+
+// Shared SVG Markup Generator for Enhanced Lines, Polygons, Parallel Transversals, and Intersecting Lines
+function renderCustomLineAndIntersectionMarkup(el: CanvasElement): string {
+  const cx = el.x + el.width / 2;
+  const cy = el.y + el.height / 2;
+  const dash = el.strokeDasharray ? `stroke-dasharray="${el.strokeDasharray}"` : '';
+  const fillOp = el.fillOpacity !== undefined ? `fill-opacity="${el.fillOpacity}"` : '';
+  const strokeOp = el.strokeOpacity !== undefined ? `stroke-opacity="${el.strokeOpacity}"` : '';
+
+  if (el.type === 'line' || el.type === 'arrow') {
+    const x1 = el.extraProps?.x1 ?? el.x;
+    const y1 = el.extraProps?.y1 ?? cy;
+    const x2 = el.extraProps?.x2 ?? (el.x + el.width);
+    const y2 = el.extraProps?.y2 ?? cy;
+    const startCap = el.extraProps?.startCap ?? 'none';
+    const endCap = el.extraProps?.endCap ?? (el.type === 'arrow' ? 'arrow' : 'none');
+    const lineShape = el.extraProps?.lineShape || 'straight';
+    const curveOffset = el.extraProps?.curveOffset ?? -45;
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.max(1, Math.hypot(dx, dy));
+    const nx = -dy / len;
+    const ny = dx / len;
+    const mx = (x1 + x2) / 2;
+    const my = (y1 + y2) / 2;
+
+    let pathMarkup = '';
+    let startOutAngle = Math.atan2(y1 - y2, x1 - x2);
+    let endOutAngle = Math.atan2(y2 - y1, x2 - x1);
+    let labelX = mx + nx * 12;
+    let labelY = my + ny * 12;
+
+    if (lineShape === 'curved') {
+      const ctrlX = Number((mx + nx * curveOffset).toFixed(1));
+      const ctrlY = Number((my + ny * curveOffset).toFixed(1));
+      pathMarkup = `<path d="M ${x1} ${y1} Q ${ctrlX} ${ctrlY} ${x2} ${y2}" fill="none" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" stroke-linecap="round" ${strokeOp} ${dash}/>`;
+      startOutAngle = Math.atan2(y1 - ctrlY, x1 - ctrlX);
+      endOutAngle = Math.atan2(y2 - ctrlY, x2 - ctrlX);
+      labelX = Number((0.25 * x1 + 0.5 * ctrlX + 0.25 * x2).toFixed(1));
+      labelY = Number((0.25 * y1 + 0.5 * ctrlY + 0.25 * y2 - 10).toFixed(1));
+    } else if (lineShape === 'elbow') {
+      pathMarkup = `<path d="M ${x1} ${y1} L ${mx} ${y1} L ${mx} ${y2} L ${x2} ${y2}" fill="none" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" stroke-linejoin="round" ${strokeOp} ${dash}/>`;
+      startOutAngle = x1 <= mx ? Math.PI : 0;
+      endOutAngle = x2 >= mx ? 0 : Math.PI;
+    } else if (lineShape === 'zigzag') {
+      const peaks = Math.max(3, Math.min(14, el.extraProps?.zigzagCount ?? 6));
+      const amp = Math.max(6, el.strokeWidth * 3);
+      let d = `M ${x1} ${y1}`;
+      const padFrac = 0.12;
+      const startZx = x1 + dx * padFrac;
+      const startZy = y1 + dy * padFrac;
+      d += ` L ${startZx.toFixed(1)} ${startZy.toFixed(1)}`;
+      for (let i = 0; i < peaks; i++) {
+        const t = padFrac + ((1 - 2 * padFrac) * (i + 0.5)) / peaks;
+        const sign = i % 2 === 0 ? 1 : -1;
+        const px = x1 + dx * t + nx * amp * sign;
+        const py = y1 + dy * t + ny * amp * sign;
+        d += ` L ${px.toFixed(1)} ${py.toFixed(1)}`;
+      }
+      const endZx = x1 + dx * (1 - padFrac);
+      const endZy = y1 + dy * (1 - padFrac);
+      d += ` L ${endZx.toFixed(1)} ${endZy.toFixed(1)} L ${x2} ${y2}`;
+      pathMarkup = `<path d="${d}" fill="none" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" stroke-linejoin="round" ${strokeOp} ${dash}/>`;
+    } else if (lineShape === 'double') {
+      const off = Math.max(2.5, el.strokeWidth * 1.1);
+      pathMarkup = `<line x1="${(x1 + nx * off).toFixed(1)}" y1="${(y1 + ny * off).toFixed(1)}" x2="${(x2 + nx * off).toFixed(1)}" y2="${(y2 + ny * off).toFixed(1)}" stroke="${el.stroke}" stroke-width="${Math.max(1.5, el.strokeWidth * 0.75)}" ${strokeOp} ${dash}/>
+<line x1="${(x1 - nx * off).toFixed(1)}" y1="${(y1 - ny * off).toFixed(1)}" x2="${(x2 - nx * off).toFixed(1)}" y2="${(y2 - ny * off).toFixed(1)}" stroke="${el.stroke}" stroke-width="${Math.max(1.5, el.strokeWidth * 0.75)}" ${strokeOp} ${dash}/>`;
+    } else {
+      pathMarkup = `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" stroke-linecap="round" ${strokeOp} ${dash}/>`;
+    }
+
+    // Invisible wide hit-area so thin lines are effortless to click & drag
+    const hitLine = `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="transparent" stroke-width="14"/>`;
+    const cap1 = renderLineCapSvg(x1, y1, startOutAngle, startCap, el.stroke, el.strokeWidth);
+    const cap2 = renderLineCapSvg(x2, y2, endOutAngle, endCap, el.stroke, el.strokeWidth);
+    const textTag = el.text
+      ? `<text x="${labelX.toFixed(1)}" y="${labelY.toFixed(1)}" font-size="${el.fontSize || 13}" font-weight="${el.fontWeight || 'bold'}" fill="${el.stroke}" text-anchor="middle" dominant-baseline="central" font-family="${el.fontFamily || 'Sarabun, sans-serif'}">${escapeXml(el.text)}</text>`
+      : '';
+    return `${hitLine}${pathMarkup}${cap1}${cap2}${textTag}`;
+  }
+
+  if (el.type === 'polygon_custom') {
+    const rawPts: { x: number; y: number }[] = el.extraProps?.points || [
+      { x: 0.5, y: 0 },
+      { x: 1, y: 0.85 },
+      { x: 0, y: 0.85 }
+    ];
+    const absPts = rawPts.map(p => ({
+      x: Number((el.x + p.x * el.width).toFixed(1)),
+      y: Number((el.y + p.y * el.height).toFixed(1))
+    }));
+    const ptsStr = absPts.map(p => `${p.x},${p.y}`).join(' ');
+    const isClosed = el.extraProps?.closed !== false;
+    const showAngles = Boolean(el.extraProps?.showVertexAngles);
+
+    let polyMarkup = isClosed
+      ? `<polygon points="${ptsStr}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" stroke-linejoin="round" ${fillOp} ${strokeOp} ${dash}/>`
+      : `<polyline points="${ptsStr}" fill="none" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" stroke-linejoin="round" stroke-linecap="round" ${strokeOp} ${dash}/>`;
+
+    if (!isClosed && absPts.length >= 2) {
+      const p0 = absPts[0];
+      const p1 = absPts[1];
+      const pn = absPts[absPts.length - 1];
+      const pn1 = absPts[absPts.length - 2];
+      polyMarkup += renderLineCapSvg(p0.x, p0.y, Math.atan2(p0.y - p1.y, p0.x - p1.x), el.extraProps?.startCap || 'none', el.stroke, el.strokeWidth);
+      polyMarkup += renderLineCapSvg(pn.x, pn.y, Math.atan2(pn.y - pn1.y, pn.x - pn1.x), el.extraProps?.endCap || 'none', el.stroke, el.strokeWidth);
+    }
+
+    if (showAngles && absPts.length >= 3) {
+      const count = isClosed ? absPts.length : absPts.length - 2;
+      for (let idx = 0; idx < count; idx++) {
+        const i = isClosed ? idx : idx + 1;
+        const prev = absPts[(i - 1 + absPts.length) % absPts.length];
+        const curr = absPts[i];
+        const next = absPts[(i + 1) % absPts.length];
+        const a1 = Math.atan2(prev.y - curr.y, prev.x - curr.x) * (180 / Math.PI);
+        const a2 = Math.atan2(next.y - curr.y, next.x - curr.x) * (180 / Math.PI);
+        let diff = a2 - a1;
+        while (diff < 0) diff += 360;
+        const startA = diff <= 180 ? a1 : a2;
+        const endA = diff <= 180 ? a2 : a1;
+        const degVal = Math.round(diff <= 180 ? diff : 360 - diff);
+        polyMarkup += renderArcBetweenAnglesSvg(curr.x, curr.y, 18, startA, endA, '#2563eb', `${degVal}°`);
+      }
+    }
+
+    if (el.text) {
+      polyMarkup += `<text x="${cx}" y="${cy}" font-size="${el.fontSize || 13}" font-weight="bold" fill="#0f172a" text-anchor="middle" dominant-baseline="central" font-family="Sarabun, sans-serif">${escapeXml(el.text)}</text>`;
+    }
+    return polyMarkup;
+  }
+
+  if (el.type === 'parallel_transversal') {
+    const y1 = Math.round(el.y + el.height * 0.28);
+    const y2 = Math.round(el.y + el.height * 0.72);
+    const xLeft = el.x + 16;
+    const xRight = el.x + el.width - 16;
+    const transAngle = Math.max(25, Math.min(155, el.extraProps?.transversalAngle ?? 65));
+    const angleMode = el.extraProps?.angleMode || 'alternate_interior';
+    const topLabel = el.extraProps?.topAngleLabel ?? `${transAngle}°`;
+    const bottomLabel = el.extraProps?.bottomAngleLabel ?? 'x';
+    const l1Label = el.extraProps?.line1Label ?? 'AB';
+    const l2Label = el.extraProps?.line2Label ?? 'CD';
+    const showParallelMarks = el.extraProps?.showParallelMarks !== false;
+
+    // Transversal passes through center (cx, cy) at angle -transAngle in SVG screen coords (going up-right for <90°)
+    const rad = (transAngle * Math.PI) / 180;
+    const cot = Math.cos(rad) / (Math.sin(rad) || 0.001);
+    const ix1 = Math.round(cx + (cy - y1) * cot);
+    const iy1 = y1;
+    const ix2 = Math.round(cx - (y2 - cy) * cot);
+    const iy2 = y2;
+
+    const tTopY = el.y + 6;
+    const tBotY = el.y + el.height - 6;
+    const tTopX = Math.round(cx + (cy - tTopY) * cot);
+    const tBotX = Math.round(cx - (tBotY - cy) * cot);
+
+    let out = '';
+    // Parallel Line 1 & Line 2 with double arrows
+    out += `<line x1="${xLeft}" y1="${y1}" x2="${xRight}" y2="${y1}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" ${dash}/>`;
+    out += `<line x1="${xLeft}" y1="${y2}" x2="${xRight}" y2="${y2}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" ${dash}/>`;
+    out += renderLineCapSvg(xLeft, y1, Math.PI, 'arrow', el.stroke, el.strokeWidth * 0.85);
+    out += renderLineCapSvg(xRight, y1, 0, 'arrow', el.stroke, el.strokeWidth * 0.85);
+    out += renderLineCapSvg(xLeft, y2, Math.PI, 'arrow', el.stroke, el.strokeWidth * 0.85);
+    out += renderLineCapSvg(xRight, y2, 0, 'arrow', el.stroke, el.strokeWidth * 0.85);
+
+    // Parallel chevron marks (>>) on both parallel lines
+    if (showParallelMarks) {
+      const pmX = Math.round(el.x + el.width * 0.22);
+      [y1, y2].forEach(py => {
+        out += `<polyline points="${pmX - 5},${py - 5} ${pmX + 1},${py} ${pmX - 5},${py + 5}" fill="none" stroke="${el.stroke}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`;
+        out += `<polyline points="${pmX + 1},${py - 5} ${pmX + 7},${py} ${pmX + 1},${py + 5}" fill="none" stroke="${el.stroke}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`;
+      });
+    }
+
+    // Line labels
+    if (l1Label) {
+      out += `<text x="${xRight - 6}" y="${y1 - 12}" font-size="12" font-weight="bold" fill="#334155" text-anchor="end" font-family="Sarabun, sans-serif">${escapeXml(l1Label)}</text>`;
+    }
+    if (l2Label) {
+      out += `<text x="${xRight - 6}" y="${y2 - 12}" font-size="12" font-weight="bold" fill="#334155" text-anchor="end" font-family="Sarabun, sans-serif">${escapeXml(l2Label)}</text>`;
+    }
+
+    // Transversal line
+    out += `<line x1="${tBotX}" y1="${tBotY}" x2="${tTopX}" y2="${tTopY}" stroke="#1e293b" stroke-width="${el.strokeWidth}"/>`;
+    out += renderLineCapSvg(tTopX, tTopY, -rad, 'arrow', '#1e293b', el.strokeWidth * 0.85);
+    out += renderLineCapSvg(tBotX, tBotY, Math.PI - rad, 'arrow', '#1e293b', el.strokeWidth * 0.85);
+
+    // Angle arcs at intersections I1(ix1, iy1) and I2(ix2, iy2)
+    // In SVG screen coords (0° = right, 90° = down, 180° = left, -transAngle = up-right, 180-transAngle = down-left):
+    const arcR = 24;
+    const upTransDeg = -transAngle; // e.g. -65°
+    const downTransDeg = 180 - transAngle; // e.g. 115°
+
+    if (angleMode === 'alternate_interior') {
+      // Interior bottom-left of I1 (from downTransDeg to 180°) & Interior top-right of I2 (from upTransDeg to 0°)
+      out += renderArcBetweenAnglesSvg(ix1, iy1, arcR, downTransDeg, 180, '#2563eb', topLabel);
+      out += renderArcBetweenAnglesSvg(ix2, iy2, arcR, upTransDeg, 0, '#dc2626', bottomLabel);
+    } else if (angleMode === 'corresponding') {
+      // Top-right of I1 (from upTransDeg to 0°) & Top-right of I2 (from upTransDeg to 0°)
+      out += renderArcBetweenAnglesSvg(ix1, iy1, arcR, upTransDeg, 0, '#2563eb', topLabel);
+      out += renderArcBetweenAnglesSvg(ix2, iy2, arcR, upTransDeg, 0, '#dc2626', bottomLabel);
+    } else if (angleMode === 'co_interior') {
+      // Interior bottom-right of I1 (from 0° to downTransDeg) & Interior top-right of I2 (from upTransDeg to 0°)
+      out += renderArcBetweenAnglesSvg(ix1, iy1, arcR, 0, downTransDeg, '#7c3aed', topLabel, true);
+      out += renderArcBetweenAnglesSvg(ix2, iy2, arcR, upTransDeg, 0, '#dc2626', bottomLabel);
+    } else if (angleMode === 'alternate_exterior') {
+      // Exterior top-right of I1 (from upTransDeg to 0°) & Exterior bottom-left of I2 (from downTransDeg to 180°)
+      out += renderArcBetweenAnglesSvg(ix1, iy1, arcR, upTransDeg, 0, '#2563eb', topLabel);
+      out += renderArcBetweenAnglesSvg(ix2, iy2, arcR, downTransDeg, 180, '#dc2626', bottomLabel);
+    } else if (angleMode === 'all_angles') {
+      const supDeg = 180 - transAngle;
+      out += renderArcBetweenAnglesSvg(ix1, iy1, 21, upTransDeg, 0, '#2563eb', `${transAngle}°`);
+      out += renderArcBetweenAnglesSvg(ix1, iy1, 24, 180, 360 + upTransDeg, '#7c3aed', `${supDeg}°`, true);
+      out += renderArcBetweenAnglesSvg(ix1, iy1, 21, downTransDeg, 180, '#2563eb', `${transAngle}°`);
+      out += renderArcBetweenAnglesSvg(ix2, iy2, 21, upTransDeg, 0, '#dc2626', bottomLabel || `${transAngle}°`);
+      out += renderArcBetweenAnglesSvg(ix2, iy2, 24, 0, downTransDeg, '#7c3aed', `${supDeg}°`, true);
+    }
+
+    // Intersection vertex dots
+    out += `<circle cx="${ix1}" cy="${iy1}" r="3" fill="#0f172a"/>`;
+    out += `<circle cx="${ix2}" cy="${iy2}" r="3" fill="#0f172a"/>`;
+    return out;
+  }
+
+  if (el.type === 'intersecting_lines') {
+    const angle = Math.max(15, Math.min(165, el.extraProps?.angle ?? 60));
+    const halfRad = ((angle / 2) * Math.PI) / 180;
+    const rx = el.width * 0.46;
+    const ry = el.height * 0.46;
+    const r = Math.min(rx, ry);
+
+    // Line 1 at -angle/2, Line 2 at +angle/2
+    const l1x1 = Math.round(cx - rx * Math.cos(-halfRad));
+    const l1y1 = Math.round(cy - ry * Math.sin(-halfRad));
+    const l1x2 = Math.round(cx + rx * Math.cos(-halfRad));
+    const l1y2 = Math.round(cy + ry * Math.sin(-halfRad));
+
+    const l2x1 = Math.round(cx - rx * Math.cos(halfRad));
+    const l2y1 = Math.round(cy - ry * Math.sin(halfRad));
+    const l2x2 = Math.round(cx + rx * Math.cos(halfRad));
+    const l2y2 = Math.round(cy + ry * Math.sin(halfRad));
+
+    const a1Deg = Math.atan2(l1y2 - cy, l1x2 - cx) * (180 / Math.PI); // negative
+    const a2Deg = Math.atan2(l2y2 - cy, l2x2 - cx) * (180 / Math.PI); // positive
+    const arcR = Math.min(28, r * 0.36);
+
+    const rightLab = el.extraProps?.rightLabel ?? `${angle}°`;
+    const leftLab = el.extraProps?.leftLabel ?? 'x';
+    const topLab = el.extraProps?.topLabel ?? '';
+    const bottomLab = el.extraProps?.bottomLabel ?? '';
+
+    let out = '';
+    // Arcs in 4 quadrants
+    if (rightLab) {
+      out += renderArcBetweenAnglesSvg(cx, cy, arcR, a1Deg, a2Deg, '#2563eb', rightLab);
+    }
+    if (leftLab) {
+      out += renderArcBetweenAnglesSvg(cx, cy, arcR, a1Deg + 180, a2Deg + 180, '#dc2626', leftLab);
+    }
+    if (topLab) {
+      out += renderArcBetweenAnglesSvg(cx, cy, arcR + 4, a2Deg + 180, a1Deg + 360, '#7c3aed', topLab, true);
+    }
+    if (bottomLab) {
+      out += renderArcBetweenAnglesSvg(cx, cy, arcR + 4, a2Deg, a1Deg + 180, '#7c3aed', bottomLab, true);
+    }
+
+    // Two crossing lines with arrows
+    out += `<line x1="${l1x1}" y1="${l1y1}" x2="${l1x2}" y2="${l1y2}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" ${dash}/>`;
+    out += `<line x1="${l2x1}" y1="${l2y1}" x2="${l2x2}" y2="${l2y2}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" ${dash}/>`;
+    out += renderLineCapSvg(l1x1, l1y1, Math.atan2(l1y1 - cy, l1x1 - cx), 'arrow', el.stroke, el.strokeWidth * 0.85);
+    out += renderLineCapSvg(l1x2, l1y2, Math.atan2(l1y2 - cy, l1x2 - cx), 'arrow', el.stroke, el.strokeWidth * 0.85);
+    out += renderLineCapSvg(l2x1, l2y1, Math.atan2(l2y1 - cy, l2x1 - cx), 'arrow', el.stroke, el.strokeWidth * 0.85);
+    out += renderLineCapSvg(l2x2, l2y2, Math.atan2(l2y2 - cy, l2x2 - cx), 'arrow', el.stroke, el.strokeWidth * 0.85);
+    out += `<circle cx="${cx}" cy="${cy}" r="3.2" fill="#0f172a"/>`;
+    return out;
+  }
+
+  return '';
+}
+
 export function InStudioDiagramBuilderModal({
   isOpen,
   onClose,
@@ -196,12 +643,24 @@ export function InStudioDiagramBuilderModal({
   // Ref for Inspector text input so double-clicking an element focuses it immediately
   const inspectorTextInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Canvas Settings
+  // Canvas & Grid Alignment Settings
   const [showGrid, setShowGrid] = useState<boolean>(true);
   const [gridSize, setGridSize] = useState<number>(20);
-  const [snapToGrid, setSnapToGrid] = useState<boolean>(false);
+  const [snapToGrid, setSnapToGrid] = useState<boolean>(true);
+  const [showSmartGuides, setShowSmartGuides] = useState<boolean>(true);
+  const [activeGuides, setActiveGuides] = useState<{ verticals: number[]; horizontals: number[] }>({ verticals: [], horizontals: [] });
   const [autoCrop, setAutoCrop] = useState<boolean>(true);
   const [zoom, setZoom] = useState<number>(1);
+
+  // Interactive Mouse Drawing Mode State
+  type ToolMode = 'select' | 'draw_line' | 'draw_smart' | 'draw_polygon';
+  const [toolMode, setToolMode] = useState<ToolMode>('select');
+  const [drawPresetCapStart, setDrawPresetCapStart] = useState<string>('none');
+  const [drawPresetCapEnd, setDrawPresetCapEnd] = useState<string>('none');
+  const [drawPresetLineShape, setDrawPresetLineShape] = useState<string>('straight');
+  const [isDrawingStroke, setIsDrawingStroke] = useState<boolean>(false);
+  const [drawPoints, setDrawPoints] = useState<{ x: number; y: number }[]>([]);
+  const [polygonCursorPos, setPolygonCursorPos] = useState<{ x: number; y: number } | null>(null);
 
   // History for Undo/Redo
   const [history, setHistory] = useState<CanvasElement[][]>([]);
@@ -361,6 +820,88 @@ export function InStudioDiagramBuilderModal({
         base.width = 160;
         base.height = 100;
         base.extraProps = { topInset: 32, ...customProps.extraProps };
+        break;
+      case 'line':
+        base.width = customProps.width ?? 180;
+        base.height = customProps.height ?? 24;
+        base.fill = 'none';
+        base.text = customProps.text ?? '';
+        base.extraProps = {
+          x1: base.x,
+          y1: base.y + base.height / 2,
+          x2: base.x + base.width,
+          y2: base.y + base.height / 2,
+          startCap: 'none',
+          endCap: 'none',
+          lineShape: 'straight',
+          curveOffset: -45,
+          zigzagCount: 6,
+          ...customProps.extraProps
+        };
+        break;
+      case 'arrow':
+        base.width = customProps.width ?? 180;
+        base.height = customProps.height ?? 24;
+        base.fill = 'none';
+        base.text = customProps.text ?? '';
+        base.extraProps = {
+          x1: base.x,
+          y1: base.y + base.height / 2,
+          x2: base.x + base.width,
+          y2: base.y + base.height / 2,
+          startCap: 'none',
+          endCap: 'arrow',
+          lineShape: 'straight',
+          curveOffset: -45,
+          zigzagCount: 6,
+          ...customProps.extraProps
+        };
+        break;
+      case 'polygon_custom':
+        base.width = customProps.width ?? 160;
+        base.height = customProps.height ?? 120;
+        base.fill = customProps.fill ?? '#f8fafc';
+        base.text = customProps.text ?? '';
+        base.extraProps = {
+          points: [
+            { x: 0.5, y: 0 },
+            { x: 1, y: 0.85 },
+            { x: 0, y: 0.85 }
+          ],
+          closed: true,
+          startCap: 'none',
+          endCap: 'none',
+          showVertexAngles: false,
+          ...customProps.extraProps
+        };
+        break;
+      case 'parallel_transversal':
+        base.width = customProps.width ?? 320;
+        base.height = customProps.height ?? 210;
+        base.fill = 'none';
+        base.extraProps = {
+          transversalAngle: 65,
+          angleMode: 'alternate_interior',
+          topAngleLabel: '65°',
+          bottomAngleLabel: 'x',
+          line1Label: 'AB',
+          line2Label: 'CD',
+          showParallelMarks: true,
+          ...customProps.extraProps
+        };
+        break;
+      case 'intersecting_lines':
+        base.width = customProps.width ?? 220;
+        base.height = customProps.height ?? 180;
+        base.fill = 'none';
+        base.extraProps = {
+          angle: 60,
+          rightLabel: '60°',
+          leftLabel: 'x',
+          topLabel: '120°',
+          bottomLabel: '',
+          ...customProps.extraProps
+        };
         break;
       case 'dimension_line':
         base.width = 180;
@@ -798,6 +1339,30 @@ export function InStudioDiagramBuilderModal({
           fontWeight: 'bold'
         }
       ];
+    } else if (templateName === 'parallel_transversal') {
+      preset = [
+        {
+          id: 'pt-main',
+          type: 'parallel_transversal',
+          x: 190,
+          y: 90,
+          width: 340,
+          height: 240,
+          rotation: 0,
+          stroke: '#0f172a',
+          strokeWidth: 2.5,
+          fill: 'none',
+          extraProps: {
+            transversalAngle: 65,
+            angleMode: 'alternate_interior',
+            topAngleLabel: '65°',
+            bottomAngleLabel: '2x + 5°',
+            line1Label: 'AB',
+            line2Label: 'CD',
+            showParallelMarks: true
+          }
+        }
+      ];
     }
 
     saveToHistory(preset);
@@ -809,6 +1374,71 @@ export function InStudioDiagramBuilderModal({
   const selectedElement = useMemo(() => {
     return elements.find(el => el.id === selectedId) || null;
   }, [elements, selectedId]);
+
+  // Live Line-Intersection & Angle Calculator across all line/arrow segments on canvas
+  const lineIntersections = useMemo(() => {
+    const lines = elements.filter(el => el.type === 'line' || el.type === 'arrow');
+    const results: {
+      id: string;
+      lineAId: string;
+      lineBId: string;
+      x: number;
+      y: number;
+      acuteDeg: number;
+      obtuseDeg: number;
+    }[] = [];
+
+    const getEndpoints = (el: CanvasElement) => {
+      if (el.extraProps?.x1 !== undefined && el.extraProps?.x2 !== undefined) {
+        return {
+          p1: { x: Number(el.extraProps.x1), y: Number(el.extraProps.y1) },
+          p2: { x: Number(el.extraProps.x2), y: Number(el.extraProps.y2) }
+        };
+      }
+      const cx = el.x + el.width / 2;
+      const cy = el.y + el.height / 2;
+      const rad = ((el.rotation || 0) * Math.PI) / 180;
+      const hw = el.width / 2;
+      return {
+        p1: { x: cx - hw * Math.cos(rad), y: cy - hw * Math.sin(rad) },
+        p2: { x: cx + hw * Math.cos(rad), y: cy + hw * Math.sin(rad) }
+      };
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+      for (let j = i + 1; j < lines.length; j++) {
+        const segA = getEndpoints(lines[i]);
+        const segB = getEndpoints(lines[j]);
+        const inter = computeLineSegmentIntersection(segA.p1, segA.p2, segB.p1, segB.p2);
+        if (inter) {
+          results.push({
+            id: `${lines[i].id}__${lines[j].id}`,
+            lineAId: lines[i].id,
+            lineBId: lines[j].id,
+            x: inter.x,
+            y: inter.y,
+            acuteDeg: inter.acuteDeg,
+            obtuseDeg: inter.obtuseDeg
+          });
+        }
+      }
+    }
+    return results;
+  }, [elements]);
+
+  const handleStampIntersectionAngle = (inter: { x: number; y: number; acuteDeg: number; obtuseDeg: number }, useObtuse: boolean = false) => {
+    const deg = useObtuse ? inter.obtuseDeg : inter.acuteDeg;
+    addElement('angle_arc', {
+      x: inter.x,
+      y: inter.y - 60,
+      width: 70,
+      height: 60,
+      text: `${deg}°`,
+      extraProps: { angle: deg, radius: 28, showDegree: true }
+    });
+    toast.success(`ปักหมุดมุมเส้นตัด ${deg}° ที่จุดตัด (${inter.x}, ${inter.y}) เรียบร้อย`);
+  };
+
 
   // Robust field updater using elementsRef to prevent stale closure bugs
   const updateSelectedField = (field: keyof CanvasElement, value: any, commit: boolean = true) => {
@@ -854,11 +1484,19 @@ export function InStudioDiagramBuilderModal({
   // Duplicate Selected
   const handleDuplicateSelected = () => {
     if (!selectedElement) return;
+    const nextExtra = selectedElement.extraProps ? { ...selectedElement.extraProps } : undefined;
+    if (nextExtra && nextExtra.x1 !== undefined && nextExtra.x2 !== undefined) {
+      nextExtra.x1 += 20;
+      nextExtra.y1 += 20;
+      nextExtra.x2 += 20;
+      nextExtra.y2 += 20;
+    }
     const clone: CanvasElement = {
       ...selectedElement,
       id: `el-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       x: selectedElement.x + 20,
-      y: selectedElement.y + 20
+      y: selectedElement.y + 20,
+      extraProps: nextExtra
     };
     saveToHistory([...elementsRef.current, clone]);
     setSelectedId(clone.id);
@@ -885,8 +1523,8 @@ export function InStudioDiagramBuilderModal({
     saveToHistory(currentList);
   };
 
-  // Alignment Tools (Word / Canva style)
-  const handleAlign = (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => {
+  // Alignment Tools (Word / Canva style + Grid Snap)
+  const handleAlign = (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'snap_grid') => {
     if (!selectedElement) return;
     let newX = selectedElement.x;
     let newY = selectedElement.y;
@@ -897,14 +1535,440 @@ export function InStudioDiagramBuilderModal({
     else if (type === 'top') newY = 20;
     else if (type === 'middle') newY = Math.round((CANVAS_HEIGHT - selectedElement.height) / 2);
     else if (type === 'bottom') newY = CANVAS_HEIGHT - selectedElement.height - 20;
+    else if (type === 'snap_grid') {
+      newX = Math.round(selectedElement.x / gridSize) * gridSize;
+      newY = Math.round(selectedElement.y / gridSize) * gridSize;
+    }
 
-    updateSelectedField('x', newX, false);
-    updateSelectedField('y', newY, true);
+    const dx = newX - selectedElement.x;
+    const dy = newY - selectedElement.y;
+
+    const updated = elementsRef.current.map(el => {
+      if (el.id !== selectedElement.id) return el;
+      const nextExtra = el.extraProps ? { ...el.extraProps } : undefined;
+      if (nextExtra && nextExtra.x1 !== undefined && nextExtra.x2 !== undefined) {
+        nextExtra.x1 = type === 'snap_grid' ? Math.round(nextExtra.x1 / gridSize) * gridSize : nextExtra.x1 + dx;
+        nextExtra.y1 = type === 'snap_grid' ? Math.round(nextExtra.y1 / gridSize) * gridSize : nextExtra.y1 + dy;
+        nextExtra.x2 = type === 'snap_grid' ? Math.round(nextExtra.x2 / gridSize) * gridSize : nextExtra.x2 + dx;
+        nextExtra.y2 = type === 'snap_grid' ? Math.round(nextExtra.y2 / gridSize) * gridSize : nextExtra.y2 + dy;
+      }
+      return { ...el, x: newX, y: newY, extraProps: nextExtra };
+    });
+    saveToHistory(updated);
+  };
+
+  // Snap a point (x, y) to Grid, Cardinal Angles (relative to anchor), and Smart Guides
+  const snapPointWithGuides = useCallback((
+    rawPt: { x: number; y: number },
+    ignoreId?: string | null,
+    anchorPt?: { x: number; y: number } | null,
+    shiftHeld?: boolean
+  ) => {
+    let x = Math.round(rawPt.x);
+    let y = Math.round(rawPt.y);
+
+    // 1. Grid Snap
+    if (snapToGrid) {
+      x = Math.round(x / gridSize) * gridSize;
+      y = Math.round(y / gridSize) * gridSize;
+    }
+
+    // 2. Angle Snap relative to anchorPt (for straight line drawing / endpoint dragging)
+    if (anchorPt) {
+      const dx = x - anchorPt.x;
+      const dy = y - anchorPt.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 8) {
+        const deg = Math.atan2(dy, dx) * (180 / Math.PI);
+        const snapAngles = [0, 30, 45, 60, 90, 120, 135, 150, 180, -30, -45, -60, -90, -120, -135, -150, -180];
+        if (shiftHeld) {
+          const lockedDeg = Math.round(deg / 15) * 15;
+          const lockedRad = (lockedDeg * Math.PI) / 180;
+          x = Math.round(anchorPt.x + dist * Math.cos(lockedRad));
+          y = Math.round(anchorPt.y + dist * Math.sin(lockedRad));
+        } else {
+          for (const targetDeg of snapAngles) {
+            if (Math.abs(deg - targetDeg) <= 3.5) {
+              const targetRad = (targetDeg * Math.PI) / 180;
+              if (targetDeg === 0 || Math.abs(targetDeg) === 180) {
+                y = anchorPt.y;
+              } else if (Math.abs(targetDeg) === 90) {
+                x = anchorPt.x;
+              } else {
+                x = Math.round(anchorPt.x + dist * Math.cos(targetRad));
+                y = Math.round(anchorPt.y + dist * Math.sin(targetRad));
+              }
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // 3. Smart Alignment Guides against Canvas Center and Other Elements
+    const verticals: number[] = [];
+    const horizontals: number[] = [];
+
+    if (showSmartGuides) {
+      const xTargets: number[] = [CANVAS_WIDTH / 2];
+      const yTargets: number[] = [CANVAS_HEIGHT / 2];
+
+      elementsRef.current.forEach(other => {
+        if (other.id === ignoreId) return;
+        xTargets.push(other.x, Math.round(other.x + other.width / 2), other.x + other.width);
+        yTargets.push(other.y, Math.round(other.y + other.height / 2), other.y + other.height);
+        if (other.extraProps?.x1 !== undefined) {
+          xTargets.push(other.extraProps.x1, other.extraProps.x2);
+          yTargets.push(other.extraProps.y1, other.extraProps.y2);
+        }
+      });
+
+      const threshold = 6;
+      for (const tx of xTargets) {
+        if (Math.abs(x - tx) <= threshold) {
+          x = tx;
+          if (!verticals.includes(tx)) verticals.push(tx);
+          break;
+        }
+      }
+      for (const ty of yTargets) {
+        if (Math.abs(y - ty) <= threshold) {
+          y = ty;
+          if (!horizontals.includes(ty)) horizontals.push(ty);
+          break;
+        }
+      }
+    }
+
+    return { x, y, verticals, horizontals };
+  }, [snapToGrid, gridSize, showSmartGuides]);
+
+  // Finish Point-to-Point Polygon / Polyline Drawing
+  const finishPolygonDrawing = useCallback((closed: boolean) => {
+    if (drawPoints.length < 2) {
+      setDrawPoints([]);
+      setPolygonCursorPos(null);
+      return;
+    }
+    const xs = drawPoints.map(p => p.x);
+    const ys = drawPoints.map(p => p.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    const w = Math.max(24, maxX - minX);
+    const h = Math.max(24, maxY - minY);
+    const normPts = drawPoints.map(p => ({
+      x: Number(((p.x - minX) / w).toFixed(4)),
+      y: Number(((p.y - minY) / h).toFixed(4))
+    }));
+
+    addElement('polygon_custom', {
+      x: minX,
+      y: minY,
+      width: w,
+      height: h,
+      fill: closed ? '#f8fafc' : 'none',
+      extraProps: {
+        points: normPts,
+        closed,
+        startCap: drawPresetCapStart,
+        endCap: drawPresetCapEnd
+      }
+    });
+    setDrawPoints([]);
+    setPolygonCursorPos(null);
+    setActiveGuides({ verticals: [], horizontals: [] });
+  }, [drawPoints, drawPresetCapStart, drawPresetCapEnd]);
+
+  // Interactive Canvas Mouse Down for Drawing Modes (draw_line, draw_smart, draw_polygon)
+  const handleCanvasMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (toolMode === 'select') {
+      setSelectedId(null);
+      return;
+    }
+    e.stopPropagation();
+    const rawPos = getCanvasCoords(e.clientX, e.clientY);
+
+    if (toolMode === 'draw_polygon') {
+      const anchor = drawPoints.length > 0 ? drawPoints[drawPoints.length - 1] : null;
+      const snapped = snapPointWithGuides(rawPos, null, anchor, e.shiftKey);
+      // If clicking near first point and >= 3 points, close polygon automatically
+      if (drawPoints.length >= 3 && Math.hypot(snapped.x - drawPoints[0].x, snapped.y - drawPoints[0].y) <= 14) {
+        finishPolygonDrawing(true);
+        return;
+      }
+      setDrawPoints(prev => [...prev, { x: snapped.x, y: snapped.y }]);
+      setActiveGuides({ verticals: snapped.verticals, horizontals: snapped.horizontals });
+      return;
+    }
+
+    // draw_line or draw_smart
+    const snapped = snapPointWithGuides(rawPos, null, null, e.shiftKey);
+    setIsDrawingStroke(true);
+    setDrawPoints([{ x: snapped.x, y: snapped.y }]);
+    setActiveGuides({ verticals: snapped.verticals, horizontals: snapped.horizontals });
+  };
+
+  const handleCanvasMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (toolMode === 'select') return;
+    const rawPos = getCanvasCoords(e.clientX, e.clientY);
+
+    if (toolMode === 'draw_polygon') {
+      if (drawPoints.length === 0) return;
+      const anchor = drawPoints[drawPoints.length - 1];
+      const snapped = snapPointWithGuides(rawPos, null, anchor, e.shiftKey);
+      setPolygonCursorPos({ x: snapped.x, y: snapped.y });
+      setActiveGuides({ verticals: snapped.verticals, horizontals: snapped.horizontals });
+      return;
+    }
+
+    if (!isDrawingStroke || drawPoints.length === 0) return;
+
+    if (toolMode === 'draw_line') {
+      const startPt = drawPoints[0];
+      const snapped = snapPointWithGuides(rawPos, null, startPt, e.shiftKey);
+      setDrawPoints([startPt, { x: snapped.x, y: snapped.y }]);
+      setActiveGuides({ verticals: snapped.verticals, horizontals: snapped.horizontals });
+    } else if (toolMode === 'draw_smart') {
+      const lastPt = drawPoints[drawPoints.length - 1];
+      if (Math.hypot(rawPos.x - lastPt.x, rawPos.y - lastPt.y) >= 4) {
+        setDrawPoints(prev => [...prev, { x: Math.round(rawPos.x), y: Math.round(rawPos.y) }]);
+      }
+    }
+  };
+
+  const handleCanvasMouseUp = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (toolMode === 'select' || toolMode === 'draw_polygon') return;
+    if (!isDrawingStroke) return;
+    setIsDrawingStroke(false);
+    setActiveGuides({ verticals: [], horizontals: [] });
+
+    if (drawPoints.length < 2) {
+      setDrawPoints([]);
+      return;
+    }
+
+    if (toolMode === 'draw_line') {
+      const p1 = drawPoints[0];
+      const p2 = drawPoints[drawPoints.length - 1];
+      if (Math.hypot(p2.x - p1.x, p2.y - p1.y) < 10) {
+        setDrawPoints([]);
+        return;
+      }
+      const minX = Math.min(p1.x, p2.x);
+      const minY = Math.min(p1.y, p2.y) - 12;
+      const w = Math.max(20, Math.abs(p2.x - p1.x));
+      const h = Math.max(24, Math.abs(p2.y - p1.y) + 24);
+      addElement(drawPresetCapEnd === 'arrow' ? 'arrow' : 'line', {
+        x: minX,
+        y: minY,
+        width: w,
+        height: h,
+        rotation: 0,
+        extraProps: {
+          x1: p1.x,
+          y1: p1.y,
+          x2: p2.x,
+          y2: p2.y,
+          startCap: drawPresetCapStart,
+          endCap: drawPresetCapEnd,
+          lineShape: drawPresetLineShape,
+          curveOffset: -45,
+          zigzagCount: 6
+        }
+      });
+      setDrawPoints([]);
+      return;
+    }
+
+    // Smart Freehand-to-Straight / Geometric Shape Recognizer (toolMode === 'draw_smart')
+    const first = drawPoints[0];
+    const last = drawPoints[drawPoints.length - 1];
+    let totalLen = 0;
+    for (let i = 1; i < drawPoints.length; i++) {
+      totalLen += Math.hypot(drawPoints[i].x - drawPoints[i - 1].x, drawPoints[i].y - drawPoints[i - 1].y);
+    }
+    if (totalLen < 16) {
+      setDrawPoints([]);
+      return;
+    }
+
+    // Check if stroke is a single straight line (max deviation < threshold)
+    let maxDev = 0;
+    for (const pt of drawPoints) {
+      maxDev = Math.max(maxDev, perpendicularDistance(pt, first, last));
+    }
+    const endDist = Math.hypot(last.x - first.x, last.y - first.y);
+
+    if (endDist > 20 && maxDev <= Math.max(14, endDist * 0.09)) {
+      const s1 = snapPointWithGuides(first, null, null, false);
+      const s2 = snapPointWithGuides(last, null, s1, e.shiftKey);
+      const minX = Math.min(s1.x, s2.x);
+      const minY = Math.min(s1.y, s2.y) - 12;
+      const w = Math.max(20, Math.abs(s2.x - s1.x));
+      const h = Math.max(24, Math.abs(s2.y - s1.y) + 24);
+      addElement(drawPresetCapEnd === 'arrow' ? 'arrow' : 'line', {
+        x: minX,
+        y: minY,
+        width: w,
+        height: h,
+        rotation: 0,
+        extraProps: {
+          x1: s1.x,
+          y1: s1.y,
+          x2: s2.x,
+          y2: s2.y,
+          startCap: drawPresetCapStart,
+          endCap: drawPresetCapEnd,
+          lineShape: drawPresetLineShape,
+          curveOffset: -45,
+          zigzagCount: 6
+        }
+      });
+      toast.success('แปลงเส้นวาดเป็นเส้นตรงเวกเตอร์เรียบร้อย');
+      setDrawPoints([]);
+      return;
+    }
+
+    // Check if stroke is a closed shape
+    const isClosed = endDist <= Math.max(38, totalLen * 0.18) && drawPoints.length >= 6;
+    const simplified = simplifyPointsRDP(drawPoints, Math.max(10, totalLen * 0.035));
+
+    if (isClosed) {
+      // Remove duplicate closing vertex
+      const loopPts = simplified.length > 2 ? simplified.slice(0, simplified.length - 1) : simplified;
+      const xs = drawPoints.map(p => p.x);
+      const ys = drawPoints.map(p => p.y);
+      const minX = Math.round(Math.min(...xs) / (snapToGrid ? gridSize : 1)) * (snapToGrid ? gridSize : 1);
+      const maxX = Math.round(Math.max(...xs) / (snapToGrid ? gridSize : 1)) * (snapToGrid ? gridSize : 1);
+      const minY = Math.round(Math.min(...ys) / (snapToGrid ? gridSize : 1)) * (snapToGrid ? gridSize : 1);
+      const maxY = Math.round(Math.max(...ys) / (snapToGrid ? gridSize : 1)) * (snapToGrid ? gridSize : 1);
+      const w = Math.max(30, maxX - minX);
+      const h = Math.max(30, maxY - minY);
+
+      // Check circularity
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      const radii = drawPoints.map(p => Math.hypot((p.x - cx) / (w / 2 || 1), (p.y - cy) / (h / 2 || 1)));
+      const meanR = radii.reduce((a, b) => a + b, 0) / radii.length;
+      const stdR = Math.sqrt(radii.reduce((acc, r) => acc + (r - meanR) ** 2, 0) / radii.length);
+
+      if (stdR < 0.16 && loopPts.length >= 5) {
+        if (Math.abs(w - h) <= Math.max(w, h) * 0.22) {
+          const d = Math.round((w + h) / 2);
+          addElement('circle', { x: minX, y: minY, width: d, height: d });
+          toast.success('แปลงเส้นวาดเป็นวงกลมอัตโนมัติ');
+        } else {
+          addElement('ellipse', { x: minX, y: minY, width: w, height: h });
+          toast.success('แปลงเส้นวาดเป็นวงรีอัตโนมัติ');
+        }
+        setDrawPoints([]);
+        return;
+      }
+
+      if (loopPts.length === 4) {
+        addElement('rect', { x: minX, y: minY, width: w, height: h });
+        toast.success('แปลงเส้นวาดเป็นสี่เหลี่ยมมุมฉากอัตโนมัติ');
+        setDrawPoints([]);
+        return;
+      }
+
+      // Snap vertices to grid if enabled and create a crisp closed polygon_custom
+      const snappedLoop = loopPts.map(p => ({
+        x: snapToGrid ? Math.round(p.x / gridSize) * gridSize : p.x,
+        y: snapToGrid ? Math.round(p.y / gridSize) * gridSize : p.y
+      }));
+      const lxs = snappedLoop.map(p => p.x);
+      const lys = snappedLoop.map(p => p.y);
+      const pMinX = Math.min(...lxs);
+      const pMaxX = Math.max(...lxs);
+      const pMinY = Math.min(...lys);
+      const pMaxY = Math.max(...lys);
+      const pw = Math.max(24, pMaxX - pMinX);
+      const ph = Math.max(24, pMaxY - pMinY);
+      const normPts = snappedLoop.map(p => ({
+        x: Number(((p.x - pMinX) / pw).toFixed(4)),
+        y: Number(((p.y - pMinY) / ph).toFixed(4))
+      }));
+
+      addElement('polygon_custom', {
+        x: pMinX,
+        y: pMinY,
+        width: pw,
+        height: ph,
+        fill: '#f8fafc',
+        extraProps: { points: normPts, closed: true, startCap: 'none', endCap: 'none' }
+      });
+      toast.success(`แปลงเส้นวาดเป็นรูปทรง ${snappedLoop.length} เหลี่ยมเรียบร้อย`);
+      setDrawPoints([]);
+      return;
+    }
+
+    // Open Multi-segment Straightened Polyline
+    const snappedPoly = simplified.map(p => ({
+      x: snapToGrid ? Math.round(p.x / gridSize) * gridSize : p.x,
+      y: snapToGrid ? Math.round(p.y / gridSize) * gridSize : p.y
+    }));
+    const pxs = snappedPoly.map(p => p.x);
+    const pys = snappedPoly.map(p => p.y);
+    const pMinX = Math.min(...pxs);
+    const pMaxX = Math.max(...pxs);
+    const pMinY = Math.min(...pys);
+    const pMaxY = Math.max(...pys);
+    const pw = Math.max(24, pMaxX - pMinX);
+    const ph = Math.max(24, pMaxY - pMinY);
+    const normPts = snappedPoly.map(p => ({
+      x: Number(((p.x - pMinX) / pw).toFixed(4)),
+      y: Number(((p.y - pMinY) / ph).toFixed(4))
+    }));
+
+    addElement('polygon_custom', {
+      x: pMinX,
+      y: pMinY,
+      width: pw,
+      height: ph,
+      fill: 'none',
+      extraProps: {
+        points: normPts,
+        closed: false,
+        startCap: drawPresetCapStart,
+        endCap: drawPresetCapEnd
+      }
+    });
+    toast.success('แปลงเส้นวาดเป็นเส้นตรงต่อเนื่องเรียบร้อย');
+    setDrawPoints([]);
   };
 
   // Quick Rotate shortcuts (-90, +90, -15, +15)
   const handleRotateDelta = (deltaDeg: number) => {
     if (!selectedElement) return;
+    // If line/arrow has explicit endpoints x1,y1,x2,y2, rotate the endpoints around their midpoint
+    if (['line', 'arrow'].includes(selectedElement.type) && selectedElement.extraProps?.x1 !== undefined) {
+      const { x1, y1, x2, y2 } = selectedElement.extraProps;
+      const mx = (x1 + x2) / 2;
+      const my = (y1 + y2) / 2;
+      const rad = (deltaDeg * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+      const nx1 = Math.round(mx + (x1 - mx) * cos - (y1 - my) * sin);
+      const ny1 = Math.round(my + (x1 - mx) * sin + (y1 - my) * cos);
+      const nx2 = Math.round(mx + (x2 - mx) * cos - (y2 - my) * sin);
+      const ny2 = Math.round(my + (x2 - mx) * sin + (y2 - my) * cos);
+      const updated = elementsRef.current.map(el => {
+        if (el.id !== selectedElement.id) return el;
+        return {
+          ...el,
+          x: Math.min(nx1, nx2),
+          y: Math.min(ny1, ny2) - 12,
+          width: Math.max(20, Math.abs(nx2 - nx1)),
+          height: Math.max(24, Math.abs(ny2 - ny1) + 24),
+          extraProps: { ...el.extraProps, x1: nx1, y1: ny1, x2: nx2, y2: ny2 }
+        };
+      });
+      saveToHistory(updated);
+      return;
+    }
     let nextDeg = Math.round((selectedElement.rotation || 0) + deltaDeg);
     while (nextDeg < 0) nextDeg += 360;
     while (nextDeg >= 360) nextDeg -= 360;
@@ -921,8 +1985,9 @@ export function InStudioDiagramBuilderModal({
     }
   };
 
-  // Mouse Handlers for Dragging, Resizing, and Rotating
+  // Mouse Handlers for Dragging, Resizing, Rotating, and Endpoint/Vertex Manipulation
   const handleMouseDown = (e: React.MouseEvent, handle: string, elId?: string) => {
+    if (toolMode !== 'select') return;
     e.stopPropagation();
     if (elId) {
       setSelectedId(elId);
@@ -933,11 +1998,14 @@ export function InStudioDiagramBuilderModal({
     setIsDragging(true);
     setDragHandle(handle);
     setDragStartScreen({ x: e.clientX, y: e.clientY });
-    setElementStart({ ...targetEl });
+    setElementStart({
+      ...targetEl,
+      extraProps: targetEl.extraProps ? JSON.parse(JSON.stringify(targetEl.extraProps)) : undefined
+    });
     dragMovedRef.current = false;
   };
 
-  // Global mousemove and mouseup listeners with Invariant Affine Math for Rotated Elements
+  // Global mousemove and mouseup listeners with Invariant Affine Math & Smart Alignment Guides
   useEffect(() => {
     if (!isDragging || !dragHandle || !elementStart || !selectedId) return;
 
@@ -954,20 +2022,195 @@ export function InStudioDiagramBuilderModal({
         dragMovedRef.current = true;
       }
 
+      // Endpoint P1 / P2 dragging for line & arrow
+      if (dragHandle === 'p1' || dragHandle === 'p2') {
+        const startX1 = elementStart.extraProps?.x1 ?? elementStart.x;
+        const startY1 = elementStart.extraProps?.y1 ?? (elementStart.y + elementStart.height / 2);
+        const startX2 = elementStart.extraProps?.x2 ?? (elementStart.x + elementStart.width);
+        const startY2 = elementStart.extraProps?.y2 ?? (elementStart.y + elementStart.height / 2);
+
+        const movingRaw = dragHandle === 'p1'
+          ? { x: startX1 + rawDx, y: startY1 + rawDy }
+          : { x: startX2 + rawDx, y: startY2 + rawDy };
+        const anchor = dragHandle === 'p1' ? { x: startX2, y: startY2 } : { x: startX1, y: startY1 };
+
+        const snapped = snapPointWithGuides(movingRaw, selectedId, anchor, e.shiftKey);
+        setActiveGuides({ verticals: snapped.verticals, horizontals: snapped.horizontals });
+
+        const nx1 = dragHandle === 'p1' ? snapped.x : startX1;
+        const ny1 = dragHandle === 'p1' ? snapped.y : startY1;
+        const nx2 = dragHandle === 'p2' ? snapped.x : startX2;
+        const ny2 = dragHandle === 'p2' ? snapped.y : startY2;
+
+        setElements(prev => prev.map(el => {
+          if (el.id !== selectedId) return el;
+          return {
+            ...el,
+            x: Math.min(nx1, nx2),
+            y: Math.min(ny1, ny2) - 12,
+            width: Math.max(20, Math.abs(nx2 - nx1)),
+            height: Math.max(24, Math.abs(ny2 - ny1) + 24),
+            rotation: 0,
+            extraProps: {
+              ...(el.extraProps || {}),
+              x1: nx1,
+              y1: ny1,
+              x2: nx2,
+              y2: ny2
+            }
+          };
+        }));
+        return;
+      }
+
+      // Curve offset dragging for curved line
+      if (dragHandle === 'curve') {
+        const x1 = elementStart.extraProps?.x1 ?? elementStart.x;
+        const y1 = elementStart.extraProps?.y1 ?? (elementStart.y + elementStart.height / 2);
+        const x2 = elementStart.extraProps?.x2 ?? (elementStart.x + elementStart.width);
+        const y2 = elementStart.extraProps?.y2 ?? (elementStart.y + elementStart.height / 2);
+        const mx = (x1 + x2) / 2;
+        const my = (y1 + y2) / 2;
+        const pos = getCanvasCoords(e.clientX, e.clientY);
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        const nx = -Math.sin(angle);
+        const ny = Math.cos(angle);
+        const proj = Math.round(((pos.x - mx) * nx + (pos.y - my) * ny) * 1.6);
+        setElements(prev => prev.map(el => {
+          if (el.id !== selectedId) return el;
+          return {
+            ...el,
+            extraProps: { ...(el.extraProps || {}), curveOffset: Math.max(-160, Math.min(160, proj)) }
+          };
+        }));
+        return;
+      }
+
+      // Polygon vertex dragging (vertex-0, vertex-1, ...)
+      if (dragHandle.startsWith('vertex-')) {
+        const vIdx = parseInt(dragHandle.replace('vertex-', ''), 10);
+        const startPts: { x: number; y: number }[] = elementStart.extraProps?.points || [];
+        if (startPts[vIdx]) {
+          const worldPts = startPts.map(p => ({
+            x: elementStart.x + p.x * elementStart.width,
+            y: elementStart.y + p.y * elementStart.height
+          }));
+          const rawTarget = {
+            x: worldPts[vIdx].x + rawDx,
+            y: worldPts[vIdx].y + rawDy
+          };
+          const snapped = snapPointWithGuides(rawTarget, selectedId, null, e.shiftKey);
+          setActiveGuides({ verticals: snapped.verticals, horizontals: snapped.horizontals });
+          worldPts[vIdx] = { x: snapped.x, y: snapped.y };
+
+          const xs = worldPts.map(p => p.x);
+          const ys = worldPts.map(p => p.y);
+          const minX = Math.min(...xs);
+          const maxX = Math.max(...xs);
+          const minY = Math.min(...ys);
+          const maxY = Math.max(...ys);
+          const w = Math.max(20, maxX - minX);
+          const h = Math.max(20, maxY - minY);
+          const normPts = worldPts.map(p => ({
+            x: Number(((p.x - minX) / w).toFixed(4)),
+            y: Number(((p.y - minY) / h).toFixed(4))
+          }));
+
+          setElements(prev => prev.map(el => {
+            if (el.id !== selectedId) return el;
+            return {
+              ...el,
+              x: Math.round(minX),
+              y: Math.round(minY),
+              width: Math.round(w),
+              height: Math.round(h),
+              extraProps: { ...(el.extraProps || {}), points: normPts }
+            };
+          }));
+        }
+        return;
+      }
+
+      if (dragHandle === 'move') {
+        let nextX = Math.round(elementStart.x + rawDx);
+        let nextY = Math.round(elementStart.y + rawDy);
+
+        if (snapToGrid) {
+          nextX = Math.round(nextX / gridSize) * gridSize;
+          nextY = Math.round(nextY / gridSize) * gridSize;
+        }
+
+        const verticals: number[] = [];
+        const horizontals: number[] = [];
+
+        if (showSmartGuides) {
+          const cx = Math.round(nextX + elementStart.width / 2);
+          const cy = Math.round(nextY + elementStart.height / 2);
+          const right = nextX + elementStart.width;
+          const bottom = nextY + elementStart.height;
+
+          const xTargets: number[] = [CANVAS_WIDTH / 2];
+          const yTargets: number[] = [CANVAS_HEIGHT / 2];
+
+          elementsRef.current.forEach(other => {
+            if (other.id === selectedId) return;
+            xTargets.push(other.x, Math.round(other.x + other.width / 2), other.x + other.width);
+            yTargets.push(other.y, Math.round(other.y + other.height / 2), other.y + other.height);
+          });
+
+          const threshold = 5;
+          for (const tx of xTargets) {
+            if (Math.abs(cx - tx) <= threshold) {
+              nextX = Math.round(tx - elementStart.width / 2);
+              verticals.push(tx);
+              break;
+            } else if (Math.abs(nextX - tx) <= threshold) {
+              nextX = tx;
+              verticals.push(tx);
+              break;
+            } else if (Math.abs(right - tx) <= threshold) {
+              nextX = tx - elementStart.width;
+              verticals.push(tx);
+              break;
+            }
+          }
+          for (const ty of yTargets) {
+            if (Math.abs(cy - ty) <= threshold) {
+              nextY = Math.round(ty - elementStart.height / 2);
+              horizontals.push(ty);
+              break;
+            } else if (Math.abs(nextY - ty) <= threshold) {
+              nextY = ty;
+              horizontals.push(ty);
+              break;
+            } else if (Math.abs(bottom - ty) <= threshold) {
+              nextY = ty - elementStart.height;
+              horizontals.push(ty);
+              break;
+            }
+          }
+        }
+        setActiveGuides({ verticals, horizontals });
+
+        const appliedDx = nextX - elementStart.x;
+        const appliedDy = nextY - elementStart.y;
+
+        setElements(prev => prev.map(el => {
+          if (el.id !== selectedId) return el;
+          const nextExtra = el.extraProps ? { ...el.extraProps } : undefined;
+          if (nextExtra && elementStart.extraProps?.x1 !== undefined) {
+            nextExtra.x1 = elementStart.extraProps.x1 + appliedDx;
+            nextExtra.y1 = elementStart.extraProps.y1 + appliedDy;
+            nextExtra.x2 = elementStart.extraProps.x2 + appliedDx;
+            nextExtra.y2 = elementStart.extraProps.y2 + appliedDy;
+          }
+          return { ...el, x: nextX, y: nextY, extraProps: nextExtra };
+        }));
+        return;
+      }
+
       setElements(prev => prev.map(el => {
         if (el.id !== selectedId) return el;
-
-        if (dragHandle === 'move') {
-          let nextX = Math.round(elementStart.x + rawDx);
-          let nextY = Math.round(elementStart.y + rawDy);
-
-          if (snapToGrid) {
-            nextX = Math.round(nextX / gridSize) * gridSize;
-            nextY = Math.round(nextY / gridSize) * gridSize;
-          }
-
-          return { ...el, x: nextX, y: nextY };
-        }
 
         if (dragHandle === 'rotate') {
           const centerX = elementStart.x + elementStart.width / 2;
@@ -978,7 +2221,6 @@ export function InStudioDiagramBuilderModal({
           if (deg < 0) deg += 360;
           if (deg >= 360) deg -= 360;
 
-          // Shift key locks to 15 degree increments
           if (e.shiftKey) {
             deg = Math.round(deg / 15) * 15;
           }
@@ -986,13 +2228,11 @@ export function InStudioDiagramBuilderModal({
           return { ...el, rotation: deg };
         }
 
-        // Affine Transform Math for Corner Handles (se, sw, ne, nw) with Rotated Elements:
-        // Keeps the stationary opposite anchor corner invariant in world coordinates!
+        // Affine Transform Math for Corner Handles (se, sw, ne, nw) with Rotated Elements
         const rotRad = ((elementStart.rotation || 0) * Math.PI) / 180;
         const cosRot = Math.cos(rotRad);
         const sinRot = Math.sin(rotRad);
 
-        // Project world delta into local element coordinates
         const localDx = rawDx * Math.cos(-rotRad) - rawDy * Math.sin(-rotRad);
         const localDy = rawDx * Math.sin(-rotRad) + rawDy * Math.cos(-rotRad);
 
@@ -1002,49 +2242,60 @@ export function InStudioDiagramBuilderModal({
         const minH = ['line', 'arrow'].includes(el.type) ? 4 : 20;
 
         if (dragHandle === 'se') {
-          anchorLocalStart = { x: -elementStart.width / 2, y: -elementStart.height / 2 }; // NW is invariant
+          anchorLocalStart = { x: -elementStart.width / 2, y: -elementStart.height / 2 };
           newW = Math.max(20, Math.round(elementStart.width + localDx));
           newH = Math.max(minH, Math.round(elementStart.height + localDy));
         } else if (dragHandle === 'sw') {
-          anchorLocalStart = { x: elementStart.width / 2, y: -elementStart.height / 2 }; // NE is invariant
+          anchorLocalStart = { x: elementStart.width / 2, y: -elementStart.height / 2 };
           newW = Math.max(20, Math.round(elementStart.width - localDx));
           newH = Math.max(minH, Math.round(elementStart.height + localDy));
         } else if (dragHandle === 'ne') {
-          anchorLocalStart = { x: -elementStart.width / 2, y: elementStart.height / 2 }; // SW is invariant
+          anchorLocalStart = { x: -elementStart.width / 2, y: elementStart.height / 2 };
           newW = Math.max(20, Math.round(elementStart.width + localDx));
           newH = Math.max(minH, Math.round(elementStart.height - localDy));
         } else if (dragHandle === 'nw') {
-          anchorLocalStart = { x: elementStart.width / 2, y: elementStart.height / 2 }; // SE is invariant
+          anchorLocalStart = { x: elementStart.width / 2, y: elementStart.height / 2 };
           newW = Math.max(20, Math.round(elementStart.width - localDx));
           newH = Math.max(minH, Math.round(elementStart.height - localDy));
         }
 
-        // Stationary world anchor point before resize
+        if (snapToGrid) {
+          newW = Math.max(20, Math.round(newW / gridSize) * gridSize);
+          newH = Math.max(minH, Math.round(newH / gridSize) * gridSize);
+        }
+
         const startCenterX = elementStart.x + elementStart.width / 2;
         const startCenterY = elementStart.y + elementStart.height / 2;
         const anchorWorldX = startCenterX + anchorLocalStart.x * cosRot - anchorLocalStart.y * sinRot;
         const anchorWorldY = startCenterY + anchorLocalStart.x * sinRot + anchorLocalStart.y * cosRot;
 
-        // Position of the same anchor in the new local box
         let newAnchorLocal = { x: 0, y: 0 };
         if (dragHandle === 'se') newAnchorLocal = { x: -newW / 2, y: -newH / 2 };
         else if (dragHandle === 'sw') newAnchorLocal = { x: newW / 2, y: -newH / 2 };
         else if (dragHandle === 'ne') newAnchorLocal = { x: -newW / 2, y: newH / 2 };
         else if (dragHandle === 'nw') newAnchorLocal = { x: newW / 2, y: newH / 2 };
 
-        // Recompute world center and top-left so the anchor remains invariant
         const newCenterX = anchorWorldX - (newAnchorLocal.x * cosRot - newAnchorLocal.y * sinRot);
         const newCenterY = anchorWorldY - (newAnchorLocal.x * sinRot + newAnchorLocal.y * cosRot);
 
         const newX = Math.round(newCenterX - newW / 2);
         const newY = Math.round(newCenterY - newH / 2);
 
+        const nextExtra = el.extraProps ? { ...el.extraProps } : undefined;
+        if (nextExtra && ['line', 'arrow'].includes(el.type) && elementStart.extraProps?.x1 !== undefined) {
+          nextExtra.x1 = newX;
+          nextExtra.y1 = Math.round(newY + newH / 2);
+          nextExtra.x2 = newX + newW;
+          nextExtra.y2 = Math.round(newY + newH / 2);
+        }
+
         return {
           ...el,
           x: newX,
           y: newY,
           width: newW,
-          height: newH
+          height: newH,
+          extraProps: nextExtra
         };
       }));
     };
@@ -1052,6 +2303,7 @@ export function InStudioDiagramBuilderModal({
     const onGlobalMouseUp = () => {
       setIsDragging(false);
       setDragHandle(null);
+      setActiveGuides({ verticals: [], horizontals: [] });
       if (dragMovedRef.current) {
         saveToHistory(elementsRef.current);
       }
@@ -1064,7 +2316,7 @@ export function InStudioDiagramBuilderModal({
       window.removeEventListener('mousemove', onGlobalMouseMove);
       window.removeEventListener('mouseup', onGlobalMouseUp);
     };
-  }, [isDragging, dragHandle, dragStartScreen, elementStart, selectedId, snapToGrid, gridSize, getCanvasCoords, saveToHistory]);
+  }, [isDragging, dragHandle, dragStartScreen, elementStart, selectedId, snapToGrid, gridSize, showSmartGuides, getCanvasCoords, snapPointWithGuides, saveToHistory]);
 
   // Keyboard Shortcuts (Undo, Redo, Delete, Duplicate, Nudge)
   useEffect(() => {
@@ -1374,15 +2626,11 @@ export function InStudioDiagramBuilderModal({
 
       // --- Lines, Measurements & Math Tools ---
       case 'line':
-        return <line x1={el.x} y1={cy} x2={el.x + el.width} y2={cy} stroke={el.stroke} strokeWidth={el.strokeWidth} strokeDasharray={dash} />;
-
       case 'arrow':
-        return (
-          <g>
-            <line x1={el.x} y1={cy} x2={el.x + el.width - 8} y2={cy} stroke={el.stroke} strokeWidth={el.strokeWidth} strokeDasharray={dash} />
-            <polygon points={`${el.x + el.width - 10},${cy - 5} ${el.x + el.width},${cy} ${el.x + el.width - 10},${cy + 5}`} fill={el.stroke} />
-          </g>
-        );
+      case 'polygon_custom':
+      case 'parallel_transversal':
+      case 'intersecting_lines':
+        return <g dangerouslySetInnerHTML={{ __html: renderCustomLineAndIntersectionMarkup(el) }} />;
 
       case 'dimension_line':
         return (
@@ -2408,11 +3656,11 @@ export function InStudioDiagramBuilderModal({
 
       // --- Lines, Measurements & Math Tools ---
       case 'line':
-        return `<line x1="${el.x}" y1="${cy}" x2="${el.x + el.width}" y2="${cy}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" ${dash}/>`;
-
       case 'arrow':
-        return `<line x1="${el.x}" y1="${cy}" x2="${el.x + el.width - 8}" y2="${cy}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" ${dash}/>
-<polygon points="${el.x + el.width - 10},${cy - 5} ${el.x + el.width},${cy} ${el.x + el.width - 10},${cy + 5}" fill="${el.stroke}"/>`;
+      case 'polygon_custom':
+      case 'parallel_transversal':
+      case 'intersecting_lines':
+        return renderCustomLineAndIntersectionMarkup(el);
 
       case 'dimension_line':
         return `<line x1="${el.x}" y1="${cy - 6}" x2="${el.x}" y2="${cy + 6}" stroke="${el.stroke}" stroke-width="1.8"/>
@@ -3219,6 +4467,15 @@ ${cellsStr}`;
                 >
                   <AlignRight className="w-3.5 h-3.5" />
                 </button>
+                <div className="w-px h-3.5 bg-stone-200 mx-0.5" />
+                <button
+                  type="button"
+                  onClick={() => handleAlign('snap_grid')}
+                  className="px-1.5 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-[10px] font-bold text-blue-700 border border-blue-200"
+                  title="ดึงตำแหน่งเข้าเส้นตารางทันที"
+                >
+                  จัดเข้าตาราง
+                </button>
               </div>
             </div>
 
@@ -3359,6 +4616,7 @@ ${cellsStr}`;
                       { type: 'pentagon', label: 'ห้าเหลี่ยม', icon: <Shapes className="w-3.5 h-3.5 text-indigo-600" /> },
                       { type: 'hexagon', label: 'หกเหลี่ยม', icon: <Shapes className="w-3.5 h-3.5 text-teal-600" /> },
                       { type: 'star_5', label: 'ดาว 5 แฉก', icon: <Star className="w-3.5 h-3.5 text-amber-500" /> },
+                      { type: 'polygon_custom', label: 'หลายเหลี่ยมดัดจุดได้', icon: <Shapes className="w-3.5 h-3.5 text-blue-700" /> },
                     ].map(item => (
                       <button
                         key={item.type}
@@ -3402,11 +4660,13 @@ ${cellsStr}`;
 
               {activeCategory === 'math' && (
                 <div className="space-y-2">
-                  <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block">การวัด & เครื่องมือคณิต</span>
+                  <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block">การวัด เส้นตัด & เครื่องมือคณิต</span>
                   <div className="grid grid-cols-2 gap-1.5">
                     {[
-                      { type: 'line', label: 'เส้นตรง', icon: <Minus className="w-3.5 h-3.5 text-stone-700" /> },
-                      { type: 'arrow', label: 'ลูกศรชี้', icon: <ArrowRight className="w-3.5 h-3.5 text-blue-600" /> },
+                      { type: 'line', label: 'เส้นตรง (ปรับปลายได้)', icon: <Minus className="w-3.5 h-3.5 text-stone-700" /> },
+                      { type: 'arrow', label: 'ลูกศร / รังสี', icon: <ArrowRight className="w-3.5 h-3.5 text-blue-600" /> },
+                      { type: 'parallel_transversal', label: 'เส้นขนาน & มุมเส้นตัด', icon: <SlidersHorizontal className="w-3.5 h-3.5 text-violet-600" /> },
+                      { type: 'intersecting_lines', label: 'เส้นตัดกัน & มุมตรงข้าม', icon: <Compass className="w-3.5 h-3.5 text-rose-600" /> },
                       { type: 'dimension_line', label: 'เส้นบอกขนาด', icon: <Minus className="w-3.5 h-3.5 text-emerald-600" /> },
                       { type: 'angle_arc', label: 'มุม & ส่วนโค้ง', icon: <Compass className="w-3.5 h-3.5 text-purple-600" /> },
                       { type: 'protractor', label: 'ไม้โปรแทรกเตอร์', icon: <Compass className="w-3.5 h-3.5 text-sky-600" /> },
@@ -3531,6 +4791,13 @@ ${cellsStr}`;
                     >
                       4. กราฟสมการเส้นตรง (X-Y)
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => loadPresetTemplate('parallel_transversal')}
+                      className="w-full p-2.5 bg-white border border-stone-200 hover:border-blue-500 hover:bg-blue-50/50 rounded-xl text-left text-xs font-semibold text-stone-800 transition-all shadow-2xs"
+                    >
+                      5. เส้นขนานและมุมเส้นตัด (AB // CD)
+                    </button>
                   </div>
                 </div>
               )}
@@ -3566,56 +4833,229 @@ ${cellsStr}`;
 
           {/* Center Canvas */}
           <div 
-            className="flex-1 bg-stone-200/80 p-4 md:p-6 flex flex-col items-center justify-center overflow-auto select-none relative"
-            onClick={() => setSelectedId(null)}
+            className="flex-1 bg-stone-200/80 p-3 md:p-4 flex flex-col items-center justify-center overflow-auto select-none relative"
+            onClick={() => {
+              if (toolMode === 'select') setSelectedId(null);
+            }}
           >
-            {/* Canvas Viewport Toolbar (Zoom, Snap, Grid) */}
+            {/* Top Drawing Mode & Grid Alignment Bar */}
             <div 
-              className="absolute top-3 left-4 flex items-center gap-1.5 bg-white/95 backdrop-blur-xs px-2.5 py-1.5 rounded-xl border border-stone-300 shadow-sm text-xs z-10"
+              className="w-full max-w-[720px] mb-2 flex flex-wrap items-center justify-between gap-1.5 bg-white/95 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-stone-300 shadow-sm text-xs z-10"
               onClick={(e) => e.stopPropagation()}
             >
-              <button
-                type="button"
-                onClick={() => setZoom(prev => Math.max(0.5, prev - 0.25))}
-                className="p-1 hover:bg-stone-100 rounded text-stone-600"
-                title="ย่อมุมมอง"
-              >
-                <ZoomOut className="w-3.5 h-3.5" />
-              </button>
-              <span className="text-[11px] font-bold text-stone-700 w-10 text-center">{Math.round(zoom * 100)}%</span>
-              <button
-                type="button"
-                onClick={() => setZoom(prev => Math.min(1.5, prev + 0.25))}
-                className="p-1 hover:bg-stone-100 rounded text-stone-600"
-                title="ขยายมุมมอง"
-              >
-                <ZoomIn className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setZoom(1)}
-                className="px-1.5 py-0.5 hover:bg-stone-100 rounded text-[10px] font-semibold text-stone-600 ml-1"
-                title="รีเซ็ตขนาด 100%"
-              >
-                100%
-              </button>
-              <div className="w-px h-3.5 bg-stone-200 mx-1" />
-              <button
-                type="button"
-                onClick={() => setShowGrid(!showGrid)}
-                className={`p-1 rounded ${showGrid ? 'bg-blue-100 text-blue-700' : 'text-stone-600 hover:bg-stone-100'}`}
-                title="แสดงตาราง Grid"
-              >
-                <Grid className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setSnapToGrid(!snapToGrid)}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${snapToGrid ? 'bg-blue-600 text-white' : 'text-stone-600 hover:bg-stone-100'}`}
-                title="ดูดติดตาราง (Snap to Grid)"
-              >
-                Snap
-              </button>
+              {/* Mouse Drawing & Straightening Tools */}
+              <div className="flex items-center gap-1 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setToolMode('select');
+                    setDrawPoints([]);
+                    setPolygonCursorPos(null);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors ${
+                    toolMode === 'select'
+                      ? 'bg-stone-900 text-white shadow-2xs'
+                      : 'text-stone-700 hover:bg-stone-100'
+                  }`}
+                  title="โหมดเลือก ย้าย และดึงจุดปลาย"
+                >
+                  <Move className="w-3.5 h-3.5" />
+                  <span>เลือก/ย้าย</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setToolMode('draw_line');
+                    setDrawPoints([]);
+                    setSelectedId(null);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors ${
+                    toolMode === 'draw_line'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-stone-700 hover:bg-stone-100'
+                  }`}
+                  title="คลิกค้างแล้วลากเมาส์วาดเส้นตรง (กด Shift ล็อกมุมทีละ 15°)"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                  <span>ลากวาดเส้นตรง</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setToolMode('draw_smart');
+                    setDrawPoints([]);
+                    setSelectedId(null);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors ${
+                    toolMode === 'draw_smart'
+                      ? 'bg-indigo-600 text-white shadow-2xs'
+                      : 'text-stone-700 hover:bg-stone-100'
+                  }`}
+                  title="วาดเส้นอิสระด้วยเมาส์แล้วแปลงเป็นเส้นตรง สามเหลี่ยม สี่เหลี่ยม หรือวงกลมอัตโนมัติ"
+                >
+                  <Shapes className="w-3.5 h-3.5" />
+                  <span>วาดอิสระแปลงเป็นทรง</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setToolMode('draw_polygon');
+                    setDrawPoints([]);
+                    setSelectedId(null);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors ${
+                    toolMode === 'draw_polygon'
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'text-stone-700 hover:bg-stone-100'
+                  }`}
+                  title="คลิกทีละจุดเพื่อสร้างรูปหลายเหลี่ยมหรือเส้นหักต่อเนื่อง"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>ลากจุดต่อจุด</span>
+                </button>
+              </div>
+
+              {/* Zoom & Grid Alignment Controls */}
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setShowGrid(!showGrid)}
+                  className={`p-1 rounded ${showGrid ? 'bg-blue-100 text-blue-700' : 'text-stone-600 hover:bg-stone-100'}`}
+                  title="เปิด/ปิดตาราง Grid"
+                >
+                  <Grid className="w-3.5 h-3.5" />
+                </button>
+                <select
+                  value={gridSize}
+                  onChange={(e) => setGridSize(parseInt(e.target.value) || 20)}
+                  className="px-1 py-0.5 text-[10px] font-bold border border-stone-200 rounded bg-stone-50 text-stone-700"
+                  title="ขนาดช่องตาราง Grid"
+                >
+                  <option value={10}>Grid 10px</option>
+                  <option value={20}>Grid 20px</option>
+                  <option value={40}>Grid 40px</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setSnapToGrid(!snapToGrid)}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${snapToGrid ? 'bg-blue-600 text-white' : 'text-stone-600 hover:bg-stone-100 border border-stone-200'}`}
+                  title="ดูดติดจุดตัดตารางและล็อกมุมตรงอัตโนมัติ"
+                >
+                  Snap Grid
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSmartGuides(!showSmartGuides)}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${showSmartGuides ? 'bg-pink-600 text-white' : 'text-stone-600 hover:bg-stone-100 border border-stone-200'}`}
+                  title="เส้นช่วยจัดแนวอัจฉริยะ (Smart Alignment Guides)"
+                >
+                  Guides
+                </button>
+                <div className="w-px h-3.5 bg-stone-200 mx-0.5" />
+                <button
+                  type="button"
+                  onClick={() => setZoom(prev => Math.max(0.5, prev - 0.25))}
+                  className="p-1 hover:bg-stone-100 rounded text-stone-600"
+                  title="ย่อมุมมอง"
+                >
+                  <ZoomOut className="w-3.5 h-3.5" />
+                </button>
+                <span className="text-[10px] font-bold text-stone-700 w-9 text-center">{Math.round(zoom * 100)}%</span>
+                <button
+                  type="button"
+                  onClick={() => setZoom(prev => Math.min(1.5, prev + 0.25))}
+                  className="p-1 hover:bg-stone-100 rounded text-stone-600"
+                  title="ขยายมุมมอง"
+                >
+                  <ZoomIn className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Sub-bar when Drawing Mode is Active: Preset Endpoint Caps & Line Shape */}
+              {toolMode !== 'select' && (
+                <div className="w-full pt-1.5 mt-1 border-t border-stone-200 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-1">
+                      <span className="text-stone-500 font-semibold">ทรงเส้น:</span>
+                      <select
+                        value={drawPresetLineShape}
+                        onChange={(e) => setDrawPresetLineShape(e.target.value as any)}
+                        className="px-1.5 py-0.5 border border-stone-300 rounded bg-white font-semibold text-stone-800"
+                      >
+                        <option value="straight">เส้นตรง (Straight)</option>
+                        <option value="curved">เส้นโค้ง (Curved)</option>
+                        <option value="elbow">เส้นหักฉาก (Elbow)</option>
+                        <option value="zigzag">เส้นซิกแซก/สปริง (Zigzag)</option>
+                        <option value="double">เส้นคู่ขนาน (Double)</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-stone-500 font-semibold">หัวเส้นเริ่มต้น:</span>
+                      <select
+                        value={drawPresetCapStart}
+                        onChange={(e) => setDrawPresetCapStart(e.target.value)}
+                        className="px-1.5 py-0.5 border border-stone-300 rounded bg-white font-semibold text-stone-800"
+                      >
+                        <option value="none">ไม่มี (None)</option>
+                        <option value="arrow">หัวลูกศรทึบ</option>
+                        <option value="open_arrow">หัวลูกศรโปร่ง</option>
+                        <option value="dot">จุดทึบ</option>
+                        <option value="hollow_dot">จุดโปร่ง</option>
+                        <option value="bar">ขีดกั้นตั้งฉาก</option>
+                        <option value="diamond">หัวข้าวหลามตัด</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-stone-500 font-semibold">ปลายเส้นสิ้นสุด:</span>
+                      <select
+                        value={drawPresetCapEnd}
+                        onChange={(e) => setDrawPresetCapEnd(e.target.value)}
+                        className="px-1.5 py-0.5 border border-stone-300 rounded bg-white font-semibold text-stone-800"
+                      >
+                        <option value="none">ไม่มี (None)</option>
+                        <option value="arrow">หัวลูกศรทึบ</option>
+                        <option value="open_arrow">หัวลูกศรโปร่ง</option>
+                        <option value="dot">จุดทึบ</option>
+                        <option value="hollow_dot">จุดโปร่ง</option>
+                        <option value="bar">ขีดกั้นตั้งฉาก</option>
+                        <option value="diamond">หัวข้าวหลามตัด</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {toolMode === 'draw_polygon' ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-emerald-700 font-semibold">
+                        คลิกวางจุด ({drawPoints.length} จุด)
+                      </span>
+                      {drawPoints.length >= 2 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => finishPolygonDrawing(true)}
+                            className="px-2 py-0.5 bg-emerald-600 text-white rounded font-bold text-[10px] hover:bg-emerald-700"
+                          >
+                            ปิดรูปหลายเหลี่ยม
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => finishPolygonDrawing(false)}
+                            className="px-2 py-0.5 bg-blue-600 text-white rounded font-bold text-[10px] hover:bg-blue-700"
+                          >
+                            จบเส้นเปิด
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-blue-700 font-semibold">
+                      {toolMode === 'draw_line'
+                        ? 'คลิกค้างบนผืนผ้าใบแล้วลากเพื่อวาดเส้นตรง (กด Shift ล็อกมุมทีละ 15°)'
+                        : 'วาดเส้นด้วยเมาส์ ระบบจะดัดเป็นเส้นตรง/สามเหลี่ยม/สี่เหลี่ยม/วงกลมให้อัตโนมัติ'}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Interactive Canvas Container */}
@@ -3628,34 +5068,63 @@ ${cellsStr}`;
                 transformOrigin: 'center center'
               }}
             >
-              {/* Subtle Grid Background */}
-              {showGrid && (
-                <div 
-                  className="absolute inset-0 pointer-events-none opacity-20"
-                  style={{
-                    backgroundImage: 'radial-gradient(#475569 1px, transparent 1px)',
-                    backgroundSize: `${gridSize}px ${gridSize}px`
-                  }}
-                />
-              )}
-
               {/* Main Interactive SVG */}
               <svg
                 ref={svgRef}
                 viewBox={`0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}`}
-                className="w-full h-full cursor-default"
+                className={`w-full h-full ${toolMode !== 'select' ? 'cursor-crosshair' : 'cursor-default'}`}
+                onMouseDown={handleCanvasMouseDown}
+                onMouseMove={handleCanvasMouseMove}
+                onMouseUp={handleCanvasMouseUp}
               >
+                {/* Crisp Major & Minor Grid Lines */}
+                {showGrid && (
+                  <g className="pointer-events-none">
+                    {Array.from({ length: Math.floor(CANVAS_WIDTH / gridSize) + 1 }).map((_, idx) => {
+                      const gx = idx * gridSize;
+                      const isMajor = gx % (gridSize * 5) === 0;
+                      return (
+                        <line
+                          key={`vg-${gx}`}
+                          x1={gx}
+                          y1={0}
+                          x2={gx}
+                          y2={CANVAS_HEIGHT}
+                          stroke={isMajor ? '#cbd5e1' : '#f1f5f9'}
+                          strokeWidth={isMajor ? 1 : 0.8}
+                        />
+                      );
+                    })}
+                    {Array.from({ length: Math.floor(CANVAS_HEIGHT / gridSize) + 1 }).map((_, idx) => {
+                      const gy = idx * gridSize;
+                      const isMajor = gy % (gridSize * 5) === 0;
+                      return (
+                        <line
+                          key={`hg-${gy}`}
+                          x1={0}
+                          y1={gy}
+                          x2={CANVAS_WIDTH}
+                          y2={gy}
+                          stroke={isMajor ? '#cbd5e1' : '#f1f5f9'}
+                          strokeWidth={isMajor ? 1 : 0.8}
+                        />
+                      );
+                    })}
+                  </g>
+                )}
+
                 {elements.map(el => {
                   const isSelected = el.id === selectedId;
                   const cx = el.x + el.width / 2;
                   const cy = el.y + el.height / 2;
                   const transform = getTransformString(el);
+                  const isPointLine = (el.type === 'line' || el.type === 'arrow') && el.extraProps?.x1 !== undefined;
 
                   return (
                     <g 
                       key={el.id} 
                       transform={transform}
-                      className="cursor-pointer group"
+                      className={toolMode === 'select' ? 'cursor-pointer group' : ''}
                       onMouseDown={(e) => handleMouseDown(e, 'move', el.id)}
                       onDoubleClick={(e) => {
                         e.stopPropagation();
@@ -3672,79 +5141,294 @@ ${cellsStr}`;
                       {/* Selection Bounding Box & Drag Handles */}
                       {isSelected && (
                         <g className="selection-box">
-                          <rect
-                            x={el.x - 3}
-                            y={el.y - 3}
-                            width={el.width + 6}
-                            height={el.height + 6}
-                            fill="none"
-                            stroke="#3b82f6"
-                            strokeWidth={1.5}
-                            strokeDasharray="4,4"
-                          />
-                          {/* Corner Handles */}
-                          <rect
-                            x={el.x - 7}
-                            y={el.y - 7}
-                            width={8}
-                            height={8}
-                            fill="#3b82f6"
-                            stroke="#ffffff"
-                            strokeWidth={1.5}
-                            className="cursor-nwse-resize"
-                            onMouseDown={(e) => handleMouseDown(e, 'nw')}
-                          />
-                          <rect
-                            x={el.x + el.width - 1}
-                            y={el.y - 7}
-                            width={8}
-                            height={8}
-                            fill="#3b82f6"
-                            stroke="#ffffff"
-                            strokeWidth={1.5}
-                            className="cursor-nesw-resize"
-                            onMouseDown={(e) => handleMouseDown(e, 'ne')}
-                          />
-                          <rect
-                            x={el.x + el.width - 1}
-                            y={el.y + el.height - 1}
-                            width={8}
-                            height={8}
-                            fill="#3b82f6"
-                            stroke="#ffffff"
-                            strokeWidth={1.5}
-                            className="cursor-nwse-resize"
-                            onMouseDown={(e) => handleMouseDown(e, 'se')}
-                          />
-                          <rect
-                            x={el.x - 7}
-                            y={el.y + el.height - 1}
-                            width={8}
-                            height={8}
-                            fill="#3b82f6"
-                            stroke="#ffffff"
-                            strokeWidth={1.5}
-                            className="cursor-nesw-resize"
-                            onMouseDown={(e) => handleMouseDown(e, 'sw')}
-                          />
+                          {isPointLine ? (
+                            (() => {
+                              const x1 = Number(el.extraProps?.x1 ?? el.x);
+                              const y1 = Number(el.extraProps?.y1 ?? cy);
+                              const x2 = Number(el.extraProps?.x2 ?? (el.x + el.width));
+                              const y2 = Number(el.extraProps?.y2 ?? cy);
+                              const mx = (x1 + x2) / 2;
+                              const my = (y1 + y2) / 2;
+                              const dx = x2 - x1;
+                              const dy = y2 - y1;
+                              const len = Math.max(1, Math.hypot(dx, dy));
+                              const nx = -dy / len;
+                              const ny = dx / len;
+                              const curveOff = Number(el.extraProps?.curveOffset ?? -45);
+                              const curveHandleX = mx + nx * (curveOff * 0.5);
+                              const curveHandleY = my + ny * (curveOff * 0.5);
+                              return (
+                                <g>
+                                  <line
+                                    x1={x1}
+                                    y1={y1}
+                                    x2={x2}
+                                    y2={y2}
+                                    stroke="#3b82f6"
+                                    strokeWidth={1.2}
+                                    strokeDasharray="4,4"
+                                  />
+                                  {/* Start Endpoint Handle P1 */}
+                                  <circle
+                                    cx={x1}
+                                    cy={y1}
+                                    r={6.5}
+                                    fill="#2563eb"
+                                    stroke="#ffffff"
+                                    strokeWidth={2}
+                                    className="cursor-move"
+                                    onMouseDown={(e) => handleMouseDown(e, 'p1', el.id)}
+                                  />
+                                  {/* End Endpoint Handle P2 */}
+                                  <circle
+                                    cx={x2}
+                                    cy={y2}
+                                    r={6.5}
+                                    fill="#059669"
+                                    stroke="#ffffff"
+                                    strokeWidth={2}
+                                    className="cursor-move"
+                                    onMouseDown={(e) => handleMouseDown(e, 'p2', el.id)}
+                                  />
+                                  {/* Curve Control Handle when lineShape === 'curved' */}
+                                  {el.extraProps?.lineShape === 'curved' && (
+                                    <rect
+                                      x={curveHandleX - 5}
+                                      y={curveHandleY - 5}
+                                      width={10}
+                                      height={10}
+                                      rx={2}
+                                      fill="#f59e0b"
+                                      stroke="#ffffff"
+                                      strokeWidth={1.5}
+                                      className="cursor-ns-resize"
+                                      onMouseDown={(e) => handleMouseDown(e, 'curve', el.id)}
+                                    />
+                                  )}
+                                </g>
+                              );
+                            })()
+                          ) : (
+                            <>
+                              <rect
+                                x={el.x - 3}
+                                y={el.y - 3}
+                                width={el.width + 6}
+                                height={el.height + 6}
+                                fill="none"
+                                stroke="#3b82f6"
+                                strokeWidth={1.5}
+                                strokeDasharray="4,4"
+                              />
+                              {/* Corner Handles */}
+                              <rect
+                                x={el.x - 7}
+                                y={el.y - 7}
+                                width={8}
+                                height={8}
+                                fill="#3b82f6"
+                                stroke="#ffffff"
+                                strokeWidth={1.5}
+                                className="cursor-nwse-resize"
+                                onMouseDown={(e) => handleMouseDown(e, 'nw')}
+                              />
+                              <rect
+                                x={el.x + el.width - 1}
+                                y={el.y - 7}
+                                width={8}
+                                height={8}
+                                fill="#3b82f6"
+                                stroke="#ffffff"
+                                strokeWidth={1.5}
+                                className="cursor-nesw-resize"
+                                onMouseDown={(e) => handleMouseDown(e, 'ne')}
+                              />
+                              <rect
+                                x={el.x + el.width - 1}
+                                y={el.y + el.height - 1}
+                                width={8}
+                                height={8}
+                                fill="#3b82f6"
+                                stroke="#ffffff"
+                                strokeWidth={1.5}
+                                className="cursor-nwse-resize"
+                                onMouseDown={(e) => handleMouseDown(e, 'se')}
+                              />
+                              <rect
+                                x={el.x - 7}
+                                y={el.y + el.height - 1}
+                                width={8}
+                                height={8}
+                                fill="#3b82f6"
+                                stroke="#ffffff"
+                                strokeWidth={1.5}
+                                className="cursor-nesw-resize"
+                                onMouseDown={(e) => handleMouseDown(e, 'sw')}
+                              />
 
-                          {/* Top Rotation Handle */}
-                          <line x1={cx} y1={el.y - 3} x2={cx} y2={el.y - 18} stroke="#3b82f6" strokeWidth={1.5} />
-                          <circle
-                            cx={cx}
-                            cy={el.y - 20}
-                            r={5}
-                            fill="#3b82f6"
-                            stroke="#ffffff"
-                            strokeWidth={1.5}
-                            className="cursor-grab active:cursor-grabbing"
-                            onMouseDown={(e) => handleMouseDown(e, 'rotate')}
-                          />
+                              {/* Top Rotation Handle */}
+                              <line x1={cx} y1={el.y - 3} x2={cx} y2={el.y - 18} stroke="#3b82f6" strokeWidth={1.5} />
+                              <circle
+                                cx={cx}
+                                cy={el.y - 20}
+                                r={5}
+                                fill="#3b82f6"
+                                stroke="#ffffff"
+                                strokeWidth={1.5}
+                                className="cursor-grab active:cursor-grabbing"
+                                onMouseDown={(e) => handleMouseDown(e, 'rotate')}
+                              />
+
+                              {/* Draggable Vertex Handles for polygon_custom */}
+                              {el.type === 'polygon_custom' && Array.isArray(el.extraProps?.points) && (
+                                el.extraProps.points.map((pt: { x: number; y: number }, vIdx: number) => {
+                                  const vx = el.x + pt.x * el.width;
+                                  const vy = el.y + pt.y * el.height;
+                                  return (
+                                    <circle
+                                      key={`v-${vIdx}`}
+                                      cx={vx}
+                                      cy={vy}
+                                      r={5.5}
+                                      fill="#7c3aed"
+                                      stroke="#ffffff"
+                                      strokeWidth={1.8}
+                                      className="cursor-move"
+                                      onMouseDown={(e) => handleMouseDown(e, `vertex-${vIdx}`, el.id)}
+                                    />
+                                  );
+                                })
+                              )}
+                            </>
+                          )}
                         </g>
                       )}
                     </g>
                   );
                 })}
+
+                {/* Live Line-Intersection Detection Badges on Canvas */}
+                {lineIntersections.map(inter => (
+                  <g
+                    key={inter.id}
+                    className="cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleStampIntersectionAngle(inter, false);
+                    }}
+                  >
+                    <circle cx={inter.x} cy={inter.y} r={4.5} fill="#7c3aed" stroke="#ffffff" strokeWidth={1.5} />
+                    <rect
+                      x={inter.x + 8}
+                      y={inter.y - 22}
+                      width={68}
+                      height={18}
+                      rx={5}
+                      fill="#7c3aed"
+                      opacity={0.92}
+                    />
+                    <text
+                      x={inter.x + 42}
+                      y={inter.y - 13}
+                      fontSize={9.5}
+                      fontWeight="bold"
+                      fill="#ffffff"
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fontFamily="sans-serif"
+                    >
+                      {inter.acuteDeg}° / {inter.obtuseDeg}°
+                    </text>
+                  </g>
+                ))}
+
+                {/* Live Smart Alignment Guides (Pink/Cyan Reference Lines) */}
+                {(activeGuides.verticals.length > 0 || activeGuides.horizontals.length > 0) && (
+                  <g className="pointer-events-none">
+                    {activeGuides.verticals.map((vx, i) => (
+                      <line
+                        key={`guide-v-${i}`}
+                        x1={vx}
+                        y1={0}
+                        x2={vx}
+                        y2={CANVAS_HEIGHT}
+                        stroke="#ec4899"
+                        strokeWidth={1.3}
+                        strokeDasharray="4,3"
+                      />
+                    ))}
+                    {activeGuides.horizontals.map((hy, i) => (
+                      <line
+                        key={`guide-h-${i}`}
+                        x1={0}
+                        y1={hy}
+                        x2={CANVAS_WIDTH}
+                        y2={hy}
+                        stroke="#ec4899"
+                        strokeWidth={1.3}
+                        strokeDasharray="4,3"
+                      />
+                    ))}
+                  </g>
+                )}
+
+                {/* Live Stroke Preview while Drawing */}
+                {drawPoints.length > 0 && (
+                  <g className="pointer-events-none">
+                    {toolMode === 'draw_line' && drawPoints.length >= 2 && (() => {
+                      const p1 = drawPoints[0];
+                      const p2 = drawPoints[drawPoints.length - 1];
+                      const dist = Math.round(Math.hypot(p2.x - p1.x, p2.y - p1.y));
+                      const deg = Math.round(Math.atan2(-(p2.y - p1.y), p2.x - p1.x) * (180 / Math.PI));
+                      return (
+                        <g>
+                          <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="#2563eb" strokeWidth={2.5} strokeDasharray="5,3" />
+                          <circle cx={p1.x} cy={p1.y} r={4.5} fill="#2563eb" />
+                          <circle cx={p2.x} cy={p2.y} r={4.5} fill="#059669" />
+                          <rect x={(p1.x + p2.x) / 2 - 42} y={(p1.y + p2.y) / 2 - 24} width={84} height={18} rx={4} fill="#1e293b" opacity={0.9} />
+                          <text x={(p1.x + p2.x) / 2} y={(p1.y + p2.y) / 2 - 15} fontSize={10} fontWeight="bold" fill="#ffffff" textAnchor="middle" dominantBaseline="central" fontFamily="sans-serif">
+                            {dist}px ({deg}°)
+                          </text>
+                        </g>
+                      );
+                    })()}
+
+                    {toolMode === 'draw_smart' && drawPoints.length >= 2 && (
+                      <polyline
+                        points={drawPoints.map(p => `${p.x},${p.y}`).join(' ')}
+                        fill="none"
+                        stroke="#4f46e5"
+                        strokeWidth={2.5}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeDasharray="4,3"
+                      />
+                    )}
+
+                    {toolMode === 'draw_polygon' && (
+                      <g>
+                        <polyline
+                          points={[...drawPoints, ...(polygonCursorPos ? [polygonCursorPos] : [])].map(p => `${p.x},${p.y}`).join(' ')}
+                          fill="none"
+                          stroke="#059669"
+                          strokeWidth={2.2}
+                          strokeDasharray="4,3"
+                        />
+                        {drawPoints.map((pt, idx) => (
+                          <circle
+                            key={idx}
+                            cx={pt.x}
+                            cy={pt.y}
+                            r={idx === 0 ? 6 : 4}
+                            fill={idx === 0 ? '#dc2626' : '#059669'}
+                            stroke="#ffffff"
+                            strokeWidth={1.5}
+                          />
+                        ))}
+                      </g>
+                    )}
+                  </g>
+                )}
               </svg>
             </div>
           </div>
@@ -3794,6 +5478,354 @@ ${cellsStr}`;
                         <option value="normal">ปกติ (Normal)</option>
                         <option value="bold">หนา (Bold)</option>
                       </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Line & Arrow Endpoint Caps, Line Shapes, Angle Presets & Intersection Angles */}
+              {(selectedElement.type === 'line' || selectedElement.type === 'arrow') && (() => {
+                const x1 = Number(selectedElement.extraProps?.x1 ?? selectedElement.x);
+                const y1 = Number(selectedElement.extraProps?.y1 ?? (selectedElement.y + selectedElement.height / 2));
+                const x2 = Number(selectedElement.extraProps?.x2 ?? (selectedElement.x + selectedElement.width));
+                const y2 = Number(selectedElement.extraProps?.y2 ?? (selectedElement.y + selectedElement.height / 2));
+                const lineLen = Math.round(Math.hypot(x2 - x1, y2 - y1));
+                const lineDeg = Math.round(Math.atan2(-(y2 - y1), x2 - x1) * (180 / Math.PI));
+                const myIntersections = lineIntersections.filter(
+                  it => it.lineAId === selectedElement.id || it.lineBId === selectedElement.id
+                );
+
+                const setLineAngleDeg = (targetDeg: number) => {
+                  const rad = (-targetDeg * Math.PI) / 180;
+                  const nx2 = Math.round(x1 + lineLen * Math.cos(rad));
+                  const ny2 = Math.round(y1 + lineLen * Math.sin(rad));
+                  const updated = elementsRef.current.map(el => {
+                    if (el.id !== selectedElement.id) return el;
+                    return {
+                      ...el,
+                      x: Math.min(x1, nx2),
+                      y: Math.min(y1, ny2) - 12,
+                      width: Math.max(20, Math.abs(nx2 - x1)),
+                      height: Math.max(24, Math.abs(ny2 - y1) + 24),
+                      rotation: 0,
+                      extraProps: { ...(el.extraProps || {}), x1, y1, x2: nx2, y2: ny2 }
+                    };
+                  });
+                  saveToHistory(updated);
+                };
+
+                return (
+                  <div className="p-2.5 bg-blue-50/50 rounded-xl border border-blue-200 space-y-2.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-blue-900">ปรับแต่งเส้น & ปลายเส้น</span>
+                      <span className="text-[10px] font-mono font-bold text-blue-700">{lineLen}px | {lineDeg}°</span>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-stone-600 font-semibold block mb-0.5">รูปทรงของเส้น (Line Shape):</label>
+                      <select
+                        value={selectedElement.extraProps?.lineShape || 'straight'}
+                        onChange={(e) => updateSelectedExtraProp('lineShape', e.target.value)}
+                        className="w-full px-2 py-1 border border-stone-300 rounded bg-white font-medium"
+                      >
+                        <option value="straight">เส้นตรง (Straight)</option>
+                        <option value="curved">เส้นโค้งพาราโบลา (Curved)</option>
+                        <option value="elbow">เส้นหักมุมฉาก (Elbow 90°)</option>
+                        <option value="zigzag">เส้นซิกแซก/คลื่น (Zigzag)</option>
+                        <option value="double">เส้นคู่ขนาน (Double Line)</option>
+                      </select>
+                    </div>
+
+                    {selectedElement.extraProps?.lineShape === 'curved' && (
+                      <div>
+                        <div className="flex items-center justify-between text-[10px] text-stone-600">
+                          <span>ความโค้ง (Curve Offset)</span>
+                          <span className="font-bold text-blue-700">{selectedElement.extraProps?.curveOffset ?? -45} px</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={-140}
+                          max={140}
+                          value={selectedElement.extraProps?.curveOffset ?? -45}
+                          onChange={(e) => updateSelectedExtraProp('curveOffset', parseInt(e.target.value))}
+                          className="w-full accent-blue-600"
+                        />
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <div>
+                        <label className="text-[10px] text-stone-600 font-semibold block mb-0.5">หัวเส้นเริ่มต้น (P1):</label>
+                        <select
+                          value={selectedElement.extraProps?.startCap || 'none'}
+                          onChange={(e) => updateSelectedExtraProp('startCap', e.target.value)}
+                          className="w-full px-1.5 py-1 border border-stone-300 rounded bg-white text-[11px]"
+                        >
+                          <option value="none">ไม่มี (None)</option>
+                          <option value="arrow">ลูกศรทึบ</option>
+                          <option value="open_arrow">ลูกศรโปร่ง</option>
+                          <option value="dot">จุดทึบ</option>
+                          <option value="hollow_dot">จุดโปร่ง</option>
+                          <option value="bar">ขีดตั้งฉาก</option>
+                          <option value="diamond">ข้าวหลามตัด</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-stone-600 font-semibold block mb-0.5">ปลายเส้นสิ้นสุด (P2):</label>
+                        <select
+                          value={selectedElement.extraProps?.endCap ?? (selectedElement.type === 'arrow' ? 'arrow' : 'none')}
+                          onChange={(e) => updateSelectedExtraProp('endCap', e.target.value)}
+                          className="w-full px-1.5 py-1 border border-stone-300 rounded bg-white text-[11px]"
+                        >
+                          <option value="none">ไม่มี (None)</option>
+                          <option value="arrow">ลูกศรทึบ</option>
+                          <option value="open_arrow">ลูกศรโปร่ง</option>
+                          <option value="dot">จุดทึบ</option>
+                          <option value="hollow_dot">จุดโปร่ง</option>
+                          <option value="bar">ขีดตั้งฉาก</option>
+                          <option value="diamond">ข้าวหลามตัด</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-stone-600 font-semibold block mb-1">ล็อกมุมเส้นตรงด่วน:</label>
+                      <div className="grid grid-cols-6 gap-1">
+                        {[0, 30, 45, 60, 90, 135].map(deg => (
+                          <button
+                            key={deg}
+                            type="button"
+                            onClick={() => setLineAngleDeg(deg)}
+                            className="py-1 bg-white border border-stone-300 hover:border-blue-500 hover:bg-blue-50 rounded text-[10px] font-bold text-stone-700"
+                          >
+                            {deg}°
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {myIntersections.length > 0 && (
+                      <div className="pt-2 border-t border-blue-200 space-y-1.5">
+                        <span className="text-[11px] font-bold text-violet-900 block">
+                          ตรวจพบจุดตัดเส้นตรง ({myIntersections.length} จุด):
+                        </span>
+                        {myIntersections.map((inter, idx) => (
+                          <div key={inter.id} className="p-2 bg-white rounded-lg border border-violet-200 space-y-1">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="font-semibold text-stone-700">จุดตัดที่ {idx + 1}:</span>
+                              <span className="font-bold text-violet-700">
+                                มุมแหลม {inter.acuteDeg}° | มุมป้าน {inter.obtuseDeg}°
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleStampIntersectionAngle(inter, false)}
+                                className="py-1 px-1.5 bg-violet-50 hover:bg-violet-100 text-violet-800 border border-violet-200 rounded text-[10px] font-bold"
+                              >
+                                + ปักมุม {inter.acuteDeg}°
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleStampIntersectionAngle(inter, true)}
+                                className="py-1 px-1.5 bg-violet-50 hover:bg-violet-100 text-violet-800 border border-violet-200 rounded text-[10px] font-bold"
+                              >
+                                + ปักมุม {inter.obtuseDeg}°
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Polygon Custom / Multi-Segment Polyline Controls */}
+              {selectedElement.type === 'polygon_custom' && (
+                <div className="p-2.5 bg-indigo-50/50 rounded-xl border border-indigo-200 space-y-2 text-xs">
+                  <span className="font-bold text-indigo-900 block">ตั้งค่ารูปหลายเหลี่ยม / เส้นหัก:</span>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-stone-700">เชื่อมจุดปิดเป็นรูปทรง (Closed)</span>
+                    <input
+                      type="checkbox"
+                      checked={selectedElement.extraProps?.closed !== false}
+                      onChange={(e) => {
+                        updateSelectedExtraProp('closed', e.target.checked, false);
+                        if (e.target.checked && selectedElement.fill === 'none') {
+                          updateSelectedField('fill', '#f8fafc', true);
+                        }
+                      }}
+                      className="accent-indigo-600 rounded"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-stone-700">แสดงส่วนโค้งและองศาทุกมุมยอด</span>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(selectedElement.extraProps?.showVertexAngles)}
+                      onChange={(e) => updateSelectedExtraProp('showVertexAngles', e.target.checked)}
+                      className="accent-indigo-600 rounded"
+                    />
+                  </div>
+                  <p className="text-[10px] text-stone-500">
+                    ลากจุดสีม่วงบนผืนผ้าใบเพื่อดัดมุมแต่ละยอดได้อย่างอิสระ
+                  </p>
+                </div>
+              )}
+
+              {/* Parallel Lines & Transversal Angle Controls (ฟีเจอร์มุมเส้นตัดเส้นขนาน) */}
+              {selectedElement.type === 'parallel_transversal' && (
+                <div className="p-2.5 bg-violet-50/60 rounded-xl border border-violet-200 space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-violet-900">เส้นขนาน & มุมเส้นตัด</span>
+                    <span className="font-bold text-violet-700">{selectedElement.extraProps?.transversalAngle ?? 65}°</span>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-stone-600 font-semibold block">องศาเส้นตัดขวาง (Transversal Angle):</label>
+                    <input
+                      type="range"
+                      min={25}
+                      max={155}
+                      step={5}
+                      value={selectedElement.extraProps?.transversalAngle ?? 65}
+                      onChange={(e) => {
+                        const deg = parseInt(e.target.value);
+                        updateSelectedExtraProp('transversalAngle', deg, false);
+                        updateSelectedExtraProp('topAngleLabel', `${deg}°`, true);
+                      }}
+                      className="w-full accent-violet-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-stone-600 font-semibold block mb-0.5">รูปแบบความสัมพันธ์ของมุมเส้นตัด:</label>
+                    <select
+                      value={selectedElement.extraProps?.angleMode || 'alternate_interior'}
+                      onChange={(e) => updateSelectedExtraProp('angleMode', e.target.value)}
+                      className="w-full px-2 py-1 border border-stone-300 rounded bg-white text-[11px] font-medium"
+                    >
+                      <option value="alternate_interior">มุมแย้งภายใน (Alternate Interior)</option>
+                      <option value="corresponding">มุมภายนอก-ภายในข้างเดียวกัน (Corresponding)</option>
+                      <option value="co_interior">มุมภายในข้างเดียวกันรวม 180° (Co-Interior)</option>
+                      <option value="alternate_exterior">มุมแย้งภายนอก (Alternate Exterior)</option>
+                      <option value="all_angles">แสดงมุมรอบจุดตัดครบทุกมุม</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <div>
+                      <label className="text-[10px] text-stone-600 block">ป้ายมุมบน (จุดตัด 1)</label>
+                      <input
+                        type="text"
+                        value={selectedElement.extraProps?.topAngleLabel ?? '65°'}
+                        onChange={(e) => updateSelectedExtraProp('topAngleLabel', e.target.value)}
+                        className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-stone-600 block">ป้ายมุมล่าง (จุดตัด 2)</label>
+                      <input
+                        type="text"
+                        value={selectedElement.extraProps?.bottomAngleLabel ?? 'x'}
+                        onChange={(e) => updateSelectedExtraProp('bottomAngleLabel', e.target.value)}
+                        className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <div>
+                      <label className="text-[10px] text-stone-600 block">ชื่อเส้นบน</label>
+                      <input
+                        type="text"
+                        value={selectedElement.extraProps?.line1Label ?? 'AB'}
+                        onChange={(e) => updateSelectedExtraProp('line1Label', e.target.value)}
+                        className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-stone-600 block">ชื่อเส้นล่าง</label>
+                      <input
+                        type="text"
+                        value={selectedElement.extraProps?.line2Label ?? 'CD'}
+                        onChange={(e) => updateSelectedExtraProp('line2Label', e.target.value)}
+                        className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-stone-700">แสดงสัญลักษณ์เส้นขนาน (&gt;&gt;)</span>
+                    <input
+                      type="checkbox"
+                      checked={selectedElement.extraProps?.showParallelMarks !== false}
+                      onChange={(e) => updateSelectedExtraProp('showParallelMarks', e.target.checked)}
+                      className="accent-violet-600 rounded"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Intersecting Lines & Vertical Angles Controls (เส้นตรง 2 เส้นตัดกัน / มุมตรงข้าม) */}
+              {selectedElement.type === 'intersecting_lines' && (
+                <div className="p-2.5 bg-rose-50/50 rounded-xl border border-rose-200 space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-rose-900">มุมเส้นตัดกัน 4 ทิศ</span>
+                    <span className="font-bold text-rose-700">
+                      {selectedElement.extraProps?.angle ?? 60}° / {180 - (selectedElement.extraProps?.angle ?? 60)}°
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={15}
+                    max={165}
+                    step={5}
+                    value={selectedElement.extraProps?.angle ?? 60}
+                    onChange={(e) => {
+                      const deg = parseInt(e.target.value);
+                      updateSelectedExtraProp('angle', deg, false);
+                      updateSelectedExtraProp('rightLabel', `${deg}°`, false);
+                      updateSelectedExtraProp('topLabel', `${180 - deg}°`, true);
+                    }}
+                    className="w-full accent-rose-600"
+                  />
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <div>
+                      <label className="text-[10px] text-stone-600 block">มุมขวา</label>
+                      <input
+                        type="text"
+                        value={selectedElement.extraProps?.rightLabel ?? '60°'}
+                        onChange={(e) => updateSelectedExtraProp('rightLabel', e.target.value)}
+                        className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                        placeholder="เช่น 60°"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-stone-600 block">มุมซ้าย (ตรงข้าม)</label>
+                      <input
+                        type="text"
+                        value={selectedElement.extraProps?.leftLabel ?? 'x'}
+                        onChange={(e) => updateSelectedExtraProp('leftLabel', e.target.value)}
+                        className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                        placeholder="เช่น x"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-stone-600 block">มุมบน (ประชิด)</label>
+                      <input
+                        type="text"
+                        value={selectedElement.extraProps?.topLabel ?? '120°'}
+                        onChange={(e) => updateSelectedExtraProp('topLabel', e.target.value)}
+                        className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                        placeholder="เช่น 120°"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-stone-600 block">มุมล่าง (ประชิด)</label>
+                      <input
+                        type="text"
+                        value={selectedElement.extraProps?.bottomLabel ?? ''}
+                        onChange={(e) => updateSelectedExtraProp('bottomLabel', e.target.value)}
+                        className="w-full px-2 py-1 border border-stone-300 rounded bg-white"
+                        placeholder="เว้นว่างเพื่อซ่อน"
+                      />
                     </div>
                   </div>
                 </div>

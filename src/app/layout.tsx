@@ -59,10 +59,10 @@ export default async function RootLayout({
         <Toaster position="top-right" richColors />
         <LanguageProvider>
           <AuthProvider>
-            <div className="sticky top-0 z-50">
+            <div className="sticky top-0 z-40">
               <AppNav />
             </div>
-            <main className="flex-1 relative z-10 pb-24 md:pb-10">
+            <main className="flex-1 relative pb-24 md:pb-10">
               {children}
             </main>
             <GlobalNongFahBot />
