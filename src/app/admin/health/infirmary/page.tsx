@@ -399,8 +399,8 @@ export default function SchoolInfirmaryPage() {
               <ShieldAlert className="w-7 h-7 text-white animate-bounce" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-black tracking-tight">
-                🚨 แจ้งเตือนตรวจพบคลัสเตอร์การระบาดของโรคติดต่อในโรงเรียน!
+              <h2 className="text-base sm:text-lg font-black tracking-tight flex items-center gap-2">
+                <span>แจ้งเตือนตรวจพบคลัสเตอร์การระบาดของโรคติดต่อในโรงเรียน!</span>
               </h2>
               <p className="text-xs sm:text-sm text-rose-100">
                 ระบบตรวจพบผู้ป่วยเข้าเกณฑ์ในพื้นที่ห้องเรียนเดียวกันเกิน 3 รายในรอบ 7 วัน
@@ -542,7 +542,7 @@ export default function SchoolInfirmaryPage() {
                             : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                         }`}
                       >
-                        {v.parentContacted ? '✓ แจ้งแล้ว' : 'ยังไม่แจ้ง'}
+                        {v.parentContacted ? 'แจ้งผู้ปกครองแล้ว' : 'ยังไม่แจ้ง'}
                       </button>
                     </td>
                     <td className="p-3.5 text-center whitespace-nowrap">

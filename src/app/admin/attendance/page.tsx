@@ -21,7 +21,9 @@ import {
   UserCheck,
   ShieldAlert,
   Sparkles,
-  FileDown
+  FileDown,
+  Check,
+  FileText
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { printDocumentViaSandbox, openDocumentPreviewInTab } from '@/lib/documents/print-service';
@@ -879,30 +881,34 @@ export default function AdminAttendancePage() {
                     <button
                       type="button"
                       onClick={() => { setManualInTime('07:15'); setManualOutTime('17:00'); }}
-                      className="p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 font-bold text-left hover:bg-emerald-100 transition-colors"
+                      className="p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 font-bold text-left hover:bg-emerald-100 transition-colors flex items-center gap-1.5"
                     >
-                      ✓ มาปกติ (07:15 - 17:00)
+                      <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>มาปกติ (07:15 - 17:00)</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => { setManualInTime('08:00'); setManualOutTime('17:00'); }}
-                      className="p-2.5 rounded-xl border border-rose-200 dark:border-rose-800/60 bg-rose-50 dark:bg-rose-950/30 text-rose-800 dark:text-rose-300 font-bold text-left hover:bg-rose-100 transition-colors"
+                      className="p-2.5 rounded-xl border border-rose-200 dark:border-rose-800/60 bg-rose-50 dark:bg-rose-950/30 text-rose-800 dark:text-rose-300 font-bold text-left hover:bg-rose-100 transition-colors flex items-center gap-1.5"
                     >
-                      ⚠ มาสาย (08:00 - 17:00)
+                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span>มาสาย (08:00 - 17:00)</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => { setManualInTime('07:15'); setManualOutTime('15:30'); }}
-                      className="p-2.5 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 font-bold text-left hover:bg-amber-100 transition-colors"
+                      className="p-2.5 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 font-bold text-left hover:bg-amber-100 transition-colors flex items-center gap-1.5"
                     >
-                      ⚠ ออกก่อนเวลา (07:15 - 15:30)
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>ออกก่อนเวลา (07:15 - 15:30)</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => { setManualInTime(''); setManualOutTime(''); }}
-                      className="p-2.5 rounded-xl border border-blue-200 dark:border-blue-800/60 bg-blue-50 dark:bg-blue-950/30 text-blue-800 dark:text-blue-300 font-bold text-left hover:bg-blue-100 transition-colors"
+                      className="p-2.5 rounded-xl border border-blue-200 dark:border-blue-800/60 bg-blue-50 dark:bg-blue-950/30 text-blue-800 dark:text-blue-300 font-bold text-left hover:bg-blue-100 transition-colors flex items-center gap-1.5"
                     >
-                      📋 วันลา / ไปราชการ (เว้นว่าง)
+                      <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+                      <span>วันลา / ไปราชการ (เว้นว่าง)</span>
                     </button>
                   </div>
                 </div>

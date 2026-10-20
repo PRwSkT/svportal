@@ -26,7 +26,9 @@ import {
   Info,
   Layers,
   ChevronRight,
-  Filter
+  Filter,
+  GraduationCap,
+  User
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { 
@@ -609,33 +611,36 @@ export default function PastoralCarePage() {
                   <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700">
                     <button
                       onClick={() => setEvaluatorType('teacher')}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all ${
+                      className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 ${
                         evaluatorType === 'teacher'
                           ? 'bg-[#7B1C3E] text-white shadow-sm'
                           : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
                       }`}
                     >
-                      👨‍🏫 ครูประเมิน
+                      <GraduationCap className="w-3.5 h-3.5" />
+                      <span>ครูประเมิน</span>
                     </button>
                     <button
                       onClick={() => setEvaluatorType('parent')}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all ${
+                      className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 ${
                         evaluatorType === 'parent'
                           ? 'bg-[#7B1C3E] text-white shadow-sm'
                           : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
                       }`}
                     >
-                      👨‍👩‍👧 ผู้ปกครอง
+                      <Users className="w-3.5 h-3.5" />
+                      <span>ผู้ปกครอง</span>
                     </button>
                     <button
                       onClick={() => setEvaluatorType('student')}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all ${
+                      className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 ${
                         evaluatorType === 'student'
                           ? 'bg-[#7B1C3E] text-white shadow-sm'
                           : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
                       }`}
                     >
-                      🧑 นร.ประเมินตนเอง
+                      <User className="w-3.5 h-3.5" />
+                      <span>นร.ประเมินตนเอง</span>
                     </button>
                   </div>
                 </div>

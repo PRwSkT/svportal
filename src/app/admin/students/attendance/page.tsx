@@ -20,6 +20,8 @@ import {
   Baby,
   BellRing,
   Sparkles,
+  Calendar,
+  User,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -732,22 +734,24 @@ export default function StudentAttendance360Page() {
                           </p>
 
                           <div className="text-xs text-slate-500 flex flex-wrap items-center gap-3">
-                            <span>
-                              📅 {isThai ? 'วันที่ลา:' : 'Date:'} {req.start_date}{' '}
+                            <span className="inline-flex items-center gap-1.5">
+                              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                              <span>{isThai ? 'วันที่ลา:' : 'Date:'} {req.start_date}{' '}
                               {req.end_date !== req.start_date
                                 ? `ถึง ${req.end_date}`
-                                : ''}
+                                : ''}</span>
                             </span>
                             <span>•</span>
-                            <span>
-                              👤 {isThai ? 'ผู้ปกครองที่ยื่น:' : 'Submitted by:'}{' '}
-                              {req.guardian_name}
+                            <span className="inline-flex items-center gap-1.5">
+                              <User className="w-3.5 h-3.5 text-slate-400" />
+                              <span>{isThai ? 'ผู้ปกครองที่ยื่น:' : 'Submitted by:'}{' '}
+                              {req.guardian_name}</span>
                             </span>
                             {req.reviewed_by && (
                               <>
                                 <span>•</span>
-                                <span className="text-emerald-700 dark:text-emerald-400 font-semibold">
-                                  ✓ ตรวจสอบโดย {req.reviewed_by} ({req.review_note})
+                                <span className="text-emerald-700 dark:text-emerald-400 font-semibold inline-flex items-center gap-1">
+                                  <Check className="w-3.5 h-3.5" /> ตรวจสอบโดย {req.reviewed_by} ({req.review_note})
                                 </span>
                               </>
                             )}

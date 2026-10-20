@@ -496,38 +496,41 @@ function EarlyYearsAssessmentContent() {
 
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                           <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
-                            <span className="text-slate-400 block text-[11px]">
+                            <span className="text-slate-400 block text-[11px] mb-1">
                               {isThai ? 'ชั่วโมงการนอนเมื่อคืน' : 'Sleep Hours'}
                             </span>
-                            <strong className="text-slate-900 dark:text-white">
-                              🌙 {note.sleep_hours} ชั่วโมง
+                            <strong className="text-slate-900 dark:text-white inline-flex items-center gap-1.5 font-bold">
+                              <Moon className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                              <span>{note.sleep_hours} {isThai ? 'ชั่วโมง' : 'hours'}</span>
                             </strong>
                           </div>
                           <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
-                            <span className="text-slate-400 block text-[11px]">
+                            <span className="text-slate-400 block text-[11px] mb-1">
                               {isThai ? 'อาหารเช้าจากบ้าน' : 'Breakfast'}
                             </span>
-                            <strong className="text-emerald-700 dark:text-emerald-400">
-                              🥣{' '}
-                              {note.ate_breakfast
-                                ? 'ทานเรียบร้อยแล้ว'
-                                : 'ยังไม่ได้ทาน'}
+                            <strong className="text-emerald-700 dark:text-emerald-400 inline-flex items-center gap-1.5 font-bold">
+                              <Utensils className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                              <span>{note.ate_breakfast
+                                ? (isThai ? 'ทานเรียบร้อยแล้ว' : 'Ate at home')
+                                : (isThai ? 'ยังไม่ได้ทาน' : 'Not yet')}</span>
                             </strong>
                           </div>
                           <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
-                            <span className="text-slate-400 block text-[11px]">
+                            <span className="text-slate-400 block text-[11px] mb-1">
                               {isThai ? 'อารมณ์เช้านี้' : 'Morning Mood'}
                             </span>
-                            <strong className="text-slate-900 dark:text-white">
-                              😊 {note.morning_mood}
+                            <strong className="text-slate-900 dark:text-white inline-flex items-center gap-1.5 font-bold">
+                              <Smile className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                              <span>{note.morning_mood}</span>
                             </strong>
                           </div>
                           <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
-                            <span className="text-slate-400 block text-[11px]">
+                            <span className="text-slate-400 block text-[11px] mb-1">
                               {isThai ? 'ผู้มารับกลับวันนี้' : 'Pickup Today'}
                             </span>
-                            <strong className="text-slate-900 dark:text-white">
-                              🚗 {note.pickup_person_today}
+                            <strong className="text-slate-900 dark:text-white inline-flex items-center gap-1.5 font-bold">
+                              <Clock className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                              <span>{note.pickup_person_today}</span>
                             </strong>
                           </div>
                         </div>
@@ -723,11 +726,11 @@ function EarlyYearsAssessmentContent() {
                             }
                             className="w-full p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-bold"
                           >
-                            <option value="CHEERFUL">😊 ร่าเริงสดใส (CHEERFUL)</option>
-                            <option value="CALM">🙂 สงบเรียบร้อย (CALM)</option>
-                            <option value="TIRED">😴 ง่วงนอน/เพลีย (TIRED)</option>
-                            <option value="CLINGY">🥺 คิดถึงบ้าน (CLINGY)</option>
-                            <option value="UNWELL">🤒 ไม่สบายตัว (UNWELL)</option>
+                            <option value="CHEERFUL">ร่าเริงสดใส (CHEERFUL)</option>
+                            <option value="CALM">สงบเรียบร้อย (CALM)</option>
+                            <option value="TIRED">ง่วงนอน/เพลีย (TIRED)</option>
+                            <option value="CLINGY">คิดถึงบ้าน (CLINGY)</option>
+                            <option value="UNWELL">ไม่สบายตัว (UNWELL)</option>
                           </select>
                         </div>
 
@@ -747,10 +750,10 @@ function EarlyYearsAssessmentContent() {
                             }
                             className="w-full p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-bold"
                           >
-                            <option value="ALL">🍱 ทานหมด (ALL)</option>
-                            <option value="HALF">🥣 ครึ่งถาด (HALF)</option>
-                            <option value="LITTLE">🥄 เล็กน้อย (LITTLE)</option>
-                            <option value="NONE">❌ ไม่ทาน (NONE)</option>
+                            <option value="ALL">ทานหมด (ALL)</option>
+                            <option value="HALF">ครึ่งถาด (HALF)</option>
+                            <option value="LITTLE">เล็กน้อย (LITTLE)</option>
+                            <option value="NONE">ไม่ทาน (NONE)</option>
                           </select>
                         </div>
 
@@ -770,10 +773,10 @@ function EarlyYearsAssessmentContent() {
                             }
                             className="w-full p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-bold"
                           >
-                            <option value="ALL">🍱 ทานหมดถาด (ALL)</option>
-                            <option value="HALF">🥣 ครึ่งถาด (HALF)</option>
-                            <option value="LITTLE">🥄 เล็กน้อย (LITTLE)</option>
-                            <option value="NONE">❌ ไม่ทาน (NONE)</option>
+                            <option value="ALL">ทานหมดถาด (ALL)</option>
+                            <option value="HALF">ครึ่งถาด (HALF)</option>
+                            <option value="LITTLE">เล็กน้อย (LITTLE)</option>
+                            <option value="NONE">ไม่ทาน (NONE)</option>
                           </select>
                         </div>
 
@@ -799,9 +802,9 @@ function EarlyYearsAssessmentContent() {
                             }}
                             className="w-full p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-bold"
                           >
-                            <option value="ALL">🥛 หมดกล่อง (ALL)</option>
-                            <option value="HALF">🥛 ครึ่งกล่อง (HALF)</option>
-                            <option value="NONE">❌ ไม่ดื่ม (NONE)</option>
+                            <option value="ALL">หมดกล่อง (ALL)</option>
+                            <option value="HALF">ครึ่งกล่อง (HALF)</option>
+                            <option value="NONE">ไม่ดื่ม (NONE)</option>
                           </select>
                         </div>
 
@@ -822,10 +825,10 @@ function EarlyYearsAssessmentContent() {
                             className="w-full p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-bold"
                           >
                             <option value="SOUND">
-                              😴 หลับสนิท ({care.nap_start}-{care.nap_end})
+                              หลับสนิท ({care.nap_start}-{care.nap_end})
                             </option>
-                            <option value="RESTLESS">🌙 หลับๆ ตื่นๆ (RESTLESS)</option>
-                            <option value="NO_NAP">👀 ไม่นอน (NO_NAP)</option>
+                            <option value="RESTLESS">หลับๆ ตื่นๆ (RESTLESS)</option>
+                            <option value="NO_NAP">ไม่นอน (NO_NAP)</option>
                           </select>
                         </div>
 

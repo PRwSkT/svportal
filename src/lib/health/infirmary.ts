@@ -81,7 +81,7 @@ export function checkMedicationAllergy(
     if (allergyLower && (medLower.includes(allergyLower) || allergyLower.includes(medLower))) {
       return {
         isSafe: false,
-        warning: `⚠️ อันตราย! นักเรียนมีประวัติแพ้ยาหรือสาร: "${allergy}" ซึ่งตรงกับหรือใกล้เคียงกับยาที่กำลังจะจ่าย ("${medication}")`
+        warning: `[คำเตือนความปลอดภัย] นักเรียนมีประวัติแพ้ยาหรือสาร: "${allergy}" ซึ่งตรงกับหรือใกล้เคียงกับยาที่กำลังจะจ่าย ("${medication}")`
       };
     }
 
@@ -90,7 +90,7 @@ export function checkMedicationAllergy(
       if (medLower.includes(aToken)) {
         return {
           isSafe: false,
-          warning: `⚠️ อันตราย! นักเรียนมีประวัติแพ้ยาหรือสาร: "${allergy}" (พบคำสำคัญ: "${aToken}") ซึ่งตรงกับยาที่กำลังจะจ่าย ("${medication}")`
+          warning: `[คำเตือนความปลอดภัย] นักเรียนมีประวัติแพ้ยาหรือสาร: "${allergy}" (พบคำสำคัญ: "${aToken}") ซึ่งตรงกับยาที่กำลังจะจ่าย ("${medication}")`
         };
       }
     }
@@ -99,7 +99,7 @@ export function checkMedicationAllergy(
       if (allergyLower.includes(mToken)) {
         return {
           isSafe: false,
-          warning: `⚠️ อันตราย! นักเรียนมีประวัติแพ้ยาหรือสาร: "${allergy}" ซึ่งตรงกับยาที่กำลังจะจ่าย ("${medication}")`
+          warning: `[คำเตือนความปลอดภัย] นักเรียนมีประวัติแพ้ยาหรือสาร: "${allergy}" ซึ่งตรงกับยาที่กำลังจะจ่าย ("${medication}")`
         };
       }
     }

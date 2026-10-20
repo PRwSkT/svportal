@@ -77,6 +77,8 @@ import {
   Globe,
   ShieldAlert,
   ChevronRight,
+  GraduationCap,
+  MessageSquare,
 } from 'lucide-react';
 
 type MainTabId = 'today' | 'messages' | 'calendar' | 'children' | 'more';
@@ -919,202 +921,56 @@ export default function ParentsPortalPage() {
   return (
     <div className="flex-1 flex flex-col pb-24 md:pb-12">
       {/* ==================================================================
-          STICKY TOP APP BAR (Parents Portal PWA Header)
+          STICKY TOP APP BAR (Parents Portal Mobile-First Header)
           ================================================================== */}
-      <header className="sticky top-0 z-40 bg-white/92 backdrop-blur-xl border-b border-[#7B1C3E]/12 shadow-sm">
-        <div className="max-w-6xl mx-auto px-3.5 sm:px-6 py-2.5">
-          {/* Top Row: School Branding + Subdomain Badge + Staff Switcher + Lang */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#7B1C3E] to-[#9B2C52] flex items-center justify-center text-white font-bold shadow-sm sv-avatar-media shrink-0">
-                <Image
-                  src="/logo2.png"
-                  alt="โรงเรียนสมคิดวิทยา"
-                  width={36}
-                  height={36}
-                  className="w-8 h-8 object-contain brightness-0 invert"
-                />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-extrabold text-sm sm:text-base text-[#7B1C3E] tracking-tight">
-                    {isThai
-                      ? 'โรงเรียนสมคิดวิทยา • Parents Portal'
-                      : 'Somkidvittaya • Parents Portal'}
-                  </span>
-                  <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    parents.portal.somkidvittaya.ac.th
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-500 flex items-center gap-1.5">
-                  <span>
-                    {isThai
-                      ? `ผู้ปกครอง: ${pipeline.guardian.full_name} (มารดา)`
-                      : `Guardian: ${pipeline.guardian.full_name}`}
-                  </span>
-                  {lastSyncedAt && (
-                    <span className="text-emerald-600 font-medium">
-                      • Live Sync {lastSyncedAt}
-                    </span>
-                  )}
-                </p>
-              </div>
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-xl border-b border-slate-200/80 shadow-xs">
+        <div className="max-w-4xl mx-auto px-3.5 sm:px-6 py-2.5 flex items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-[#7B1C3E] to-[#9B2C52] flex items-center justify-center text-white font-bold shadow-xs shrink-0 p-1.5">
+              <Image
+                src="/logo2.png"
+                alt="โรงเรียนสมคิดวิทยา"
+                width={32}
+                height={32}
+                className="w-7 h-7 object-contain brightness-0 invert"
+              />
             </div>
-
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <button
-                type="button"
-                onClick={handleResetDemo}
-                title={
-                  isThai ? 'รีเซ็ตข้อมูลสาธิต' : 'Reset Bidirectional Demo Data'
-                }
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-[#7B1C3E] bg-slate-100 hover:bg-rose-50 border border-slate-200/80 transition-colors cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span className="hidden lg:inline">
-                  {isThai ? 'รีเซ็ตข้อมูล' : 'Reset Demo'}
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="font-black text-sm text-[#7B1C3E] tracking-tight truncate">
+                  {isThai ? 'สมคิดวิทยา Parents' : 'Somkid Parents'}
                 </span>
-              </button>
-
-              <Link
-                href="/home"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-[#1B3A6B] hover:bg-[#152e56] text-white shadow-sm transition-all"
-              >
-                <ArrowUpRight className="w-3.5 h-3.5" />
-                <span>
-                  {isThai
-                    ? 'สลับไปหน้าบุคลากร (SV-Portal Staff)'
-                    : 'Switch to Staff Portal'}
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Live
                 </span>
-              </Link>
-
-              <LanguageSwitcher size="sm" />
+              </div>
+              <p className="text-[11px] text-slate-500 truncate">
+                {isThai
+                  ? `${pipeline.guardian.full_name} • มารดา`
+                  : `${pipeline.guardian.full_name} • Guardian`}
+              </p>
             </div>
           </div>
 
-          {/* Second Row: One-Tap Multi-Child Switcher Pill + All Children Summary Toggle */}
-          <div className="pt-2.5 flex flex-wrap items-center justify-between gap-2">
-            <div
-              role="tablist"
-              aria-label={isThai ? 'เลือกบุตรหลาน' : 'Select Child'}
-              className="flex items-center gap-2 overflow-x-auto pb-0.5 no-scrollbar"
-            >
-              {pipeline.children.map((child) => {
-                const isSelected =
-                  !showFamilySummary && child.id === selectedChild.id;
-                const isChildEarly = child.stage === 'EARLY_YEARS';
-                const childIncidents = pipeline.incidents.filter(
-                  (i) => i.student_id === child.id && !i.parent_acknowledged
-                ).length;
-
-                return (
-                  <button
-                    key={child.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={isSelected}
-                    onClick={() => {
-                      setSelectedChildId(child.id);
-                      setShowFamilySummary(false);
-                    }}
-                    className={`group relative inline-flex items-center gap-2.5 px-3.5 py-2 rounded-2xl text-left transition-all cursor-pointer border ${
-                      isSelected
-                        ? isChildEarly
-                          ? 'bg-gradient-to-r from-[#7B1C3E] to-[#A32652] text-white border-[#7B1C3E] shadow-md'
-                          : 'bg-gradient-to-r from-[#1B3A6B] to-[#274F8E] text-white border-[#1B3A6B] shadow-md'
-                        : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200/90'
-                    }`}
-                  >
-                    <div
-                      className={`w-8 h-8 rounded-xl flex items-center justify-center font-extrabold text-xs shrink-0 sv-avatar-media ${
-                        isSelected
-                          ? 'bg-white/20 text-white'
-                          : isChildEarly
-                          ? 'bg-pink-100 text-[#7B1C3E]'
-                          : 'bg-blue-100 text-[#1B3A6B]'
-                      }`}
-                    >
-                      {isChildEarly ? (
-                        <Baby className="w-4 h-4" />
-                      ) : (
-                        <BookOpen className="w-4 h-4" />
-                      )}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-extrabold text-xs sm:text-sm leading-none">
-                          {child.nickname}
-                        </span>
-                        <span
-                          className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
-                            isSelected
-                              ? 'bg-white/20 text-white'
-                              : isChildEarly
-                              ? 'bg-pink-50 text-[#7B1C3E]'
-                              : 'bg-blue-50 text-[#1B3A6B]'
-                          }`}
-                        >
-                          {child.grade}
-                        </span>
-                        {childIncidents > 0 && (
-                          <span className="w-2 h-2 rounded-full bg-amber-400 ring-2 ring-white animate-ping" />
-                        )}
-                      </div>
-                      <p
-                        className={`text-[10px] mt-0.5 truncate max-w-[155px] sm:max-w-[200px] ${
-                          isSelected ? 'text-white/85' : 'text-slate-500'
-                        }`}
-                      >
-                        {isThai
-                          ? `${child.full_name} • ${
-                              isChildEarly ? 'ปฐมวัย' : 'ประถมศึกษา'
-                            }`
-                          : `${child.name_en} • ${
-                              isChildEarly ? 'Early Years' : 'Primary'
-                            }`}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
-
-              {/* All Children Family Summary Toggle */}
-              <button
-                type="button"
-                onClick={() => setShowFamilySummary((prev) => !prev)}
-                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold border transition-all cursor-pointer ${
-                  showFamilySummary
-                    ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
-                    : 'bg-amber-50/80 hover:bg-amber-100/80 text-amber-900 border-amber-200'
-                }`}
-              >
-                <Users className="w-3.5 h-3.5" />
-                <span>
-                  {isThai
-                    ? 'มุมมองรวมครอบครัว (2 คน)'
-                    : 'All Children Summary (2)'}
-                </span>
-              </button>
-            </div>
-
-            {/* Desktop 5-Tab Navigation Pill Bar */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Desktop Navigation Tabs embedded in header on large screens */}
             <nav
               aria-label="Parents Portal Desktop Navigation"
-              className="hidden md:flex items-center gap-1 bg-slate-100/90 p-1 rounded-2xl border border-slate-200/80"
+              className="hidden lg:flex items-center gap-1 bg-slate-100/90 p-1 rounded-2xl border border-slate-200/80 mr-1"
             >
               {[
                 {
                   id: 'today' as MainTabId,
-                  label_th: 'วันนี้ (Today)',
+                  label_th: 'วันนี้',
                   label_en: 'Today',
                   icon: Sun,
                   badge: urgentActionCount,
                 },
                 {
                   id: 'messages' as MainTabId,
-                  label_th: 'ข้อความ (Chat)',
-                  label_en: 'Messages',
+                  label_th: 'แชตครู',
+                  label_en: 'Chat',
                   icon: MessageCircle,
                   badge: unreadMessagesCount,
                 },
@@ -1127,15 +983,15 @@ export default function ParentsPortalPage() {
                 },
                 {
                   id: 'children' as MainTabId,
-                  label_th: 'บุตรหลาน 360°',
-                  label_en: 'Children 360°',
+                  label_th: 'บุตรหลาน',
+                  label_en: 'Children',
                   icon: Users,
                   badge: 0,
                 },
                 {
                   id: 'more' as MainTabId,
-                  label_th: 'การเงิน & PDPA',
-                  label_en: 'Finance & PDPA',
+                  label_th: 'การเงิน/PDPA',
+                  label_en: 'Finance',
                   icon: Wallet,
                   badge: childUnsignedSubsidies.length,
                 },
@@ -1149,7 +1005,7 @@ export default function ParentsPortalPage() {
                     onClick={() => setActiveTab(tab.id)}
                     className={`relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       active
-                        ? 'bg-white text-[#7B1C3E] shadow-sm border border-slate-200/70'
+                        ? 'bg-white text-[#7B1C3E] shadow-xs border border-slate-200/70'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -1164,6 +1020,26 @@ export default function ParentsPortalPage() {
                 );
               })}
             </nav>
+
+            <button
+              type="button"
+              onClick={handleResetDemo}
+              title={isThai ? 'รีเซ็ตข้อมูลสาธิต' : 'Reset Demo'}
+              className="p-1.5 rounded-xl text-slate-500 hover:text-[#7B1C3E] hover:bg-rose-50 border border-slate-200/80 transition-colors cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+
+            <Link
+              href="/home"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-[#1B3A6B] hover:bg-[#152e56] text-white shadow-xs transition-all"
+              title={isThai ? 'สลับไปหน้าบุคลากร' : 'Staff Portal'}
+            >
+              <ArrowUpRight className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{isThai ? 'หน้าบุคลากร' : 'Staff'}</span>
+            </Link>
+
+            <LanguageSwitcher size="sm" />
           </div>
         </div>
       </header>
@@ -1171,7 +1047,172 @@ export default function ParentsPortalPage() {
       {/* ==================================================================
           MAIN CONTAINER CONTENT
           ================================================================== */}
-      <div className="max-w-6xl w-full mx-auto px-3.5 sm:px-6 pt-4 space-y-5">
+      <div className="max-w-4xl w-full mx-auto px-3.5 sm:px-6 pt-3 space-y-4">
+        {/* APP CHILD SELECTOR SEGMENTED CONTROL */}
+        <section aria-label="Select Child" className="space-y-2">
+          <div className="flex items-center justify-between text-xs px-0.5">
+            <span className="font-extrabold text-slate-500 uppercase tracking-wider text-[11px]">
+              {isThai ? 'บุตรหลานของคุณ' : 'Your Children'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowFamilySummary((prev) => !prev)}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                showFamilySummary
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200/90'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>{isThai ? 'ภาพรวมครอบครัว (2)' : 'Family Overview'}</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            {pipeline.children.map((child) => {
+              const isSelected = !showFamilySummary && child.id === selectedChild.id;
+              const isChildEarly = child.stage === 'EARLY_YEARS';
+              const childIncidents = pipeline.incidents.filter(
+                (i) => i.student_id === child.id && !i.parent_acknowledged
+              ).length;
+
+              return (
+                <button
+                  key={child.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedChildId(child.id);
+                    setShowFamilySummary(false);
+                  }}
+                  className={`relative p-3 rounded-2xl text-left transition-all border flex items-center gap-2.5 sm:gap-3 cursor-pointer ${
+                    isSelected
+                      ? isChildEarly
+                        ? 'bg-gradient-to-r from-[#7B1C3E] to-[#9B2C52] text-white border-[#7B1C3E] shadow-md ring-2 ring-[#7B1C3E]/20'
+                        : 'bg-gradient-to-r from-[#1B3A6B] to-[#254C87] text-white border-[#1B3A6B] shadow-md ring-2 ring-[#1B3A6B]/20'
+                      : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200/90 shadow-xs'
+                  }`}
+                >
+                  <div
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold shrink-0 ${
+                      isSelected
+                        ? 'bg-white/20 text-white'
+                        : isChildEarly
+                        ? 'bg-pink-100 text-[#7B1C3E]'
+                        : 'bg-blue-100 text-[#1B3A6B]'
+                    }`}
+                  >
+                    {isChildEarly ? (
+                      <Baby className="w-5 h-5" />
+                    ) : (
+                      <GraduationCap className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-black text-sm truncate">
+                        {child.nickname}
+                      </span>
+                      <span
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold ${
+                          isSelected
+                            ? 'bg-white/25 text-white'
+                            : isChildEarly
+                            ? 'bg-pink-100 text-[#7B1C3E]'
+                            : 'bg-blue-100 text-[#1B3A6B]'
+                        }`}
+                      >
+                        {child.grade}
+                      </span>
+                    </div>
+                    <p
+                      className={`text-[11px] truncate mt-0.5 ${
+                        isSelected ? 'text-white/85' : 'text-slate-500'
+                      }`}
+                    >
+                      {isThai
+                        ? isChildEarly ? 'ปฐมวัย' : 'ประถมศึกษา'
+                        : isChildEarly ? 'Early Years' : 'Primary'}
+                      {' • '}{child.full_name}
+                    </p>
+                  </div>
+                  {childIncidents > 0 && (
+                    <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-white animate-pulse" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* NATIVE APP QUICK ACTION HUB (4 HIGH-FREQUENCY DAILY TASKS) */}
+        <section aria-label="Quick Actions" className="bg-white rounded-3xl p-3 border border-slate-200/90 shadow-xs">
+          <div className="grid grid-cols-4 gap-2 text-center">
+            {/* 1. Leave Request */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('children');
+                setChildrenSubTab('leave');
+              }}
+              className="flex flex-col items-center gap-1.5 p-2 rounded-2xl hover:bg-amber-50/80 transition-all cursor-pointer group"
+            >
+              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-amber-100/90 text-amber-800 flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                <CalendarDays className="w-5 h-5 text-amber-700" />
+              </div>
+              <span className="text-xs font-bold text-slate-800 leading-tight">
+                {isThai ? 'แจ้งลาเรียน' : 'Leave'}
+              </span>
+            </button>
+
+            {/* 2. Pickup Pass / TOTP */}
+            <button
+              type="button"
+              onClick={() => setTotpModalOpen(true)}
+              className="flex flex-col items-center gap-1.5 p-2 rounded-2xl hover:bg-rose-50/80 transition-all cursor-pointer group"
+            >
+              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-rose-100/90 text-[#7B1C3E] flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform relative">
+                <QrCode className="w-5 h-5 text-[#7B1C3E]" />
+                <span className="absolute -top-1 -right-1 px-1 rounded-full text-[9px] font-black bg-[#7B1C3E] text-white">
+                  30s
+                </span>
+              </div>
+              <span className="text-xs font-bold text-slate-800 leading-tight">
+                {isThai ? 'รหัสรับกลับ' : 'Pickup QR'}
+              </span>
+            </button>
+
+            {/* 3. Medication Request */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('children');
+                setChildrenSubTab('health');
+              }}
+              className="flex flex-col items-center gap-1.5 p-2 rounded-2xl hover:bg-purple-50/80 transition-all cursor-pointer group"
+            >
+              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-purple-100/90 text-purple-800 flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                <Pill className="w-5 h-5 text-purple-700" />
+              </div>
+              <span className="text-xs font-bold text-slate-800 leading-tight">
+                {isThai ? 'ฝากป้อนยา' : 'Medicine'}
+              </span>
+            </button>
+
+            {/* 4. Tuition / Wallet */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('more')}
+              className="flex flex-col items-center gap-1.5 p-2 rounded-2xl hover:bg-emerald-50/80 transition-all cursor-pointer group"
+            >
+              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-emerald-100/90 text-emerald-800 flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                <Wallet className="w-5 h-5 text-emerald-700" />
+              </div>
+              <span className="text-xs font-bold text-slate-800 leading-tight">
+                {isThai ? 'ค่าเทอม/เงิน' : 'Tuition/Pay'}
+              </span>
+            </button>
+          </div>
+        </section>
         {/* ALL CHILDREN FAMILY SUMMARY BANNER (When toggled on) */}
         {showFamilySummary && (
           <section className="sv-glass-card rounded-3xl p-4 sm:p-5 border-2 border-amber-300/80 bg-gradient-to-br from-amber-50/90 via-white to-rose-50/50">
@@ -1319,8 +1360,12 @@ export default function ParentsPortalPage() {
         >
           <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-start sm:items-center gap-3.5">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/15 backdrop-blur-md border border-white/25 flex items-center justify-center text-2xl font-black shrink-0 sv-avatar-media">
-                {isEarlyYears ? '👧🏻' : '👦🏻'}
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/15 backdrop-blur-md border border-white/25 flex items-center justify-center shrink-0 sv-avatar-media">
+                {isEarlyYears ? (
+                  <Baby className="w-8 h-8 text-white" />
+                ) : (
+                  <GraduationCap className="w-8 h-8 text-white" />
+                )}
               </div>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -1340,8 +1385,9 @@ export default function ParentsPortalPage() {
                       : `Attendance ${selectedChild.attendance_rate_pct}%`}
                   </span>
                   {selectedChild.allergies !== 'ไม่มี' && (
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-rose-500 text-white shadow-sm">
-                      ⚠️ {selectedChild.allergies}
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-rose-500 text-white shadow-sm">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      <span>{selectedChild.allergies}</span>
                     </span>
                   )}
                 </div>
@@ -1664,11 +1710,13 @@ export default function ParentsPortalPage() {
                         {childPickupPlan?.notes}
                       </p>
                       {childPickupPlan?.released_at && (
-                        <p className="text-xs font-bold text-emerald-700 mt-1">
-                          ✓{' '}
-                          {isThai
-                            ? `ส่งมอบนักเรียนแล้วเมื่อ ${childPickupPlan.released_at}`
-                            : `Released at ${childPickupPlan.released_at}`}
+                        <p className="text-xs font-bold text-emerald-700 mt-1 flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>
+                            {isThai
+                              ? `ส่งมอบนักเรียนแล้วเมื่อ ${childPickupPlan.released_at}`
+                              : `Released at ${childPickupPlan.released_at}`}
+                          </span>
                         </p>
                       )}
                     </div>
@@ -1941,8 +1989,8 @@ export default function ParentsPortalPage() {
                         <p className="text-sm font-black text-slate-900 mt-1">
                           {childDailyCare.morning_mood === 'CHEERFUL'
                             ? isThai
-                              ? 'ร่าเริงแจ่มใส 😊'
-                              : 'Cheerful 😊'
+                              ? 'ร่าเริงแจ่มใส'
+                              : 'Cheerful'
                             : childDailyCare.morning_mood}
                         </p>
                       </div>
@@ -2025,10 +2073,13 @@ export default function ParentsPortalPage() {
                     {/* Learning Activity, Home Suggestion & Teacher Note */}
                     <div className="sv-adaptive-grid grid grid-cols-1 gap-3.5">
                       <div className="rounded-2xl bg-white p-4 border border-slate-200/80">
-                        <h3 className="text-xs font-extrabold text-[#7B1C3E] uppercase tracking-wider">
-                          {isThai
-                            ? '🎨 กิจกรรมเสริมประสบการณ์วันนี้'
-                            : "🎨 Today's Learning Activity"}
+                        <h3 className="text-xs font-extrabold text-[#7B1C3E] uppercase tracking-wider flex items-center gap-1.5">
+                          <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+                          <span>
+                            {isThai
+                              ? 'กิจกรรมเสริมประสบการณ์วันนี้'
+                              : "Today's Learning Activity"}
+                          </span>
                         </h3>
                         <p className="text-sm font-semibold text-slate-800 mt-1">
                           {childDailyCare.learning_activity}
@@ -2036,10 +2087,13 @@ export default function ParentsPortalPage() {
                       </div>
 
                       <div className="rounded-2xl bg-white p-4 border border-slate-200/80">
-                        <h3 className="text-xs font-extrabold text-[#1B3A6B] uppercase tracking-wider">
-                          {isThai
-                            ? '🏡 คำแนะนำชวนคุยต่อยอดที่บ้าน'
-                            : '🏡 Home Connection Suggestion'}
+                        <h3 className="text-xs font-extrabold text-[#1B3A6B] uppercase tracking-wider flex items-center gap-1.5">
+                          <BookOpen className="w-4 h-4 text-[#1B3A6B] shrink-0" />
+                          <span>
+                            {isThai
+                              ? 'คำแนะนำชวนคุยต่อยอดที่บ้าน'
+                              : 'Home Connection Suggestion'}
+                          </span>
                         </h3>
                         <p className="text-sm font-semibold text-slate-800 mt-1">
                           {childDailyCare.home_suggestion}
@@ -2047,10 +2101,13 @@ export default function ParentsPortalPage() {
                       </div>
 
                       <div className="rounded-2xl bg-pink-50/60 p-4 border border-pink-200/80">
-                        <h3 className="text-xs font-extrabold text-[#7B1C3E] uppercase tracking-wider">
-                          {isThai
-                            ? '💌 บันทึกจากครูแนนถึงคุณแม่'
-                            : "💌 Teacher Nan's Daily Note"}
+                        <h3 className="text-xs font-extrabold text-[#7B1C3E] uppercase tracking-wider flex items-center gap-1.5">
+                          <MessageSquare className="w-4 h-4 text-[#7B1C3E] shrink-0" />
+                          <span>
+                            {isThai
+                              ? 'บันทึกจากครูแนนถึงคุณแม่'
+                              : "Teacher Nan's Daily Note"}
+                          </span>
                         </h3>
                         <p className="text-sm font-semibold text-slate-800 mt-1">
                           “{childDailyCare.teacher_note}”
@@ -2139,8 +2196,9 @@ export default function ParentsPortalPage() {
                             <span>{asg.assigned_by}</span>
                           </div>
                           {asg.teacher_feedback && (
-                            <p className="text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-1.5 rounded-xl mt-1">
-                              💬 {asg.teacher_feedback}
+                            <p className="text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-1.5 rounded-xl mt-1 flex items-center gap-1.5">
+                              <MessageSquare className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span>{asg.teacher_feedback}</span>
                             </p>
                           )}
                         </div>
@@ -2303,13 +2361,16 @@ export default function ParentsPortalPage() {
 
                       {showEnglishTranslation && msg.body_en && (
                         <p
-                          className={`text-xs pt-2 border-t ${
+                          className={`text-xs pt-2 border-t flex items-start gap-1.5 ${
                             isParent
                               ? 'border-white/20 text-white/90'
                               : 'border-slate-100 text-slate-600'
                           }`}
                         >
-                          🇬🇧 {msg.body_en}
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-200/80 text-slate-700 shrink-0">
+                            EN
+                          </span>
+                          <span>{msg.body_en}</span>
                         </p>
                       )}
 
@@ -2698,8 +2759,9 @@ export default function ParentsPortalPage() {
                           </div>
                           <p className="text-xs text-slate-700">{lv.reason}</p>
                           {lv.review_note && (
-                            <p className="text-xs text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-1 rounded-lg">
-                              ✓ {lv.reviewed_by}: {lv.review_note}
+                            <p className="text-xs text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span>{lv.reviewed_by}: {lv.review_note}</span>
                             </p>
                           )}
                         </div>
@@ -2761,8 +2823,9 @@ export default function ParentsPortalPage() {
                           <p className="text-sm font-bold text-slate-900">
                             {isThai ? ms.indicator_th : ms.indicator_en}
                           </p>
-                          <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl">
-                            💬 {ms.teacher_comment}
+                          <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl flex items-center gap-1.5">
+                            <MessageSquare className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                            <span>{ms.teacher_comment}</span>
                           </p>
                         </div>
                       ))}
@@ -3043,8 +3106,9 @@ export default function ParentsPortalPage() {
                         className="rounded-2xl bg-white p-3.5 border border-slate-200 space-y-1.5"
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-extrabold text-xs text-slate-900">
-                            💊 {med.medication_name} ({med.dosage})
+                          <span className="inline-flex items-center gap-1.5 font-extrabold text-xs text-slate-900">
+                            <Pill className="w-3.5 h-3.5 text-[#7B1C3E] shrink-0" />
+                            <span>{med.medication_name} ({med.dosage})</span>
                           </span>
                           <span
                             className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold ${
@@ -3068,8 +3132,9 @@ export default function ParentsPortalPage() {
                           {med.reason}
                         </p>
                         {med.nurse_note && (
-                          <p className="text-xs font-semibold text-emerald-800 bg-emerald-50 p-2 rounded-xl">
-                            ✓ {med.last_administered_by}: {med.nurse_note}
+                          <p className="text-xs font-semibold text-emerald-800 bg-emerald-50 p-2 rounded-xl flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span>{med.last_administered_by}: {med.nurse_note}</span>
                           </p>
                         )}
                       </div>
@@ -3081,8 +3146,9 @@ export default function ParentsPortalPage() {
                         className="rounded-2xl bg-rose-50/70 p-3.5 border border-rose-200 space-y-1.5"
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-extrabold text-xs text-rose-900">
-                            🩹 {inc.incident_date} เวลา {inc.incident_time} น.
+                          <span className="inline-flex items-center gap-1.5 font-extrabold text-xs text-rose-900">
+                            <HeartPulse className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                            <span>{inc.incident_date} เวลา {inc.incident_time} น.</span>
                           </span>
                           <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-white text-rose-800 border border-rose-200">
                             {inc.parent_acknowledged
@@ -3543,8 +3609,9 @@ export default function ParentsPortalPage() {
                         {formatCurrency(sub.amount)}
                       </span>
                       {sub.parent_signed ? (
-                        <span className="text-xs font-bold text-emerald-700">
-                          ✓ {sub.signed_by_name}
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>{sub.signed_by_name}</span>
                         </span>
                       ) : (
                         <button
@@ -3670,9 +3737,9 @@ export default function ParentsPortalPage() {
           ================================================================== */}
       <nav
         aria-label="Parents Portal Mobile Bottom Navigation"
-        className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-xl border-t border-slate-200/90 px-2 py-1.5 shadow-lg"
+        className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-xl border-t border-slate-200/90 px-3 py-1.5 shadow-2xl pb-safe"
       >
-        <div className="grid grid-cols-5 gap-1">
+        <div className="max-w-md mx-auto grid grid-cols-5 gap-1">
           {[
             {
               id: 'today' as MainTabId,
@@ -3683,7 +3750,7 @@ export default function ParentsPortalPage() {
             },
             {
               id: 'messages' as MainTabId,
-              label_th: 'ข้อความ',
+              label_th: 'แชตครู',
               label_en: 'Chat',
               icon: MessageCircle,
               badge: unreadMessagesCount,
@@ -3704,7 +3771,7 @@ export default function ParentsPortalPage() {
             },
             {
               id: 'more' as MainTabId,
-              label_th: 'การเงิน/ตั้งค่า',
+              label_th: 'การเงิน',
               label_en: 'More',
               icon: Wallet,
               badge: childUnsignedSubsidies.length,
@@ -3717,16 +3784,28 @@ export default function ParentsPortalPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`relative flex flex-col items-center justify-center py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
-                  active ? 'text-[#7B1C3E] bg-rose-50/80' : 'text-slate-500'
+                className={`relative flex flex-col items-center justify-center py-1 px-1 rounded-2xl transition-all cursor-pointer ${
+                  active ? 'text-[#7B1C3E]' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Icon className="w-4 h-4" />
-                <span className="mt-0.5 truncate">
+                <div
+                  className={`p-1.5 rounded-xl transition-all ${
+                    active
+                      ? 'bg-rose-100 text-[#7B1C3E] shadow-xs scale-105'
+                      : 'text-slate-500'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                </div>
+                <span
+                  className={`text-[10px] mt-0.5 tracking-tight truncate ${
+                    active ? 'font-black text-[#7B1C3E]' : 'font-semibold text-slate-500'
+                  }`}
+                >
                   {isThai ? tab.label_th : tab.label_en}
                 </span>
                 {tab.badge > 0 && (
-                  <span className="absolute top-1 right-3 w-4 h-4 rounded-full bg-rose-600 text-white text-[9px] font-black flex items-center justify-center">
+                  <span className="absolute top-1 right-2 w-4 h-4 rounded-full bg-rose-600 text-white text-[9px] font-black flex items-center justify-center ring-2 ring-white">
                     {tab.badge}
                   </span>
                 )}
@@ -3910,7 +3989,10 @@ export default function ParentsPortalPage() {
               <div className="space-y-4">
                 <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 space-y-2 text-xs">
                   <div className="flex items-center justify-between font-extrabold text-emerald-900 text-sm">
-                    <span>✓ {isThai ? 'ชำระเงินเรียบร้อยแล้ว' : 'PAID'}</span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{isThai ? 'ชำระเงินเรียบร้อยแล้ว' : 'PAID'}</span>
+                    </span>
                     <span>{activeInvoiceModal.receipt_number}</span>
                   </div>
                   <p className="text-slate-700">

@@ -92,7 +92,7 @@ export function auditVanSafety(logs: VanDailyLogItem[]): VanSafetyAuditResult {
       trappedCount,
       trappedStudents,
       alarmLevel: 'EMERGENCY_ALARM',
-      message: `🚨 สัญญาณเตือนภัยฉุกเฉิน! ตรวจพบนักเรียนยังค้างอยู่ในรถตู้จำนวน ${trappedCount} คน! กรุณาตรวจค้นทุกที่นั่งและใต้เบาะรถทันทีก่อนดับเครื่อง!`
+      message: `[สัญญาณเตือนภัยฉุกเฉิน] ตรวจพบนักเรียนยังค้างอยู่ในรถตู้จำนวน ${trappedCount} คน! กรุณาตรวจค้นทุกที่นั่งและใต้เบาะรถทันทีก่อนดับเครื่อง!`
     };
   }
 
@@ -121,6 +121,6 @@ export function auditVanSafety(logs: VanDailyLogItem[]): VanSafetyAuditResult {
     trappedCount: 0,
     trappedStudents: [],
     alarmLevel: 'SAFE',
-    message: '✅ ตรวจสอบความปลอดภัยเรียบร้อยแล้ว: นักเรียนทุกคนลงจากรถอย่างปลอดภัย 100%'
+    message: '[ตรวจสอบปลอดภัย 100%] นักเรียนทุกคนลงจากรถอย่างปลอดภัยเรียบร้อยแล้ว'
   };
 }

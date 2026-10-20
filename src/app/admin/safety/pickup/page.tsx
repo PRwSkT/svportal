@@ -19,6 +19,10 @@ import {
   Sparkles,
   RefreshCw,
   Lock,
+  User,
+  Pin,
+  Bell,
+  AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -101,8 +105,8 @@ export default function SmartPickupKioskPage() {
     if (selectedStudentRestrictedLink) {
       toast.error(
         isThai
-          ? '⛔ ระงับการส่งมอบ! นักเรียนรายนี้มีคำสั่งจำกัดสิทธิ์การรับกลับ (Child Safeguarding Alert)'
-          : '⛔ BLOCKED! Active Child Safeguarding / Custody Restriction on this student.'
+          ? 'คำสั่งระงับการส่งมอบ! นักเรียนรายนี้มีคำสั่งจำกัดสิทธิ์การรับกลับ (Child Safeguarding Alert)'
+          : 'BLOCKED! Active Child Safeguarding / Custody Restriction on this student.'
       );
       return;
     }
@@ -134,8 +138,8 @@ export default function SmartPickupKioskPage() {
     if (linkRestricted) {
       toast.error(
         isThai
-          ? `⛔ ไม่สามารถส่งมอบ ${studentName} ได้เนื่องจากมีคำสั่งระงับสิทธิ์ตามกฎหมาย: ${linkRestricted.restriction_note || ''}`
-          : `⛔ Cannot release ${studentName} due to active Legal Custody Restriction!`
+          ? `ไม่สามารถส่งมอบ ${studentName} ได้เนื่องจากมีคำสั่งระงับสิทธิ์ตามกฎหมาย: ${linkRestricted.restriction_note || ''}`
+          : `Cannot release ${studentName} due to active Legal Custody Restriction!`
       );
       return;
     }
@@ -289,8 +293,9 @@ export default function SmartPickupKioskPage() {
                     </p>
                   </div>
                 </div>
-                <span className="px-2.5 py-1 rounded-full text-[11px] font-mono font-bold bg-amber-100 text-amber-900">
-                  ⏳ {secondsLeft}s
+                <span className="px-2.5 py-1 rounded-full text-[11px] font-mono font-bold bg-amber-100 text-amber-900 inline-flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-amber-700" />
+                  <span>{secondsLeft}s</span>
                 </span>
               </div>
 
@@ -539,9 +544,10 @@ export default function SmartPickupKioskPage() {
                           </div>
 
                           <div className="text-xs text-slate-600 dark:text-slate-300 flex flex-wrap items-center gap-3">
-                            <span>
-                              👤 <strong>{isThai ? 'ผู้รับ:' : 'Collector:'}</strong>{' '}
-                              {plan.collector_name} ({plan.collector_relationship})
+                            <span className="inline-flex items-center gap-1.5">
+                              <User className="w-3.5 h-3.5 text-slate-400" />
+                              <span><strong>{isThai ? 'ผู้รับ:' : 'Collector:'}</strong>{' '}
+                              {plan.collector_name} ({plan.collector_relationship})</span>
                             </span>
                             {plan.collector_phone && (
                               <span className="inline-flex items-center gap-1 font-mono">
@@ -552,8 +558,9 @@ export default function SmartPickupKioskPage() {
                           </div>
 
                           {plan.notes && (
-                            <p className="text-xs text-slate-500">
-                              📌 {plan.notes}
+                            <p className="text-xs text-slate-500 inline-flex items-center gap-1.5">
+                              <Pin className="w-3 h-3 text-slate-400 shrink-0" />
+                              <span>{plan.notes}</span>
                             </p>
                           )}
                         </div>
@@ -561,7 +568,7 @@ export default function SmartPickupKioskPage() {
                         {/* Real-time Arrival Status Badge */}
                         <div className="flex flex-col items-end gap-1.5 shrink-0">
                           <span
-                            className={`px-3 py-1 rounded-full text-xs font-black ${
+                            className={`px-3 py-1 rounded-full text-xs font-black inline-flex items-center gap-1.5 ${
                               isReleased
                                 ? 'bg-emerald-600 text-white'
                                 : isAtGate
@@ -571,21 +578,24 @@ export default function SmartPickupKioskPage() {
                                 : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
                             }`}
                           >
-                            {plan.arrival_status === 'SCHEDULED'
-                              ? isThai
-                                ? 'รอเวลารับกลับ (SCHEDULED)'
-                                : 'SCHEDULED'
-                              : plan.arrival_status === 'ARRIVING_SOON'
-                              ? isThai
-                                ? 'กำลังใกล้ถึงโรงเรียน (ARRIVING SOON)'
-                                : 'ARRIVING SOON'
-                              : plan.arrival_status === 'ARRIVED_AT_GATE'
-                              ? isThai
-                                ? '🔔 ถึงจุดรับหน้าประตูแล้ว (AT GATE)'
-                                : 'ARRIVED AT GATE'
-                              : isThai
-                              ? '✓ ส่งมอบปลอดภัยแล้ว (RELEASED)'
-                              : 'RELEASED'}
+                            {isAtGate && <Bell className="w-3 h-3 shrink-0" />}
+                            <span>
+                              {plan.arrival_status === 'SCHEDULED'
+                                ? isThai
+                                  ? 'รอเวลารับกลับ (SCHEDULED)'
+                                  : 'SCHEDULED'
+                                : plan.arrival_status === 'ARRIVING_SOON'
+                                ? isThai
+                                  ? 'กำลังใกล้ถึงโรงเรียน (ARRIVING SOON)'
+                                  : 'ARRIVING SOON'
+                                : plan.arrival_status === 'ARRIVED_AT_GATE'
+                                ? isThai
+                                  ? 'ถึงจุดรับหน้าประตูแล้ว (AT GATE)'
+                                  : 'ARRIVED AT GATE'
+                                : isThai
+                                ? 'ส่งมอบปลอดภัยแล้ว (RELEASED)'
+                                : 'RELEASED'}
+                            </span>
                           </span>
 
                           {plan.released_at && (

@@ -18,7 +18,9 @@ import {
   Plus, 
   Check, 
   X,
-  Users
+  Users,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { VanDailyLogItem, VanSafetyAuditResult } from '@/lib/safety/van';
@@ -217,19 +219,21 @@ export default function SchoolVanSafetyPage() {
           <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
             <button
               onClick={() => setTripType('morning')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
                 tripType === 'morning' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-600 dark:text-slate-300'
               }`}
             >
-              🌅 เที่ยวเช้า (มารร.)
+              <Sun className="w-3.5 h-3.5" />
+              <span>เที่ยวเช้า (มารร.)</span>
             </button>
             <button
               onClick={() => setTripType('evening')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
                 tripType === 'evening' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-600 dark:text-slate-300'
               }`}
             >
-              🌆 เที่ยวเย็น (กลับบ้าน)
+              <Moon className="w-3.5 h-3.5" />
+              <span>เที่ยวเย็น (กลับบ้าน)</span>
             </button>
           </div>
 

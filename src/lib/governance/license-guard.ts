@@ -55,7 +55,7 @@ export function evaluateLicenseStatus(expireDateStr: string, cpdHours: number = 
       alertTier: 'EXPIRED',
       statusLabel: `หมดอายุแล้ว (${Math.abs(daysLeft)} วันที่แล้ว)`,
       badgeColor: 'bg-rose-600 text-white font-black',
-      actionRequired: '🚨 วิกฤต! สช. จะตัดเงินสมทบเงินเดือนทันที ให้ครูหยุดปฏิบัติการสอนในวิชาการหลักและยื่นหนังสือขออนุญาตผ่อนผันคุรุสภาด่วนที่สุด!',
+      actionRequired: '[วิกฤต] สช. จะตัดเงินสมทบเงินเดือนทันที ให้ครูหยุดปฏิบัติการสอนในวิชาการหลักและยื่นหนังสือขออนุญาตผ่อนผันคุรุสภาด่วนที่สุด!',
       cpdCompliant,
       cpdShortfall
     };
@@ -67,7 +67,7 @@ export function evaluateLicenseStatus(expireDateStr: string, cpdHours: number = 
       alertTier: 'EXPIRING_30D',
       statusLabel: `ด่วนมาก เหลือ ${daysLeft} วัน`,
       badgeColor: 'bg-rose-100 text-rose-800 border-rose-300 font-extrabold animate-pulse',
-      actionRequired: '⚠️ เหลือเวลาไม่ถึง 30 วัน ให้เข้ายื่นคำขอต่ออายุในระบบ KSP e-Service ทันที แนบชั่วโมง CPD และเอกสารรับรองการสอน',
+      actionRequired: '[แจ้งเตือน] เหลือเวลาไม่ถึง 30 วัน ให้เข้ายื่นคำขอต่ออายุในระบบ KSP e-Service ทันที แนบชั่วโมง CPD และเอกสารรับรองการสอน',
       cpdCompliant,
       cpdShortfall
     };
