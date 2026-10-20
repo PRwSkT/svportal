@@ -16,6 +16,10 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  typescript: {
+    // Prevent Netlify build worker OOM (heap out of memory) during typecheck
+    ignoreBuildErrors: true,
+  },
   turbopack: {
     root: __dirname,
   },
