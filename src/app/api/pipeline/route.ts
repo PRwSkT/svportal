@@ -30,11 +30,14 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const studentId = searchParams.get('student_id');
+    const guardianId =
+      searchParams.get('guardian_id') ||
+      request.cookies.get('sv_parent_session_guardian_id')?.value;
 
     // Fetch real live state directly from Supabase
     let state;
     try {
-      state = await fetchRealPipelineState(studentId || undefined);
+      state = await fetchRealPipelineState(studentId || undefined, guardianId || undefined);
     } catch (dbErr) {
       console.warn('Supabase fetchRealPipelineState fallback:', dbErr);
       state = getPipelineState();

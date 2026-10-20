@@ -78,7 +78,10 @@ function formatCheckInTime(raw: string | null | undefined): string | null {
 /**
  * Fetches the entire real pipeline state from Supabase database tables.
  */
-export async function fetchRealPipelineState(targetStudentId?: string): Promise<BidirectionalPipelineState> {
+export async function fetchRealPipelineState(
+  targetStudentId?: string,
+  guardianId?: string
+): Promise<BidirectionalPipelineState> {
   const supabase = getAdminClient();
   const todayStr = new Date().toISOString().slice(0, 10);
 
@@ -190,26 +193,31 @@ export async function fetchRealPipelineState(targetStudentId?: string): Promise<
     };
   });
 
-  // Pick or construct the default real GuardianProfile
-  const firstRealGuardian = guardians[0];
-  const realGuardian: GuardianProfile = firstRealGuardian
+  // Pick or construct the target real GuardianProfile
+  const targetGuardianRaw = guardianId
+    ? (guardians.find((g) => g.id === guardianId) || guardians[0])
+    : (targetStudentId
+        ? (guardians.find((g) => links.some((l) => l.guardian_id === g.id && l.student_id === targetStudentId)) || guardians[0])
+        : guardians[0]);
+
+  const realGuardian: GuardianProfile = targetGuardianRaw
     ? {
-        id: firstRealGuardian.id,
-        citizen_id: firstRealGuardian.citizen_id,
-        prefix: firstRealGuardian.prefix || 'คุณ',
-        first_name: firstRealGuardian.first_name,
-        last_name: firstRealGuardian.last_name,
-        full_name: `${firstRealGuardian.prefix || 'คุณ'}${firstRealGuardian.first_name} ${firstRealGuardian.last_name}`.trim(),
-        phone_number: firstRealGuardian.phone_number || '088-665-6166',
-        email: firstRealGuardian.email,
-        line_user_id: firstRealGuardian.line_user_id,
-        occupation: firstRealGuardian.occupation,
-        annual_income: firstRealGuardian.annual_income,
-        photo_url: firstRealGuardian.photo_url,
+        id: targetGuardianRaw.id,
+        citizen_id: targetGuardianRaw.citizen_id,
+        prefix: targetGuardianRaw.prefix || 'คุณ',
+        first_name: targetGuardianRaw.first_name,
+        last_name: targetGuardianRaw.last_name,
+        full_name: `${targetGuardianRaw.prefix || 'คุณ'}${targetGuardianRaw.first_name} ${targetGuardianRaw.last_name}`.trim(),
+        phone_number: targetGuardianRaw.phone_number || '088-665-6166',
+        email: targetGuardianRaw.email,
+        line_user_id: targetGuardianRaw.line_user_id,
+        occupation: targetGuardianRaw.occupation,
+        annual_income: targetGuardianRaw.annual_income,
+        photo_url: targetGuardianRaw.photo_url,
         preferred_lang: 'th',
-        is_active: firstRealGuardian.is_active,
-        created_at: firstRealGuardian.created_at,
-        updated_at: firstRealGuardian.updated_at,
+        is_active: targetGuardianRaw.is_active,
+        created_at: targetGuardianRaw.created_at,
+        updated_at: targetGuardianRaw.updated_at,
       }
     : {
         id: 'g-somkid-real',
@@ -229,6 +237,15 @@ export async function fetchRealPipelineState(targetStudentId?: string): Promise<
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
+
+  // Find linked students for this guardian
+  const guardianLinks = links.filter((l) => l.guardian_id === realGuardian.id);
+  const linkedStudentIds = new Set(guardianLinks.map((l) => l.student_id));
+
+  // If guardianId is provided and guardian has linked students, filter children to only their students!
+  const myChildren = (guardianId && linkedStudentIds.size > 0)
+    ? realChildren.filter((c) => linkedStudentIds.has(c.id))
+    : realChildren;
 
   // Map real guardian student links
   const realLinks: GuardianStudentLink[] = links.map((l) => ({
@@ -558,7 +575,7 @@ export async function fetchRealPipelineState(targetStudentId?: string): Promise<
   return {
     version: 2,
     guardian: realGuardian,
-    children: realChildren,
+    children: myChildren,
     links: realLinks,
     invitations: realInvitations,
     consents: realConsents,

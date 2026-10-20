@@ -1866,3 +1866,70 @@ export function createOrUpdateAssignment(input: {
   savePipelineState(state);
   return item;
 }
+
+// ============================================================================
+// Parent Client Session Management (LocalStorage & Sync)
+// ============================================================================
+
+export const PARENT_SESSION_STORAGE_KEY = 'sv_parent_client_session_v1';
+
+export interface ParentClientSession {
+  authenticated: boolean;
+  guardian: {
+    id: string;
+    prefix: string;
+    first_name: string;
+    last_name: string;
+    full_name: string;
+    citizen_id?: string | null;
+    phone_number?: string | null;
+    email?: string | null;
+  } | null;
+  children: Array<{
+    id: string;
+    name: string;
+    first_name: string;
+    last_name: string;
+    prefix: string;
+    grade: string;
+    classroom: string;
+    relationship: string;
+    wallet_balance: number;
+  }>;
+}
+
+export function getParentClientSession(): ParentClientSession | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(PARENT_SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.authenticated && parsed.guardian) {
+      return parsed;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+export function setParentClientSession(session: ParentClientSession): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(PARENT_SESSION_STORAGE_KEY, JSON.stringify(session));
+    window.dispatchEvent(new Event('sv_parent_session_change'));
+  } catch {
+    // ignore
+  }
+}
+
+export function clearParentClientSession(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(PARENT_SESSION_STORAGE_KEY);
+    window.dispatchEvent(new Event('sv_parent_session_change'));
+  } catch {
+    // ignore
+  }
+}
+

@@ -79,7 +79,15 @@ import {
   ChevronRight,
   GraduationCap,
   MessageSquare,
+  LogOut,
 } from 'lucide-react';
+import { ParentLoginView } from '@/components/parents/ParentLoginView';
+import {
+  getParentClientSession,
+  setParentClientSession,
+  clearParentClientSession,
+  type ParentClientSession,
+} from '@/lib/pipeline/bidirectional-store';
 
 type MainTabId = 'today' | 'messages' | 'calendar' | 'children' | 'more';
 type ChildrenSubTabId = 'leave' | 'academics' | 'health' | 'pickup';
@@ -278,13 +286,17 @@ function DeterministicQrSvg({
 export default function ParentsPortalPage() {
   const { language, isThai, formatCurrency } = useLanguage();
 
+  // Parent Authentication & Session State
+  const [parentSession, setParentSession] = useState<ParentClientSession | null>(() => getParentClientSession());
+  const [sessionChecking, setSessionChecking] = useState<boolean>(true);
+
   // Live Bidirectional Pipeline State
   const [pipeline, setPipeline] = useState<BidirectionalPipelineState>(() =>
     getPipelineState()
   );
   const [selectedChildId, setSelectedChildId] = useState<string>(() => {
     const s = getPipelineState();
-    return s.children[0]?.id || '10103';
+    return s.children[0]?.id || '10260';
   });
   const [studentSearchModalOpen, setStudentSearchModalOpen] = useState<boolean>(false);
   const [studentSearchQuery, setStudentSearchQuery] = useState<string>('');
@@ -356,10 +368,32 @@ export default function ParentsPortalPage() {
   // Wallet Daily Limit local edit state
   const [customDailyLimit, setCustomDailyLimit] = useState<number>(80);
 
-  // Refresh state from bidirectional store
-  const refreshPipeline = useCallback(() => {
-    const fresh = getPipelineState();
-    setPipeline({ ...fresh });
+  // Refresh state from bidirectional store and server
+  const refreshPipeline = useCallback(async (forcedGuardianId?: string) => {
+    const currentGuardianId = forcedGuardianId || parentSession?.guardian?.id;
+    try {
+      const url = currentGuardianId
+        ? `/api/pipeline?guardian_id=${currentGuardianId}`
+        : '/api/pipeline';
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.success && data.guardian) {
+        setPipeline(data);
+        if (data.children && data.children.length > 0) {
+          setSelectedChildId((prev) => {
+            const exists = data.children.some((c: any) => c.id === prev);
+            return exists ? prev : data.children[0].id;
+          });
+        }
+      } else {
+        const fresh = getPipelineState();
+        setPipeline({ ...fresh });
+      }
+    } catch {
+      const fresh = getPipelineState();
+      setPipeline({ ...fresh });
+    }
+
     setLastSyncedAt(
       new Date().toLocaleTimeString('th-TH', {
         hour: '2-digit',
@@ -367,7 +401,74 @@ export default function ParentsPortalPage() {
         second: '2-digit',
       })
     );
-  }, []);
+  }, [parentSession?.guardian?.id]);
+
+  // Check parent session on mount
+  useEffect(() => {
+    let isMounted = true;
+    const checkSession = async () => {
+      const local = getParentClientSession();
+      if (local && local.authenticated && local.guardian) {
+        if (isMounted) {
+          setParentSession(local);
+          refreshPipeline(local.guardian.id);
+        }
+      }
+
+      try {
+        const res = await fetch('/api/parents/auth');
+        const data = await res.json();
+        if (!isMounted) return;
+        if (data.ok && data.authenticated && data.guardian) {
+          const sessionData: ParentClientSession = {
+            authenticated: true,
+            guardian: data.guardian,
+            children: data.children || [],
+          };
+          setParentSession(sessionData);
+          setParentClientSession(sessionData);
+          refreshPipeline(data.guardian.id);
+        } else if (!local) {
+          setParentSession(null);
+        }
+      } catch (err) {
+        console.error('Session check error:', err);
+      } finally {
+        if (isMounted) setSessionChecking(false);
+      }
+    };
+
+    checkSession();
+
+    const handleSessionChange = () => {
+      const current = getParentClientSession();
+      setParentSession(current);
+      if (current?.guardian?.id) {
+        refreshPipeline(current.guardian.id);
+      }
+    };
+
+    window.addEventListener('sv_parent_session_change', handleSessionChange);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('sv_parent_session_change', handleSessionChange);
+    };
+  }, [refreshPipeline]);
+
+  const handleSignOut = async () => {
+    try {
+      await fetch('/api/parents/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'logout' }),
+      });
+    } catch (e) {
+      console.error('Logout error:', e);
+    }
+    clearParentClientSession();
+    setParentSession(null);
+    toast.success(isThai ? 'ออกจากระบบเรียบร้อยแล้ว' : 'Signed out successfully');
+  };
 
   useEffect(() => {
     refreshPipeline();
@@ -955,6 +1056,55 @@ export default function ParentsPortalPage() {
 
   const unreadMessagesCount = childThread?.unread_parent_count || 0;
 
+  if (sessionChecking) {
+    return (
+      <div className="min-h-screen bg-[#F5F4F2] flex flex-col items-center justify-center p-4">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#7B1C3E] to-[#9B2C52] flex items-center justify-center p-2 mb-3 shadow-md shadow-[#7B1C3E]/20">
+          <Image
+            src="/logo2.png"
+            alt="โรงเรียนสมคิดวิทยา"
+            width={36}
+            height={36}
+            className="w-8 h-8 object-contain brightness-0 invert"
+          />
+        </div>
+        <div className="w-6 h-6 border-2 border-[#7B1C3E]/30 border-t-[#7B1C3E] rounded-full animate-spin mb-2" />
+        <p className="text-xs font-bold text-slate-600">
+          {isThai ? 'กำลังตรวจสอบข้อมูลผู้ปกครอง...' : 'Verifying Parent Session...'}
+        </p>
+      </div>
+    );
+  }
+
+  if (!parentSession) {
+    return (
+      <ParentLoginView
+        onLoginSuccess={async (guardian, children) => {
+          const sessionData: ParentClientSession = {
+            authenticated: true,
+            guardian,
+            children,
+          };
+          setParentSession(sessionData);
+          setParentClientSession(sessionData);
+
+          try {
+            const pRes = await fetch(`/api/pipeline?guardian_id=${guardian.id}`);
+            const pData = await pRes.json();
+            if (pData.success && pData.guardian) {
+              setPipeline(pData);
+              if (pData.children && pData.children.length > 0) {
+                setSelectedChildId(pData.children[0].id);
+              }
+            }
+          } catch (e) {
+            console.error('Failed to load pipeline after login:', e);
+          }
+        }}
+      />
+    );
+  }
+
   return (
     <div className="flex-1 flex flex-col pb-24 md:pb-12">
       {/* ==================================================================
@@ -984,8 +1134,8 @@ export default function ParentsPortalPage() {
               </div>
               <p className="text-[11px] text-slate-500 truncate">
                 {isThai
-                  ? `${pipeline.guardian.full_name} • มารดา`
-                  : `${pipeline.guardian.full_name} • Guardian`}
+                  ? `${parentSession?.guardian?.full_name || pipeline.guardian.full_name} • ผู้ปกครอง`
+                  : `${parentSession?.guardian?.full_name || pipeline.guardian.full_name} • Parent`}
               </p>
             </div>
           </div>
@@ -1077,6 +1227,16 @@ export default function ParentsPortalPage() {
             </Link>
 
             <LanguageSwitcher size="sm" />
+
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/80 shadow-xs transition-all cursor-pointer"
+              title={isThai ? 'ออกจากระบบ' : 'Sign Out'}
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{isThai ? 'ออกจากระบบ' : 'Sign Out'}</span>
+            </button>
           </div>
         </div>
       </header>
@@ -3778,6 +3938,46 @@ export default function ParentsPortalPage() {
                     </div>
                   );
                 })}
+              </div>
+            </section>
+
+            {/* Section 5: Parent Account & Logout */}
+            <section className="sv-glass-card rounded-3xl p-4 sm:p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-extrabold bg-slate-100 text-slate-800">
+                    <UserCheck className="w-3.5 h-3.5 text-[#7B1C3E]" />
+                    {isThai ? 'ข้อมูลบัญชีผู้ปกครอง' : 'Parent Account Profile'}
+                  </span>
+                  <h3 className="text-base font-extrabold text-slate-900 mt-1">
+                    {parentSession?.guardian?.full_name || pipeline.guardian.full_name}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 shadow-xs transition-all cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>{isThai ? 'ออกจากระบบ' : 'Sign Out'}</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs">
+                <div className="p-3 rounded-2xl bg-white border border-slate-200">
+                  <span className="text-slate-500 block mb-0.5">{isThai ? 'เบอร์โทรศัพท์ที่ลงทะเบียน' : 'Registered Phone'}</span>
+                  <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-[#7B1C3E]" />
+                    {parentSession?.guardian?.phone_number || pipeline.guardian.phone_number || '-'}
+                  </span>
+                </div>
+                <div className="p-3 rounded-2xl bg-white border border-slate-200">
+                  <span className="text-slate-500 block mb-0.5">{isThai ? 'เลขประจำตัวประชาชน' : 'Citizen ID'}</span>
+                  <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                    <CreditCard className="w-3.5 h-3.5 text-[#7B1C3E]" />
+                    {parentSession?.guardian?.citizen_id || pipeline.guardian.citizen_id || '-'}
+                  </span>
+                </div>
               </div>
             </section>
           </div>
