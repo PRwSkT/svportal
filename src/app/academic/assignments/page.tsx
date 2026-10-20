@@ -54,7 +54,10 @@ export default function AcademicAssignmentsPage() {
   const [formDueDate, setFormDueDate] = useState('2026-10-25');
   const [formMaxScore, setFormMaxScore] = useState<number>(10);
   const [formAssignedBy, setFormAssignedBy] = useState('ครูธนกฤต สุวรรณภูมิ');
-  const [formStudentId, setFormStudentId] = useState('64008');
+  const [formStudentId, setFormStudentId] = useState(() => {
+    const s = getPipelineState();
+    return s.children[0]?.id || '10103';
+  });
   const [formSubmissionStatus, setFormSubmissionStatus] = useState<AssignmentSubmissionStatus>('PENDING');
   const [formScore, setFormScore] = useState<string>('');
   const [formFeedback, setFormFeedback] = useState<string>('');
@@ -104,7 +107,7 @@ export default function AcademicAssignmentsPage() {
     setFormDueDate('2026-10-25');
     setFormMaxScore(10);
     setFormAssignedBy('ครูธนกฤต สุวรรณภูมิ');
-    setFormStudentId('64008');
+    setFormStudentId(pipeline.children[0]?.id || '10103');
     setFormSubmissionStatus('PENDING');
     setFormScore('');
     setFormFeedback('');
@@ -387,15 +390,23 @@ export default function AcademicAssignmentsPage() {
                     </td>
                     <td className="p-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-xs">
-                          {item.student_id === '64008' ? 'ก' : 'พ'}
-                        </div>
-                        <div>
-                          <div className="font-bold text-slate-900 dark:text-white">
-                            {item.student_id === '64008' ? 'น้องกัปตัน (ด.ช.กิตติภพ)' : 'น้องพราว (ด.ญ.พิมพ์ชนก)'}
-                          </div>
-                          <div className="text-[10px] text-slate-400 font-mono">ID: {item.student_id}</div>
-                        </div>
+                        {(() => {
+                          const targetChild = pipeline.children.find((c) => c.id === item.student_id);
+                          const initial = (targetChild?.nickname || item.student_id).slice(0, 1);
+                          return (
+                            <>
+                              <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-xs">
+                                {initial}
+                              </div>
+                              <div>
+                                <div className="font-bold text-slate-900 dark:text-white">
+                                  {targetChild ? `${targetChild.nickname} (${targetChild.full_name})` : item.student_id}
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-mono">ID: {item.student_id}</div>
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     </td>
                     <td className="p-4 text-center whitespace-nowrap font-mono text-xs text-slate-600 dark:text-slate-300">
@@ -483,8 +494,11 @@ export default function AcademicAssignmentsPage() {
                     onChange={(e) => setFormStudentId(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-semibold"
                   >
-                    <option value="64008">64008 - น้องกัปตัน (ด.ช.กิตติภพ)</option>
-                    <option value="67012">67012 - น้องพราว (ด.ญ.พิมพ์ชนก)</option>
+                    {pipeline.children.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.id} - {c.nickname} ({c.full_name} • {c.grade})
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>

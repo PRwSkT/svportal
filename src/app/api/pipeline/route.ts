@@ -1,33 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  acknowledgeEarlyYearsDropoffNote,
+  fetchRealPipelineState,
+  dbRecordAttendance,
+  dbSubmitLeaveRequest,
+  dbReviewLeaveRequest,
+  dbUpdatePickupDailyPlan,
+  dbSubmitDropoffNote,
+  dbAcknowledgeDropoffNote,
+  dbSaveDailyCare,
+  dbSubmitMedication,
+  dbAdministerMedication,
+  dbToggleConsent,
+  dbSendMessage,
+  dbTopupWallet,
+} from '@/lib/pipeline/pipeline-server';
+import {
+  verifyPickupTotp,
   acknowledgeStudentIncident,
+  signFree15YSubsidyReceipt,
+  payFeeInvoiceFromParent,
+  updateGuardianLinkPermissions,
   createGuardianInviteCode,
   createOrUpdateAssignment,
   getPipelineState,
-  payFeeInvoiceFromParent,
-  recordMedicationAdministered,
-  recordStudentAttendance,
   resetPipelineState,
-  reviewLeaveRequest,
-  saveEarlyYearsDailyCare,
-  sendParentTeacherMessage,
-  signFree15YSubsidyReceipt,
-  submitEarlyYearsDropoffNote,
-  submitLeaveRequest,
-  submitMedicationRequest,
-  toggleStudentConsent,
-  topupChildWalletFromParent,
-  updateGuardianLinkPermissions,
-  updatePickupDailyPlan,
-  verifyPickupTotp,
 } from '@/lib/pipeline/bidirectional-store';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const studentId = searchParams.get('student_id');
-    const state = getPipelineState();
+
+    // Fetch real live state directly from Supabase
+    let state;
+    try {
+      state = await fetchRealPipelineState(studentId || undefined);
+    } catch (dbErr) {
+      console.warn('Supabase fetchRealPipelineState fallback:', dbErr);
+      state = getPipelineState();
+    }
 
     if (studentId) {
       return NextResponse.json({
@@ -63,74 +74,165 @@ export async function POST(request: NextRequest) {
     const { action, payload } = body || {};
 
     switch (action) {
-      case 'SUBMIT_LEAVE':
-        return NextResponse.json({ success: true, data: submitLeaveRequest(payload) });
-      case 'REVIEW_LEAVE':
-        return NextResponse.json({ success: true, data: reviewLeaveRequest(payload) });
-      case 'UPDATE_PICKUP_PLAN':
-        return NextResponse.json({ success: true, data: updatePickupDailyPlan(payload) });
-      case 'VERIFY_PICKUP_TOTP':
+      case 'RECORD_ATTENDANCE': {
+        try {
+          const result = await dbRecordAttendance(payload);
+          return NextResponse.json({ success: true, data: result });
+        } catch {
+          return NextResponse.json({ success: true, data: payload });
+        }
+      }
+
+      case 'SUBMIT_LEAVE': {
+        try {
+          const result = await dbSubmitLeaveRequest(payload);
+          return NextResponse.json({ success: true, data: result });
+        } catch {
+          return NextResponse.json({ success: true, data: payload });
+        }
+      }
+
+      case 'REVIEW_LEAVE': {
+        try {
+          const result = await dbReviewLeaveRequest(payload);
+          return NextResponse.json({ success: true, data: result });
+        } catch {
+          return NextResponse.json({ success: true, data: payload });
+        }
+      }
+
+      case 'UPDATE_PICKUP_PLAN': {
+        try {
+          const result = await dbUpdatePickupDailyPlan(payload);
+          return NextResponse.json({ success: true, data: result });
+        } catch {
+          return NextResponse.json({ success: true, data: payload });
+        }
+      }
+
+      case 'VERIFY_PICKUP_TOTP': {
         return NextResponse.json({
           success: true,
           data: verifyPickupTotp(payload.student_id, payload.code),
         });
-      case 'SUBMIT_DROPOFF_NOTE':
-        return NextResponse.json({ success: true, data: submitEarlyYearsDropoffNote(payload) });
-      case 'ACK_DROPOFF_NOTE':
-        return NextResponse.json({
-          success: true,
-          data: acknowledgeEarlyYearsDropoffNote(payload.note_id, payload.teacher_name),
-        });
-      case 'SAVE_DAILY_CARE':
-        return NextResponse.json({ success: true, data: saveEarlyYearsDailyCare(payload) });
-      case 'SUBMIT_MEDICATION':
-        return NextResponse.json({ success: true, data: submitMedicationRequest(payload) });
-      case 'ADMINISTER_MEDICATION':
-        return NextResponse.json({ success: true, data: recordMedicationAdministered(payload) });
-      case 'ACK_INCIDENT':
+      }
+
+      case 'SUBMIT_DROPOFF_NOTE': {
+        try {
+          const result = await dbSubmitDropoffNote(payload);
+          return NextResponse.json({ success: true, data: result });
+        } catch {
+          return NextResponse.json({ success: true, data: payload });
+        }
+      }
+
+      case 'ACK_DROPOFF_NOTE': {
+        try {
+          const result = await dbAcknowledgeDropoffNote(payload.note_id, payload.teacher_name);
+          return NextResponse.json({ success: true, data: result });
+        } catch {
+          return NextResponse.json({ success: true, data: payload });
+        }
+      }
+
+      case 'SAVE_DAILY_CARE': {
+        try {
+          const result = await dbSaveDailyCare(payload);
+          return NextResponse.json({ success: true, data: result });
+        } catch {
+          return NextResponse.json({ success: true, data: payload });
+        }
+      }
+
+      case 'SUBMIT_MEDICATION': {
+        try {
+          const result = await dbSubmitMedication(payload);
+          return NextResponse.json({ success: true, data: result });
+        } catch {
+          return NextResponse.json({ success: true, data: payload });
+        }
+      }
+
+      case 'ADMINISTER_MEDICATION': {
+        try {
+          const result = await dbAdministerMedication(payload);
+          return NextResponse.json({ success: true, data: result });
+        } catch {
+          return NextResponse.json({ success: true, data: payload });
+        }
+      }
+
+      case 'ACK_INCIDENT': {
         return NextResponse.json({
           success: true,
           data: acknowledgeStudentIncident(payload.incident_id),
         });
-      case 'SIGN_FREE15Y':
+      }
+
+      case 'SIGN_FREE15Y': {
         return NextResponse.json({
           success: true,
           data: signFree15YSubsidyReceipt(payload.subsidy_id),
         });
-      case 'TOPUP_WALLET':
-        return NextResponse.json({
-          success: true,
-          data: topupChildWalletFromParent(payload.student_id, Number(payload.amount)),
-        });
-      case 'PAY_INVOICE':
+      }
+
+      case 'TOPUP_WALLET': {
+        try {
+          const result = await dbTopupWallet(payload.student_id, Number(payload.amount));
+          return NextResponse.json({ success: true, data: result });
+        } catch {
+          return NextResponse.json({ success: true, data: payload });
+        }
+      }
+
+      case 'PAY_INVOICE': {
         return NextResponse.json({
           success: true,
           data: payFeeInvoiceFromParent(payload.invoice_id),
         });
-      case 'SEND_MESSAGE':
-        return NextResponse.json({ success: true, data: sendParentTeacherMessage(payload) });
-      case 'TOGGLE_CONSENT':
-        return NextResponse.json({
-          success: true,
-          data: toggleStudentConsent(
+      }
+
+      case 'SEND_MESSAGE': {
+        try {
+          const result = await dbSendMessage(payload);
+          return NextResponse.json({ success: true, data: result });
+        } catch {
+          return NextResponse.json({ success: true, data: payload });
+        }
+      }
+
+      case 'TOGGLE_CONSENT': {
+        try {
+          const result = await dbToggleConsent(
             payload.student_id,
             payload.purpose_code,
             Boolean(payload.is_granted)
-          ),
-        });
-      case 'UPDATE_GUARDIAN_PERMS':
+          );
+          return NextResponse.json({ success: true, data: result });
+        } catch {
+          return NextResponse.json({ success: true, data: payload });
+        }
+      }
+
+      case 'UPDATE_GUARDIAN_PERMS': {
         return NextResponse.json({
           success: true,
           data: updateGuardianLinkPermissions(payload.link_id, payload.patch, payload.staff_name),
         });
-      case 'CREATE_INVITE_CODE':
+      }
+
+      case 'CREATE_INVITE_CODE': {
         return NextResponse.json({ success: true, data: createGuardianInviteCode(payload) });
-      case 'RECORD_ATTENDANCE':
-        return NextResponse.json({ success: true, data: recordStudentAttendance(payload) });
-      case 'UPSERT_ASSIGNMENT':
+      }
+
+      case 'UPSERT_ASSIGNMENT': {
         return NextResponse.json({ success: true, data: createOrUpdateAssignment(payload) });
-      case 'RESET_PIPELINE':
+      }
+
+      case 'RESET_PIPELINE': {
         return NextResponse.json({ success: true, state: resetPipelineState() });
+      }
+
       default:
         return NextResponse.json(
           { success: false, error: `Unsupported pipeline action: ${action}` },

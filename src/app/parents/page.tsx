@@ -282,7 +282,13 @@ export default function ParentsPortalPage() {
   const [pipeline, setPipeline] = useState<BidirectionalPipelineState>(() =>
     getPipelineState()
   );
-  const [selectedChildId, setSelectedChildId] = useState<string>('67012');
+  const [selectedChildId, setSelectedChildId] = useState<string>(() => {
+    const s = getPipelineState();
+    return s.children[0]?.id || '10103';
+  });
+  const [studentSearchModalOpen, setStudentSearchModalOpen] = useState<boolean>(false);
+  const [studentSearchQuery, setStudentSearchQuery] = useState<string>('');
+  const [studentGradeFilter, setStudentGradeFilter] = useState<string>('ALL');
   const [showFamilySummary, setShowFamilySummary] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<MainTabId>('today');
   const [childrenSubTab, setChildrenSubTab] =
@@ -392,6 +398,37 @@ export default function ParentsPortalPage() {
   }, [pipeline.children, selectedChildId]);
 
   const isEarlyYears = selectedChild?.stage === 'EARLY_YEARS';
+
+  const featuredChildren = useMemo(() => {
+    const list = pipeline.children.slice(0, 4);
+    if (selectedChild && !list.some((c) => c.id === selectedChild.id)) {
+      return [selectedChild, ...list.slice(0, 3)];
+    }
+    return list;
+  }, [pipeline.children, selectedChild]);
+
+  const filteredSearchStudents = useMemo(() => {
+    return pipeline.children.filter((child) => {
+      if (studentGradeFilter === 'EARLY' && child.stage !== 'EARLY_YEARS') return false;
+      if (studentGradeFilter === 'PRIMARY_LOWER') {
+        const lowerGrades = ['ป.1', 'ป.2', 'ป.3'];
+        if (!lowerGrades.some((g) => child.grade.startsWith(g))) return false;
+      }
+      if (studentGradeFilter === 'PRIMARY_UPPER') {
+        const upperGrades = ['ป.4', 'ป.5', 'ป.6'];
+        if (!upperGrades.some((g) => child.grade.startsWith(g))) return false;
+      }
+      if (studentSearchQuery.trim()) {
+        const q = studentSearchQuery.trim().toLowerCase();
+        const matchName = (child.full_name || '').toLowerCase().includes(q);
+        const matchNick = (child.nickname || '').toLowerCase().includes(q);
+        const matchId = (child.id || '').toLowerCase().includes(q);
+        const matchGrade = (child.grade || '').toLowerCase().includes(q);
+        return matchName || matchNick || matchId || matchGrade;
+      }
+      return true;
+    });
+  }, [pipeline.children, studentGradeFilter, studentSearchQuery]);
 
   // Sync forms when switching child
   useEffect(() => {
@@ -751,9 +788,9 @@ export default function ParentsPortalPage() {
     updatePickupDailyPlan({
       student_id: selectedChild.id,
       collector_name:
-        collectorName.trim() || 'คุณตาสมศักดิ์ รัตนโชติ (ผู้รับมอบอำนาจ)',
-      collector_relationship: collectorRelation.trim() || 'ปู่/ย่า/ตา/ยาย',
-      collector_phone: collectorPhone.trim() || '081-942-5618',
+        collectorName.trim() || (isThai ? 'ผู้รับมอบอำนาจแทน' : 'Authorized Collector'),
+      collector_relationship: collectorRelation.trim() || (isThai ? 'ญาติผู้ปกครอง' : 'Relative'),
+      collector_phone: collectorPhone.trim() || pipeline.guardian.phone_number,
       temp_otp_code: randomOtp,
       actor_role: 'PARENT',
       actor_name: pipeline.guardian.full_name,
@@ -908,8 +945,8 @@ export default function ParentsPortalPage() {
     refreshPipeline();
     toast.info(
       isThai
-        ? 'รีเซ็ตข้อมูลสาธิตกลับสู่ค่าเริ่มต้นของครอบครัวรัตนโชติเรียบร้อยแล้ว'
-        : 'Reset demo data to initial family state!'
+        ? 'รีเซ็ตข้อมูลระบบกลับสู่ค่าเริ่มต้นเรียบร้อยแล้ว'
+        : 'Reset data to initial state!'
     );
   };
 
@@ -1054,22 +1091,37 @@ export default function ParentsPortalPage() {
             <span className="font-extrabold text-slate-500 uppercase tracking-wider text-[11px]">
               {isThai ? 'บุตรหลานของคุณ' : 'Your Children'}
             </span>
-            <button
-              type="button"
-              onClick={() => setShowFamilySummary((prev) => !prev)}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                showFamilySummary
-                  ? 'bg-amber-600 text-white shadow-xs'
-                  : 'text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200/90'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5" />
-              <span>{isThai ? 'ภาพรวมครอบครัว (2)' : 'Family Overview'}</span>
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setStudentSearchModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold transition-all bg-[#7B1C3E]/10 hover:bg-[#7B1C3E]/20 text-[#7B1C3E] border border-[#7B1C3E]/20 cursor-pointer"
+                title={isThai ? 'ค้นหาและเลือกนักเรียนทั้ง 151 คน' : 'Select from 151 students'}
+              >
+                <Users className="w-3.5 h-3.5 text-[#7B1C3E]" />
+                <span>
+                  {isThai
+                    ? `เลือกนักเรียน (${pipeline.children.length} คน)`
+                    : `Students (${pipeline.children.length})`}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowFamilySummary((prev) => !prev)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  showFamilySummary
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200/90'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>{isThai ? 'ภาพรวม' : 'Overview'}</span>
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5">
-            {pipeline.children.map((child) => {
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {featuredChildren.map((child) => {
               const isSelected = !showFamilySummary && child.id === selectedChild.id;
               const isChildEarly = child.stage === 'EARLY_YEARS';
               const childIncidents = pipeline.incidents.filter(
@@ -1222,14 +1274,14 @@ export default function ParentsPortalPage() {
                   <Users className="w-4 h-4 text-amber-600" />
                   <span>
                     {isThai
-                      ? 'มุมมองรวมครอบครัวรัตนโชติ (All Children Daily Overview)'
-                      : 'Rattanachot Family Overview (All Children)'}
+                      ? 'มุมมองรวมครอบครัว (All Children Daily Overview)'
+                      : 'Family Overview (All Children)'}
                   </span>
                 </h2>
                 <p className="text-xs text-slate-600">
                   {isThai
-                    ? 'เปรียบเทียบสถานะการมาเรียน กระเป๋าเงิน และรายการที่ต้องดำเนินการของบุตรหลานทั้ง 2 คนในหน้าเดียว'
-                    : 'Unified daily status across both children at Somkidvittaya School'}
+                    ? 'เปรียบเทียบสถานะการมาเรียน กระเป๋าเงิน และรายการที่ต้องดำเนินการของบุตรหลานในหน้าเดียว'
+                    : 'Unified daily status across children at Somkidvittaya School'}
                 </p>
               </div>
               <button
@@ -2248,7 +2300,7 @@ export default function ParentsPortalPage() {
                           <p className="font-semibold text-slate-700">
                             {slot.teacher}
                           </p>
-                          <p>{slot.room}</p>
+                          <p>{slot.room.includes('ป.4/1') ? slot.room.replace('ป.4/1', selectedChild.grade) : slot.room}</p>
                         </div>
                       </div>
                     ))}
@@ -4017,6 +4069,142 @@ export default function ParentsPortalPage() {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================================
+          MODAL 3: SELECT ANY STUDENT (151 STUDENTS ACROSS 13 CLASSROOMS)
+          ================================================================== */}
+      {studentSearchModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4"
+        >
+          <div className="bg-white rounded-3xl max-w-lg w-full p-4 sm:p-6 shadow-2xl border border-slate-200 flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-[#7B1C3E]/10 text-[#7B1C3E]">
+                  {isThai ? 'ทะเบียนนักเรียนสมคิดวิทยา' : 'Student Registry'}
+                </span>
+                <h3 className="text-base font-extrabold text-slate-900 mt-1 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-[#7B1C3E]" />
+                  <span>
+                    {isThai
+                      ? `เลือกนักเรียนในระบบ (${pipeline.children.length} คน)`
+                      : `Select Student (${pipeline.children.length} Students)`}
+                  </span>
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStudentSearchModalOpen(false)}
+                className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="pt-3 pb-2 space-y-2">
+              <input
+                type="text"
+                value={studentSearchQuery}
+                onChange={(e) => setStudentSearchQuery(e.target.value)}
+                placeholder={isThai ? 'ค้นหาชื่อ, ชื่อเล่น, รหัสนักเรียน หรือชั้นเรียน...' : 'Search name, nickname, ID, or grade...'}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#7B1C3E]/20"
+              />
+
+              {/* Grade Filter Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                {[
+                  { id: 'ALL', label_th: 'ทั้งหมด', label_en: 'All' },
+                  { id: 'EARLY', label_th: 'ปฐมวัย (อ.1-อ.3)', label_en: 'Kindergarten' },
+                  { id: 'PRIMARY_LOWER', label_th: 'ประถมต้น (ป.1-3)', label_en: 'Primary 1-3' },
+                  { id: 'PRIMARY_UPPER', label_th: 'ประถมปลาย (ป.4-6)', label_en: 'Primary 4-6' },
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setStudentGradeFilter(f.id)}
+                    className={`px-2.5 py-1 rounded-xl text-[11px] font-bold shrink-0 transition-all cursor-pointer ${
+                      studentGradeFilter === f.id
+                        ? 'bg-[#7B1C3E] text-white shadow-xs'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {isThai ? f.label_th : f.label_en}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Students List Scrollable */}
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1 pt-1 min-h-[220px]">
+              {filteredSearchStudents.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 text-xs font-semibold">
+                  {isThai ? 'ไม่พบนักเรียนตามเงื่อนไขที่ค้นหา' : 'No students found matching search.'}
+                </div>
+              ) : (
+                filteredSearchStudents.map((child) => {
+                  const isSelected = child.id === selectedChild.id;
+                  const isChildEarly = child.stage === 'EARLY_YEARS';
+                  return (
+                    <button
+                      key={child.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedChildId(child.id);
+                        setShowFamilySummary(false);
+                        setStudentSearchModalOpen(false);
+                      }}
+                      className={`w-full p-2.5 sm:p-3 rounded-2xl text-left border flex items-center justify-between gap-3 transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-rose-50 border-[#7B1C3E] ring-1 ring-[#7B1C3E]'
+                          : 'bg-white hover:bg-slate-50 border-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
+                            isChildEarly
+                              ? 'bg-pink-100 text-[#7B1C3E]'
+                              : 'bg-blue-100 text-[#1B3A6B]'
+                          }`}
+                        >
+                          {isChildEarly ? (
+                            <Baby className="w-4 h-4" />
+                          ) : (
+                            <GraduationCap className="w-4 h-4" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-extrabold text-xs sm:text-sm text-slate-900 truncate">
+                              {child.nickname ? `${child.nickname} • ` : ''}{child.full_name}
+                            </span>
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold shrink-0 ${
+                                isChildEarly
+                                  ? 'bg-pink-100 text-[#7B1C3E]'
+                                  : 'bg-blue-100 text-[#1B3A6B]'
+                              }`}
+                            >
+                              {child.grade}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                            ID: {child.id} • {child.homeroom_teacher}
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -188,10 +188,14 @@ export default function StudentDetailPage() {
   const [pipeline, setPipeline] = useState<BidirectionalPipelineState>(() =>
     getPipelineState()
   );
-  const [inviteGuardianName, setInviteGuardianName] = useState(
-    'นายวรพจน์ รัตนโชติ (บิดา)'
-  );
-  const [inviteGuardianPhone, setInviteGuardianPhone] = useState('081-775-1920');
+  const [inviteGuardianName, setInviteGuardianName] = useState(() => {
+    const s = getPipelineState();
+    return s.guardian?.full_name ? `${s.guardian.full_name} (ผู้ปกครอง)` : '';
+  });
+  const [inviteGuardianPhone, setInviteGuardianPhone] = useState(() => {
+    const s = getPipelineState();
+    return s.guardian?.phone_number || '';
+  });
   const [restrictionDraft, setRestrictionDraft] = useState('');
 
   const syncPipeline = useCallback(() => {
@@ -210,11 +214,11 @@ export default function StudentDetailPage() {
     };
   }, [syncPipeline]);
 
-  // Match resolvedId or fallback to '67012' so any student page has rich interactive controls
+  // Match resolvedId or fallback to first student so any student page has rich interactive controls
   const effectivePipelineStudentId =
     resolvedId && pipeline.links.some((l) => l.student_id === resolvedId)
       ? resolvedId
-      : '67012';
+      : pipeline.children[0]?.id || '10103';
 
   const activeLink =
     pipeline.links.find((l) => l.student_id === effectivePipelineStudentId) ||
@@ -306,9 +310,9 @@ export default function StudentDetailPage() {
     } catch (err: any) {
       console.error('Fetch student error:', err);
       // Graceful fallback to pipeline child if API fails
-      const fallbackChild = pipeline.children.find(
-        (c) => c.id === resolvedId || c.id === '67012'
-      );
+      const fallbackChild =
+        pipeline.children.find((c) => c.id === resolvedId) ||
+        pipeline.children[0];
       if (fallbackChild) {
         setStudent({
           id: fallbackChild.id,
@@ -465,8 +469,11 @@ export default function StudentDetailPage() {
         student.name ||
         pipeline.children.find((c) => c.id === effectivePipelineStudentId)
           ?.full_name ||
-        'ด.ญ.พิมพ์ชนก รัตนโชติ',
-      grade_level: student.grade || 'อ.2/1',
+        'นักเรียนสมคิดวิทยา',
+      grade_level:
+        student.grade ||
+        pipeline.children.find((c) => c.id === effectivePipelineStudentId)?.grade ||
+        'ป.1/1',
       guardian_name: inviteGuardianName.trim(),
       guardian_phone: inviteGuardianPhone.trim(),
     });

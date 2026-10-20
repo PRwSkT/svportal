@@ -440,7 +440,7 @@ export interface SubjectGradeSummaryItem {
 }
 
 export interface ParentChildProfile {
-  id: string; // Backward-compatible TEXT PK e.g. '67012' or '64008'
+  id: string; // Somkidvittaya student ID e.g. '10103' or '10264'
   public_uid: string; // Surrogate UUID
   learner_id: string; // OPEC / MoE 13-digit or learner code
   prefix: string;

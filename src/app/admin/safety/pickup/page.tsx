@@ -44,14 +44,19 @@ export default function SmartPickupKioskPage() {
   const [pipeline, setPipeline] = useState<BidirectionalPipelineState>(() =>
     getPipelineState()
   );
-  const [selectedStudentId, setSelectedStudentId] = useState<string>('67012');
+  const [selectedStudentId, setSelectedStudentId] = useState<string>(() => {
+    const s = getPipelineState();
+    return s.children[0]?.id || '10103';
+  });
   const [totpInput, setTotpInput] = useState<string>('');
   const [secondsLeft, setSecondsLeft] = useState<number>(() =>
     getPickupBucketSecondsRemaining()
   );
-  const [liveTotpCode, setLiveTotpCode] = useState<string>(() =>
-    generatePickupTotp('67012')
-  );
+  const [liveTotpCode, setLiveTotpCode] = useState<string>(() => {
+    const s = getPipelineState();
+    const id = s.children[0]?.id || '10103';
+    return generatePickupTotp(id);
+  });
   const [verifiedStudentIds, setVerifiedStudentIds] = useState<string[]>([]);
   const [lastVerifiedMode, setLastVerifiedMode] = useState<string | null>(null);
 

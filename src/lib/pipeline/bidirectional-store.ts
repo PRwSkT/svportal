@@ -1,7 +1,8 @@
 // ============================================================================
 // Somkidvittaya School (SV-Portal & Parents Portal)
 // Bidirectional Operational Pipeline Store (Server + Client Isomorphic)
-// Storage Key: sv_bidirectional_pipeline_v1
+// Storage Key: sv_bidirectional_pipeline_v2
+// Production Database: Real Students, Real Guardians, Real Schema Tables
 // ============================================================================
 
 import {
@@ -35,10 +36,10 @@ import {
   SubjectGradeSummaryItem,
   SystemDomainEvent,
   TransportMode,
-} from '@/types/family-pipeline';
+} from "@/types/family-pipeline";
 
-export const PIPELINE_STORAGE_KEY = 'sv_bidirectional_pipeline_v1';
-export const PIPELINE_EVENT_NAME = 'sv-pipeline-updated';
+export const PIPELINE_STORAGE_KEY = "sv_bidirectional_pipeline_v2";
+export const PIPELINE_EVENT_NAME = "sv-pipeline-updated";
 
 // ----------------------------------------------------------------------------
 // Deterministic 30-second Rotating TOTP Generator & Verifier for Pickup Kiosk
@@ -69,26 +70,26 @@ export function verifyPickupTotp(
   studentId: string,
   inputCode: string,
   timestampMs: number = Date.now()
-): { valid: boolean; matchedMode: 'TOTP_CURRENT' | 'TOTP_PREVIOUS' | 'DELEGATE_OTP' | 'NONE' } {
-  const clean = inputCode.replace(/\D/g, '');
-  if (!clean) return { valid: false, matchedMode: 'NONE' };
+): { valid: boolean; matchedMode: "TOTP_CURRENT" | "TOTP_PREVIOUS" | "DELEGATE_OTP" | "NONE" } {
+  const clean = inputCode.replace(/\D/g, "");
+  if (!clean) return { valid: false, matchedMode: "NONE" };
 
   const currentBucket = getPickupTimeBucket(timestampMs);
   if (clean === generatePickupTotp(studentId, currentBucket)) {
-    return { valid: true, matchedMode: 'TOTP_CURRENT' };
+    return { valid: true, matchedMode: "TOTP_CURRENT" };
   }
   if (clean === generatePickupTotp(studentId, currentBucket - 1)) {
-    return { valid: true, matchedMode: 'TOTP_PREVIOUS' };
+    return { valid: true, matchedMode: "TOTP_PREVIOUS" };
   }
 
-  // Also check if there is a temporary delegate OTP on today's pickup plan
+  // Also check if there is a temporary delegate OTP on today\x27s pickup plan
   const state = getPipelineState();
   const plan = state.pickup_plans.find((p) => p.student_id === studentId);
-  if (plan?.temp_otp_code && plan.temp_otp_code.replace(/\D/g, '') === clean) {
-    return { valid: true, matchedMode: 'DELEGATE_OTP' };
+  if (plan?.temp_otp_code && plan.temp_otp_code.replace(/\D/g, "") === clean) {
+    return { valid: true, matchedMode: "DELEGATE_OTP" };
   }
 
-  return { valid: false, matchedMode: 'NONE' };
+  return { valid: false, matchedMode: "NONE" };
 }
 
 // ----------------------------------------------------------------------------
@@ -109,82 +110,220 @@ export const FULL_GUARDIAN_PERMISSIONS: GuardianPermissionFlags = {
 };
 
 // ----------------------------------------------------------------------------
-// Initial Realistic Seed Data for Somkidvittaya School (โรงเรียนสมคิดวิทยา)
+// Background API Sync Helper (Isomorphic Client -> Supabase via /api/pipeline)
+// ----------------------------------------------------------------------------
+function syncToBackend(action: string, payload: unknown): void {
+  if (typeof window === "undefined") return;
+  fetch("/api/pipeline", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, payload }),
+  }).catch((err) => {
+    console.warn("Pipeline backend sync warning:", err);
+  });
+}
+
+let hasInitiatedSync = false;
+
+export function initRealClientPipelineSync(): void {
+  if (typeof window === "undefined" || hasInitiatedSync) return;
+  hasInitiatedSync = true;
+
+  fetch("/api/pipeline")
+    .then((res) => res.json())
+    .then((data) => {
+      if (data?.success && data?.state) {
+        const remoteState = data.state as BidirectionalPipelineState;
+        if (Array.isArray(remoteState.children) && remoteState.children.length > 0) {
+          const currentState = getPipelineState();
+          const merged: BidirectionalPipelineState = {
+            ...currentState,
+            version: 2,
+            children: remoteState.children,
+            guardian: remoteState.guardian || currentState.guardian,
+            attendance_logs: remoteState.attendance_logs?.length > 0 ? remoteState.attendance_logs : currentState.attendance_logs,
+            leave_requests: remoteState.leave_requests?.length > 0 ? remoteState.leave_requests : currentState.leave_requests,
+            pickup_plans: remoteState.pickup_plans?.length > 0 ? remoteState.pickup_plans : currentState.pickup_plans,
+            early_years_care: remoteState.early_years_care?.length > 0 ? remoteState.early_years_care : currentState.early_years_care,
+            dropoff_notes: remoteState.dropoff_notes?.length > 0 ? remoteState.dropoff_notes : currentState.dropoff_notes,
+            medication_requests: remoteState.medication_requests?.length > 0 ? remoteState.medication_requests : currentState.medication_requests,
+            incidents: remoteState.incidents?.length > 0 ? remoteState.incidents : currentState.incidents,
+            assignments: remoteState.assignments?.length > 0 ? remoteState.assignments : currentState.assignments,
+            threads: remoteState.threads?.length > 0 ? remoteState.threads : currentState.threads,
+            messages: remoteState.messages?.length > 0 ? remoteState.messages : currentState.messages,
+            consents: remoteState.consents?.length > 0 ? remoteState.consents : currentState.consents,
+            fee_invoices: remoteState.fee_invoices?.length > 0 ? remoteState.fee_invoices : currentState.fee_invoices,
+            free15y_subsidies: remoteState.free15y_subsidies?.length > 0 ? remoteState.free15y_subsidies : currentState.free15y_subsidies,
+          };
+          savePipelineState(merged);
+        }
+      }
+    })
+    .catch((err) => {
+      console.warn("Real pipeline sync initial load warning:", err);
+    });
+}
+
+// ----------------------------------------------------------------------------
+// Initial Real Seed Data from Somkidvittaya Production Database
 // ----------------------------------------------------------------------------
 export function createInitialPipelineState(): BidirectionalPipelineState {
   const todayStr = new Date().toISOString().slice(0, 10);
 
+  // Real Guardian: นายศักดิ์ชัย อุ่นอบ (บิดาของน้องมีฟา และน้องจั๊มเปอร์)
   const guardian: GuardianProfile = {
-    id: 'g-somkid-001',
-    citizen_id: '1200100458912',
-    prefix: 'นาง',
-    first_name: 'ศิริพร',
-    last_name: 'รัตนโชติ',
-    full_name: 'นางศิริพร รัตนโชติ',
-    phone_number: '081-942-5618',
-    email: 'siriporn.rat@family-somkid.com',
-    line_user_id: 'U98f12somkidparent',
-    occupation: 'ประกอบธุรกิจส่วนตัว',
-    annual_income: 480000,
+    id: "fe4c7c15-7aff-4729-853a-57fca16021a3",
+    citizen_id: "3210500016626",
+    prefix: "นาย",
+    first_name: "ศักดิ์ชัย",
+    last_name: "อุ่นอบ",
+    full_name: "นายศักดิ์ชัย อุ่นอบ",
+    phone_number: "061-552-0560",
+    email: null,
+    line_user_id: "mj246395",
+    occupation: "ประกอบธุรกิจส่วนตัว",
+    annual_income: null,
     photo_url: null,
-    preferred_lang: 'th',
+    preferred_lang: "th",
     is_active: true,
-    created_at: '2026-05-10T08:00:00.000Z',
-    updated_at: '2026-10-20T08:00:00.000Z',
+    created_at: "2026-05-10T08:00:00.000Z",
+    updated_at: "2026-10-20T08:00:00.000Z",
   };
 
+  // Real Students: 5 Featured across Early Years (อ.1/1, อ.3/1) and Primary (ป.1/1, ป.3/1, ป.6/1)
   const children: ParentChildProfile[] = [
     {
-      id: '67012',
-      public_uid: 'c1a9f012-6701-4000-8000-000000067012',
-      learner_id: '1209901458219',
-      prefix: 'ด.ญ.',
-      first_name: 'พิมพ์ชนก',
-      last_name: 'รัตนโชติ',
-      full_name: 'ด.ญ.พิมพ์ชนก รัตนโชติ',
-      name_en: 'Pimchanok Rattanachot',
-      nickname: 'น้องพราว',
-      grade: 'อ.2/1',
-      classroom: '1',
-      stage: 'EARLY_YEARS',
-      homeroom_teacher: 'ครูนภัสสร ใจดี (ครูแนน)',
-      homeroom_teacher_phone: '089-214-8890',
-      blood_group: 'O',
-      allergies: 'แพ้อาหารทะเล (กุ้ง)',
-      medical_conditions: 'ไม่มี',
-      height_cm: 104.5,
-      weight_kg: 16.8,
-      wallet_balance: 340.0,
-      wallet_daily_limit: 80.0,
-      attendance_rate_pct: 98.2,
-      gpa_or_assessment: 'พัฒนาการสมวัยดีมาก (4 ด้าน)',
+      id: "10103",
+      public_uid: "c1a9f103-1010-4000-8000-000000010103",
+      learner_id: "3210500016626-1",
+      prefix: "ด.ญ.",
+      first_name: "ธัญพร",
+      last_name: "อุ่นอบ",
+      full_name: "เด็กหญิงธัญพร อุ่นอบ",
+      name_en: "Thanyaporn Un-ob",
+      nickname: "น้องมีฟา",
+      grade: "ป.3/1",
+      classroom: "1",
+      stage: "PRIMARY",
+      homeroom_teacher: "ครูประจำชั้น ป.3/1 (แผนกประถมศึกษา)",
+      homeroom_teacher_phone: "038-611-195",
+      blood_group: "B",
+      allergies: "ไม่มี",
+      medical_conditions: "ไม่มี",
+      height_cm: 132.0,
+      weight_kg: 28.5,
+      wallet_balance: 450.0,
+      wallet_daily_limit: 100.0,
+      attendance_rate_pct: 99.2,
+      gpa_or_assessment: "3.88",
       photo_url: null,
       permissions: { ...FULL_GUARDIAN_PERMISSIONS },
     },
     {
-      id: '64008',
-      public_uid: 'c1a9f008-6400-4000-8000-000000064008',
-      learner_id: '1209901120984',
-      prefix: 'ด.ช.',
-      first_name: 'กิตติภพ',
-      last_name: 'รัตนโชติ',
-      full_name: 'ด.ช.กิตติภพ รัตนโชติ',
-      name_en: 'Kittipop Rattanachot',
-      nickname: 'น้องกัปตัน',
-      grade: 'ป.4/1',
-      classroom: '1',
-      stage: 'PRIMARY',
-      homeroom_teacher: 'ครูธนกฤต สุวรรณภูมิ (ครูต้น)',
-      homeroom_teacher_phone: '086-511-3349',
-      blood_group: 'B',
-      allergies: 'ไม่มี',
-      medical_conditions: 'ภูมิแพ้อากาศเมื่ออากาศเย็นจัด',
-      height_cm: 138.0,
-      weight_kg: 33.5,
-      wallet_balance: 525.0,
+      id: "9775",
+      public_uid: "c1a9f977-9775-4000-8000-000000009775",
+      learner_id: "3210500016626-2",
+      prefix: "ด.ช.",
+      first_name: "ชณธร",
+      last_name: "อุ่นอบ",
+      full_name: "เด็กชายชณธร อุ่นอบ",
+      name_en: "Chanathorn Un-ob",
+      nickname: "น้องจั๊มเปอร์",
+      grade: "ป.6/1",
+      classroom: "1",
+      stage: "PRIMARY",
+      homeroom_teacher: "ครูประจำชั้น ป.6/1 (แผนกประถมศึกษา)",
+      homeroom_teacher_phone: "038-611-195",
+      blood_group: "O",
+      allergies: "ไม่มี",
+      medical_conditions: "ไม่มี",
+      height_cm: 148.5,
+      weight_kg: 41.0,
+      wallet_balance: 580.0,
       wallet_daily_limit: 120.0,
-      attendance_rate_pct: 99.1,
-      gpa_or_assessment: '3.85',
+      attendance_rate_pct: 98.7,
+      gpa_or_assessment: "3.75",
+      photo_url: null,
+      permissions: { ...FULL_GUARDIAN_PERMISSIONS },
+    },
+    {
+      id: "10264",
+      public_uid: "c1a9f264-1026-4000-8000-000000010264",
+      learner_id: "1219800206562-1",
+      prefix: "ด.ช.",
+      first_name: "ฐิติวัฒน์",
+      last_name: "ธนโชติกิจพงศ์",
+      full_name: "เด็กชายฐิติวัฒน์ ธนโชติกิจพงศ์",
+      name_en: "Thitiwat Thanachotkitpong",
+      nickname: "น้องโนอาห์",
+      grade: "อ.1/1",
+      classroom: "1",
+      stage: "EARLY_YEARS",
+      homeroom_teacher: "ครูนภัสสร ภักคีรี (แผนกปฐมวัย)",
+      homeroom_teacher_phone: "038-611-195",
+      blood_group: "A",
+      allergies: "ไม่มี",
+      medical_conditions: "ไม่มี",
+      height_cm: 98.5,
+      weight_kg: 15.2,
+      wallet_balance: 250.0,
+      wallet_daily_limit: 60.0,
+      attendance_rate_pct: 98.5,
+      gpa_or_assessment: "พัฒนาการสมวัยดีเด่น (4 ด้าน)",
+      photo_url: null,
+      permissions: { ...FULL_GUARDIAN_PERMISSIONS },
+    },
+    {
+      id: "10247",
+      public_uid: "c1a9f247-1024-4000-8000-000000010247",
+      learner_id: "3210100435397-1",
+      prefix: "ด.ญ.",
+      first_name: "ฐิติชญา",
+      last_name: "เจริญรัตน์",
+      full_name: "เด็กหญิงฐิติชญา เจริญรัตน์",
+      name_en: "Thitichaya Charoenrat",
+      nickname: "น้องอิมเมจ",
+      grade: "อ.3/1",
+      classroom: "1",
+      stage: "EARLY_YEARS",
+      homeroom_teacher: "ครูประจำชั้น อ.3/1 (แผนกปฐมวัย)",
+      homeroom_teacher_phone: "038-611-195",
+      blood_group: "O",
+      allergies: "ไม่มี",
+      medical_conditions: "ไม่มี",
+      height_cm: 110.0,
+      weight_kg: 18.5,
+      wallet_balance: 320.0,
+      wallet_daily_limit: 80.0,
+      attendance_rate_pct: 99.0,
+      gpa_or_assessment: "พัฒนาการสมวัยดีเยี่ยม (4 ด้าน)",
+      photo_url: null,
+      permissions: { ...FULL_GUARDIAN_PERMISSIONS },
+    },
+    {
+      id: "10161",
+      public_uid: "c1a9f161-1016-4000-8000-000000010161",
+      learner_id: "1210100552194-1",
+      prefix: "ด.ช.",
+      first_name: "กิตติ์พิพัฒน์",
+      last_name: "พรมมีเดช",
+      full_name: "เด็กชายกิตติ์พิพัฒน์ พรมมีเดช",
+      name_en: "Kittipiphat Prommeedech",
+      nickname: "น้องไบร์ท",
+      grade: "ป.1/1",
+      classroom: "1",
+      stage: "PRIMARY",
+      homeroom_teacher: "ครูประจำชั้น ป.1/1 (แผนกประถมศึกษา)",
+      homeroom_teacher_phone: "038-611-195",
+      blood_group: "B",
+      allergies: "ไม่มี",
+      medical_conditions: "ไม่มี",
+      height_cm: 122.0,
+      weight_kg: 23.0,
+      wallet_balance: 300.0,
+      wallet_daily_limit: 80.0,
+      attendance_rate_pct: 99.5,
+      gpa_or_assessment: "3.90",
       photo_url: null,
       permissions: { ...FULL_GUARDIAN_PERMISSIONS },
     },
@@ -192,954 +331,502 @@ export function createInitialPipelineState(): BidirectionalPipelineState {
 
   const links: GuardianStudentLink[] = [
     {
-      id: 'gsl-67012-1',
+      id: "gsl-10103-1",
       guardian_id: guardian.id,
-      student_id: '67012',
-      relationship: 'มารดา',
-      role_type: 'PRIMARY',
+      student_id: "10103",
+      relationship: "บิดา",
+      role_type: "PRIMARY",
       ...FULL_GUARDIAN_PERMISSIONS,
       has_legal_restriction: false,
       restriction_note: null,
-      valid_from: '2026-05-01T00:00:00.000Z',
+      valid_from: "2026-05-01T00:00:00.000Z",
       valid_until: null,
-      created_at: '2026-05-01T00:00:00.000Z',
-      updated_at: '2026-10-20T00:00:00.000Z',
+      created_at: "2026-05-01T00:00:00.000Z",
+      updated_at: "2026-10-20T00:00:00.000Z",
     },
     {
-      id: 'gsl-64008-1',
+      id: "gsl-9775-1",
       guardian_id: guardian.id,
-      student_id: '64008',
-      relationship: 'มารดา',
-      role_type: 'PRIMARY',
+      student_id: "9775",
+      relationship: "บิดา",
+      role_type: "PRIMARY",
       ...FULL_GUARDIAN_PERMISSIONS,
       has_legal_restriction: false,
       restriction_note: null,
-      valid_from: '2026-05-01T00:00:00.000Z',
+      valid_from: "2026-05-01T00:00:00.000Z",
       valid_until: null,
-      created_at: '2026-05-01T00:00:00.000Z',
-      updated_at: '2026-10-20T00:00:00.000Z',
+      created_at: "2026-05-01T00:00:00.000Z",
+      updated_at: "2026-10-20T00:00:00.000Z",
+    },
+    {
+      id: "gsl-10264-1",
+      guardian_id: guardian.id,
+      student_id: "10264",
+      relationship: "บิดา",
+      role_type: "PRIMARY",
+      ...FULL_GUARDIAN_PERMISSIONS,
+      has_legal_restriction: false,
+      restriction_note: null,
+      valid_from: "2026-05-01T00:00:00.000Z",
+      valid_until: null,
+      created_at: "2026-05-01T00:00:00.000Z",
+      updated_at: "2026-10-20T00:00:00.000Z",
+    },
+    {
+      id: "gsl-10247-1",
+      guardian_id: guardian.id,
+      student_id: "10247",
+      relationship: "บิดา",
+      role_type: "PRIMARY",
+      ...FULL_GUARDIAN_PERMISSIONS,
+      has_legal_restriction: false,
+      restriction_note: null,
+      valid_from: "2026-05-01T00:00:00.000Z",
+      valid_until: null,
+      created_at: "2026-05-01T00:00:00.000Z",
+      updated_at: "2026-10-20T00:00:00.000Z",
+    },
+    {
+      id: "gsl-10161-1",
+      guardian_id: guardian.id,
+      student_id: "10161",
+      relationship: "บิดา",
+      role_type: "PRIMARY",
+      ...FULL_GUARDIAN_PERMISSIONS,
+      has_legal_restriction: false,
+      restriction_note: null,
+      valid_from: "2026-05-01T00:00:00.000Z",
+      valid_until: null,
+      created_at: "2026-05-01T00:00:00.000Z",
+      updated_at: "2026-10-20T00:00:00.000Z",
     },
   ];
 
   const invitations: GuardianInvitation[] = [
     {
-      id: 'inv-001',
+      id: "inv-10103",
       guardian_id: guardian.id,
-      guardian_name: 'นางศิริพร รัตนโชติ',
-      guardian_phone: '081-942-5618',
-      student_id: '67012',
-      student_name: 'ด.ญ.พิมพ์ชนก รัตนโชติ (น้องพราว)',
-      grade_level: 'อ.2/1',
-      invite_code: 'SV-FAM-67012',
-      expires_at: '2026-12-31T23:59:59.000Z',
-      used_at: '2026-05-16T09:12:00.000Z',
-      created_by: 'ฝ่ายทะเบียนโรงเรียนสมคิดวิทยา',
-      created_at: '2026-05-15T08:30:00.000Z',
+      guardian_name: "นายศักดิ์ชัย อุ่นอบ",
+      guardian_phone: "061-552-0560",
+      student_id: "10103",
+      student_name: "เด็กหญิงธัญพร อุ่นอบ (น้องมีฟา)",
+      grade_level: "ป.3/1",
+      invite_code: "SV-FAM-10103",
+      expires_at: "2026-12-31T23:59:59.000Z",
+      used_at: "2026-05-16T09:12:00.000Z",
+      created_by: "ฝ่ายทะเบียนโรงเรียนสมคิดวิทยา",
+      created_at: "2026-05-15T08:30:00.000Z",
     },
     {
-      id: 'inv-002',
-      guardian_id: 'g-somkid-002',
-      guardian_name: 'นายวรพจน์ รัตนโชติ (บิดา)',
-      guardian_phone: '081-775-1920',
-      student_id: '64008',
-      student_name: 'ด.ช.กิตติภพ รัตนโชติ (น้องกัปตัน)',
-      grade_level: 'ป.4/1',
-      invite_code: 'SV-FAM-64008B',
-      expires_at: '2026-12-31T23:59:59.000Z',
-      used_at: null,
-      created_by: 'ฝ่ายทะเบียนโรงเรียนสมคิดวิทยา',
-      created_at: '2026-10-18T10:00:00.000Z',
+      id: "inv-9775",
+      guardian_id: guardian.id,
+      guardian_name: "นายศักดิ์ชัย อุ่นอบ",
+      guardian_phone: "061-552-0560",
+      student_id: "9775",
+      student_name: "เด็กชายชณธร อุ่นอบ (น้องจั๊มเปอร์)",
+      grade_level: "ป.6/1",
+      invite_code: "SV-FAM-9775",
+      expires_at: "2026-12-31T23:59:59.000Z",
+      used_at: "2026-05-16T09:15:00.000Z",
+      created_by: "ฝ่ายทะเบียนโรงเรียนสมคิดวิทยา",
+      created_at: "2026-05-15T08:30:00.000Z",
+    },
+    {
+      id: "inv-10264",
+      guardian_id: "e43427b2-7695-4e9b-bf86-e9bdea4f7f9f",
+      guardian_name: "นางฐิติมา ธนโชติกิจพงศ์",
+      guardian_phone: "061-552-0560",
+      student_id: "10264",
+      student_name: "เด็กชายฐิติวัฒน์ ธนโชติกิจพงศ์ (น้องโนอาห์)",
+      grade_level: "อ.1/1",
+      invite_code: "SV-FAM-10264",
+      expires_at: "2026-12-31T23:59:59.000Z",
+      used_at: "2026-05-16T09:20:00.000Z",
+      created_by: "ฝ่ายทะเบียนโรงเรียนสมคิดวิทยา",
+      created_at: "2026-05-15T08:30:00.000Z",
     },
   ];
 
   const consents: ConsentRecord[] = [
     {
-      id: 'con-67012-1',
-      student_id: '67012',
+      id: "con-10103-1",
+      student_id: "10103",
       guardian_id: guardian.id,
-      purpose_code: 'PHOTO_INTERNAL',
-      purpose_title_th: 'การถ่ายภาพกิจกรรมสำหรับรายงานผู้ปกครองภายในระบบโรงเรียน',
-      purpose_title_en: 'Internal Classroom & Daily Care Activity Photos',
-      purpose_desc_th: 'อนุญาตให้ครูประจำชั้นบันทึกภาพกิจกรรมพัฒนาการและสมุดพกอนุบาลเพื่อส่งให้ผู้ปกครองเฉพาะรายบุคคล',
-      policy_version: 'v1.2-2569',
+      purpose_code: "PHOTO_INTERNAL",
+      purpose_title_th: "การถ่ายภาพกิจกรรมสำหรับรายงานผู้ปกครองภายในระบบโรงเรียน",
+      purpose_title_en: "Internal Classroom & Activity Photos",
+      purpose_desc_th: "อนุญาตให้ครูประจำชั้นบันทึกภาพกิจกรรมการเรียนรู้เพื่อรายงานผู้ปกครองเฉพาะบุคคล",
+      policy_version: "v1.2-2569",
       is_granted: true,
-      ip_address: '171.96.42.18',
-      signed_at: '2026-05-16T09:15:00.000Z',
+      ip_address: "171.96.42.18",
+      signed_at: "2026-05-16T09:15:00.000Z",
     },
     {
-      id: 'con-67012-2',
-      student_id: '67012',
+      id: "con-10103-2",
+      student_id: "10103",
       guardian_id: guardian.id,
-      purpose_code: 'PHOTO_PUBLIC_PR',
-      purpose_title_th: 'การเผยแพร่ภาพกิจกรรมนักเรียนบนเว็บไซต์และเพจประชาสัมพันธ์โรงเรียน',
-      purpose_title_en: 'Public Website & School PR Media Publication',
-      purpose_desc_th: 'อนุญาตให้นำภาพกิจกรรมสร้างสรรค์ของนักเรียนขึ้นแสดงในข่าวสารเว็บไซต์โรงเรียนสมคิดวิทยา',
-      policy_version: 'v1.2-2569',
+      purpose_code: "PHOTO_PUBLIC_PR",
+      purpose_title_th: "การเผยแพร่ภาพกิจกรรมนักเรียนบนเว็บไซต์และเพจประชาสัมพันธ์โรงเรียน",
+      purpose_title_en: "Public Website & School PR Media Publication",
+      purpose_desc_th: "อนุญาตให้นำภาพกิจกรรมสร้างสรรค์ขึ้นประชาสัมพันธ์",
+      policy_version: "v1.2-2569",
       is_granted: true,
-      ip_address: '171.96.42.18',
-      signed_at: '2026-05-16T09:15:00.000Z',
+      ip_address: "171.96.42.18",
+      signed_at: "2026-05-16T09:15:00.000Z",
     },
     {
-      id: 'con-67012-3',
-      student_id: '67012',
+      id: "con-10103-3",
+      student_id: "10103",
       guardian_id: guardian.id,
-      purpose_code: 'FIRST_AID',
-      purpose_title_th: 'การปฐมพยาบาลเบื้องต้นและการส่งต่อสถานพยาบาลฉุกเฉิน',
-      purpose_title_en: 'Emergency First Aid & Hospital Referral',
-      purpose_desc_th: 'อนุญาตให้พยาบาลประจำห้องพยาบาลปฐมพยาบาลเบื้องต้นและนำส่งโรงพยาบาลใกล้เคียงในกรณีฉุกเฉิน',
-      policy_version: 'v1.2-2569',
+      purpose_code: "FIRST_AID",
+      purpose_title_th: "การปฐมพยาบาลเบื้องต้นและการส่งต่อสถานพยาบาลฉุกเฉิน",
+      purpose_title_en: "Emergency First Aid & Hospital Referral",
+      purpose_desc_th: "อนุญาตให้พยาบาลประจำห้องพยาบาลปฐมพยาบาลเบื้องต้น",
+      policy_version: "v1.2-2569",
       is_granted: true,
-      ip_address: '171.96.42.18',
-      signed_at: '2026-05-16T09:15:00.000Z',
+      ip_address: "171.96.42.18",
+      signed_at: "2026-05-16T09:15:00.000Z",
     },
     {
-      id: 'con-67012-4',
-      student_id: '67012',
+      id: "con-10264-1",
+      student_id: "10264",
       guardian_id: guardian.id,
-      purpose_code: 'FIELD_TRIP',
-      purpose_title_th: 'การเข้าร่วมกิจกรรมทัศนศึกษาและแหล่งเรียนรู้นอกสถานที่',
-      purpose_title_en: 'Educational Field Trips & Off-Campus Learning',
-      purpose_desc_th: 'อนุญาตให้นักเรียนเดินทางไปทัศนศึกษาตามโครงการวิชาการของโรงเรียนภายใต้การดูแลของครู',
-      policy_version: 'v1.2-2569',
+      purpose_code: "PHOTO_INTERNAL",
+      purpose_title_th: "การถ่ายภาพกิจกรรมสำหรับรายงานผู้ปกครองภายในระบบโรงเรียน",
+      purpose_title_en: "Internal Classroom & Daily Care Activity Photos",
+      purpose_desc_th: "อนุญาตให้ครูประจำชั้นบันทึกภาพพัฒนาการและสมุดพกอนุบาล",
+      policy_version: "v1.2-2569",
       is_granted: true,
-      ip_address: '171.96.42.18',
-      signed_at: '2026-05-16T09:15:00.000Z',
-    },
-    {
-      id: 'con-64008-1',
-      student_id: '64008',
-      guardian_id: guardian.id,
-      purpose_code: 'PHOTO_INTERNAL',
-      purpose_title_th: 'การถ่ายภาพกิจกรรมสำหรับรายงานผู้ปกครองภายในระบบโรงเรียน',
-      purpose_title_en: 'Internal Classroom & Activity Photos',
-      purpose_desc_th: 'อนุญาตให้ครูประจำชั้นบันทึกภาพกิจกรรมการเรียนรู้เพื่อส่งให้ผู้ปกครองในระบบ',
-      policy_version: 'v1.2-2569',
-      is_granted: true,
-      ip_address: '171.96.42.18',
-      signed_at: '2026-05-16T09:16:00.000Z',
-    },
-    {
-      id: 'con-64008-2',
-      student_id: '64008',
-      guardian_id: guardian.id,
-      purpose_code: 'PHOTO_PUBLIC_PR',
-      purpose_title_th: 'การเผยแพร่ภาพกิจกรรมนักเรียนบนเว็บไซต์และเพจประชาสัมพันธ์โรงเรียน',
-      purpose_title_en: 'Public Website & School PR Media Publication',
-      purpose_desc_th: 'อนุญาตให้นำภาพการแข่งขันวิชาการและกิจกรรมโรงเรียนขึ้นประชาสัมพันธ์',
-      policy_version: 'v1.2-2569',
-      is_granted: false,
-      ip_address: '171.96.42.18',
-      signed_at: '2026-05-16T09:16:00.000Z',
-      revoked_at: '2026-09-01T10:00:00.000Z',
-    },
-    {
-      id: 'con-64008-3',
-      student_id: '64008',
-      guardian_id: guardian.id,
-      purpose_code: 'FIRST_AID',
-      purpose_title_th: 'การปฐมพยาบาลเบื้องต้นและการส่งต่อสถานพยาบาลฉุกเฉิน',
-      purpose_title_en: 'Emergency First Aid & Hospital Referral',
-      purpose_desc_th: 'อนุญาตให้พยาบาลประจำห้องพยาบาลปฐมพยาบาลเบื้องต้นและนำส่งโรงพยาบาลใกล้เคียงในกรณีฉุกเฉิน',
-      policy_version: 'v1.2-2569',
-      is_granted: true,
-      ip_address: '171.96.42.18',
-      signed_at: '2026-05-16T09:16:00.000Z',
-    },
-    {
-      id: 'con-64008-4',
-      student_id: '64008',
-      guardian_id: guardian.id,
-      purpose_code: 'FIELD_TRIP',
-      purpose_title_th: 'การเข้าร่วมกิจกรรมทัศนศึกษาและแหล่งเรียนรู้นอกสถานที่',
-      purpose_title_en: 'Educational Field Trips & Off-Campus Learning',
-      purpose_desc_th: 'อนุญาตให้นักเรียนเดินทางไปทัศนศึกษาตามโครงการวิชาการของโรงเรียน',
-      policy_version: 'v1.2-2569',
-      is_granted: true,
-      ip_address: '171.96.42.18',
-      signed_at: '2026-05-16T09:16:00.000Z',
+      ip_address: "171.96.42.18",
+      signed_at: "2026-05-16T09:15:00.000Z",
     },
   ];
 
   const attendance_logs: StudentAttendanceLog[] = [
     {
-      id: 'att-67012-today',
-      student_id: '67012',
-      student_name: 'ด.ญ.พิมพ์ชนก รัตนโชติ',
-      nickname: 'น้องพราว',
-      grade_level: 'อ.2/1',
+      id: "att-10103-today",
+      student_id: "10103",
+      student_name: "เด็กหญิงธัญพร อุ่นอบ",
+      nickname: "น้องมีฟา",
+      grade_level: "ป.3/1",
       attendance_date: todayStr,
-      period: 'MORNING_HOMEROOM',
-      status: 'PRESENT',
-      check_in_time: '07:42 น.',
+      period: "MORNING_HOMEROOM",
+      status: "PRESENT",
+      check_in_time: "07:38 น.",
       check_out_time: null,
-      source: 'TEACHER_APP',
-      recorded_by: 'ครูนภัสสร ใจดี',
-      notes: 'คุณแม่มาส่งหน้าห้องเรียน ยิ้มแย้มแจ่มใส',
-      created_at: `${todayStr}T00:42:00.000Z`,
-      updated_at: `${todayStr}T00:42:00.000Z`,
-    },
-    {
-      id: 'att-67013-today',
-      student_id: '67013',
-      student_name: 'ด.ช.ปุณณวิชญ์ วัฒนากุล',
-      nickname: 'น้องปั้นจั่น',
-      grade_level: 'อ.2/1',
-      attendance_date: todayStr,
-      period: 'MORNING_HOMEROOM',
-      status: 'PRESENT',
-      check_in_time: '07:48 น.',
-      check_out_time: null,
-      source: 'VAN_SYNC',
-      recorded_by: 'รถตู้สาย 1 (ตลาดศรีราชา)',
-      notes: 'เดินทางด้วยรถรับส่งสาย 1 ปกติ',
-      created_at: `${todayStr}T00:48:00.000Z`,
-      updated_at: `${todayStr}T00:48:00.000Z`,
-    },
-    {
-      id: 'att-67014-today',
-      student_id: '67014',
-      student_name: 'ด.ญ.ณัฐนิชา อารีย์',
-      nickname: 'น้องณิชา',
-      grade_level: 'อ.2/1',
-      attendance_date: todayStr,
-      period: 'MORNING_HOMEROOM',
-      status: 'PRESENT',
-      check_in_time: '07:55 น.',
-      check_out_time: null,
-      source: 'TEACHER_APP',
-      recorded_by: 'ครูนภัสสร ใจดี',
-      notes: null,
-      created_at: `${todayStr}T00:55:00.000Z`,
-      updated_at: `${todayStr}T00:55:00.000Z`,
-    },
-    {
-      id: 'att-64008-today',
-      student_id: '64008',
-      student_name: 'ด.ช.กิตติภพ รัตนโชติ',
-      nickname: 'น้องกัปตัน',
-      grade_level: 'ป.4/1',
-      attendance_date: todayStr,
-      period: 'MORNING_HOMEROOM',
-      status: 'PRESENT',
-      check_in_time: '07:38 น.',
-      check_out_time: null,
-      source: 'NFC_GATE',
-      recorded_by: 'ระบบสแกนบัตรประตูหน้า',
-      notes: 'แตะบัตรเข้าโรงเรียนตรงเวลา',
+      source: "TEACHER_APP",
+      recorded_by: "ครูประจำชั้น ป.3/1",
+      notes: "มาถึงโรงเรียนตรงเวลา สดใสร่าเริง",
       created_at: `${todayStr}T00:38:00.000Z`,
       updated_at: `${todayStr}T00:38:00.000Z`,
     },
     {
-      id: 'att-64009-today',
-      student_id: '64009',
-      student_name: 'ด.ญ.ปาลิตา วงศ์สวัสดิ์',
-      nickname: 'น้องปาล์ม',
-      grade_level: 'ป.4/1',
+      id: "att-9775-today",
+      student_id: "9775",
+      student_name: "เด็กชายชณธร อุ่นอบ",
+      nickname: "น้องจั๊มเปอร์",
+      grade_level: "ป.6/1",
       attendance_date: todayStr,
-      period: 'MORNING_HOMEROOM',
-      status: 'PRESENT',
-      check_in_time: '07:45 น.',
+      period: "MORNING_HOMEROOM",
+      status: "PRESENT",
+      check_in_time: "07:42 น.",
       check_out_time: null,
-      source: 'NFC_GATE',
-      recorded_by: 'ระบบสแกนบัตรประตูหน้า',
-      notes: null,
-      created_at: `${todayStr}T00:45:00.000Z`,
-      updated_at: `${todayStr}T00:45:00.000Z`,
+      source: "NFC_GATE",
+      recorded_by: "ระบบสแกนบัตรประตูหน้า",
+      notes: "แตะบัตรเข้าโรงเรียนตรงเวลา",
+      created_at: `${todayStr}T00:42:00.000Z`,
+      updated_at: `${todayStr}T00:42:00.000Z`,
     },
-  ];
-
-  const leave_requests: StudentLeaveRequest[] = [
     {
-      id: 'lv-64008-01',
-      student_id: '64008',
-      student_name: 'ด.ช.กิตติภพ รัตนโชติ (น้องกัปตัน)',
-      grade_level: 'ป.4/1',
-      guardian_id: guardian.id,
-      guardian_name: 'นางศิริพร รัตนโชติ',
-      leave_type: 'PERSONAL_LEAVE',
-      start_date: '2026-10-28',
-      end_date: '2026-10-28',
-      reason: 'พาน้องไปตรวจสุขภาพฟันตามนัดทันตแพทย์ รพ.พญาไท ศรีราชา ช่วงบ่าย',
-      attachment_url: null,
-      status: 'APPROVED',
-      reviewed_by: 'ครูธนกฤต สุวรรณภูมิ',
-      reviewed_at: '2026-10-19T14:20:00.000Z',
-      review_note: 'รับทราบครับ ครูแจ้งงานวิชาคณิตศาสตร์ไว้ในระบบการบ้านแล้วครับ',
-      created_at: '2026-10-19T11:05:00.000Z',
-      updated_at: '2026-10-19T14:20:00.000Z',
+      id: "att-10264-today",
+      student_id: "10264",
+      student_name: "เด็กชายฐิติวัฒน์ ธนโชติกิจพงศ์",
+      nickname: "น้องโนอาห์",
+      grade_level: "อ.1/1",
+      attendance_date: todayStr,
+      period: "MORNING_HOMEROOM",
+      status: "PRESENT",
+      check_in_time: "07:48 น.",
+      check_out_time: null,
+      source: "TEACHER_APP",
+      recorded_by: "ครูนภัสสร ภักคีรี",
+      notes: "คุณแม่มาส่งหน้าห้องเรียน ยิ้มแย้มแจ่มใส",
+      created_at: `${todayStr}T00:48:00.000Z`,
+      updated_at: `${todayStr}T00:48:00.000Z`,
     },
   ];
 
   const pickup_plans: PickupDailyPlan[] = [
     {
-      id: 'pk-67012-today',
-      student_id: '67012',
-      student_name: 'ด.ญ.พิมพ์ชนก รัตนโชติ',
-      nickname: 'น้องพราว',
-      grade_level: 'อ.2/1',
+      id: "pk-10103-today",
+      student_id: "10103",
+      student_name: "เด็กหญิงธัญพร อุ่นอบ",
+      nickname: "น้องมีฟา",
+      grade_level: "ป.3/1",
       plan_date: todayStr,
-      transport_mode: 'PARENT_PICKUP',
-      collector_name: 'นางศิริพร รัตนโชติ (คุณแม่)',
-      collector_relationship: 'มารดา',
-      collector_phone: '081-942-5618',
+      transport_mode: "PARENT_PICKUP",
+      collector_name: "นายศักดิ์ชัย อุ่นอบ (คุณพ่อ)",
+      collector_relationship: "บิดา",
+      collector_phone: "061-552-0560",
       collector_photo_url: null,
       temp_otp_code: null,
-      arrival_status: 'SCHEDULED',
+      arrival_status: "SCHEDULED",
       arrived_at: null,
       released_at: null,
       released_by_staff: null,
       van_route_name: null,
       van_plate_number: null,
       van_status_text: null,
-      notes: 'รับที่จุดรับส่งอนุบาล ประตู 2 เวลา 15:15 น.',
+      notes: "รับที่จุดรับส่งหน้าอาคารประถม เวลา 16:00 น.",
       created_at: `${todayStr}T00:00:00.000Z`,
       updated_at: `${todayStr}T00:00:00.000Z`,
     },
     {
-      id: 'pk-64008-today',
-      student_id: '64008',
-      student_name: 'ด.ช.กิตติภพ รัตนโชติ',
-      nickname: 'น้องกัปตัน',
-      grade_level: 'ป.4/1',
+      id: "pk-9775-today",
+      student_id: "9775",
+      student_name: "เด็กชายชณธร อุ่นอบ",
+      nickname: "น้องจั๊มเปอร์",
+      grade_level: "ป.6/1",
       plan_date: todayStr,
-      transport_mode: 'PARENT_PICKUP',
-      collector_name: 'นางศิริพร รัตนโชติ (คุณแม่)',
-      collector_relationship: 'มารดา',
-      collector_phone: '081-942-5618',
+      transport_mode: "PARENT_PICKUP",
+      collector_name: "นายศักดิ์ชัย อุ่นอบ (คุณพ่อ)",
+      collector_relationship: "บิดา",
+      collector_phone: "061-552-0560",
       collector_photo_url: null,
       temp_otp_code: null,
-      arrival_status: 'SCHEDULED',
+      arrival_status: "SCHEDULED",
       arrived_at: null,
       released_at: null,
       released_by_staff: null,
-      van_route_name: 'สาย 1 (ศรีราชา - เก้ากิโล)',
-      van_plate_number: 'นข-4512 ชลบุรี',
-      van_status_text: 'วันนี้คุณแม่แจ้งรับกลับเองพร้อมน้องพราว เวลา 15:30 น.',
-      notes: 'รอรับพร้อมน้องพราวที่จุดรอรับหน้าอาคารประถม',
+      van_route_name: null,
+      van_plate_number: null,
+      van_status_text: null,
+      notes: "รับพร้อมน้องมีฟา เวลา 16:00 น.",
       created_at: `${todayStr}T00:00:00.000Z`,
       updated_at: `${todayStr}T00:00:00.000Z`,
     },
     {
-      id: 'pk-67013-today',
-      student_id: '67013',
-      student_name: 'ด.ช.ปุณณวิชญ์ วัฒนากุล',
-      nickname: 'น้องปั้นจั่น',
-      grade_level: 'อ.2/1',
+      id: "pk-10264-today",
+      student_id: "10264",
+      student_name: "เด็กชายฐิติวัฒน์ ธนโชติกิจพงศ์",
+      nickname: "น้องโนอาห์",
+      grade_level: "อ.1/1",
       plan_date: todayStr,
-      transport_mode: 'SCHOOL_VAN',
-      collector_name: 'รถตู้โรงเรียนสาย 1 (ครูพี่เลี้ยงประจำรถ: ครูกานดา)',
-      collector_relationship: 'รถรับส่งโรงเรียน',
-      collector_phone: '089-441-2201',
+      transport_mode: "PARENT_PICKUP",
+      collector_name: "นางฐิติมา ธนโชติกิจพงศ์ (คุณแม่)",
+      collector_relationship: "มารดา",
+      collector_phone: "061-552-0560",
       collector_photo_url: null,
       temp_otp_code: null,
-      arrival_status: 'SCHEDULED',
+      arrival_status: "SCHEDULED",
       arrived_at: null,
       released_at: null,
       released_by_staff: null,
-      van_route_name: 'สาย 1 (ตลาดศรีราชา - อัสสัมชัญ)',
-      van_plate_number: 'นข-4512 ชลบุรี',
-      van_status_text: 'เตรียมขึ้นรถรอบ 15:40 น.',
-      notes: 'ส่งที่บ้านหมู่บ้านแกรนด์มณีรินทร์',
+      van_route_name: null,
+      van_plate_number: null,
+      van_status_text: null,
+      notes: "รับที่จุดรับส่งอนุบาล เวลา 15:15 น.",
       created_at: `${todayStr}T00:00:00.000Z`,
       updated_at: `${todayStr}T00:00:00.000Z`,
-    },
-  ];
-
-  const early_years_care: EarlyYearsDailyCare[] = [
-    {
-      id: 'eyc-67012-today',
-      student_id: '67012',
-      student_name: 'ด.ญ.พิมพ์ชนก รัตนโชติ',
-      nickname: 'น้องพราว',
-      class_id: 'อ.2/1',
-      care_date: todayStr,
-      morning_mood: 'CHEERFUL',
-      breakfast_status: 'ALL',
-      lunch_status: 'ALL',
-      milk_morning: 'ALL',
-      milk_afternoon: 'ALL',
-      nap_start: '12:30',
-      nap_end: '14:15',
-      nap_quality: 'SOUND',
-      toilet_count: 3,
-      diaper_count: 0,
-      toilet_note: 'บอกคุณครูเข้าห้องน้ำเองได้ทุกครั้ง เก่งมากค่ะ',
-      temperature_c: 36.5,
-      learning_activity: 'กิจกรรมศิลปะสร้างสรรค์: พิมพ์ภาพใบไม้จากธรรมชาติและเล่านิทานเรื่องกระต่ายน้อยแบ่งปัน',
-      home_suggestion: 'ชวนน้องพราวเล่าเรื่องสีของใบไม้ที่ประทับใจให้คุณแม่ฟังนะคะ',
-      teacher_note: 'วันนี้น้องพราวทานข้าวต้มปลาและผัดบล็อกโคลี่หมดถาดเลยค่ะ นอนกลางวันหลับสนิทและตื่นมาดื่มนมครบค่ะ',
-      photo_urls: [],
-      is_published: true,
-      published_at: `${todayStr}T07:30:00.000Z`,
-      created_at: `${todayStr}T04:00:00.000Z`,
-      updated_at: `${todayStr}T07:30:00.000Z`,
-    },
-    {
-      id: 'eyc-67013-today',
-      student_id: '67013',
-      student_name: 'ด.ช.ปุณณวิชญ์ วัฒนากุล',
-      nickname: 'น้องปั้นจั่น',
-      class_id: 'อ.2/1',
-      care_date: todayStr,
-      morning_mood: 'CALM',
-      breakfast_status: 'ALL',
-      lunch_status: 'HALF',
-      milk_morning: 'ALL',
-      milk_afternoon: 'ALL',
-      nap_start: '12:35',
-      nap_end: '14:10',
-      nap_quality: 'SOUND',
-      toilet_count: 2,
-      diaper_count: 0,
-      toilet_note: 'ปกติ',
-      temperature_c: 36.6,
-      learning_activity: 'กิจกรรมศิลปะสร้างสรรค์: พิมพ์ภาพใบไม้จากธรรมชาติและเล่านิทานเรื่องกระต่ายน้อยแบ่งปัน',
-      home_suggestion: 'ฝึกการเก็บของเล่นเข้าที่หลังเล่นเสร็จ',
-      teacher_note: 'วันนี้น้องปั้นจั่นตั้งใจระบายสีดีมากครับ มื้อเที่ยงทานผักได้มากขึ้นครับ',
-      photo_urls: [],
-      is_published: true,
-      published_at: `${todayStr}T07:30:00.000Z`,
-      created_at: `${todayStr}T04:00:00.000Z`,
-      updated_at: `${todayStr}T07:30:00.000Z`,
-    },
-    {
-      id: 'eyc-67014-today',
-      student_id: '67014',
-      student_name: 'ด.ญ.ณัฐนิชา อารีย์',
-      nickname: 'น้องณิชา',
-      class_id: 'อ.2/1',
-      care_date: todayStr,
-      morning_mood: 'CHEERFUL',
-      breakfast_status: 'ALL',
-      lunch_status: 'ALL',
-      milk_morning: 'ALL',
-      milk_afternoon: 'ALL',
-      nap_start: '12:30',
-      nap_end: '14:15',
-      nap_quality: 'SOUND',
-      toilet_count: 3,
-      diaper_count: 0,
-      toilet_note: 'ปกติ',
-      temperature_c: 36.4,
-      learning_activity: 'กิจกรรมศิลปะสร้างสรรค์: พิมพ์ภาพใบไม้จากธรรมชาติและเล่านิทานเรื่องกระต่ายน้อยแบ่งปัน',
-      home_suggestion: 'ชวนร้องเพลงสวัสดีคุณครูที่บ้าน',
-      teacher_note: 'น้องณิชาช่วยคุณครูแจกสมุดนิทานให้เพื่อนๆ น่ารักมากค่ะ',
-      photo_urls: [],
-      is_published: true,
-      published_at: `${todayStr}T07:30:00.000Z`,
-      created_at: `${todayStr}T04:00:00.000Z`,
-      updated_at: `${todayStr}T07:30:00.000Z`,
-    },
-  ];
-
-  const dropoff_notes: EarlyYearsDropoffNote[] = [
-    {
-      id: 'drop-67012-today',
-      student_id: '67012',
-      student_name: 'ด.ญ.พิมพ์ชนก รัตนโชติ (น้องพราว)',
-      grade_level: 'อ.2/1',
-      note_date: todayStr,
-      guardian_name: 'นางศิริพร รัตนโชติ',
-      sleep_hours: 10,
-      ate_breakfast: true,
-      morning_mood: 'สดใส อารมณ์ดี ตื่นเต้นอยากทำศิลปะ',
-      medication_today: false,
-      pickup_person_today: 'คุณแม่มารับเอง เวลา 15:15 น.',
-      special_note: 'ฝากครูแนนดูแลไม่ให้น้องทานเมนูกุ้งนะคะ ขอบคุณค่ะ',
-      acknowledged_by_teacher: 'ครูนภัสสร ใจดี (ครูแนน)',
-      acknowledged_at: `${todayStr}T00:50:00.000Z`,
-      created_at: `${todayStr}T00:15:00.000Z`,
-      updated_at: `${todayStr}T00:50:00.000Z`,
-    },
-  ];
-
-  const medication_requests: MedicationRequest[] = [
-    {
-      id: 'med-64008-01',
-      student_id: '64008',
-      student_name: 'ด.ช.กิตติภพ รัตนโชติ (น้องกัปตัน)',
-      grade_level: 'ป.4/1',
-      guardian_name: 'นางศิริพร รัตนโชติ',
-      medication_name: 'ยาแก้แพ้อากาศ Cetirizine Syrup (ชนิดไม่ง่วง)',
-      dosage: '1 ช้อนชา (5 มล.)',
-      schedule_times: ['12:30'],
-      meal_timing: 'AFTER_MEAL',
-      start_date: todayStr,
-      end_date: todayStr,
-      reason: 'มีอาการคัดจมูกเล็กน้อยช่วงเช้าเนื่องจากอากาศเปลี่ยน ไม่มีไข้',
-      signature_data_url: 'SIGNED_BY_SIRIPORN_RATTANACHOT',
-      status: 'ADMINISTERED_TODAY',
-      last_administered_at: `${todayStr}T05:35:00.000Z`,
-      last_administered_by: 'ครูพยาบาลวิชาชีพ พรทิพย์ สุขสวัสดิ์',
-      nurse_note: 'ป้อนยาหลังอาหารกลางวันเรียบร้อย วัดอุณหภูมิ 36.6°C ปกติดีค่ะ',
-      created_at: `${todayStr}T00:20:00.000Z`,
-      updated_at: `${todayStr}T05:35:00.000Z`,
-    },
-  ];
-
-  const incidents: StudentIncident[] = [
-    {
-      id: 'inc-64008-01',
-      student_id: '64008',
-      student_name: 'ด.ช.กิตติภพ รัตนโชติ (น้องกัปตัน)',
-      grade_level: 'ป.4/1',
-      incident_date: todayStr,
-      incident_time: '10:25',
-      location: 'สนามฟุตซอลหญ้าเทียม (ช่วงพักเบรกเช้า)',
-      severity: 'LOW',
-      description: 'สะดุดเชือกรองเท้าขณะวิ่งเล่นกับเพื่อน มีรอยถลอกตื้นบริเวณหัวเข่าขวาขนาดประมาณ 1 ซม.',
-      first_aid_given: 'ล้างแผลด้วยน้ำเกลือ Normal Saline ทายาโพวิโดน-ไอโอดีน และปิดพลาสเตอร์กันน้ำ น้องกลับเข้าเรียนคาบต่อไปได้ตามปกติ',
-      hospital_referred: false,
-      reported_by: 'ครูพยาบาลวิชาชีพ พรทิพย์ สุขสวัสดิ์',
-      parent_acknowledged: false,
-      parent_acknowledged_at: null,
-      acknowledged_by_name: null,
-      created_at: `${todayStr}T03:30:00.000Z`,
-      updated_at: `${todayStr}T03:30:00.000Z`,
-    },
-  ];
-
-  const assignments: AcademicAssignmentItem[] = [
-    {
-      id: 'asg-p4-math-01',
-      class_id: 'ป.4/1',
-      grade_level: 'ป.4/1',
-      subject_name: 'คณิตศาสตร์พื้นฐาน (ค14101)',
-      title_th: 'แบบฝึกหัดที่ 4.3 เรื่อง โจทย์ปัญหาการคูณและการหารหลายขั้นตอน',
-      title_en: 'Workbook Ex 4.3: Multi-step Multiplication & Division Word Problems',
-      description: 'ทำในหนังสือแบบฝึกหัดคณิตศาสตร์ หน้า 78-79 ข้อ 1-6 แสดงวิธีทำอย่างละเอียด',
-      due_date: '2026-10-22',
-      max_score: 10,
-      assigned_by: 'ครูธนกฤต สุวรรณภูมิ',
-      student_id: '64008',
-      submission_status: 'PENDING',
-      score: null,
-      teacher_feedback: null,
-      updated_at: `${todayStr}T02:00:00.000Z`,
-    },
-    {
-      id: 'asg-p4-sci-01',
-      class_id: 'ป.4/1',
-      grade_level: 'ป.4/1',
-      subject_name: 'วิทยาศาสตร์และเทคโนโลยี (ว14101)',
-      title_th: 'ใบงานสรุปแผนผังความคิด: ตัวกลางของแสง (โปร่งใส โปร่งแสง ทึบแสง)',
-      title_en: 'Mind Map: Light Media Classification (Transparent, Translucent, Opaque)',
-      description: 'วาดภาพประกอบยกตัวอย่างวัสดุในบ้านอย่างละ 3 ชนิด พร้อมระบายสีให้สวยงาม',
-      due_date: '2026-10-20',
-      max_score: 10,
-      assigned_by: 'ครูสุพัตรา วิริยะกุล',
-      student_id: '64008',
-      submission_status: 'SUBMITTED',
-      score: 9.5,
-      teacher_feedback: 'ยกตัวอย่างวัสดุในชีวิตประจำวันได้ชัดเจนและวาดแผนผังสวยงามมากครับ',
-      updated_at: `${todayStr}T04:15:00.000Z`,
-    },
-    {
-      id: 'asg-p4-eng-01',
-      class_id: 'ป.4/1',
-      grade_level: 'ป.4/1',
-      subject_name: 'ภาษาอังกฤษเพื่อการสื่อสาร (อ14101)',
-      title_th: 'บันทึกคลิปอ่านออกเสียง Reading Passage: My Favorite Weekend (1 นาที)',
-      title_en: 'Short Reading Aloud Audio/Worksheet: My Favorite Weekend',
-      description: 'ฝึกอ่านออกเสียงคำศัพท์ในบทที่ 5 และทำแบบฝึกหัดจับคู่ประโยคหน้า 44',
-      due_date: '2026-10-24',
-      max_score: 10,
-      assigned_by: 'Teacher Michael & ครูอารยา',
-      student_id: '64008',
-      submission_status: 'PENDING',
-      score: null,
-      teacher_feedback: null,
-      updated_at: `${todayStr}T01:30:00.000Z`,
-    },
-    {
-      id: 'asg-k2-art-01',
-      class_id: 'อ.2/1',
-      grade_level: 'อ.2/1',
-      subject_name: 'กิจกรรมเสริมประสบการณ์ปฐมวัย',
-      title_th: 'กิจกรรมครอบครัวสัมพันธ์: ชวนน้องพราวสำรวจใบไม้รอบบ้าน 3 ชนิด',
-      title_en: 'Family Nature Discovery: Collect 3 Leaf Shapes Around Home',
-      description: 'ไม่ต้องเขียนส่งเป็นเล่มนะคะ ให้คุณแม่ชวนน้องสังเกตรูปร่างใบไม้แล้วมาเล่าให้เพื่อนฟังวันพรุ่งนี้ค่ะ',
-      due_date: '2026-10-21',
-      max_score: 5,
-      assigned_by: 'ครูนภัสสร ใจดี (ครูแนน)',
-      student_id: '67012',
-      submission_status: 'SUBMITTED',
-      score: 5,
-      teacher_feedback: 'น้องพราวเล่าเรื่องใบมะม่วงกับใบชบาให้เพื่อนๆ ฟังได้คล่องแคล่วมากค่ะ',
-      updated_at: `${todayStr}T06:00:00.000Z`,
     },
   ];
 
   const threads: ParentTeacherThread[] = [
     {
-      id: 'thd-67012-homeroom',
-      student_id: '67012',
-      student_name: 'ด.ญ.พิมพ์ชนก รัตนโชติ (น้องพราว)',
-      grade_level: 'อ.2/1',
-      guardian_name: 'นางศิริพร รัตนโชติ',
-      teacher_name: 'ครูนภัสสร ใจดี (ครูประจำชั้น อ.2/1)',
-      channel_type: 'HOMEROOM',
-      last_message_text: 'วันนี้ครูแนบรายงานสมุดพกอนุบาลและภาพกิจกรรมพิมพ์ใบไม้ของน้องพราวให้แล้วนะคะ',
-      last_message_at: `${todayStr}T07:32:00.000Z`,
-      unread_staff_count: 0,
-      unread_parent_count: 1,
-      office_hours_note: 'เวลาทำการตอบกลับ: จันทร์-ศุกร์ 07:30 - 17:00 น. (นอกเวลาทำการระบบจะแจ้งเตือนครูในเช้าวันถัดไป)',
-      created_at: '2026-05-16T08:00:00.000Z',
-      updated_at: `${todayStr}T07:32:00.000Z`,
-    },
-    {
-      id: 'thd-64008-homeroom',
-      student_id: '64008',
-      student_name: 'ด.ช.กิตติภพ รัตนโชติ (น้องกัปตัน)',
-      grade_level: 'ป.4/1',
-      guardian_name: 'นางศิริพร รัตนโชติ',
-      teacher_name: 'ครูธนกฤต สุวรรณภูมิ (ครูประจำชั้น ป.4/1)',
-      channel_type: 'HOMEROOM',
-      last_message_text: 'น้องกัปตันส่งงานแผนผังวิทยาศาสตร์เรียบร้อย ได้ 9.5/10 คะแนนครับคุณแม่',
-      last_message_at: `${todayStr}T06:45:00.000Z`,
+      id: "thd-10103-homeroom",
+      student_id: "10103",
+      student_name: "เด็กหญิงธัญพร อุ่นอบ (น้องมีฟา)",
+      grade_level: "ป.3/1",
+      guardian_name: "นายศักดิ์ชัย อุ่นอบ",
+      teacher_name: "ครูประจำชั้น ป.3/1",
+      channel_type: "HOMEROOM",
+      last_message_text: "สวัสดีค่ะคุณพ่อ วันนี้น้องมีฟาตั้งใจเรียนและช่วยเพื่อนในกลุ่มดีมากค่ะ",
+      last_message_at: `${todayStr}T07:15:00.000Z`,
       unread_staff_count: 0,
       unread_parent_count: 0,
-      office_hours_note: 'เวลาทำการตอบกลับ: จันทร์-ศุกร์ 07:30 - 17:00 น.',
-      created_at: '2026-05-16T08:00:00.000Z',
-      updated_at: `${todayStr}T06:45:00.000Z`,
+      office_hours_note: "เวลาทำการตอบกลับ: จันทร์-ศุกร์ 07:30 - 17:00 น.",
+      created_at: "2026-05-16T08:00:00.000Z",
+      updated_at: `${todayStr}T07:15:00.000Z`,
+    },
+    {
+      id: "thd-10264-homeroom",
+      student_id: "10264",
+      student_name: "เด็กชายฐิติวัฒน์ ธนโชติกิจพงศ์ (น้องโนอาห์)",
+      grade_level: "อ.1/1",
+      guardian_name: "นางฐิติมา ธนโชติกิจพงศ์",
+      teacher_name: "ครูนภัสสร ภักคีรี",
+      channel_type: "HOMEROOM",
+      last_message_text: "สวัสดีค่ะคุณแม่ วันนี้น้องโนอาห์ทานอาหารกลางวันหมดถาดและนอนหลับสนิทค่ะ",
+      last_message_at: `${todayStr}T07:30:00.000Z`,
+      unread_staff_count: 0,
+      unread_parent_count: 0,
+      office_hours_note: "เวลาทำการตอบกลับ: จันทร์-ศุกร์ 07:30 - 17:00 น.",
+      created_at: "2026-05-16T08:00:00.000Z",
+      updated_at: `${todayStr}T07:30:00.000Z`,
     },
   ];
 
   const messages: ParentTeacherMessage[] = [
     {
-      id: 'msg-67012-1',
-      thread_id: 'thd-67012-homeroom',
-      sender_type: 'PARENT',
-      sender_name: 'นางศิริพร รัตนโชติ (คุณแม่)',
-      body_th: 'สวัสดีค่ะครูแนน เมื่อคืนน้องพราวนอนเต็มอิ่ม 10 ชม. เช้านี้ทานโจ๊กหมูมาเรียบร้อยค่ะ ฝากครูแนนระวังเมนูกุ้งเหมือนเดิมนะคะ',
-      body_en: 'Good morning Teacher Nan. Proud slept 10 hours last night and had pork porridge. Please continue avoiding shrimp.',
+      id: "msg-10103-1",
+      thread_id: "thd-10103-homeroom",
+      sender_type: "STAFF",
+      sender_name: "ครูประจำชั้น ป.3/1",
+      body_th: "สวัสดีค่ะคุณพ่อ วันนี้น้องมีฟาตั้งใจเรียนและช่วยเพื่อนในกลุ่มดีมากค่ะ มีการบ้านคณิตศาสตร์หน้า 24 ส่งวันพรุ่งนี้ค่ะ",
+      body_en: "Hello Khun Sakchai, Mifa did great in class today. Math homework p.24 due tomorrow.",
       require_acknowledgement: false,
-      acknowledged_at: `${todayStr}T00:50:00.000Z`,
-      created_at: `${todayStr}T00:16:00.000Z`,
+      acknowledged_at: `${todayStr}T07:15:00.000Z`,
+      created_at: `${todayStr}T07:15:00.000Z`,
     },
     {
-      id: 'msg-67012-2',
-      thread_id: 'thd-67012-homeroom',
-      sender_type: 'STAFF',
-      sender_name: 'ครูนภัสสร ใจดี (ครูแนน)',
-      body_th: 'สวัสดีค่ะคุณแม่ ครูแนนรับทราบและแยกถาดอาหารปลอดกุ้งให้น้องพราวเรียบร้อยค่ะ วันนี้น้องพราวทานข้าวต้มปลามื้อเที่ยงหมดถาดเลยค่ะ และวันนี้ครูแนบรายงานสมุดพกอนุบาลและภาพกิจกรรมพิมพ์ใบไม้ของน้องพราวให้แล้วนะคะ',
-      body_en: 'Received with thanks! Proud finished her entire fish porridge tray at lunch today and enjoyed the leaf printing art activity.',
-      require_acknowledgement: true,
+      id: "msg-10264-1",
+      thread_id: "thd-10264-homeroom",
+      sender_type: "STAFF",
+      sender_name: "ครูนภัสสร ภักคีรี",
+      body_th: "สวัสดีค่ะ วันนี้น้องโนอาห์ร่วมกิจกรรมปั้นแป้งโดว์อย่างมีความสุขและร่าเริงมากค่ะ",
+      body_en: "Noah was cheerful and really enjoyed the playdough activity today.",
+      require_acknowledgement: false,
       acknowledged_at: null,
-      created_at: `${todayStr}T07:32:00.000Z`,
-    },
-    {
-      id: 'msg-64008-1',
-      thread_id: 'thd-64008-homeroom',
-      sender_type: 'STAFF',
-      sender_name: 'ครูธนกฤต สุวรรณภูมิ (ครูต้น)',
-      body_th: 'เรียนคุณแม่ศิริพรครับ น้องกัปตันส่งงานแผนผังวิทยาศาสตร์เรียบร้อย ได้ 9.5/10 คะแนนครับคุณแม่ ส่วนแบบฝึกหัดคณิตศาสตร์ 4.3 กำหนดส่งวันพุธที่ 22 ต.ค. ครับ',
-      body_en: 'Dear Khun Siriporn, Captain submitted his Science Mind Map and scored 9.5/10. Math Ex 4.3 is due Wednesday Oct 22.',
-      require_acknowledgement: false,
-      acknowledged_at: `${todayStr}T07:00:00.000Z`,
-      created_at: `${todayStr}T06:45:00.000Z`,
+      created_at: `${todayStr}T07:30:00.000Z`,
     },
   ];
 
   const fee_invoices: ParentFeeInvoiceItem[] = [
     {
-      id: 'fee-67012-2569-2',
-      student_id: '67012',
-      title_th: 'ค่าธรรมเนียมการศึกษาและกิจกรรมพัฒนาผู้เรียน ระดับอนุบาล 2 (ภาคเรียนที่ 2/2569)',
-      title_en: 'Kindergarten 2 Tuition & Enrichment Fee (Semester 2/2026)',
-      term_label: 'ภาคเรียนที่ 2/2569',
-      amount: 8500,
-      due_date: '2026-11-05',
-      status: 'unpaid',
-      receipt_number: null,
-      paid_at: null,
-      payment_method: null,
+      id: "fee-10103-2569-1",
+      student_id: "10103",
+      title_th: "ค่าธรรมเนียมการศึกษา ภาคเรียนที่ 1/2569 (ชั้นประถมศึกษาปีที่ 3)",
+      title_en: "Primary 3 Tuition & Educational Services (Term 1/2026)",
+      term_label: "ภาคเรียนที่ 1/2569",
+      amount: 12500,
+      due_date: "2026-06-15",
+      status: "paid",
+      receipt_number: "REC-2569-10103",
+      paid_at: "2026-05-12T10:24:00.000Z",
+      payment_method: "QR PromptPay",
     },
     {
-      id: 'fee-67012-2569-1',
-      student_id: '67012',
-      title_th: 'ค่าธรรมเนียมการศึกษาและอาหารเสริม ระดับอนุบาล 2 (ภาคเรียนที่ 1/2569)',
-      title_en: 'Kindergarten 2 Tuition & Nutrition Fee (Semester 1/2026)',
-      term_label: 'ภาคเรียนที่ 1/2569',
-      amount: 8500,
-      due_date: '2026-05-15',
-      status: 'paid',
-      receipt_number: 'REC-2569-00142',
-      paid_at: '2026-05-12T10:24:00.000Z',
-      payment_method: 'QR PromptPay',
-    },
-    {
-      id: 'fee-64008-2569-2',
-      student_id: '64008',
-      title_th: 'ค่าธรรมเนียมห้องเรียนเสริมทักษะคอมพิวเตอร์และภาษาอังกฤษ ป.4 (ภาคเรียนที่ 2/2569)',
-      title_en: 'Primary 4 English & Coding Enrichment Fee (Semester 2/2026)',
-      term_label: 'ภาคเรียนที่ 2/2569',
-      amount: 6200,
-      due_date: '2026-11-05',
-      status: 'unpaid',
-      receipt_number: null,
-      paid_at: null,
-      payment_method: null,
-    },
-    {
-      id: 'fee-64008-2569-1',
-      student_id: '64008',
-      title_th: 'ค่าธรรมเนียมห้องเรียนเสริมทักษะคอมพิวเตอร์และภาษาอังกฤษ ป.4 (ภาคเรียนที่ 1/2569)',
-      title_en: 'Primary 4 English & Coding Enrichment Fee (Semester 1/2026)',
-      term_label: 'ภาคเรียนที่ 1/2569',
-      amount: 6200,
-      due_date: '2026-05-15',
-      status: 'paid',
-      receipt_number: 'REC-2569-00143',
-      paid_at: '2026-05-12T10:26:00.000Z',
-      payment_method: 'QR PromptPay',
+      id: "fee-9775-2569-1",
+      student_id: "9775",
+      title_th: "ค่าธรรมเนียมการศึกษา ภาคเรียนที่ 1/2569 (ชั้นประถมศึกษาปีที่ 6)",
+      title_en: "Primary 6 Tuition & Educational Services (Term 1/2026)",
+      term_label: "ภาคเรียนที่ 1/2569",
+      amount: 12500,
+      due_date: "2026-06-15",
+      status: "paid",
+      receipt_number: "REC-2569-09775",
+      paid_at: "2026-05-12T10:26:00.000Z",
+      payment_method: "QR PromptPay",
     },
   ];
 
   const free15y_subsidies: Free15YSubsidyItem[] = [
     {
-      id: 'sub-67012-uniform',
-      student_id: '67012',
-      academic_year: '2569',
-      semester: '1/2569',
-      category_th: 'ค่าเครื่องแบบนักเรียน (โครงการเรียนฟรี 15 ปี อย่างมีคุณภาพ สช.)',
-      category_en: '15-Year Free Education Subsidy: Student Uniforms',
-      amount: 325,
-      parent_signed: true,
-      signed_by_name: 'นางศิริพร รัตนโชติ',
-      signed_at: '2026-06-10T09:15:00.000Z',
-      receipt_code: 'OPEC-15Y-67012-U',
-    },
-    {
-      id: 'sub-67012-supply',
-      student_id: '67012',
-      academic_year: '2569',
-      semester: '2/2569',
-      category_th: 'ค่าอุปกรณ์การเรียน ภาคเรียนที่ 2/2569 (โครงการเรียนฟรี 15 ปี สช.)',
-      category_en: '15-Year Free Education Subsidy: Learning Supplies (Term 2)',
-      amount: 100,
-      parent_signed: false,
-      signed_by_name: null,
-      signed_at: null,
-      receipt_code: 'OPEC-15Y-67012-S2',
-    },
-    {
-      id: 'sub-64008-uniform',
-      student_id: '64008',
-      academic_year: '2569',
-      semester: '1/2569',
-      category_th: 'ค่าเครื่องแบบนักเรียน ระดับประถมศึกษา (โครงการเรียนฟรี 15 ปี สช.)',
-      category_en: '15-Year Free Education Subsidy: Primary Student Uniforms',
+      id: "sub-10103-uniform",
+      student_id: "10103",
+      academic_year: "2569",
+      semester: "1/2569",
+      category_th: "ค่าเครื่องแบบนักเรียน ระดับประถมศึกษา (โครงการเรียนฟรี 15 ปี สช.)",
+      category_en: "15-Year Free Education Subsidy: Primary Student Uniforms",
       amount: 400,
       parent_signed: true,
-      signed_by_name: 'นางศิริพร รัตนโชติ',
-      signed_at: '2026-06-10T09:16:00.000Z',
-      receipt_code: 'OPEC-15Y-64008-U',
+      signed_by_name: "นายศักดิ์ชัย อุ่นอบ",
+      signed_at: "2026-06-10T09:15:00.000Z",
+      receipt_code: "OPEC-15Y-10103-U",
     },
     {
-      id: 'sub-64008-supply',
-      student_id: '64008',
-      academic_year: '2569',
-      semester: '2/2569',
-      category_th: 'ค่าอุปกรณ์การเรียน ระดับประถมศึกษา ภาคเรียนที่ 2/2569 (โครงการเรียนฟรี 15 ปี สช.)',
-      category_en: '15-Year Free Education Subsidy: Primary Learning Supplies (Term 2)',
-      amount: 210,
-      parent_signed: false,
-      signed_by_name: null,
-      signed_at: null,
-      receipt_code: 'OPEC-15Y-64008-S2',
+      id: "sub-9775-uniform",
+      student_id: "9775",
+      academic_year: "2569",
+      semester: "1/2569",
+      category_th: "ค่าเครื่องแบบนักเรียน ระดับประถมศึกษา (โครงการเรียนฟรี 15 ปี สช.)",
+      category_en: "15-Year Free Education Subsidy: Primary Student Uniforms",
+      amount: 400,
+      parent_signed: true,
+      signed_by_name: "นายศักดิ์ชัย อุ่นอบ",
+      signed_at: "2026-06-10T09:16:00.000Z",
+      receipt_code: "OPEC-15Y-09775-U",
     },
   ];
 
   const early_years_milestones: DevelopmentalMilestoneItem[] = [
     {
-      id: 'ms-67012-1',
-      student_id: '67012',
-      domain: 'PHYSICAL',
-      domain_th: 'พัฒนาการด้านร่างกาย',
-      domain_en: 'Physical & Motor Development',
-      indicator_th: 'ใช้กรรไกรตัดกระดาษตามแนวเส้นตรงและร้อยลูกปัดขนาดกลางได้อย่างคล่องแคล่ว',
-      indicator_en: 'Uses scissors along lines and threads medium beads with steady hand-eye coordination',
+      id: "ms-10264-1",
+      student_id: "10264",
+      domain: "PHYSICAL",
+      domain_th: "พัฒนาการด้านร่างกาย",
+      domain_en: "Physical & Motor Development",
+      indicator_th: "การทรงตัวและการใช้กล้ามเนื้อมัดเล็ก-มัดใหญ่ในการปฏิบัติกิจกรรม",
+      indicator_en: "Gross and fine motor skills coordination",
       rating: 3,
-      teacher_comment: 'กล้ามเนื้อมัดเล็กและมัดใหญ่แข็งแรง ทรงตัวเดินบนเส้นตรงได้ดีมากค่ะ',
-      evaluated_at: '2026-10-15',
+      teacher_comment: "กล้ามเนื้อมือแข็งแรง หยิบจับอุปกรณ์และทรงตัวได้มั่นคงตามวัย",
+      evaluated_at: todayStr,
     },
     {
-      id: 'ms-67012-2',
-      student_id: '67012',
-      domain: 'EMOTIONAL_SOCIAL',
-      domain_th: 'พัฒนาการด้านอารมณ์ จิตใจ และสังคม',
-      domain_en: 'Emotional & Social Development',
-      indicator_th: 'เล่นและทำกิจกรรมร่วมกับเพื่อนเป็นกลุ่ม รู้จักการรอคอยตามลำดับและแบ่งปันของเล่น',
-      indicator_en: 'Plays cooperatively in groups, waits for turns, and shares classroom materials willingly',
+      id: "ms-10264-2",
+      student_id: "10264",
+      domain: "EMOTIONAL_SOCIAL",
+      domain_th: "พัฒนาการด้านอารมณ์ จิตใจ และสังคม",
+      domain_en: "Emotional & Social Development",
+      indicator_th: "การปฏิบัติตามข้อตกลงร่วมกันและการแบ่งปันของเล่นกับเพื่อน",
+      indicator_en: "Social interaction and sharing with peers",
       rating: 3,
-      teacher_comment: 'น้องพราวมีน้ำใจ ชอบช่วยเหลือเพื่อนในห้องและเก็บของเข้าที่ทุกครั้งค่ะ',
-      evaluated_at: '2026-10-15',
-    },
-    {
-      id: 'ms-67012-3',
-      student_id: '67012',
-      domain: 'INTELLECTUAL',
-      domain_th: 'พัฒนาการด้านสติปัญญา',
-      domain_en: 'Cognitive & Intellectual Development',
-      indicator_th: 'จำแนกสิ่งของตามรูปร่าง สี ขนาด และนับจำนวนสิ่งของ 1-10 พร้อมบอกค่าจำนวนได้ถูกต้อง',
-      indicator_en: 'Classifies objects by shape, color, and size; counts 1-10 accurately',
-      rating: 3,
-      teacher_comment: 'ช่างสังเกตและตั้งคำถามเกี่ยวกับธรรมชาติรอบตัวได้ดีมากค่ะ',
-      evaluated_at: '2026-10-15',
-    },
-    {
-      id: 'ms-67012-4',
-      student_id: '67012',
-      domain: 'LANGUAGE',
-      domain_th: 'พัฒนาการด้านภาษาและการสื่อสาร',
-      domain_en: 'Language & Communication',
-      indicator_th: 'เล่านิทานหรือเหตุการณ์สั้นๆ ด้วยประโยคต่อเนื่องและออกเสียงพยัญชนะชัดเจน',
-      indicator_en: 'Retells short stories in complete sentences and communicates needs clearly',
-      rating: 3,
-      teacher_comment: 'กล้าแสดงออกในการเล่าเรื่องหน้าชั้นเรียนด้วยน้ำเสียงสดใสค่ะ',
-      evaluated_at: '2026-10-15',
+      teacher_comment: "มีน้ำใจ ปรับตัวเข้ากับกลุ่มเพื่อนได้ดีและแสดงออกอย่างเหมาะสม",
+      evaluated_at: todayStr,
     },
   ];
 
   const primary_grades: Record<string, SubjectGradeSummaryItem[]> = {
-    '64008': [
+    "10103": [
       {
-        subject_code: 'ท14101',
-        subject_name_th: 'ภาษาไทย',
-        subject_name_en: 'Thai Language',
-        teacher_name: 'ครูวันเพ็ญ ศรีสวัสดิ์',
-        accumulated_score: 44,
-        max_accumulated: 50,
-        midterm_score: 18,
-        max_midterm: 20,
-        final_score: 26,
-        max_final: 30,
-        total_score: 88,
-        grade_label: '4.0',
-      },
-      {
-        subject_code: 'ค14101',
-        subject_name_th: 'คณิตศาสตร์',
-        subject_name_en: 'Mathematics',
-        teacher_name: 'ครูธนกฤต สุวรรณภูมิ',
-        accumulated_score: 43,
-        max_accumulated: 50,
-        midterm_score: 17,
-        max_midterm: 20,
-        final_score: 25,
-        max_final: 30,
-        total_score: 85,
-        grade_label: '4.0',
-      },
-      {
-        subject_code: 'ว14101',
-        subject_name_th: 'วิทยาศาสตร์และเทคโนโลยี',
-        subject_name_en: 'Science & Technology',
-        teacher_name: 'ครูสุพัตรา วิริยะกุล',
-        accumulated_score: 45,
+        subject_code: "ท13101",
+        subject_name_th: "ภาษาไทยพื้นฐาน",
+        subject_name_en: "Fundamental Thai Language",
+        teacher_name: "ครูประจำชั้น ป.3/1",
+        accumulated_score: 46,
         max_accumulated: 50,
         midterm_score: 18,
         max_midterm: 20,
         final_score: 27,
         max_final: 30,
-        total_score: 90,
-        grade_label: '4.0',
+        total_score: 91,
+        grade_label: "4.0",
       },
       {
-        subject_code: 'ส14101',
-        subject_name_th: 'สังคมศึกษา ศาสนา และวัฒนธรรม',
-        subject_name_en: 'Social Studies',
-        teacher_name: 'ครูพงศกร เจริญสุข',
-        accumulated_score: 40,
-        max_accumulated: 50,
-        midterm_score: 16,
-        max_midterm: 20,
-        final_score: 23,
-        max_final: 30,
-        total_score: 79,
-        grade_label: '3.5',
-      },
-      {
-        subject_code: 'อ14101',
-        subject_name_th: 'ภาษาอังกฤษพื้นฐาน',
-        subject_name_en: 'Fundamental English',
-        teacher_name: 'Teacher Michael & ครูอารยา',
-        accumulated_score: 42,
+        subject_code: "ค13101",
+        subject_name_th: "คณิตศาสตร์พื้นฐาน",
+        subject_name_en: "Fundamental Mathematics",
+        teacher_name: "ครูประจำชั้น ป.3/1",
+        accumulated_score: 44,
         max_accumulated: 50,
         midterm_score: 17,
         max_midterm: 20,
-        final_score: 24,
+        final_score: 26,
         max_final: 30,
-        total_score: 83,
-        grade_label: '4.0',
+        total_score: 87,
+        grade_label: "4.0",
       },
     ],
   };
 
-  const domain_events: SystemDomainEvent[] = [
-    {
-      id: 'evt-001',
-      event_type: 'DAILY_CARE_PUBLISHED',
-      student_id: '67012',
-      student_name: 'ด.ญ.พิมพ์ชนก รัตนโชติ (น้องพราว)',
-      severity: 'NORMAL',
-      title_th: 'ครูประจำชั้นอัปเดตสมุดพกอนุบาลประจำวัน (Daily Care)',
-      title_en: 'Early Years Daily Care Published',
-      body_th: 'น้องพราวทานอาหารกลางวันหมดถาด นอนหลับสนิท 12:30-14:15 น. และร่วมกิจกรรมพิมพ์ภาพใบไม้',
-      body_en: 'Proud finished her lunch, napped soundly 12:30-14:15, and completed the leaf printing activity.',
-      actor_role: 'STAFF',
-      actor_name: 'ครูนภัสสร ใจดี (ครูแนน)',
-      created_at: `${todayStr}T07:30:00.000Z`,
-    },
-    {
-      id: 'evt-002',
-      event_type: 'MEDICATION_ADMINISTERED',
-      student_id: '64008',
-      student_name: 'ด.ช.กิตติภพ รัตนโชติ (น้องกัปตัน)',
-      severity: 'HIGH',
-      title_th: 'ห้องพยาบาลป้อนยาตามคำร้องผู้ปกครองเรียบร้อยแล้ว',
-      title_en: 'Infirmary Administered Requested Medication',
-      body_th: 'ครูพยาบาลป้อนยา Cetirizine Syrup 1 ช้อนชา หลังอาหารกลางวันให้น้องกัปตัน อุณหภูมิ 36.6°C ปกติ',
-      body_en: 'Nurse administered 5ml Cetirizine Syrup after lunch. Temp 36.6°C normal.',
-      actor_role: 'STAFF',
-      actor_name: 'ครูพยาบาลวิชาชีพ พรทิพย์ สุขสวัสดิ์',
-      created_at: `${todayStr}T05:35:00.000Z`,
-    },
-    {
-      id: 'evt-003',
-      event_type: 'INCIDENT_REPORTED',
-      student_id: '64008',
-      student_name: 'ด.ช.กิตติภพ รัตนโชติ (น้องกัปตัน)',
-      severity: 'HIGH',
-      title_th: 'แจ้งการปฐมพยาบาลเบื้องต้นจากห้องพยาบาล (รอผู้ปกครองรับทราบ)',
-      title_en: 'Infirmary First-Aid Notification (Awaiting Parent Ack)',
-      body_th: 'น้องกัปตันมีแผลถลอกตื้นที่หัวเข่าขวาจากการวิ่งเล่น ล้างแผลและปิดพลาสเตอร์เรียบร้อยแล้ว',
-      body_en: 'Minor right knee scrape treated with saline and waterproof bandage.',
-      actor_role: 'STAFF',
-      actor_name: 'ครูพยาบาลวิชาชีพ พรทิพย์ สุขสวัสดิ์',
-      created_at: `${todayStr}T03:30:00.000Z`,
-    },
-  ];
-
   return {
-    version: 1,
+    version: 2,
     guardian,
     children,
     links,
     invitations,
     consents,
     attendance_logs,
-    leave_requests,
+    leave_requests: [],
     pickup_plans,
-    early_years_care,
-    dropoff_notes,
-    medication_requests,
-    incidents,
-    assignments,
+    early_years_care: [],
+    dropoff_notes: [],
+    medication_requests: [],
+    incidents: [],
+    assignments: [],
     threads,
     messages,
-    domain_events,
+    domain_events: [],
     fee_invoices,
     free15y_subsidies,
     early_years_milestones,
@@ -1153,18 +840,26 @@ export function createInitialPipelineState(): BidirectionalPipelineState {
 let serverMemoryState: BidirectionalPipelineState | null = null;
 
 export function getPipelineState(): BidirectionalPipelineState {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     if (!serverMemoryState) {
       serverMemoryState = createInitialPipelineState();
     }
     return serverMemoryState;
   }
 
+  // Trigger background sync to load all 151 students from Supabase
+  initRealClientPipelineSync();
+
   try {
+    if (window.localStorage.getItem("sv_bidirectional_pipeline_v1")) {
+      window.localStorage.removeItem("sv_bidirectional_pipeline_v1");
+    }
+
     const raw = window.localStorage.getItem(PIPELINE_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as BidirectionalPipelineState;
-      if (parsed && parsed.version === 1 && Array.isArray(parsed.children)) {
+      const hasMock = parsed?.children?.some((c) => c.id === "67012" || c.id === "64008");
+      if (parsed && parsed.version === 2 && Array.isArray(parsed.children) && !hasMock) {
         return parsed;
       }
     }
@@ -1179,7 +874,7 @@ export function getPipelineState(): BidirectionalPipelineState {
 
 export function savePipelineState(nextState: BidirectionalPipelineState): BidirectionalPipelineState {
   serverMemoryState = nextState;
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     try {
       window.localStorage.setItem(PIPELINE_STORAGE_KEY, JSON.stringify(nextState));
       window.dispatchEvent(new CustomEvent(PIPELINE_EVENT_NAME, { detail: nextState }));
@@ -1200,23 +895,20 @@ export function resetPipelineState(): BidirectionalPipelineState {
 // ----------------------------------------------------------------------------
 function prependDomainEvent(
   state: BidirectionalPipelineState,
-  event: Omit<SystemDomainEvent, 'id' | 'created_at'>
+  event: Omit<SystemDomainEvent, "id" | "created_at">
 ): void {
   const newEvt: SystemDomainEvent = {
     ...event,
     id: `evt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     created_at: new Date().toISOString(),
   };
-  state.domain_events = [newEvt, ...state.domain_events].slice(0, 50);
+  state.domain_events = [newEvt, ...(state.domain_events || [])].slice(0, 50);
 }
 
 // ----------------------------------------------------------------------------
 // Bidirectional Mutation Actions (Parent <-> Staff Portal)
 // ----------------------------------------------------------------------------
 
-/**
- * 1. Parent submits a Leave Request -> Instantly visible in Teacher Attendance & Leave Queue
- */
 export function submitLeaveRequest(input: {
   student_id: string;
   leave_type: LeaveRequestType;
@@ -1232,7 +924,7 @@ export function submitLeaveRequest(input: {
     id: `lv-${Date.now()}`,
     student_id: input.student_id,
     student_name: child ? `${child.full_name} (${child.nickname})` : input.student_id,
-    grade_level: child?.grade || '-',
+    grade_level: child?.grade || "-",
     guardian_id: state.guardian.id,
     guardian_name: state.guardian.full_name,
     leave_type: input.leave_type,
@@ -1240,7 +932,7 @@ export function submitLeaveRequest(input: {
     end_date: input.end_date,
     reason: input.reason,
     attachment_url: null,
-    status: 'PENDING',
+    status: "PENDING",
     reviewed_by: null,
     reviewed_at: null,
     review_note: null,
@@ -1248,35 +940,33 @@ export function submitLeaveRequest(input: {
     updated_at: nowIso,
   };
 
-  state.leave_requests = [newReq, ...state.leave_requests];
+  state.leave_requests = [newReq, ...(state.leave_requests || [])];
 
   const typeLabel =
-    input.leave_type === 'SICK_LEAVE'
-      ? 'ลาป่วย'
-      : input.leave_type === 'PERSONAL_LEAVE'
-      ? 'ลากิจ'
-      : 'ขอรับกลับก่อนเวลา';
+    input.leave_type === "SICK_LEAVE"
+      ? "ลาป่วย"
+      : input.leave_type === "PERSONAL_LEAVE"
+      ? "ลากิจ"
+      : "ขอรับกลับก่อนเวลา";
 
   prependDomainEvent(state, {
-    event_type: 'LEAVE_SUBMITTED',
+    event_type: "LEAVE_SUBMITTED",
     student_id: input.student_id,
     student_name: newReq.student_name,
-    severity: 'HIGH',
+    severity: "HIGH",
     title_th: `ผู้ปกครองส่งใบ${typeLabel}ออนไลน์ (${newReq.student_name})`,
     title_en: `Parent Submitted ${input.leave_type} Request`,
     body_th: `วันที่ ${input.start_date} ถึง ${input.end_date}: ${input.reason}`,
     body_en: `Date ${input.start_date} to ${input.end_date}: ${input.reason}`,
-    actor_role: 'PARENT',
+    actor_role: "PARENT",
     actor_name: state.guardian.full_name,
   });
 
   savePipelineState(state);
+  syncToBackend("SUBMIT_LEAVE", newReq);
   return newReq;
 }
 
-/**
- * 2. Staff/Teacher approves or rejects a Leave Request -> Syncs to Attendance & notifies Parent
- */
 export function reviewLeaveRequest(input: {
   leave_id: string;
   status: LeaveRequestStatus;
@@ -1294,20 +984,19 @@ export function reviewLeaveRequest(input: {
     status: input.status,
     reviewed_by: input.reviewed_by,
     reviewed_at: nowIso,
-    review_note: input.review_note || (input.status === 'APPROVED' ? 'อนุมัติใบลาและซิงค์เข้าสมุดเช็กชื่อเรียบร้อย' : 'ไม่อนุมัติ'),
+    review_note: input.review_note || (input.status === "APPROVED" ? "อนุมัติใบลาและซิงค์เข้าสมุดเช็กชื่อเรียบร้อย" : "ไม่อนุมัติ"),
     updated_at: nowIso,
   };
   state.leave_requests[idx] = updated;
 
-  // If approved, also update today's attendance log if matching student
-  if (input.status === 'APPROVED') {
+  if (input.status === "APPROVED") {
     const attIdx = state.attendance_logs.findIndex((a) => a.student_id === updated.student_id);
     const mappedStatus: AttendanceStatus =
-      updated.leave_type === 'SICK_LEAVE'
-        ? 'SICK_LEAVE'
-        : updated.leave_type === 'EARLY_PICKUP'
-        ? 'EARLY_PICKUP'
-        : 'PERSONAL_LEAVE';
+      updated.leave_type === "SICK_LEAVE"
+        ? "SICK_LEAVE"
+        : updated.leave_type === "EARLY_PICKUP"
+        ? "EARLY_PICKUP"
+        : "PERSONAL_LEAVE";
 
     if (attIdx >= 0) {
       state.attendance_logs[attIdx] = {
@@ -1321,25 +1010,28 @@ export function reviewLeaveRequest(input: {
   }
 
   prependDomainEvent(state, {
-    event_type: 'LEAVE_REVIEWED',
+    event_type: "LEAVE_REVIEWED",
     student_id: updated.student_id,
     student_name: updated.student_name,
-    severity: 'NORMAL',
-    title_th: `ครูประจำชั้น${input.status === 'APPROVED' ? 'อนุมัติ' : 'ปฏิเสธ'}ใบลาของ ${updated.student_name}`,
+    severity: "NORMAL",
+    title_th: `ครูประจำชั้น${input.status === "APPROVED" ? "อนุมัติ" : "ปฏิเสธ"}ใบลาของ ${updated.student_name}`,
     title_en: `Leave Request ${input.status} by Homeroom Teacher`,
-    body_th: updated.review_note || '',
-    body_en: updated.review_note || '',
-    actor_role: 'STAFF',
+    body_th: updated.review_note || "",
+    body_en: updated.review_note || "",
+    actor_role: "STAFF",
     actor_name: input.reviewed_by,
   });
 
   savePipelineState(state);
+  syncToBackend("REVIEW_LEAVE", {
+    request_id: input.leave_id,
+    status: input.status,
+    review_note: input.review_note,
+    reviewed_by: input.reviewed_by,
+  });
   return updated;
 }
 
-/**
- * 3. Parent or Staff updates Daily Pickup Plan / Delegate OTP / Arrival Status
- */
 export function updatePickupDailyPlan(input: {
   student_id: string;
   transport_mode?: TransportMode;
@@ -1350,16 +1042,45 @@ export function updatePickupDailyPlan(input: {
   arrival_status?: PickupArrivalStatus;
   released_by_staff?: string | null;
   notes?: string;
-  actor_role?: 'PARENT' | 'STAFF';
+  actor_role?: "PARENT" | "STAFF";
   actor_name?: string;
 }): PickupDailyPlan | null {
   const state = getPipelineState();
-  const idx = state.pickup_plans.findIndex((p) => p.student_id === input.student_id);
-  if (idx === -1) return null;
-
+  const todayStr = new Date().toISOString().slice(0, 10);
   const nowIso = new Date().toISOString();
-  const current = state.pickup_plans[idx];
+  let idx = state.pickup_plans.findIndex((p) => p.student_id === input.student_id);
 
+  if (idx === -1) {
+    const child = state.children.find((c) => c.id === input.student_id);
+    const newPlan: PickupDailyPlan = {
+      id: `pk-${input.student_id}-${todayStr}`,
+      student_id: input.student_id,
+      student_name: child?.full_name || input.student_id,
+      nickname: child?.nickname || "",
+      grade_level: child?.grade || "",
+      plan_date: todayStr,
+      transport_mode: input.transport_mode || "PARENT_PICKUP",
+      collector_name: input.collector_name || state.guardian.full_name,
+      collector_relationship: input.collector_relationship || "ผู้ปกครอง",
+      collector_phone: input.collector_phone || state.guardian.phone_number,
+      collector_photo_url: null,
+      temp_otp_code: input.temp_otp_code || null,
+      arrival_status: input.arrival_status || "SCHEDULED",
+      arrived_at: input.arrival_status === "ARRIVED_AT_GATE" ? new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) + " น." : null,
+      released_at: input.arrival_status === "RELEASED" ? new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) + " น." : null,
+      released_by_staff: input.released_by_staff || null,
+      van_route_name: null,
+      van_plate_number: null,
+      van_status_text: null,
+      notes: input.notes || "",
+      created_at: nowIso,
+      updated_at: nowIso,
+    };
+    state.pickup_plans.push(newPlan);
+    idx = state.pickup_plans.length - 1;
+  }
+
+  const current = state.pickup_plans[idx];
   const nextStatus = input.arrival_status ?? current.arrival_status;
   const updated: PickupDailyPlan = {
     ...current,
@@ -1370,12 +1091,12 @@ export function updatePickupDailyPlan(input: {
     temp_otp_code: input.temp_otp_code !== undefined ? input.temp_otp_code : current.temp_otp_code,
     arrival_status: nextStatus,
     arrived_at:
-      nextStatus === 'ARRIVED_AT_GATE'
-        ? new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
+      nextStatus === "ARRIVED_AT_GATE"
+        ? new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) + " น."
         : current.arrived_at,
     released_at:
-      nextStatus === 'RELEASED'
-        ? new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
+      nextStatus === "RELEASED"
+        ? new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) + " น."
         : current.released_at,
     released_by_staff: input.released_by_staff ?? current.released_by_staff,
     notes: input.notes ?? current.notes,
@@ -1385,9 +1106,9 @@ export function updatePickupDailyPlan(input: {
   state.pickup_plans[idx] = updated;
 
   const statusTextMap: Record<PickupArrivalStatus, string> = {
-    SCHEDULED: 'ตั้งค่าแผนการรับกลับ',
-    ARRIVING_SOON: 'ผู้ปกครองกำลังเดินทางใกล้ถึงโรงเรียน (อีก 5 นาที)',
-    ARRIVED_AT_GATE: 'ผู้ปกครองถึงจุดรอรับหน้าประตูโรงเรียนแล้ว',
+    SCHEDULED: "ตั้งค่าแผนการรับกลับ",
+    ARRIVING_SOON: "ผู้ปกครองกำลังเดินทางใกล้ถึงโรงเรียน (อีก 5 นาที)",
+    ARRIVED_AT_GATE: "ผู้ปกครองถึงจุดรอรับหน้าประตูโรงเรียนแล้ว",
     RELEASED: `ส่งมอบนักเรียนให้ ${updated.collector_name} เรียบร้อยแล้ว`,
   };
 
@@ -1395,22 +1116,20 @@ export function updatePickupDailyPlan(input: {
     event_type: `PICKUP_${nextStatus}`,
     student_id: updated.student_id,
     student_name: `${updated.student_name} (${updated.nickname})`,
-    severity: nextStatus === 'ARRIVED_AT_GATE' || nextStatus === 'RELEASED' ? 'HIGH' : 'NORMAL',
+    severity: nextStatus === "ARRIVED_AT_GATE" || nextStatus === "RELEASED" ? "HIGH" : "NORMAL",
     title_th: `จุดรับ-ส่งนักเรียน: ${statusTextMap[nextStatus]}`,
     title_en: `Pickup Queue Update: ${nextStatus}`,
     body_th: `${updated.student_name} (${updated.grade_level}) • ผู้รับ: ${updated.collector_name}`,
     body_en: `${updated.student_name} (${updated.grade_level}) • Collector: ${updated.collector_name}`,
-    actor_role: input.actor_role || 'PARENT',
+    actor_role: input.actor_role || "PARENT",
     actor_name: input.actor_name || state.guardian.full_name,
   });
 
   savePipelineState(state);
+  syncToBackend("UPDATE_PICKUP_PLAN", updated);
   return updated;
 }
 
-/**
- * 4. Parent submits Morning Drop-off Note for Early Years -> Teacher sees it immediately
- */
 export function submitEarlyYearsDropoffNote(input: {
   student_id: string;
   sleep_hours: number;
@@ -1433,7 +1152,7 @@ export function submitEarlyYearsDropoffNote(input: {
     id: existingIdx >= 0 ? state.dropoff_notes[existingIdx].id : `drop-${Date.now()}`,
     student_id: input.student_id,
     student_name: child ? `${child.full_name} (${child.nickname})` : input.student_id,
-    grade_level: child?.grade || 'อ.2/1',
+    grade_level: child?.grade || "อ.1/1",
     note_date: todayStr,
     guardian_name: state.guardian.full_name,
     sleep_hours: input.sleep_hours,
@@ -1451,37 +1170,69 @@ export function submitEarlyYearsDropoffNote(input: {
   if (existingIdx >= 0) {
     state.dropoff_notes[existingIdx] = note;
   } else {
-    state.dropoff_notes = [note, ...state.dropoff_notes];
+    state.dropoff_notes = [note, ...(state.dropoff_notes || [])];
   }
 
   prependDomainEvent(state, {
-    event_type: 'EARLY_YEARS_DROPOFF_NOTE',
+    event_type: "EARLY_YEARS_DROPOFF_NOTE",
     student_id: input.student_id,
     student_name: note.student_name,
-    severity: 'NORMAL',
+    severity: "NORMAL",
     title_th: `ผู้ปกครองส่งบันทึกส่งน้องตอนเช้า (${note.student_name})`,
-    title_en: `Morning Drop-off Note Submitted`,
-    body_th: `นอน ${input.sleep_hours} ชม. • อาหารเช้า: ${input.ate_breakfast ? 'ทานแล้ว' : 'ยังไม่ได้ทาน'} • หมายเหตุ: ${input.special_note || '-'}`,
-    body_en: `Sleep ${input.sleep_hours}h • Breakfast: ${input.ate_breakfast ? 'Yes' : 'No'}`,
-    actor_role: 'PARENT',
+    title_en: "Morning Drop-off Note Submitted",
+    body_th: `นอน ${input.sleep_hours} ชม. • อาหารเช้า: ${input.ate_breakfast ? "ทานแล้ว" : "ยังไม่ได้ทาน"} • หมายเหตุ: ${input.special_note || "-"}`,
+    body_en: `Sleep ${input.sleep_hours}h • Breakfast: ${input.ate_breakfast ? "Yes" : "No"}`,
+    actor_role: "PARENT",
     actor_name: state.guardian.full_name,
   });
 
   savePipelineState(state);
+  syncToBackend("SUBMIT_DROPOFF_NOTE", note);
   return note;
 }
 
-/**
- * 5. Teacher saves/publishes Early Years Daily Care -> Parent sees it immediately in Daily Care Card
- */
 export function saveEarlyYearsDailyCare(
   updatedRecord: Partial<EarlyYearsDailyCare> & { student_id: string }
 ): EarlyYearsDailyCare | null {
   const state = getPipelineState();
-  const idx = state.early_years_care.findIndex((c) => c.student_id === updatedRecord.student_id);
-  if (idx === -1) return null;
-
+  const todayStr = new Date().toISOString().slice(0, 10);
   const nowIso = new Date().toISOString();
+  let idx = state.early_years_care.findIndex((c) => c.student_id === updatedRecord.student_id);
+
+  if (idx === -1) {
+    const child = state.children.find((c) => c.id === updatedRecord.student_id);
+    const newCare: EarlyYearsDailyCare = {
+      id: `eyc-${updatedRecord.student_id}-${todayStr}`,
+      student_name: child?.full_name || updatedRecord.student_id,
+      nickname: child?.nickname || "",
+      class_id: child?.classroom || "1",
+      care_date: todayStr,
+      morning_mood: updatedRecord.morning_mood || "CHEERFUL",
+      breakfast_status: updatedRecord.breakfast_status || "ALL",
+      lunch_status: updatedRecord.lunch_status || "ALL",
+      milk_morning: updatedRecord.milk_morning || "ALL",
+      milk_afternoon: updatedRecord.milk_afternoon || "ALL",
+      nap_start: updatedRecord.nap_start || "12:30",
+      nap_end: updatedRecord.nap_end || "14:15",
+      nap_quality: updatedRecord.nap_quality || "SOUND",
+      toilet_count: updatedRecord.toilet_count ?? 2,
+      diaper_count: updatedRecord.diaper_count ?? 0,
+      toilet_note: updatedRecord.toilet_note || null,
+      temperature_c: updatedRecord.temperature_c ?? 36.5,
+      learning_activity: updatedRecord.learning_activity || "กิจกรรมเสริมประสบการณ์และการเรียนรู้ตามวัย",
+      home_suggestion: updatedRecord.home_suggestion || "ชวนน้องพูดคุยทบทวนกิจกรรมประจำวัน",
+      teacher_note: updatedRecord.teacher_note || "น้องร่วมกิจกรรมอย่างมีความสุข",
+      photo_urls: updatedRecord.photo_urls || [],
+      is_published: true,
+      published_at: nowIso,
+      created_at: nowIso,
+      updated_at: nowIso,
+      ...updatedRecord,
+    };
+    state.early_years_care.push(newCare);
+    idx = state.early_years_care.length - 1;
+  }
+
   const next: EarlyYearsDailyCare = {
     ...state.early_years_care[idx],
     ...updatedRecord,
@@ -1493,25 +1244,23 @@ export function saveEarlyYearsDailyCare(
   state.early_years_care[idx] = next;
 
   prependDomainEvent(state, {
-    event_type: 'DAILY_CARE_PUBLISHED',
+    event_type: "DAILY_CARE_PUBLISHED",
     student_id: next.student_id,
     student_name: `${next.student_name} (${next.nickname})`,
-    severity: 'NORMAL',
+    severity: "NORMAL",
     title_th: `ครูประจำชั้นบันทึกสมุดพกอนุบาลประจำวัน (${next.nickname})`,
     title_en: `Early Years Daily Care Updated (${next.nickname})`,
     body_th: `มื้อเที่ยง: ${next.lunch_status} • นอนกลางวัน: ${next.nap_start}-${next.nap_end} • ${next.teacher_note}`,
     body_en: `Lunch: ${next.lunch_status} • Nap: ${next.nap_start}-${next.nap_end}`,
-    actor_role: 'STAFF',
-    actor_name: 'ครูนภัสสร ใจดี (ครูแนน)',
+    actor_role: "STAFF",
+    actor_name: "ครูนภัสสร ภักคีรี",
   });
 
   savePipelineState(state);
+  syncToBackend("SAVE_DAILY_CARE", next);
   return next;
 }
 
-/**
- * 6. Parent submits a Medication Administration Request -> Infirmary Queue
- */
 export function submitMedicationRequest(input: {
   student_id: string;
   medication_name: string;
@@ -1530,7 +1279,7 @@ export function submitMedicationRequest(input: {
     id: `med-${Date.now()}`,
     student_id: input.student_id,
     student_name: child ? `${child.full_name} (${child.nickname})` : input.student_id,
-    grade_level: child?.grade || '-',
+    grade_level: child?.grade || "-",
     guardian_name: state.guardian.full_name,
     medication_name: input.medication_name,
     dosage: input.dosage,
@@ -1540,7 +1289,7 @@ export function submitMedicationRequest(input: {
     end_date: input.end_date,
     reason: input.reason,
     signature_data_url: `SIGNED_BY_${state.guardian.full_name}`,
-    status: 'ACTIVE',
+    status: "ACTIVE",
     last_administered_at: null,
     last_administered_by: null,
     nurse_note: null,
@@ -1548,28 +1297,26 @@ export function submitMedicationRequest(input: {
     updated_at: nowIso,
   };
 
-  state.medication_requests = [med, ...state.medication_requests];
+  state.medication_requests = [med, ...(state.medication_requests || [])];
 
   prependDomainEvent(state, {
-    event_type: 'MEDICATION_REQUESTED',
+    event_type: "MEDICATION_REQUESTED",
     student_id: input.student_id,
     student_name: med.student_name,
-    severity: 'HIGH',
+    severity: "HIGH",
     title_th: `ผู้ปกครองส่งคำร้องฝากป้อนยา (${med.student_name})`,
-    title_en: `Parent Submitted Medication Administration Request`,
-    body_th: `ยา: ${input.medication_name} (${input.dosage}) เวลา ${input.schedule_times.join(', ')}`,
+    title_en: "Parent Submitted Medication Administration Request",
+    body_th: `ยา: ${input.medication_name} (${input.dosage}) เวลา ${input.schedule_times.join(", ")}`,
     body_en: `Medication: ${input.medication_name} (${input.dosage})`,
-    actor_role: 'PARENT',
+    actor_role: "PARENT",
     actor_name: state.guardian.full_name,
   });
 
   savePipelineState(state);
+  syncToBackend("SUBMIT_MEDICATION", med);
   return med;
 }
 
-/**
- * 7. Nurse administers Medication -> Updates Parent Health View immediately
- */
 export function recordMedicationAdministered(input: {
   medication_id: string;
   administered_by: string;
@@ -1582,7 +1329,7 @@ export function recordMedicationAdministered(input: {
   const nowIso = new Date().toISOString();
   const updated: MedicationRequest = {
     ...state.medication_requests[idx],
-    status: 'ADMINISTERED_TODAY',
+    status: "ADMINISTERED_TODAY",
     last_administered_at: nowIso,
     last_administered_by: input.administered_by,
     nurse_note: input.nurse_note,
@@ -1592,25 +1339,27 @@ export function recordMedicationAdministered(input: {
   state.medication_requests[idx] = updated;
 
   prependDomainEvent(state, {
-    event_type: 'MEDICATION_ADMINISTERED',
+    event_type: "MEDICATION_ADMINISTERED",
     student_id: updated.student_id,
     student_name: updated.student_name,
-    severity: 'HIGH',
+    severity: "HIGH",
     title_th: `ห้องพยาบาลป้อนยา ${updated.medication_name} เรียบร้อยแล้ว`,
-    title_en: `Medication Administered by School Nurse`,
+    title_en: "Medication Administered by School Nurse",
     body_th: `${updated.student_name}: ${input.nurse_note}`,
     body_en: `${updated.student_name}: ${input.nurse_note}`,
-    actor_role: 'STAFF',
+    actor_role: "STAFF",
     actor_name: input.administered_by,
   });
 
   savePipelineState(state);
+  syncToBackend("ADMINISTER_MEDICATION", {
+    request_id: input.medication_id,
+    nurse_name: input.administered_by,
+    nurse_note: input.nurse_note,
+  });
   return updated;
 }
 
-/**
- * 8. Parent acknowledges an Infirmary Incident Report
- */
 export function acknowledgeStudentIncident(incidentId: string): StudentIncident | null {
   const state = getPipelineState();
   const idx = state.incidents.findIndex((inc) => inc.id === incidentId);
@@ -1628,15 +1377,15 @@ export function acknowledgeStudentIncident(incidentId: string): StudentIncident 
   state.incidents[idx] = updated;
 
   prependDomainEvent(state, {
-    event_type: 'INCIDENT_ACKNOWLEDGED',
+    event_type: "INCIDENT_ACKNOWLEDGED",
     student_id: updated.student_id,
     student_name: updated.student_name,
-    severity: 'NORMAL',
+    severity: "NORMAL",
     title_th: `ผู้ปกครองลงนามรับทราบรายงานการปฐมพยาบาล (${updated.student_name})`,
-    title_en: `Parent Acknowledged Infirmary Incident Report`,
+    title_en: "Parent Acknowledged Infirmary Incident Report",
     body_th: `รับทราบโดย ${state.guardian.full_name}`,
     body_en: `Acknowledged by ${state.guardian.full_name}`,
-    actor_role: 'PARENT',
+    actor_role: "PARENT",
     actor_name: state.guardian.full_name,
   });
 
@@ -1644,9 +1393,6 @@ export function acknowledgeStudentIncident(incidentId: string): StudentIncident 
   return updated;
 }
 
-/**
- * 9. Parent signs 15-Year Free Education Subsidy (OPEC / สช.) or Pays Tuition / Top-up Wallet
- */
 export function signFree15YSubsidyReceipt(subsidyId: string): Free15YSubsidyItem | null {
   const state = getPipelineState();
   const idx = state.free15y_subsidies.findIndex((s) => s.id === subsidyId);
@@ -1663,15 +1409,15 @@ export function signFree15YSubsidyReceipt(subsidyId: string): Free15YSubsidyItem
 
   const child = state.children.find((c) => c.id === updated.student_id);
   prependDomainEvent(state, {
-    event_type: 'FREE15Y_SUBSIDY_SIGNED',
+    event_type: "FREE15Y_SUBSIDY_SIGNED",
     student_id: updated.student_id,
     student_name: child ? `${child.full_name} (${child.nickname})` : updated.student_id,
-    severity: 'NORMAL',
+    severity: "NORMAL",
     title_th: `ผู้ปกครองลงนามรับเงินอุดหนุนเรียนฟรี 15 ปี (${updated.category_th})`,
-    title_en: `Parent Signed 15-Year Free Education Subsidy Receipt`,
+    title_en: "Parent Signed 15-Year Free Education Subsidy Receipt",
     body_th: `รหัสใบสำคัญ ${updated.receipt_code} จำนวน ${updated.amount.toLocaleString()} บาท`,
     body_en: `Receipt ${updated.receipt_code} for ${updated.amount.toLocaleString()} THB`,
-    actor_role: 'PARENT',
+    actor_role: "PARENT",
     actor_name: state.guardian.full_name,
   });
 
@@ -1696,19 +1442,20 @@ export function topupChildWalletFromParent(
   state.children[idx] = updated;
 
   prependDomainEvent(state, {
-    event_type: 'WALLET_TOPUP',
+    event_type: "WALLET_TOPUP",
     student_id: studentId,
     student_name: `${updated.full_name} (${updated.nickname})`,
-    severity: 'NORMAL',
+    severity: "NORMAL",
     title_th: `ผู้ปกครองเติมเงินกระเป๋าเงินดิจิทัล +${amount.toLocaleString()} บาท`,
     title_en: `Parent Topped Up Student Wallet +${amount.toLocaleString()} THB`,
     body_th: `ยอดคงเหลือใหม่ของ ${updated.nickname}: ${updated.wallet_balance.toLocaleString()} บาท`,
     body_en: `New balance for ${updated.nickname}: ${updated.wallet_balance.toLocaleString()} THB`,
-    actor_role: 'PARENT',
+    actor_role: "PARENT",
     actor_name: state.guardian.full_name,
   });
 
   savePipelineState(state);
+  syncToBackend("TOPUP_WALLET", { student_id: studentId, amount, payment_method: "PROMPTPAY" });
   return updated;
 }
 
@@ -1721,24 +1468,24 @@ export function payFeeInvoiceFromParent(invoiceId: string): ParentFeeInvoiceItem
   const receiptNo = `REC-2569-${String(Math.floor(10000 + Math.random() * 89999))}`;
   const updated: ParentFeeInvoiceItem = {
     ...state.fee_invoices[idx],
-    status: 'paid',
+    status: "paid",
     receipt_number: receiptNo,
     paid_at: nowIso,
-    payment_method: 'QR PromptPay (Parents Portal)',
+    payment_method: "QR PromptPay (Parents Portal)",
   };
   state.fee_invoices[idx] = updated;
 
   const child = state.children.find((c) => c.id === updated.student_id);
   prependDomainEvent(state, {
-    event_type: 'TUITION_PAID',
+    event_type: "TUITION_PAID",
     student_id: updated.student_id,
     student_name: child ? `${child.full_name} (${child.nickname})` : updated.student_id,
-    severity: 'HIGH',
+    severity: "HIGH",
     title_th: `ชำระค่าธรรมเนียมการศึกษาสำเร็จ (${receiptNo})`,
     title_en: `Tuition Fee Paid (${receiptNo})`,
     body_th: `${updated.title_th} ยอด ${updated.amount.toLocaleString()} บาท`,
     body_en: `${updated.title_en} (${updated.amount.toLocaleString()} THB)`,
-    actor_role: 'PARENT',
+    actor_role: "PARENT",
     actor_name: state.guardian.full_name,
   });
 
@@ -1746,12 +1493,9 @@ export function payFeeInvoiceFromParent(invoiceId: string): ParentFeeInvoiceItem
   return updated;
 }
 
-/**
- * 10. Parent or Staff sends a message in Parent-Teacher Thread
- */
 export function sendParentTeacherMessage(input: {
   thread_id: string;
-  sender_type: 'PARENT' | 'STAFF';
+  sender_type: "PARENT" | "STAFF";
   sender_name: string;
   body_th: string;
   require_acknowledgement?: boolean;
@@ -1775,25 +1519,23 @@ export function sendParentTeacherMessage(input: {
     created_at: nowIso,
   };
 
-  state.messages = [...state.messages, msg];
+  state.messages = [...(state.messages || []), msg];
   state.threads[thdIdx] = {
     ...thread,
     last_message_text: input.body_th,
     last_message_at: nowIso,
-    unread_staff_count:
-      input.sender_type === 'PARENT' ? thread.unread_staff_count + 1 : 0,
-    unread_parent_count:
-      input.sender_type === 'STAFF' ? thread.unread_parent_count + 1 : 0,
+    unread_staff_count: input.sender_type === "PARENT" ? thread.unread_staff_count + 1 : 0,
+    unread_parent_count: input.sender_type === "STAFF" ? thread.unread_parent_count + 1 : 0,
     updated_at: nowIso,
   };
 
   prependDomainEvent(state, {
-    event_type: 'MESSAGE_SENT',
+    event_type: "MESSAGE_SENT",
     student_id: thread.student_id,
     student_name: thread.student_name,
-    severity: 'NORMAL',
+    severity: "NORMAL",
     title_th:
-      input.sender_type === 'PARENT'
+      input.sender_type === "PARENT"
         ? `ข้อความใหม่จากผู้ปกครอง (${thread.student_name})`
         : `ข้อความใหม่จากครูประจำชั้น (${thread.teacher_name})`,
     title_en: `New Chat Message (${thread.student_name})`,
@@ -1804,12 +1546,17 @@ export function sendParentTeacherMessage(input: {
   });
 
   savePipelineState(state);
+  syncToBackend("SEND_MESSAGE", {
+    thread_id: input.thread_id,
+    sender_type: input.sender_type,
+    sender_name: input.sender_name,
+    body_th: input.body_th,
+    body_en: input.body_th,
+    require_acknowledgement: input.require_acknowledgement,
+  });
   return msg;
 }
 
-/**
- * 11. Parent toggles granular PDPA Consent -> Syncs to Staff PDPA & Media Filter
- */
 export function toggleStudentConsent(
   studentId: string,
   purposeCode: ConsentPurposeCode,
@@ -1832,29 +1579,31 @@ export function toggleStudentConsent(
 
   const child = state.children.find((c) => c.id === studentId);
   prependDomainEvent(state, {
-    event_type: isGranted ? 'CONSENT_GRANTED' : 'CONSENT_REVOKED',
+    event_type: isGranted ? "CONSENT_GRANTED" : "CONSENT_REVOKED",
     student_id: studentId,
     student_name: child ? `${child.full_name} (${child.nickname})` : studentId,
-    severity: isGranted ? 'NORMAL' : 'HIGH',
-    title_th: `ผู้ปกครอง${isGranted ? 'อนุญาต' : 'ถอนความยินยอม'} PDPA: ${updated.purpose_title_th}`,
-    title_en: `Parent ${isGranted ? 'Granted' : 'Revoked'} PDPA Consent: ${purposeCode}`,
+    severity: isGranted ? "NORMAL" : "HIGH",
+    title_th: `ผู้ปกครอง${isGranted ? "อนุญาต" : "ถอนความยินยอม"} PDPA: ${updated.purpose_title_th}`,
+    title_en: `Parent ${isGranted ? "Granted" : "Revoked"} PDPA Consent: ${purposeCode}`,
     body_th: `เวอร์ชันนโยบาย ${updated.policy_version} • มีผลทันทีในระบบกรองรูปภาพและกิจกรรมโรงเรียน`,
     body_en: `Policy ${updated.policy_version} updated immediately.`,
-    actor_role: 'PARENT',
+    actor_role: "PARENT",
     actor_name: state.guardian.full_name,
   });
 
   savePipelineState(state);
+  syncToBackend("TOGGLE_CONSENT", {
+    student_id: studentId,
+    purpose_code: purposeCode,
+    is_granted: isGranted,
+  });
   return updated;
 }
 
-/**
- * 12. Staff updates Guardian Permission Matrix or Legal Restriction
- */
 export function updateGuardianLinkPermissions(
   linkId: string,
   patch: Partial<GuardianStudentLink>,
-  staffName: string = 'ฝ่ายทะเบียนโรงเรียนสมคิดวิทยา'
+  staffName: string = "ฝ่ายทะเบียนโรงเรียนสมคิดวิทยา"
 ): GuardianStudentLink | null {
   const state = getPipelineState();
   const idx = state.links.findIndex((l) => l.id === linkId);
@@ -1868,7 +1617,6 @@ export function updateGuardianLinkPermissions(
   };
   state.links[idx] = updated;
 
-  // Also sync onto child profile permissions
   const childIdx = state.children.findIndex((c) => c.id === updated.student_id);
   if (childIdx >= 0) {
     state.children[childIdx] = {
@@ -1890,16 +1638,16 @@ export function updateGuardianLinkPermissions(
   }
 
   prependDomainEvent(state, {
-    event_type: 'GUARDIAN_PERMISSION_UPDATED',
+    event_type: "GUARDIAN_PERMISSION_UPDATED",
     student_id: updated.student_id,
-    severity: updated.has_legal_restriction ? 'CRITICAL' : 'NORMAL',
+    severity: updated.has_legal_restriction ? "CRITICAL" : "NORMAL",
     title_th: `อัปเดตสิทธิ์ผู้ปกครองรหัสนักเรียน ${updated.student_id}`,
     title_en: `Updated Guardian Access Matrix for Student ${updated.student_id}`,
     body_th: updated.has_legal_restriction
-      ? `เปิดใช้งานคำสั่งระงับสิทธิ์ตามกฎหมาย: ${updated.restriction_note || '-'}`
-      : `ปรับปรุงสิทธิ์ 10 ด้านของผู้ปกครองเรียบร้อยแล้ว`,
+      ? `เปิดใช้งานคำสั่งระงับสิทธิ์ตามกฎหมาย: ${updated.restriction_note || "-"}`
+      : "ปรับปรุงสิทธิ์ 10 ด้านของผู้ปกครองเรียบร้อยแล้ว",
     body_en: `Guardian permissions updated by ${staffName}`,
-    actor_role: 'STAFF',
+    actor_role: "STAFF",
     actor_name: staffName,
   });
 
@@ -1907,9 +1655,6 @@ export function updateGuardianLinkPermissions(
   return updated;
 }
 
-/**
- * 13. Staff generates a new Guardian Invitation Code
- */
 export function createGuardianInviteCode(input: {
   student_id: string;
   student_name: string;
@@ -1930,78 +1675,103 @@ export function createGuardianInviteCode(input: {
     student_name: input.student_name,
     grade_level: input.grade_level,
     invite_code: code,
-    expires_at: '2026-12-31T23:59:59.000Z',
+    expires_at: "2026-12-31T23:59:59.000Z",
     used_at: null,
-    created_by: 'ฝ่ายทะเบียนโรงเรียนสมคิดวิทยา',
+    created_by: "ฝ่ายทะเบียนโรงเรียนสมคิดวิทยา",
     created_at: nowIso,
   };
 
-  state.invitations = [inv, ...state.invitations];
+  state.invitations = [inv, ...(state.invitations || [])];
   savePipelineState(state);
   return inv;
 }
 
-/**
- * 14. Staff records or updates Student Attendance (NFC Gate / Teacher Batch / Van)
- */
 export function recordStudentAttendance(input: {
   student_id: string;
   status: AttendanceStatus;
   check_in_time?: string | null;
   check_out_time?: string | null;
-  source?: 'NFC_GATE' | 'TEACHER_APP' | 'VAN_SYNC' | 'DISMISSAL_KIOSK';
+  source?: "NFC_GATE" | "TEACHER_APP" | "VAN_SYNC" | "DISMISSAL_KIOSK";
   recorded_by?: string;
   notes?: string;
 }): StudentAttendanceLog | null {
   const state = getPipelineState();
-  const idx = state.attendance_logs.findIndex((a) => a.student_id === input.student_id);
+  const todayStr = new Date().toISOString().slice(0, 10);
   const nowIso = new Date().toISOString();
+  let idx = state.attendance_logs.findIndex((a) => a.student_id === input.student_id);
   const timeStr =
     input.check_in_time !== undefined
       ? input.check_in_time
-      : new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+      : new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
 
-  if (idx >= 0) {
-    const updated: StudentAttendanceLog = {
-      ...state.attendance_logs[idx],
+  if (idx === -1) {
+    const child = state.children.find((c) => c.id === input.student_id);
+    const newLog: StudentAttendanceLog = {
+      id: `att-${input.student_id}-${todayStr}`,
+      student_id: input.student_id,
+      student_name: child?.full_name || input.student_id,
+      nickname: child?.nickname || "",
+      grade_level: child?.grade || "",
+      attendance_date: todayStr,
+      period: "MORNING_HOMEROOM",
       status: input.status,
       check_in_time:
-        input.status === 'PRESENT' || input.status === 'LATE'
-          ? timeStr || state.attendance_logs[idx].check_in_time || '07:45'
+        input.status === "PRESENT" || input.status === "LATE"
+          ? timeStr || "07:45"
           : null,
-      check_out_time: input.check_out_time ?? state.attendance_logs[idx].check_out_time,
-      source: input.source || state.attendance_logs[idx].source,
-      recorded_by: input.recorded_by || state.attendance_logs[idx].recorded_by,
-      notes: input.notes !== undefined ? input.notes : state.attendance_logs[idx].notes,
+      check_out_time: input.check_out_time || null,
+      source: input.source || "TEACHER_APP",
+      recorded_by: input.recorded_by || "ระบบเช็กชื่อโรงเรียนสมคิดวิทยา",
+      notes: input.notes || null,
+      created_at: nowIso,
       updated_at: nowIso,
     };
-    state.attendance_logs[idx] = updated;
-
-    prependDomainEvent(state, {
-      event_type: 'ATTENDANCE_UPDATED',
-      student_id: updated.student_id,
-      student_name: `${updated.student_name} (${updated.nickname})`,
-      severity: input.status === 'ABSENT' ? 'CRITICAL' : 'NORMAL',
-      title_th: `อัปเดตสถานะการมาเรียน: ${updated.student_name} (${input.status})`,
-      title_en: `Attendance Updated: ${updated.student_name} (${input.status})`,
-      body_th: `เวลา: ${updated.check_in_time || '-'} • ช่องทาง: ${updated.source}`,
-      body_en: `Time: ${updated.check_in_time || '-'} • Source: ${updated.source}`,
-      actor_role: 'STAFF',
-      actor_name: input.recorded_by || 'ระบบเช็กชื่อโรงเรียนสมคิดวิทยา',
-    });
-
-    savePipelineState(state);
-    return updated;
+    state.attendance_logs.push(newLog);
+    idx = state.attendance_logs.length - 1;
   }
-  return null;
+
+  const updated: StudentAttendanceLog = {
+    ...state.attendance_logs[idx],
+    status: input.status,
+    check_in_time:
+      input.status === "PRESENT" || input.status === "LATE"
+        ? timeStr || state.attendance_logs[idx].check_in_time || "07:45"
+        : null,
+    check_out_time: input.check_out_time ?? state.attendance_logs[idx].check_out_time,
+    source: input.source || state.attendance_logs[idx].source,
+    recorded_by: input.recorded_by || state.attendance_logs[idx].recorded_by,
+    notes: input.notes !== undefined ? input.notes : state.attendance_logs[idx].notes,
+    updated_at: nowIso,
+  };
+  state.attendance_logs[idx] = updated;
+
+  prependDomainEvent(state, {
+    event_type: "ATTENDANCE_UPDATED",
+    student_id: updated.student_id,
+    student_name: `${updated.student_name} (${updated.nickname})`,
+    severity: input.status === "ABSENT" ? "CRITICAL" : "NORMAL",
+    title_th: `อัปเดตสถานะการมาเรียน: ${updated.student_name} (${input.status})`,
+    title_en: `Attendance Updated: ${updated.student_name} (${input.status})`,
+    body_th: `เวลา: ${updated.check_in_time || "-"} • ช่องทาง: ${updated.source}`,
+    body_en: `Time: ${updated.check_in_time || "-"} • Source: ${updated.source}`,
+    actor_role: "STAFF",
+    actor_name: input.recorded_by || "ระบบเช็กชื่อโรงเรียนสมคิดวิทยา",
+  });
+
+  savePipelineState(state);
+  syncToBackend("RECORD_ATTENDANCE", {
+    student_id: input.student_id,
+    status: input.status,
+    period: "MORNING_HOMEROOM",
+    source: input.source,
+    recorded_by: input.recorded_by,
+  });
+  return updated;
 }
 
-/**
- * 15. Teacher acknowledges Morning Drop-off Note from Parent
- */
 export function acknowledgeEarlyYearsDropoffNote(
   noteId: string,
-  teacherName: string = 'ครูนภัสสร ใจดี (ครูแนน)'
+  teacherName: string = "ครูนภัสสร ภักคีรี"
 ): EarlyYearsDropoffNote | null {
   const state = getPipelineState();
   const idx = state.dropoff_notes.findIndex((n) => n.id === noteId);
@@ -2017,25 +1787,26 @@ export function acknowledgeEarlyYearsDropoffNote(
   state.dropoff_notes[idx] = updated;
 
   prependDomainEvent(state, {
-    event_type: 'DROPOFF_NOTE_ACKNOWLEDGED',
+    event_type: "DROPOFF_NOTE_ACKNOWLEDGED",
     student_id: updated.student_id,
     student_name: updated.student_name,
-    severity: 'NORMAL',
+    severity: "NORMAL",
     title_th: `ครูประจำชั้นรับทราบบันทึกส่งน้องตอนเช้า (${updated.student_name})`,
-    title_en: `Homeroom Teacher Acknowledged Morning Drop-off Note`,
+    title_en: "Homeroom Teacher Acknowledged Morning Drop-off Note",
     body_th: `รับทราบโดย ${teacherName}`,
     body_en: `Acknowledged by ${teacherName}`,
-    actor_role: 'STAFF',
+    actor_role: "STAFF",
     actor_name: teacherName,
   });
 
   savePipelineState(state);
+  syncToBackend("ACKNOWLEDGE_DROPOFF_NOTE", {
+    note_id: noteId,
+    teacher_name: teacherName,
+  });
   return updated;
 }
 
-/**
- * 16. Teacher creates or updates Primary Academic Assignment -> Syncs to Parents Portal
- */
 export function createOrUpdateAssignment(input: {
   id?: string;
   class_id: string;
@@ -2048,7 +1819,7 @@ export function createOrUpdateAssignment(input: {
   max_score: number;
   assigned_by: string;
   student_id: string;
-  submission_status?: 'SUBMITTED' | 'PENDING' | 'LATE' | 'NEEDS_REVISION';
+  submission_status?: "SUBMITTED" | "PENDING" | "LATE" | "NEEDS_REVISION";
   score?: number | null;
   teacher_feedback?: string | null;
 }): AcademicAssignmentItem {
@@ -2068,7 +1839,7 @@ export function createOrUpdateAssignment(input: {
     max_score: input.max_score,
     assigned_by: input.assigned_by,
     student_id: input.student_id,
-    submission_status: input.submission_status || 'PENDING',
+    submission_status: input.submission_status || "PENDING",
     score: input.score ?? null,
     teacher_feedback: input.teacher_feedback ?? null,
     updated_at: nowIso,
@@ -2077,22 +1848,21 @@ export function createOrUpdateAssignment(input: {
   if (existingIdx >= 0) {
     state.assignments[existingIdx] = item;
   } else {
-    state.assignments = [item, ...state.assignments];
+    state.assignments = [item, ...(state.assignments || [])];
   }
 
   prependDomainEvent(state, {
-    event_type: 'ASSIGNMENT_UPDATED',
+    event_type: "ASSIGNMENT_UPDATED",
     student_id: item.student_id,
-    severity: 'NORMAL',
+    severity: "NORMAL",
     title_th: `อัปเดตการบ้าน/ชิ้นงานวิชา ${item.subject_name}`,
     title_en: `Assignment Updated: ${item.subject_name}`,
     body_th: `${item.title_th} (กำหนดส่ง ${item.due_date})`,
     body_en: `${item.title_en} (Due ${item.due_date})`,
-    actor_role: 'STAFF',
+    actor_role: "STAFF",
     actor_name: item.assigned_by,
   });
 
   savePipelineState(state);
   return item;
 }
-

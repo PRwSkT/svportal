@@ -40,7 +40,10 @@ import {
 export default function ParentCommunicationsPage() {
   const { isThai } = useLanguage();
   const [pipeline, setPipeline] = useState<BidirectionalPipelineState>(() => getPipelineState());
-  const [selectedThreadId, setSelectedThreadId] = useState<string>('thd-67012-homeroom');
+  const [selectedThreadId, setSelectedThreadId] = useState<string>(() => {
+    const s = getPipelineState();
+    return s.threads[0]?.id || 'thd-10103-homeroom';
+  });
   const [channelFilter, setChannelFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
