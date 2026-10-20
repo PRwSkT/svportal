@@ -68,8 +68,9 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
 
   // Host-based routing for Parents Portal subdomain (parents.portal.somkidvittaya.ac.th)
-  const hostname = (request.headers.get('host') || '').toLowerCase();
-  const isParentsSubdomain = hostname.startsWith('parents.portal.');
+  const rawHost = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
+  const hostname = rawHost.toLowerCase().split(':')[0];
+  const isParentsSubdomain = hostname.startsWith('parents.portal.') || hostname.startsWith('parents.');
 
   if (isParentsSubdomain) {
     if (request.nextUrl.pathname === '/manifest.json') {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -10,8 +10,20 @@ import { useAuth } from '@/contexts/AuthContext';
 export default function WelcomePage() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
+  const [parentsHref, setParentsHref] = useState('https://parents.portal.somkidvittaya.ac.th');
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const host = window.location.hostname.toLowerCase();
+      if (host.startsWith('parents.')) {
+        router.replace('/parents');
+        return;
+      }
+      if (host === 'localhost' || host === '127.0.0.1' || host.includes('.local')) {
+        setParentsHref('/parents');
+      }
+    }
+
     if (isLoading) return;
 
     if (user) {
@@ -66,15 +78,18 @@ export default function WelcomePage() {
         </div>
 
         <div className="space-y-3 relative z-10 flex flex-col items-center w-full">
-          {/* Parents Button */}
-          <button
-            type="button"
-            onClick={handleNotReady}
-            className="w-full flex flex-col items-center justify-center p-3 sm:p-3.5 rounded-2xl border border-foreground/10 bg-white/60 hover:bg-white/90 backdrop-blur-sm transition-all duration-300 group shadow-xs hover:shadow-md hover:-translate-y-0.5"
+          {/* Parents Button (Unlocked & Live for parents.portal.somkidvittaya.ac.th) */}
+          <Link
+            href={parentsHref}
+            className="w-full flex flex-col items-center justify-center p-3 sm:p-3.5 rounded-2xl border border-primary/20 bg-white/80 hover:bg-white backdrop-blur-sm transition-all duration-300 group shadow-xs hover:shadow-md hover:-translate-y-0.5 cursor-pointer ring-1 ring-primary/10 hover:ring-primary/30"
           >
-            <span className="text-lg sm:text-xl font-bold text-foreground group-hover:text-primary">ผู้ปกครอง</span>
-            <span className="text-xs font-medium text-foreground/50 group-hover:text-primary/70 mt-0.5">Parents • 家长</span>
-          </button>
+            <span className="text-lg sm:text-xl font-bold text-foreground group-hover:text-primary transition-colors">
+              ผู้ปกครอง
+            </span>
+            <span className="text-xs font-medium text-foreground/60 group-hover:text-primary/80 mt-0.5 transition-colors">
+              Parents • 家长
+            </span>
+          </Link>
 
           {/* Students Button */}
           <button
