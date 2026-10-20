@@ -144,9 +144,19 @@ export async function analyzeAndCleanseFormResponses(formId: string): Promise<Fo
 
   const fields = (form.fields || []) as any[];
   const fieldLabelMap: Record<string, string> = {};
+  const fieldOptionsMap: Record<string, any[]> = {};
   for (const f of fields) {
     const label = typeof f.label === 'object' ? f.label.th || f.label.en : f.label;
     fieldLabelMap[f.id] = label;
+    if (f.field_key) {
+      fieldLabelMap[f.field_key] = label;
+      if (Array.isArray(f.options)) {
+        fieldOptionsMap[f.field_key] = f.options;
+      }
+    }
+    if (Array.isArray(f.options)) {
+      fieldOptionsMap[f.id] = f.options;
+    }
   }
 
   // 2. Fetch all responses
@@ -238,7 +248,7 @@ export async function analyzeAndCleanseFormResponses(formId: string): Promise<Fo
         label.includes('เลขประจำตัวนักเรียน')
       ) {
         const valStr = typeof val === 'string' ? val.trim() : '';
-        const isInvalidId = !valStr || valStr.length > 6 || !/^\d{4,5}$/.test(valStr);
+        const isInvalidId = !valStr || valStr.length > 6 || !/^[A-Za-z]?\d{4,5}$/.test(valStr);
 
         if (isInvalidId && matchedStudent) {
           const correctId = matchedStudent.student_id || matchedStudent.id;
@@ -266,19 +276,21 @@ export async function analyzeAndCleanseFormResponses(formId: string): Promise<Fo
         // Find if there is a student id field in form definition
         const idField = fields.find(f => {
           const l = (typeof f.label === 'object' ? f.label.th || f.label.en : f.label) || '';
-          return l.includes('รหัสนักเรียน') || l.includes('เลขประจำตัวนักเรียน') || f.id.includes('student_id');
+          const fKey = f.field_key || f.id || '';
+          return l.includes('รหัสนักเรียน') || l.includes('เลขประจำตัวนักเรียน') || fKey.includes('student_id');
         });
-        if (idField && !cleanedAnswers[idField.id]) {
+        const targetIdKey = idField ? (idField.field_key || idField.id) : null;
+        if (targetIdKey && !cleanedAnswers[targetIdKey]) {
           const correctId = matchedStudent.student_id || matchedStudent.id;
           changes.push({
-            fieldKey: idField.id,
-            fieldLabel: fieldLabelMap[idField.id] || 'เลขประจำตัวนักเรียน',
+            fieldKey: targetIdKey,
+            fieldLabel: fieldLabelMap[targetIdKey] || 'เลขประจำตัวนักเรียน',
             oldValue: '(ว่าง)',
             newValue: correctId,
             reason: `ดึงรหัสนักเรียน (${correctId}) จากฐานข้อมูลมาใส่ในช่องรหัสนักเรียน`,
             source: 'database_enrichment',
           });
-          cleanedAnswers[idField.id] = correctId;
+          cleanedAnswers[targetIdKey] = correctId;
           studentIdsEnriched++;
         }
       }
@@ -312,8 +324,8 @@ export async function analyzeAndCleanseFormResponses(formId: string): Promise<Fo
         !label.includes('ชื่อเล่น') &&
         !lowerKey.includes('eng')
       ) {
-        // Remove duplicate spaces
-        const trimmed = val.replace(/\s+/g, ' ').trim();
+        // Remove duplicate spaces and zero-width spaces
+        const trimmed = val.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim();
         if (trimmed !== val) {
           changes.push({
             fieldKey: key,
@@ -340,9 +352,11 @@ export async function analyzeAndCleanseFormResponses(formId: string): Promise<Fo
           trimmedVal === 'ไม่แพ้' ||
           trimmedVal === 'ไม่มีค่ะ' ||
           trimmedVal === 'ไม่มีครับ' ||
+          trimmedVal === 'ยังไม่พบ' ||
           trimmedVal === 'ยังไม่พบว่าแพ้ยา' ||
           trimmedVal === 'ปกติ' ||
           trimmedVal === '-' ||
+          trimmedVal.toLowerCase() === 'none' ||
           trimmedVal === 'ไม่มีโรคประจำตัว';
 
         if (isNegative && trimmedVal !== 'ไม่มี') {
@@ -359,32 +373,54 @@ export async function analyzeAndCleanseFormResponses(formId: string): Promise<Fo
         }
       }
 
-      // 5. Classroom / Level Alignment
+      // 5. Classroom / Level Alignment (preserve actual classroom selected in form!)
       if (
         typeof val === 'string' &&
         (lowerKey.includes('level') || lowerKey.includes('grade') || lowerKey.includes('class') || label.includes('ระดับชั้น') || label.includes('ห้อง'))
       ) {
         const rawLevel = val.trim();
+        const opts = fieldOptionsMap[key] || [];
         let normalizedLevel = rawLevel;
-        // Standardize codes like p6_2 -> ป.6/2, kg1 -> อ.1, etc.
-        if (rawLevel === 'p6_2') normalizedLevel = 'ป.6/2';
-        else if (rawLevel === 'p6_1') normalizedLevel = 'ป.6/1';
-        else if (rawLevel === 'p5_1') normalizedLevel = 'ป.5/1';
-        else if (rawLevel === 'p5_2') normalizedLevel = 'ป.5/2';
-        else if (rawLevel === 'p4_1') normalizedLevel = 'ป.4/1';
-        else if (rawLevel === 'p3_1') normalizedLevel = 'ป.3/1';
-        else if (rawLevel === 'p2_1') normalizedLevel = 'ป.2/1';
-        else if (rawLevel === 'p1_1') normalizedLevel = 'ป.1/1';
-        else if (rawLevel === 'kg1') normalizedLevel = 'อ.1';
-        else if (rawLevel === 'kg2') normalizedLevel = 'อ.2';
-        else if (rawLevel === 'kg3') normalizedLevel = 'อ.3';
 
-        // Or align with matched student DB record
-        if (matchedStudent?.grade) {
-          const dbClass = matchedStudent.grade.includes('/')
-            ? matchedStudent.grade
-            : `${matchedStudent.grade}/${matchedStudent.classroom || '1'}`;
-          normalizedLevel = dbClass;
+        if (opts.length > 0) {
+          // If the form field defines select options, normalize text/DB grade to the form option value
+          const exactOpt = opts.find((o: any) => o.value === rawLevel);
+          if (!exactOpt) {
+            const labelMatch = opts.find(
+              (o: any) => o.label?.th === rawLevel || o.label?.en === rawLevel
+            );
+            if (labelMatch) {
+              normalizedLevel = labelMatch.value;
+            } else {
+              const dbToOptMap: Record<string, string> = {
+                'อ.1': 'kg1', 'อ.1/1': 'kg1',
+                'อ.2': 'kg2', 'อ.2/1': 'kg2',
+                'อ.3': 'kg3', 'อ.3/1': 'kg3',
+                'ป.1': 'p1', 'ป.1/1': 'p1',
+                'ป.2': 'p2', 'ป.2/1': 'p2',
+                'ป.3/1': 'p3_1', 'ป.3/2': 'p3_2',
+                'ป.4/1': 'p4_1', 'ป.4/2': 'p4_2',
+                'ป.5/1': 'p5_1', 'ป.5/2': 'p5_2',
+                'ป.6/1': 'p6_1', 'ป.6/2': 'p6_2',
+              };
+              if (dbToOptMap[rawLevel]) normalizedLevel = dbToOptMap[rawLevel];
+            }
+          }
+        } else {
+          // Map option code to DB grade format (keeping the form's room /1 or /2)
+          const optToDbMap: Record<string, string> = {
+            nursery: 'ต.อ.1/1',
+            kg1: 'อ.1/1',
+            kg2: 'อ.2/1',
+            kg3: 'อ.3/1',
+            p1: 'ป.1/1', p1_1: 'ป.1/1',
+            p2: 'ป.2/1', p2_1: 'ป.2/1',
+            p3_1: 'ป.3/1', p3_2: 'ป.3/2',
+            p4_1: 'ป.4/1', p4_2: 'ป.4/2',
+            p5_1: 'ป.5/1', p5_2: 'ป.5/2',
+            p6_1: 'ป.6/1', p6_2: 'ป.6/2',
+          };
+          if (optToDbMap[rawLevel]) normalizedLevel = optToDbMap[rawLevel];
         }
 
         if (normalizedLevel !== rawLevel) {
@@ -393,7 +429,7 @@ export async function analyzeAndCleanseFormResponses(formId: string): Promise<Fo
             fieldLabel: label,
             oldValue: rawLevel,
             newValue: normalizedLevel,
-            reason: `ปรับรหัสระดับชั้นให้อยู่ในฟอร์แมตมาตรฐานโรงเรียน (${normalizedLevel})`,
+            reason: `ปรับรหัสระดับชั้นให้อยู่ในฟอร์แมตมาตรฐาน (${normalizedLevel})`,
             source: 'normalization',
           });
           cleanedAnswers[key] = normalizedLevel;
@@ -401,27 +437,41 @@ export async function analyzeAndCleanseFormResponses(formId: string): Promise<Fo
         }
       }
 
-      // 6. Birth Date Format Normalization (Buddhist Era to CE)
+      // 6. Birth Date Format Normalization & Alignment with Original Student Database
       if (
         typeof val === 'string' &&
         (lowerKey.includes('dob') || lowerKey.includes('birth') || label.includes('วันเกิด') || label.includes('วัน เดือน ปี เกิด'))
       ) {
         const valStr = val.trim();
-        // Check if BE year like 2555-08-20 or 20/08/2555
-        const beYearMatch = valStr.match(/\b(25[0-9]{2})\b/);
-        if (beYearMatch) {
-          const beYear = parseInt(beYearMatch[1], 10);
-          const ceYear = beYear - 543;
-          const ceDateStr = valStr.replace(beYearMatch[1], ceYear.toString());
+        const dbDob = matchedStudent?.birth_date ? String(matchedStudent.birth_date).slice(0, 10) : '';
+
+        if (dbDob && dbDob !== valStr) {
           changes.push({
             fieldKey: key,
             fieldLabel: label,
             oldValue: valStr,
-            newValue: ceDateStr,
-            reason: `แปลงปี พ.ศ. (${beYear}) เป็น ค.ศ. (${ceYear}) ตามมาตรฐาน ISO`,
-            source: 'normalization',
+            newValue: dbDob,
+            reason: `อ้างอิงวันเดือนปีเกิดตามข้อมูลทะเบียนนักเรียนเดิม (${dbDob}) เพื่อป้องกันความคลาดเคลื่อนจากการกรอกของผู้ปกครอง`,
+            source: 'database_enrichment',
           });
-          cleanedAnswers[key] = ceDateStr;
+          cleanedAnswers[key] = dbDob;
+        } else {
+          // Check if BE year like 2555-08-20 or 20/08/2555
+          const beYearMatch = valStr.match(/\b(25[0-9]{2})\b/);
+          if (beYearMatch) {
+            const beYear = parseInt(beYearMatch[1], 10);
+            const ceYear = beYear - 543;
+            const ceDateStr = valStr.replace(beYearMatch[1], ceYear.toString());
+            changes.push({
+              fieldKey: key,
+              fieldLabel: label,
+              oldValue: valStr,
+              newValue: ceDateStr,
+              reason: `แปลงปี พ.ศ. (${beYear}) เป็น ค.ศ. (${ceYear}) ตามมาตรฐาน ISO`,
+              source: 'normalization',
+            });
+            cleanedAnswers[key] = ceDateStr;
+          }
         }
       }
     }

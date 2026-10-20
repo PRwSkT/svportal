@@ -166,7 +166,11 @@ export async function POST(req: NextRequest) {
         studentUpdates.religion = String(sUpdates.religion).trim();
       }
       if (sUpdates.grade !== undefined) {
-        studentUpdates.grade = String(sUpdates.grade).trim();
+        const g = String(sUpdates.grade).trim();
+        studentUpdates.grade = g;
+        if (sUpdates.classroom === undefined && g.includes('/')) {
+          studentUpdates.classroom = g.split('/')[1] || '1';
+        }
       }
       if (sUpdates.classroom !== undefined) {
         studentUpdates.classroom = String(sUpdates.classroom).trim();
@@ -244,24 +248,27 @@ export async function POST(req: NextRequest) {
 
         const { data: existingParents } = await supabase
           .from('student_parents')
-          .select('id')
-          .eq('student_id', sId)
-          .limit(1);
+          .select('id, relationship, first_name')
+          .eq('student_id', sId);
 
         const parentPayload: any = {
           updated_at: new Date().toISOString(),
         };
         if (cleanPhone) parentPayload.phone_number = cleanPhone;
-        if (firstName) parentPayload.first_name = firstName;
-        if (lastName) parentPayload.last_name = lastName;
-        if (parentRel) parentPayload.relationship = parentRel;
         if (parentLine) parentPayload.line_id = parentLine;
 
         if (existingParents && existingParents.length > 0) {
+          const targetRow =
+            existingParents.find((p: any) => p.relationship === parentRel) || existingParents[0];
+          const rowPayload: any = { ...parentPayload };
+          if (!targetRow.first_name || targetRow.first_name === '-') {
+            if (firstName) rowPayload.first_name = firstName;
+            if (lastName) rowPayload.last_name = lastName;
+          }
           await supabase
             .from('student_parents')
-            .update(parentPayload)
-            .eq('id', existingParents[0].id);
+            .update(rowPayload)
+            .eq('id', targetRow.id);
         } else {
           await supabase.from('student_parents').insert({
             student_id: sId,

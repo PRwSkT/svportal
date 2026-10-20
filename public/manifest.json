@@ -3,7 +3,7 @@
   "short_name": "SV-Portal",
   "description": "ระบบบริหารจัดการโรงเรียนสมคิดวิทยา (Somkidvittaya School)",
   "id": "/",
-  "start_url": "/",
+  "start_url": "/home",
   "display": "standalone",
   "orientation": "portrait",
   "theme_color": "#7B1C3E",

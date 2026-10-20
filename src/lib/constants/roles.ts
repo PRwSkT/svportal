@@ -48,6 +48,34 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
     labelTh: 'เจ้าหน้าที่การเงิน/ร้านค้า',
     fullLabel: 'Cashier (เจ้าหน้าที่การเงิน/ร้านค้า)',
     badgeClass: 'bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800'
+  },
+  nurse: {
+    key: 'nurse',
+    labelEn: 'School Nurse',
+    labelTh: 'ครูพยาบาล',
+    fullLabel: 'School Nurse (ครูพยาบาล)',
+    badgeClass: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-950/50 dark:text-red-300 dark:border-red-800'
+  },
+  driver: {
+    key: 'driver',
+    labelEn: 'Transport & Safety',
+    labelTh: 'เจ้าหน้าที่รถรับ-ส่ง/ความปลอดภัย',
+    fullLabel: 'Transport & Safety (รถรับ-ส่ง/ความปลอดภัย)',
+    badgeClass: 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-950/50 dark:text-orange-300 dark:border-orange-800'
+  },
+  dpo: {
+    key: 'dpo',
+    labelEn: 'Data Protection Officer',
+    labelTh: 'เจ้าหน้าที่คุ้มครองข้อมูล (DPO)',
+    fullLabel: 'DPO (เจ้าหน้าที่คุ้มครองข้อมูล)',
+    badgeClass: 'bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-950/50 dark:text-teal-300 dark:border-teal-800'
+  },
+  parent: {
+    key: 'parent',
+    labelEn: 'Parent / Guardian',
+    labelTh: 'ผู้ปกครอง',
+    fullLabel: 'Parent / Guardian (ผู้ปกครอง)',
+    badgeClass: 'bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-950/50 dark:text-pink-300 dark:border-pink-800'
   }
 };
 
@@ -92,7 +120,9 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
   { id: 'pos_wallet_topup', name: 'เติมเงิน Wallet', category: 'งานร้านค้าสหกรณ์', href: '/pos/wallet/topup' },
   { id: 'admin_wallet_students', name: 'Wallet นักเรียน', category: 'งานร้านค้าสหกรณ์', href: '/admin/wallet/students' },
   // งานทะเบียนและดูแลนักเรียน
-  { id: 'admin_students', name: 'ข้อมูลนักเรียน', category: 'งานทะเบียน & ดูแลนักเรียน', href: '/admin/students' },
+  { id: 'admin_students', name: 'ข้อมูลนักเรียน & ครอบครัว', category: 'งานทะเบียน & ดูแลนักเรียน', href: '/admin/students' },
+  { id: 'student_attendance', name: 'เช็กชื่อนักเรียน & อนุมัติใบลา', category: 'งานทะเบียน & ดูแลนักเรียน', href: '/admin/students/attendance' },
+  { id: 'pickup_dismissal', name: 'จุดรับ-ส่งเด็ก & ตรวจสอบผู้มารับ (Pickup)', category: 'งานทะเบียน & ดูแลนักเรียน', href: '/admin/safety/pickup' },
   { id: 'pastoral_care', name: 'ดูแลช่วยเหลือนักเรียน 360° (SDQ & เยี่ยมบ้าน)', category: 'งานทะเบียน & ดูแลนักเรียน', href: '/admin/students/pastoral' },
   { id: 'student_nutrition', name: 'โภชนาการ & บัญชีนมโรงเรียน', category: 'งานทะเบียน & ดูแลนักเรียน', href: '/admin/students/nutrition' },
   { id: 'van_safety', name: 'ความปลอดภัยรถรับ-ส่งนักเรียน', category: 'งานทะเบียน & ดูแลนักเรียน', href: '/admin/safety/van' },
@@ -100,7 +130,8 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
   // งานวิชาการและงานวัดผล
   { id: 'academic_hub', name: 'ศูนย์รวมวิชาการ & ตรวจทาน', category: 'งานวิชาการ', href: '/academic' },
   { id: 'academic_gradebook', name: 'Smart Gradebook (ปพ.5)', category: 'งานวิชาการ', href: '/academic/gradebook' },
-  { id: 'academic_early_years', name: 'บันทึกพัฒนาการปฐมวัย', category: 'งานวิชาการ', href: '/academic/early-years' },
+  { id: 'academic_assignments', name: 'สั่งการบ้าน & ติดตามงานค้าง', category: 'งานวิชาการ', href: '/academic/assignments' },
+  { id: 'academic_early_years', name: 'ปฐมวัย (กิจวัตรรายวัน & พัฒนาการ)', category: 'งานวิชาการ', href: '/academic/early-years' },
   { id: 'academic_exams', name: 'คลังข้อสอบ & ตรวจ OMR', category: 'งานวิชาการ', href: '/academic/exams' },
   { id: 'academic_timetable', name: 'ตารางสอน & จัดสอนแทน', category: 'งานวิชาการ', href: '/academic/timetable' },
   { id: 'academic_documents', name: 'เอกสารราชการ (ปพ.1/2/3/6)', category: 'งานวิชาการ', href: '/academic/documents' },
@@ -112,7 +143,9 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
   { id: 'admin_attendance', name: 'ข้อมูลการเข้างาน', category: 'งาน HR & ธรรมาภิบาล', href: '/admin/attendance' },
   { id: 'admin_kpi', name: 'ประเมินผลการปฏิบัติงาน (KPI)', category: 'งาน HR & ธรรมาภิบาล', href: '/admin/kpi' },
   { id: 'esar_governance', name: 'รายงานประเมินตนเอง e-SAR & ธรรมาภิบาล', category: 'งาน HR & ธรรมาภิบาล', href: '/admin/governance' },
-  // งานประชาสัมพันธ์ (PR)
+  // งานประชาสัมพันธ์และผู้ปกครองสัมพันธ์ (PR & Parents Portal)
+  { id: 'parent_communications', name: 'ศูนย์สื่อสารผู้ปกครอง & แชทครู', category: 'งานประชาสัมพันธ์ (PR)', href: '/admin/communications' },
+  { id: 'parents_portal_preview', name: 'ระบบผู้ปกครอง (Parents Portal PWA)', category: 'งานประชาสัมพันธ์ (PR)', href: '/parents' },
   { id: 'admin_notifications', name: 'ระบบแจ้งเตือนอัจฉริยะ AI', category: 'งานประชาสัมพันธ์ (PR)', href: '/admin/notifications' },
   { id: 'admin_website', name: 'จัดการเว็บไซต์', category: 'งานประชาสัมพันธ์ (PR)', href: '/admin/website' },
   { id: 'admin_forms', name: 'ระบบแบบฟอร์ม (SV-Forms)', category: 'งานประชาสัมพันธ์ (PR)', href: '/admin/forms' },

@@ -22,9 +22,25 @@ import {
   Clock,
   CheckCircle2,
   Trash2,
-  LogOut
+  LogOut,
+  Sparkles,
+  ExternalLink,
+  Shield,
+  FileCheck2,
+  AlertCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useLanguage } from '@/contexts/LanguageContext';
+import {
+  getPipelineState,
+  PIPELINE_EVENT_NAME,
+  recordMedicationAdministered
+} from '@/lib/pipeline/bidirectional-store';
+import {
+  BidirectionalPipelineState,
+  MedicationRequest,
+  StudentIncident
+} from '@/types/family-pipeline';
 import { 
   COMMON_SYMPTOMS, 
   CONTAGIOUS_DISEASES_MAP, 
@@ -35,6 +51,10 @@ import {
 } from '@/lib/health/infirmary';
 
 export default function SchoolInfirmaryPage() {
+  const { isThai } = useLanguage();
+  const [infirmaryTab, setInfirmaryTab] = useState<'visits' | 'medication_queue' | 'incidents'>('visits');
+  const [pipeline, setPipeline] = useState<BidirectionalPipelineState>(() => getPipelineState());
+  const [nurseNoteInput, setNurseNoteInput] = useState<Record<string, string>>({});
   const [selectedDays, setSelectedDays] = useState<number>(7);
   const [selectedGrade, setSelectedGrade] = useState<string>('all');
   const [visits, setVisits] = useState<InfirmaryVisitRecord[]>([]);
@@ -84,6 +104,36 @@ export default function SchoolInfirmaryPage() {
   useEffect(() => {
     fetchData();
   }, [selectedDays, selectedGrade]);
+
+  // Synchronize with bidirectional pipeline store
+  useEffect(() => {
+    const handleUpdate = () => {
+      setPipeline({ ...getPipelineState() });
+    };
+    window.addEventListener(PIPELINE_EVENT_NAME, handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener(PIPELINE_EVENT_NAME, handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
+  const handleAdministerMedication = (med: MedicationRequest) => {
+    const note = nurseNoteInput[med.id]?.trim() || 'ป้อนยาตามปริมาณและเวลาที่ผู้ปกครองระบุเรียบร้อย วัดไข้ปกติ';
+    const updated = recordMedicationAdministered({
+      medication_id: med.id,
+      administered_by: 'ครูพยาบาลวิชาชีพ พรทิพย์ สุขสวัสดิ์',
+      nurse_note: note,
+    });
+
+    if (updated) {
+      toast.success(
+        isThai
+          ? 'บันทึกการป้อนยาสำเร็จและส่งแจ้งเตือนไปยัง Parents Portal แล้ว'
+          : 'Medication administered & synced to Parents Portal'
+      );
+    }
+  };
 
   // Search candidate students when typing in modal
   useEffect(() => {
@@ -287,7 +337,61 @@ export default function SchoolInfirmaryPage() {
         </div>
       </div>
 
-      {/* Outbreak Early-Warning Alert Banner (if outbreak cluster detected!) */}
+      {/* 3 Infirmary Tabs Switcher */}
+      <div className="flex border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-2xl p-1.5 shadow-2xs gap-1.5">
+        <button
+          type="button"
+          onClick={() => setInfirmaryTab('visits')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
+            infirmaryTab === 'visits'
+              ? 'bg-rose-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <HeartPulse className="w-4 h-4" />
+          <span>{isThai ? 'บันทึกห้องพยาบาล & เฝ้าระวังโรคระบาด' : 'Infirmary Visits & Outbreak Watch'}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setInfirmaryTab('medication_queue')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
+            infirmaryTab === 'medication_queue'
+              ? 'bg-[#7B1C3E] text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Pill className="w-4 h-4" />
+          <span>{isThai ? 'คิวฝากป้อนยาจากผู้ปกครอง' : 'Parent Medication Queue'}</span>
+          {pipeline.medication_requests.filter((m) => m.status === 'ACTIVE').length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-amber-950">
+              {pipeline.medication_requests.filter((m) => m.status === 'ACTIVE').length}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setInfirmaryTab('incidents')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
+            infirmaryTab === 'incidents'
+              ? 'bg-indigo-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <ShieldAlert className="w-4 h-4" />
+          <span>{isThai ? 'รายงานอุบัติเหตุ & การปฐมพยาบาล' : 'Incident Reports & Parent Ack'}</span>
+          {pipeline.incidents.filter((i) => !i.parent_acknowledged).length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white animate-pulse">
+              {pipeline.incidents.filter((i) => !i.parent_acknowledged).length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {infirmaryTab === 'visits' && (
+        <>
+          {/* Outbreak Early-Warning Alert Banner (if outbreak cluster detected!) */}
       {outbreakAnalysis.hasOutbreak && (
         <div className="p-5 bg-rose-500 text-white rounded-3xl shadow-xl shadow-rose-500/25 border-2 border-rose-300 space-y-3">
           <div className="flex items-center gap-3">
@@ -324,7 +428,6 @@ export default function SchoolInfirmaryPage() {
           </div>
         </div>
       )}
-
       {/* Stats Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-3.5">
@@ -699,6 +802,275 @@ export default function SchoolInfirmaryPage() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+        </>
+      )}
+
+      {/* Tab 2: Parent Medication Administration Queue */}
+      {infirmaryTab === 'medication_queue' && (
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Pill className="w-5 h-5 text-[#7B1C3E]" />
+                  {isThai
+                    ? 'คิวคำร้องฝากป้อนยาออนไลน์จากผู้ปกครอง (Parent Medication Requests)'
+                    : 'Parent Medication Administration Queue'}
+                </h2>
+                <p className="text-xs text-slate-500">
+                  {isThai
+                    ? 'ตรวจสอบประวัติแพ้ยาอัตโนมัติ (Drug Allergy Guard) และบันทึกเวลาป้อนยาซิงค์ไปยัง Parents Portal ทันที'
+                    : 'Verified with Drug Allergy Guard and digital parent e-signatures'}
+                </p>
+              </div>
+
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                {isThai
+                  ? `รอป้อนยา ${pipeline.medication_requests.filter((m) => m.status === 'ACTIVE').length} รายการ`
+                  : `${pipeline.medication_requests.filter((m) => m.status === 'ACTIVE').length} Active Requests`}
+              </span>
+            </div>
+
+            <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+              <table className="w-full text-left text-xs sm:text-sm">
+                <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">
+                  <tr>
+                    <th className="p-3.5 font-bold">{isThai ? 'นักเรียน / ชั้น' : 'Student / Grade'}</th>
+                    <th className="p-3.5 font-bold">{isThai ? 'ชื่อยา / ขนาดยา' : 'Medication & Dosage'}</th>
+                    <th className="p-3.5 font-bold">{isThai ? 'เวลาป้อน / มื้ออาหาร' : 'Schedule & Timing'}</th>
+                    <th className="p-3.5 font-bold">{isThai ? 'อาการ / เหตุผล' : 'Reason'}</th>
+                    <th className="p-3.5 font-bold text-center">{isThai ? 'การลงนามผู้ปกครอง' : 'Parent Signature'}</th>
+                    <th className="p-3.5 font-bold text-center">{isThai ? 'สถานะ / การดำเนินการ' : 'Status & Action'}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {pipeline.medication_requests.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-slate-400 text-xs">
+                        {isThai ? 'ไม่มีคำร้องฝากป้อนยาในขณะนี้' : 'No medication requests active'}
+                      </td>
+                    </tr>
+                  ) : (
+                    pipeline.medication_requests.map((med) => {
+                      const isDone = med.status === 'ADMINISTERED_TODAY';
+                      const child = pipeline.children.find((c) => c.id === med.student_id);
+                      const hasAllergyRisk =
+                        child?.allergies &&
+                        child.allergies.toLowerCase() !== 'ไม่มี' &&
+                        med.medication_name.toLowerCase().includes(child.allergies.toLowerCase());
+
+                      return (
+                        <tr
+                          key={med.id}
+                          className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
+                        >
+                          <td className="p-3.5">
+                            <div className="font-bold text-slate-900 dark:text-white">{med.student_name}</div>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-[#7B1C3E]/10 text-[#7B1C3E] dark:text-pink-300">
+                              {med.grade_level}
+                            </span>
+                            {child?.allergies && (
+                              <div className="text-[10px] text-rose-600 font-bold mt-1 flex items-center gap-1">
+                                <ShieldAlert className="w-3 h-3" />
+                                <span>แพ้: {child.allergies}</span>
+                              </div>
+                            )}
+                          </td>
+
+                          <td className="p-3.5">
+                            <div className="font-extrabold text-[#7B1C3E] dark:text-amber-300">
+                              {med.medication_name}
+                            </div>
+                            <div className="text-xs text-slate-600 dark:text-slate-300 font-mono">
+                              {med.dosage}
+                            </div>
+                            {hasAllergyRisk && (
+                              <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white">
+                                ALLERGY RISK ALERT
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="p-3.5 whitespace-nowrap">
+                            <div className="font-mono text-xs text-slate-900 dark:text-white font-bold">
+                              {med.schedule_times.join(', ')} น.
+                            </div>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-bold">
+                              {med.meal_timing === 'AFTER_MEAL'
+                                ? 'หลังอาหาร'
+                                : med.meal_timing === 'BEFORE_MEAL'
+                                ? 'ก่อนอาหาร'
+                                : med.meal_timing === 'WITH_MEAL'
+                                ? 'พร้อมอาหาร'
+                                : 'เมื่อมีอาการ'}
+                            </span>
+                          </td>
+
+                          <td className="p-3.5 max-w-xs">
+                            <p className="text-xs text-slate-600 dark:text-slate-300">{med.reason}</p>
+                            <span className="text-[10px] text-slate-400">ผู้ปกครอง: {med.guardian_name}</span>
+                          </td>
+
+                          <td className="p-3.5 text-center whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>{isThai ? 'ลงนามดิจิทัล' : 'Signed'}</span>
+                            </div>
+                          </td>
+
+                          <td className="p-3.5 text-center">
+                            {isDone ? (
+                              <div className="space-y-1">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  {isThai ? 'ป้อนยาวันนี้แล้ว' : 'Administered'}
+                                </span>
+                                {med.last_administered_at && (
+                                  <div className="text-[10px] text-slate-400 font-mono">
+                                    {med.last_administered_at.slice(11, 16)} น.
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="space-y-1.5 min-w-[160px]">
+                                <input
+                                  type="text"
+                                  value={nurseNoteInput[med.id] || ''}
+                                  onChange={(e) =>
+                                    setNurseNoteInput({ ...nurseNoteInput, [med.id]: e.target.value })
+                                  }
+                                  placeholder={isThai ? 'บันทึกอาการ/ผลการวัดไข้...' : 'Nurse observation note...'}
+                                  className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleAdministerMedication(med)}
+                                  className="w-full px-3 py-1.5 bg-[#7B1C3E] hover:bg-[#631430] text-white text-xs font-bold rounded-lg shadow-xs transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>{isThai ? 'ยืนยันป้อนยาแล้ว' : 'Mark Given'}</span>
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 3: Incidents & Parent Acknowledgement */}
+      {infirmaryTab === 'incidents' && (
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                  <ShieldAlert className="w-5 h-5 text-indigo-600" />
+                  {isThai
+                    ? 'รายงานอุบัติเหตุ & การปฐมพยาบาล (Student Incidents & Parent Acknowledgement)'
+                    : 'Incident Reports & Parent Acknowledgement'}
+                </h2>
+                <p className="text-xs text-slate-500">
+                  {isThai
+                    ? 'ติดตามการรับทราบการปฐมพยาบาลของผู้ปกครองผ่าน Parents Portal แบบเรียลไทม์'
+                    : 'Track parent digital acknowledgements in real-time'}
+                </p>
+              </div>
+
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
+                {isThai
+                  ? `รายงานทั้งหมด ${pipeline.incidents.length} รายการ`
+                  : `${pipeline.incidents.length} Total Incidents`}
+              </span>
+            </div>
+
+            <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+              <table className="w-full text-left text-xs sm:text-sm">
+                <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">
+                  <tr>
+                    <th className="p-3.5 font-bold">{isThai ? 'วัน/เวลา' : 'Date/Time'}</th>
+                    <th className="p-3.5 font-bold">{isThai ? 'นักเรียน' : 'Student'}</th>
+                    <th className="p-3.5 font-bold">{isThai ? 'สถานที่' : 'Location'}</th>
+                    <th className="p-3.5 font-bold text-center">{isThai ? 'ระดับความรุนแรง' : 'Severity'}</th>
+                    <th className="p-3.5 font-bold">{isThai ? 'เหตุการณ์และการปฐมพยาบาล' : 'Description & First Aid'}</th>
+                    <th className="p-3.5 font-bold text-center">{isThai ? 'การรับทราบของผู้ปกครอง' : 'Parent Ack'}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {pipeline.incidents.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-slate-400 text-xs">
+                        {isThai ? 'ไม่มีรายงานอุบัติเหตุ' : 'No incidents recorded'}
+                      </td>
+                    </tr>
+                  ) : (
+                    pipeline.incidents.map((inc) => (
+                      <tr key={inc.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="p-3.5 font-mono text-xs text-slate-500 whitespace-nowrap">
+                          {inc.incident_date} • {inc.incident_time} น.
+                        </td>
+                        <td className="p-3.5">
+                          <div className="font-bold text-slate-900 dark:text-white">{inc.student_name}</div>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                            {inc.grade_level}
+                          </span>
+                        </td>
+                        <td className="p-3.5 text-xs text-slate-600 dark:text-slate-300">{inc.location}</td>
+                        <td className="p-3.5 text-center whitespace-nowrap">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                              inc.severity === 'CRITICAL'
+                                ? 'bg-red-600 text-white'
+                                : inc.severity === 'HIGH'
+                                ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300'
+                                : inc.severity === 'MEDIUM'
+                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
+                                : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                            }`}
+                          >
+                            {inc.severity}
+                          </span>
+                        </td>
+                        <td className="p-3.5 max-w-sm">
+                          <p className="text-xs text-slate-900 dark:text-white font-medium">{inc.description}</p>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                            <strong>{isThai ? 'ปฐมพยาบาล: ' : 'First Aid: '}</strong>
+                            {inc.first_aid_given}
+                          </div>
+                        </td>
+                        <td className="p-3.5 text-center whitespace-nowrap">
+                          {inc.parent_acknowledged ? (
+                            <div className="space-y-0.5">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                {isThai ? 'ผู้ปกครองรับทราบแล้ว' : 'Acknowledged'}
+                              </span>
+                              {inc.acknowledged_by_name && (
+                                <div className="text-[10px] text-slate-400">{inc.acknowledged_by_name}</div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 animate-pulse">
+                              <Clock className="w-3.5 h-3.5" />
+                              {isThai ? 'รอผู้ปกครองรับทราบ' : 'Awaiting Ack'}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

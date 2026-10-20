@@ -39,4 +39,66 @@ body {
   display: block !important;
 }
 
+/* ==========================================================================
+   Somkidvittaya Unified Design System (SV-Portal & Parents Portal PWA)
+   Applies Modern Web Guidance: @container queries, dvh units, aspect-ratio,
+   and fluid clamp() typography.
+   ========================================================================== */
+
+.sv-viewport-shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.sv-container-context {
+  container-type: inline-size;
+  container-name: svcard;
+}
+
+.sv-fluid-title {
+  font-size: clamp(1.35rem, 1.05rem + 1.2vw, 2.15rem);
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+}
+
+.sv-fluid-subtitle {
+  font-size: clamp(0.875rem, 0.82rem + 0.3vw, 1.05rem);
+  line-height: 1.55;
+}
+
+.sv-glass-card {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(123, 28, 62, 0.10);
+  box-shadow: 0 10px 30px -10px rgba(27, 58, 107, 0.06);
+}
+
+.sv-avatar-media {
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
+
+.sv-photo-media {
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+}
+
+@container svcard (min-width: 520px) {
+  .sv-adaptive-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+}
+
+@container svcard (min-width: 820px) {
+  .sv-adaptive-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+}
+
+
 

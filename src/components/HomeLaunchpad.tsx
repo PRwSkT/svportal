@@ -34,7 +34,11 @@ import {
   Stethoscope,
   ShieldCheck,
   HandCoins,
-  ScrollText
+  ScrollText,
+  UserCheck,
+  Smartphone,
+  MessageCircle,
+  ClipboardList
 } from 'lucide-react';
 import { getRoleConfig } from '@/lib/constants/roles';
 
@@ -83,6 +87,8 @@ export default function HomeLaunchpad() {
       color: "border-indigo-500/20 bg-indigo-500/5",
       tools: [
         { id: "admin_students", name: dict.nav.adminStudents, href: "/admin/students", icon: <Users className="w-6 h-6" />, color: "bg-indigo-500 text-white" },
+        { id: "student_attendance", name: language === 'th' ? "เช็กชื่อ & ใบลา 360°" : "Attendance & Leave", href: "/admin/students/attendance", icon: <UserCheck className="w-6 h-6" />, color: "bg-indigo-500/20 text-indigo-600" },
+        { id: "pickup_dismissal", name: language === 'th' ? "จุดรับ-ส่งเด็ก (QR)" : "Smart Pickup", href: "/admin/safety/pickup", icon: <QrCode className="w-6 h-6" />, color: "bg-[#7B1C3E] text-white" },
         { id: "pastoral_care", name: language === 'th' ? "ดูแลนักเรียน (SDQ)" : "Pastoral Care", href: "/pastoral", icon: <HeartHandshake className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
         { id: "student_nutrition", name: language === 'th' ? "โภชนาการ & นม" : "Nutrition & Milk", href: "/admin/students/nutrition", icon: <Apple className="w-6 h-6" />, color: "bg-emerald-500/20 text-emerald-600" },
         { id: "van_safety", name: language === 'th' ? "รถตู้รับ-ส่ง" : "Van Safety", href: "/admin/safety/van", icon: <Bus className="w-6 h-6" />, color: "bg-amber-500/20 text-amber-600" },
@@ -105,6 +111,8 @@ export default function HomeLaunchpad() {
       icon: <Megaphone className="w-5 h-5 text-rose-500" />,
       color: "border-rose-500/20 bg-rose-500/5",
       tools: [
+        { id: "parent_communications", name: language === 'th' ? "ศูนย์สื่อสารผู้ปกครอง" : "Parent Comms", href: "/admin/communications", icon: <MessageCircle className="w-6 h-6" />, color: "bg-[#7B1C3E] text-white" },
+        { id: "parents_portal_preview", name: language === 'th' ? "Parents Portal PWA" : "Parents Portal PWA", href: "/parents", icon: <Smartphone className="w-6 h-6" />, color: "bg-amber-500 text-white" },
         { id: "admin_notifications", name: language === 'th' ? "ระบบแจ้งเตือน AI" : "AI Notifications", href: "/admin/notifications", icon: <Bell className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
         { id: "admin_website", name: dict.nav.adminWebsite, href: "/admin/website", icon: <Globe className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
         { id: "admin_forms", name: dict.nav.adminForms, href: "/admin/forms", icon: <FileText className="w-6 h-6" />, color: "bg-[#7B1C3E]/20 text-[#7B1C3E]" },
@@ -120,7 +128,8 @@ export default function HomeLaunchpad() {
       tools: [
         { id: "academic_hub", name: language === 'th' ? "ศูนย์รวมวิชาการ" : "Academic Hub", href: "/academic", icon: <GraduationCap className="w-6 h-6" />, color: "bg-indigo-500 text-white" },
         { id: "academic_gradebook", name: language === 'th' ? "Smart Gradebook (ปพ.5)" : "Gradebook (P.P.5)", href: "/academic/gradebook", icon: <BookOpen className="w-6 h-6" />, color: "bg-emerald-500/20 text-emerald-600" },
-        { id: "academic_early_years", name: language === 'th' ? "พัฒนาการปฐมวัย" : "Early Years", href: "/academic/early-years", icon: <Baby className="w-6 h-6" />, color: "bg-pink-500/20 text-pink-600" },
+        { id: "academic_early_years", name: language === 'th' ? "ปฐมวัย & กิจวัตรรายวัน" : "Early Years & Care", href: "/academic/early-years", icon: <Baby className="w-6 h-6" />, color: "bg-pink-500/20 text-pink-600" },
+        { id: "academic_assignments", name: language === 'th' ? "การบ้าน & ชิ้นงาน" : "Assignments", href: "/academic/assignments", icon: <ClipboardList className="w-6 h-6" />, color: "bg-blue-500/20 text-blue-600" },
         { id: "academic_exams", name: language === 'th' ? "คลังข้อสอบ & ตรวจ OMR" : "Exams & OMR", href: "/academic/exams", icon: <CheckSquare className="w-6 h-6" />, color: "bg-amber-500/20 text-amber-600" },
         { id: "academic_timetable", name: language === 'th' ? "ตารางสอน & จัดสอนแทน" : "Timetable", href: "/academic/timetable", icon: <CalendarDays className="w-6 h-6" />, color: "bg-sky-500/20 text-sky-600" },
         { id: "academic_documents", name: language === 'th' ? "เอกสาร ปพ.1-3 & ปพ.6" : "Statutory Docs (PP.1-6)", href: "/academic/documents", icon: <ScrollText className="w-6 h-6" />, color: "bg-teal-500/20 text-teal-600" },
@@ -187,17 +196,32 @@ export default function HomeLaunchpad() {
         </div>
         
         {/* Quick Actions / Standalone */}
-        <div className="flex gap-4">
-          <Link href="/attendance">
+        <div className="flex flex-wrap gap-3">
+          <Link href="/parents">
             <motion.div 
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="flex items-center gap-3 bg-gradient-to-r from-primary to-primary/80 text-white px-6 py-4 rounded-2xl shadow-md hover:shadow-lg transition-all"
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              className="flex items-center gap-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white px-5 py-3.5 rounded-2xl shadow-md hover:shadow-lg transition-all"
             >
               <div className="p-2 bg-white/20 rounded-xl">
-                <Clock className="w-6 h-6" />
+                <Smartphone className="w-5 h-5" />
               </div>
-              <span className="font-bold text-lg">{dict.nav.adminAttendance}</span>
+              <div className="text-left">
+                <span className="font-bold text-sm block leading-tight">Parents Portal PWA</span>
+                <span className="text-[10px] text-amber-100 block">parents.portal.somkidvittaya.ac.th</span>
+              </div>
+            </motion.div>
+          </Link>
+          <Link href="/attendance">
+            <motion.div 
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              className="flex items-center gap-3 bg-gradient-to-r from-primary to-primary/80 text-white px-5 py-3.5 rounded-2xl shadow-md hover:shadow-lg transition-all"
+            >
+              <div className="p-2 bg-white/20 rounded-xl">
+                <Clock className="w-5 h-5" />
+              </div>
+              <span className="font-bold text-sm md:text-base">{dict.nav.adminAttendance}</span>
             </motion.div>
           </Link>
         </div>

@@ -67,8 +67,31 @@ export async function proxy(request: NextRequest) {
   // This will refresh session if expired
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Handle public route
-  if (request.nextUrl.pathname.startsWith('/login')) {
+  // Host-based routing for Parents Portal subdomain (parents.portal.somkidvittaya.ac.th)
+  const hostname = (request.headers.get('host') || '').toLowerCase();
+  const isParentsSubdomain = hostname.startsWith('parents.portal.');
+
+  if (isParentsSubdomain) {
+    if (request.nextUrl.pathname === '/manifest.json') {
+      const urlClone = request.nextUrl.clone();
+      urlClone.pathname = '/parents-manifest.json';
+      return NextResponse.rewrite(urlClone, { request: { headers: requestHeaders } });
+    }
+    if (
+      !request.nextUrl.pathname.startsWith('/parents') &&
+      !request.nextUrl.pathname.startsWith('/api/') &&
+      !request.nextUrl.pathname.startsWith('/_next') &&
+      request.nextUrl.pathname !== '/sw.js' &&
+      request.nextUrl.pathname !== '/parents-manifest.json'
+    ) {
+      const urlClone = request.nextUrl.clone();
+      urlClone.pathname = `/parents${request.nextUrl.pathname === '/' ? '' : request.nextUrl.pathname}`;
+      return NextResponse.rewrite(urlClone, { request: { headers: requestHeaders } });
+    }
+  }
+
+  // Handle public route (root welcome page & login)
+  if (request.nextUrl.pathname === '/' || request.nextUrl.pathname.startsWith('/login')) {
     if (request.nextUrl.searchParams.get('logout') === 'true') {
       return response;
     }
@@ -86,11 +109,14 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect('https://somkidvittaya.ac.th', { status: 307 });
   }
 
-  // Bypass auth for the root page (welcome menu), forms, webhooks/cron, auth callbacks, PWA sw & subscribe
+  // Bypass auth for forms, webhooks/cron, auth callbacks, PWA sw & subscribe, and Parents Portal PWA routes
   if (
-    request.nextUrl.pathname === '/' ||
     request.nextUrl.pathname === '/sw.js' ||
     request.nextUrl.pathname === '/manifest.json' ||
+    request.nextUrl.pathname === '/parents-manifest.json' ||
+    request.nextUrl.pathname.startsWith('/parents') ||
+    request.nextUrl.pathname.startsWith('/api/parents') ||
+    request.nextUrl.pathname.startsWith('/api/pipeline') ||
     request.nextUrl.pathname.startsWith('/forms') ||
     request.nextUrl.pathname.startsWith('/api/forms') ||
     request.nextUrl.pathname.startsWith('/api/notifications/subscribe') ||
@@ -173,6 +199,21 @@ export async function proxy(request: NextRequest) {
         return response;
       }
       requiredFeature = 'student_nutrition';
+    } else if (path.startsWith('/admin/students/attendance')) {
+      if (userRole === 'teacher' || userRole === 'academic staff' || assignedFeatures.includes('student_attendance') || assignedFeatures.includes('admin_students')) {
+        return response;
+      }
+      requiredFeature = 'student_attendance';
+    } else if (path.startsWith('/admin/safety/pickup')) {
+      if (userRole === 'teacher' || userRole === 'staff' || userRole === 'driver' || assignedFeatures.includes('pickup_dismissal') || assignedFeatures.includes('van_safety')) {
+        return response;
+      }
+      requiredFeature = 'pickup_dismissal';
+    } else if (path.startsWith('/admin/communications')) {
+      if (userRole === 'teacher' || userRole === 'academic staff' || assignedFeatures.includes('parent_communications')) {
+        return response;
+      }
+      requiredFeature = 'parent_communications';
     } else if (path.startsWith('/admin/students') || path.startsWith('/api/admin/students')) {
       if (userRole === 'teacher' || userRole === 'academic staff') {
         return response;

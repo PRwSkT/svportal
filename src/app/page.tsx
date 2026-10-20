@@ -1,10 +1,34 @@
 'use client';
 
+import { useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function WelcomePage() {
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    if (user) {
+      router.replace('/home');
+      return;
+    }
+
+    // If opened as an installed PWA (standalone mode), go directly to /home (which routes to /login if unauthenticated)
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+    if (isStandalone) {
+      router.replace('/home');
+    }
+  }, [user, isLoading, router]);
+
   const handleNotReady = (e: React.MouseEvent) => {
     e.preventDefault();
     toast.info('ฟังก์ชันนี้ยังไม่พร้อมใช้งาน (กำลังพัฒนา)', {

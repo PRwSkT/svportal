@@ -424,15 +424,24 @@ export function normalizeStudentFieldValue(column: string, rawValue: any): any {
 
     case 'grade': {
       const lower = str.toLowerCase();
-      if (lower === 'kg1' || lower === 'k1') return 'อ.1';
-      if (lower === 'kg2' || lower === 'k2') return 'อ.2';
-      if (lower === 'kg3' || lower === 'k3') return 'อ.3';
-      if (lower === 'p1') return 'ป.1';
-      if (lower === 'p2') return 'ป.2';
-      if (lower === 'p3') return 'ป.3';
-      if (lower === 'p4') return 'ป.4';
-      if (lower === 'p5') return 'ป.5';
-      if (lower === 'p6') return 'ป.6';
+      const map: Record<string, string> = {
+        nursery: 'ต.อ.1/1',
+        kg1: 'อ.1/1', k1: 'อ.1/1', 'อ.1': 'อ.1/1', 'อนุบาลปีที่ 1': 'อ.1/1',
+        kg2: 'อ.2/1', k2: 'อ.2/1', 'อ.2': 'อ.2/1', 'อนุบาลปีที่ 2': 'อ.2/1',
+        kg3: 'อ.3/1', k3: 'อ.3/1', 'อ.3': 'อ.3/1', 'อนุบาลปีที่ 3': 'อ.3/1',
+        p1: 'ป.1/1', p1_1: 'ป.1/1', 'ป.1': 'ป.1/1', 'ประถมศึกษาปีที่ 1': 'ป.1/1',
+        p2: 'ป.2/1', p2_1: 'ป.2/1', 'ป.2': 'ป.2/1', 'ประถมศึกษาปีที่ 2': 'ป.2/1',
+        p3: 'ป.3/1', p3_1: 'ป.3/1', 'ป.3': 'ป.3/1', 'ประถมศึกษาปีที่ 3/1': 'ป.3/1',
+        p3_2: 'ป.3/2', 'ประถมศึกษาปีที่ 3/2': 'ป.3/2',
+        p4: 'ป.4/1', p4_1: 'ป.4/1', 'ป.4': 'ป.4/1', 'ประถมศึกษาปีที่ 4/1': 'ป.4/1',
+        p4_2: 'ป.4/2', 'ประถมศึกษาปีที่ 4/2': 'ป.4/2',
+        p5: 'ป.5/1', p5_1: 'ป.5/1', 'ป.5': 'ป.5/1', 'ประถมศึกษาปีที่ 5/1': 'ป.5/1',
+        p5_2: 'ป.5/2', 'ประถมศึกษาปีที่ 5/2': 'ป.5/2',
+        p6: 'ป.6/1', p6_1: 'ป.6/1', 'ป.6': 'ป.6/1', 'ประถมศึกษาปีที่ 6/1': 'ป.6/1',
+        p6_2: 'ป.6/2', 'ประถมศึกษาปีที่ 6/2': 'ป.6/2',
+      };
+      if (map[lower]) return map[lower];
+      if (map[str]) return map[str];
       return str;
     }
 
@@ -641,15 +650,15 @@ export function analyzeStudentSyncOpportunities(
           }
         }
 
-        // 4. Date of Birth
+        // 4. Date of Birth (only fill if missing in students DB; preserve original DB birth_date as source of truth)
         else if (col === 'birth_date') {
           const normDob = normVal || '';
           const currentDob = dbStudent.birth_date ? String(dbStudent.birth_date).slice(0, 10) : '';
-          if (normDob && normDob !== currentDob) {
+          if (normDob && !currentDob) {
             diffs.push({
               field: 'birth_date',
               labelTh: 'วันเกิด (YYYY-MM-DD)',
-              oldValue: currentDob || 'ยังไม่มีข้อมูล',
+              oldValue: 'ยังไม่มีข้อมูล',
               newValue: normDob,
               rawFormValue: rawVal,
             });
@@ -837,12 +846,29 @@ export function analyzeStudentSyncOpportunities(
             });
           }
         }
+
+        // 18. Grade & Classroom (from form response)
+        else if (col === 'grade') {
+          const strVal = String(normVal || '').trim();
+          if (strVal && strVal !== (dbStudent.grade || '')) {
+            diffs.push({
+              field: 'grade',
+              labelTh: 'ระดับชั้น / ห้องเรียน',
+              oldValue: dbStudent.grade || 'ยังไม่มีข้อมูล',
+              newValue: strVal,
+              rawFormValue: rawVal,
+            });
+          }
+        }
       }
 
       if (diffs.length > 0) {
         const updates: Record<string, any> = {};
         for (const d of diffs) {
           updates[d.field] = d.newValue;
+          if (d.field === 'grade' && typeof d.newValue === 'string' && d.newValue.includes('/')) {
+            updates.classroom = d.newValue.split('/')[1] || '1';
+          }
         }
 
         let parentUpdates: any = undefined;

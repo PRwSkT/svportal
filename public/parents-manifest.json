@@ -1,0 +1,59 @@
+{
+  "name": "Somkid Parents | ระบบผู้ปกครองโรงเรียนสมคิดวิทยา",
+  "short_name": "SV Parents",
+  "description": "ระบบผู้ปกครองอัจฉริยะ โรงเรียนสมคิดวิทยา อ.เมือง จ.ระยอง (Family Operations, Learning & Safety PWA)",
+  "id": "/parents",
+  "start_url": "/parents?source=pwa",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#7B1C3E",
+  "background_color": "#F5F4F2",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "QR รับบุตรหลาน (Pickup QR)",
+      "short_name": "QR รับเด็ก",
+      "url": "/parents?tab=pickup",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "แจ้งลาเรียน (Leave Request)",
+      "short_name": "แจ้งลา",
+      "url": "/parents?tab=children&action=leave",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "แชทกับครูประจำชั้น (Messages)",
+      "short_name": "ข้อความครู",
+      "url": "/parents?tab=messages",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "lang": "th",
+  "scope": "/"
+}
