@@ -121,6 +121,30 @@ function startFrameMonitor() {
   requestAnimationFrame(frameLoop);
 }
 
+// Live Clock & Date for Top Brand Header
+function startLiveClock() {
+  function tick() {
+    const clockEl = document.getElementById('header-clock');
+    const dateEl = document.getElementById('header-date');
+    if (!clockEl && !dateEl) return;
+    const now = new Date();
+    if (clockEl) {
+      clockEl.textContent = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    }
+    if (dateEl) {
+      const dayNames = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสฯ', 'ศุกร์', 'เสาร์'];
+      const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+      const dayStr = dayNames[now.getDay()];
+      const dateNum = now.getDate();
+      const monthStr = monthNames[now.getMonth()];
+      const yearBE = now.getFullYear() + 543;
+      dateEl.textContent = `วัน${dayStr} ${dateNum} ${monthStr} ${yearBE}`;
+    }
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
   initDeviceId();
@@ -128,6 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
   startFrameMonitor();
   setupAudioUnlockListeners();
   startHealthWatchdog();
+  startLiveClock();
   
   // Start Heartbeat & Sync Loops
   sendHeartbeat();

@@ -6,7 +6,7 @@
   <title>Android TV Signage Player</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#091b30">
-  <link rel="stylesheet" href="style.css?v=2.5">
+  <link rel="stylesheet" href="style.css?v=3.0">
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js').catch(err => console.log('SW reg fail:', err));
@@ -15,6 +15,21 @@
 </head>
 <body>
   <div id="player-container">
+    <!-- Top Header Bar (School Brand Identity) -->
+    <header id="top-header-bar">
+      <div class="header-brand">
+        <img src="assets/images/emblem-white.png" alt="ตราโรงเรียนสมคิดวิทยา" class="header-emblem-img">
+        <div class="header-text-block">
+          <div class="header-school-name-th">โรงเรียนสมคิดวิทยา</div>
+          <div class="header-school-name-en">SOMKIDVITTAYA SCHOOL <span class="header-est">• EST. 1960</span></div>
+        </div>
+      </div>
+      <div class="header-right-meta">
+        <div class="header-clock" id="header-clock">--:--</div>
+        <div class="header-date" id="header-date">กำลังโหลด...</div>
+      </div>
+    </header>
+
     <!-- Media Layer A -->
     <div id="layer-a" class="media-layer"></div>
 
@@ -23,7 +38,7 @@
 
     <!-- Standby screen when no media is scheduled -->
     <div id="standby-screen">
-      <img src="assets/images/logo-white.png" alt="Somkidvittaya School" class="standby-logo-img" onerror="this.style.display='none'">
+      <img src="assets/images/emblem-white.png" alt="Somkidvittaya School" class="standby-logo-img" onerror="this.style.display='none'">
       <div class="standby-title">โรงเรียนสมคิดวิทยา (Somkidvittaya School)</div>
       <div class="standby-status" id="standby-status-text">กำลังซิงก์ข้อมูลกับ SV Portal...</div>
       <div class="device-badge" id="standby-device-id">DEVICE: -</div>
@@ -32,11 +47,15 @@
     <!-- Bottom Ticker Bar -->
     <div id="ticker-bar">
       <div class="ticker-label">
-        <img src="assets/images/logo.png" alt="Somkidvittaya School" class="ticker-logo-img">
+        <img src="assets/images/emblem-navy.png" alt="ตราโรงเรียนสมคิดวิทยา" class="ticker-emblem-icon">
+        <div class="ticker-school-brand">
+          <span class="ticker-brand-th">โรงเรียนสมคิดวิทยา</span>
+          <span class="ticker-brand-en">SOMKIDVITTAYA</span>
+        </div>
       </div>
       <div class="ticker-content">
         <span class="ticker-text" id="ticker-text">
-          ยินดีต้อนรับสู่โรงเรียนสมคิดวิทยา (Somkidvittaya School) • ระบบสื่อประชาสัมพันธ์ภายในองค์กร SV Portal Signage Suite • ติดต่อสอบถามแผนกเทคโนโลยีสารสนเทศ IT Support
+          ยินดีต้อนรับสู่โรงเรียนสมคิดวิทยา (Somkidvittaya School) • ระบบสื่อประชาสัมพันธ์ภายในองค์กร SV Portal Signage Suite • ติดต่อสอบถามแผนกธุรการ
         </span>
       </div>
     </div>
@@ -62,6 +81,6 @@
     </div>
   </div>
 
-  <script src="player.js?v=2.5"></script>
+  <script src="player.js?v=3.0"></script>
 </body>
 </html>

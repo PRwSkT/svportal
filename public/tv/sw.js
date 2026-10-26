@@ -1,10 +1,12 @@
 // Android TV Signage Offline Cache Service Worker
-const CACHE_NAME = 'sv-signage-v6';
+const CACHE_NAME = 'sv-signage-v7';
 const STATIC_ASSETS = [
   '/tv/',
   '/tv/index.html',
   '/tv/style.css',
   '/tv/player.js',
+  '/tv/assets/images/emblem-white.png',
+  '/tv/assets/images/emblem-navy.png',
   '/tv/assets/images/logo.png',
   '/tv/assets/images/logo-white.png',
   '/tv/assets/fonts/SukhumvitSet-Text.ttf',
