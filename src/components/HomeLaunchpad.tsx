@@ -38,7 +38,8 @@ import {
   UserCheck,
   Smartphone,
   MessageCircle,
-  ClipboardList
+  ClipboardList,
+  Tv
 } from 'lucide-react';
 import { getRoleConfig } from '@/lib/constants/roles';
 
@@ -118,6 +119,7 @@ export default function HomeLaunchpad() {
         { id: "admin_forms", name: dict.nav.adminForms, href: "/admin/forms", icon: <FileText className="w-6 h-6" />, color: "bg-[#7B1C3E]/20 text-[#7B1C3E]" },
         { id: "post_assistant", name: dict.nav.postAssistant, href: "/post-assistant", icon: <MessageSquare className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
         { id: "audio_remote", name: dict.nav.audioRemote, href: "/audio-remote", icon: <Radio className="w-6 h-6" />, color: "bg-rose-500 text-white" },
+        { id: "admin_signage", name: language === 'th' ? "จอประชาสัมพันธ์ทีวี (Signage)" : "Digital Signage TV", href: "/admin/signage", icon: <Tv className="w-6 h-6" />, color: "bg-blue-600 text-white" },
         { id: "qr_generator", name: dict.nav.qrGenerator, href: "/qr-generator", icon: <QrCode className="w-6 h-6" />, color: "bg-rose-500 text-white" }
       ]
     },
