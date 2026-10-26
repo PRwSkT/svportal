@@ -6,7 +6,7 @@
   <title>Android TV Signage Player</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#091b30">
-  <link rel="stylesheet" href="style.css?v=3.0">
+  <link rel="stylesheet" href="style.css?v=3.1">
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js').catch(err => console.log('SW reg fail:', err));
@@ -18,7 +18,7 @@
     <!-- Top Header Bar (School Brand Identity) -->
     <header id="top-header-bar">
       <div class="header-brand">
-        <img src="assets/images/emblem-white.png" alt="ตราโรงเรียนสมคิดวิทยา" class="header-emblem-img">
+        <img src="assets/images/emblem-white.png" alt="ตราโรงเรียนสมคิดวิทยา" style="height: 72px; width: auto; max-width: 72px; object-fit: contain; flex-shrink: 0;" class="header-emblem-img">
         <div class="header-text-block">
           <div class="header-school-name-th">โรงเรียนสมคิดวิทยา</div>
           <div class="header-school-name-en">SOMKIDVITTAYA SCHOOL <span class="header-est">• EST. 1960</span></div>
@@ -38,7 +38,7 @@
 
     <!-- Standby screen when no media is scheduled -->
     <div id="standby-screen">
-      <img src="assets/images/emblem-white.png" alt="Somkidvittaya School" class="standby-logo-img" onerror="this.style.display='none'">
+      <img src="assets/images/emblem-white.png" alt="Somkidvittaya School" class="standby-logo-img" style="max-height: 80px; width: auto; object-fit: contain;" onerror="this.style.display='none'">
       <div class="standby-title">โรงเรียนสมคิดวิทยา (Somkidvittaya School)</div>
       <div class="standby-status" id="standby-status-text">กำลังซิงก์ข้อมูลกับ SV Portal...</div>
       <div class="device-badge" id="standby-device-id">DEVICE: -</div>
@@ -47,7 +47,7 @@
     <!-- Bottom Ticker Bar -->
     <div id="ticker-bar">
       <div class="ticker-label">
-        <img src="assets/images/emblem-navy.png" alt="ตราโรงเรียนสมคิดวิทยา" class="ticker-emblem-icon">
+        <img src="assets/images/emblem-navy.png" alt="ตราโรงเรียนสมคิดวิทยา" style="height: 52px; width: auto; max-width: 52px; object-fit: contain; flex-shrink: 0;" class="ticker-emblem-icon">
         <div class="ticker-school-brand">
           <span class="ticker-brand-th">โรงเรียนสมคิดวิทยา</span>
           <span class="ticker-brand-en">SOMKIDVITTAYA</span>
@@ -81,6 +81,6 @@
     </div>
   </div>
 
-  <script src="player.js?v=3.0"></script>
+  <script src="player.js?v=3.1"></script>
 </body>
 </html>

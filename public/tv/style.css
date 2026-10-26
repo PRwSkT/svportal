@@ -109,17 +109,6 @@ body.rotate-180 #player-container {
   transform: translateZ(0);
 }
 
-/* In Landscape mode, hide top header so full 16:9 media is unhindered */
-body:not(.rotate-90):not(.rotate-270) #top-header-bar {
-  display: none;
-}
-
-body.rotate-90 .media-layer,
-body.rotate-270 .media-layer {
-  top: 105px;
-  height: calc(100% - 175px);
-}
-
 .header-brand {
   display: flex;
   align-items: center;
@@ -186,10 +175,10 @@ body.rotate-270 .media-layer {
 
 .media-layer {
   position: absolute;
-  top: 0;
+  top: 105px;
   left: 0;
   width: 100%;
-  height: 100%;
+  height: calc(100% - 175px);
   opacity: 0;
   transition: opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1);
   background: #000;
