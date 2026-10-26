@@ -293,14 +293,24 @@ export default function AdminSignagePage() {
                     โซลูชันเกรดองค์กรสำหรับ Android TV รองรับเปิดเครื่องอัตโนมัติ 24/7 ไม่หลุดจอ
                   </p>
                   <ol className="text-xs text-slate-700 space-y-2.5 list-decimal list-inside bg-slate-50 p-3.5 rounded-xl border border-slate-200">
-                    <li>เปิด <strong>Google Play Store</strong> บน Android TV</li>
-                    <li>ค้นหาและติดตั้ง <strong>&quot;Fully Kiosk Browser for Android TV&quot;</strong></li>
+                    <li>ดาวน์โหลดไฟล์ <strong>signage-tv.apk</strong> ใส่ Flash Drive ไปเสียบที่ทีวี หรือเปิดแอป Downloader บนทีวี</li>
+                    <li>เปิดไฟล์เพื่อกดติดตั้ง <strong>&quot;Install&quot;</strong> บน Android TV</li>
                     <li>เปิดแอปแล้วใส่ <strong>Start URL</strong> ที่ได้จากระบบด้านบน</li>
-                    <li>ตั้งค่า <strong>&quot;Run on Boot&quot;</strong> เป็น Enabled เพื่อให้เปิดจอเองเมื่อเสียบปลั๊กทีวี</li>
+                    <li>ตั้งค่า <strong>&quot;Run on Boot&quot;</strong> และ <strong>&quot;Keep Screen On&quot;</strong> เป็น On</li>
                   </ol>
+                  <div className="mt-3">
+                    <a
+                      href={`${serverUrl}/download/signage-tv.apk`}
+                      download="signage-tv.apk"
+                      className="inline-flex items-center justify-center gap-2 w-full px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-sm"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>ดาวน์โหลดไฟล์ signage-tv.apk (7.1 MB)</span>
+                    </a>
+                  </div>
                 </div>
                 <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                  <span>สถานะ: รองรับทีวีทุกยี่ห้อ</span>
+                  <span>สถานะ: รองรับ Android TV 7.0 - 14+</span>
                   <span className="font-semibold text-emerald-600">เสถียรภาพสูงสุด</span>
                 </div>
               </div>
