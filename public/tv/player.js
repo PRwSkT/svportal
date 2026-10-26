@@ -121,28 +121,120 @@ function startFrameMonitor() {
   requestAnimationFrame(frameLoop);
 }
 
-// Live Clock & Date for Top Brand Header
+// Live Clock, Date & Weather Rotator
+let currentWeather = null;
+let currentMetaSlide = 0; // 0: Date TH, 1: Date EN, 2: Weather TH, 3: Weather EN
+
+async function fetchWeather() {
+  try {
+    // School Location: Mueang Rayong (Lat: 12.6815, Lon: 101.2816)
+    const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=12.6815&longitude=101.2816&current=temperature_2m,weather_code&timezone=Asia%2FBangkok');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.current) {
+      currentWeather = {
+        temp: Math.round(data.current.temperature_2m),
+        code: data.current.weather_code
+      };
+    }
+  } catch (e) {
+    console.warn('[Signage] Weather fetch error:', e);
+  }
+}
+
+function getWeatherInfo(code) {
+  const table = {
+    0: { th: 'ท้องฟ้าแจ่มใส', en: 'Clear Sky', icon: '☀️' },
+    1: { th: 'ฟ้าโปร่ง', en: 'Mainly Clear', icon: '🌤️' },
+    2: { th: 'มีเมฆบางส่วน', en: 'Partly Cloudy', icon: '⛅' },
+    3: { th: 'มีเมฆมาก', en: 'Overcast', icon: '☁️' },
+    45: { th: 'มีหมอก', en: 'Foggy', icon: '🌫️' },
+    48: { th: 'มีหมอกหนา', en: 'Dense Fog', icon: '🌫️' },
+    51: { th: 'ฝนตกปรอยๆ', en: 'Light Drizzle', icon: '🌦️' },
+    53: { th: 'ฝนปรอยปานกลาง', en: 'Moderate Drizzle', icon: '🌦️' },
+    55: { th: 'ฝนปรอยหนาแน่น', en: 'Dense Drizzle', icon: '🌧️' },
+    61: { th: 'ฝนตกเล็กน้อย', en: 'Slight Rain', icon: '🌧️' },
+    63: { th: 'ฝนตกปานกลาง', en: 'Moderate Rain', icon: '🌧️' },
+    65: { th: 'ฝนตกหนัก', en: 'Heavy Rain', icon: '🌧️' },
+    80: { th: 'ฝนโปรยปราย', en: 'Rain Showers', icon: '🌦️' },
+    81: { th: 'ฝนตกชุก', en: 'Moderate Showers', icon: '🌧️' },
+    82: { th: 'ฝนตกหนักมาก', en: 'Heavy Showers', icon: '⛈️' },
+    95: { th: 'พายุฝนฟ้าคะนอง', en: 'Thunderstorm', icon: '⛈️' },
+    96: { th: 'พายุลูกเห็บ', en: 'Thunderstorm & Hail', icon: '⛈️' },
+    99: { th: 'พายุฟ้าคะนองรุนแรง', en: 'Severe Storm', icon: '⛈️' }
+  };
+  return table[code] || { th: 'มีเมฆบางส่วน', en: 'Partly Cloudy', icon: '🌤️' };
+}
+
 function startLiveClock() {
-  function tick() {
-    const clockEl = document.getElementById('header-clock');
-    const dateEl = document.getElementById('header-date');
-    if (!clockEl && !dateEl) return;
+  const clockEl = document.getElementById('header-clock');
+  const dateEl = document.getElementById('header-date');
+  if (!clockEl && !dateEl) return;
+
+  function updateClock() {
     const now = new Date();
     if (clockEl) {
       clockEl.textContent = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
     }
-    if (dateEl) {
-      const dayNames = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสฯ', 'ศุกร์', 'เสาร์'];
-      const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-      const dayStr = dayNames[now.getDay()];
-      const dateNum = now.getDate();
-      const monthStr = monthNames[now.getMonth()];
-      const yearBE = now.getFullYear() + 543;
-      dateEl.textContent = `วัน${dayStr} ${dateNum} ${monthStr} ${yearBE}`;
-    }
   }
-  tick();
-  setInterval(tick, 1000);
+
+  function getSlideContent(slideIndex) {
+    const now = new Date();
+    const dayNamesTh = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสฯ', 'ศุกร์', 'เสาร์'];
+    const monthNamesTh = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+    const dayNamesEn = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const monthNamesEn = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    if (slideIndex === 0) {
+      // 1. วันที่ (ไทย)
+      const dayStr = dayNamesTh[now.getDay()];
+      const dateNum = now.getDate();
+      const monthStr = monthNamesTh[now.getMonth()];
+      const yearBE = now.getFullYear() + 543;
+      return `วัน${dayStr} ${dateNum} ${monthStr} ${yearBE}`;
+    } else if (slideIndex === 1) {
+      // 2. Date (English)
+      const dayStr = dayNamesEn[now.getDay()];
+      const dateNum = now.getDate();
+      const monthStr = monthNamesEn[now.getMonth()];
+      const yearCE = now.getFullYear();
+      return `${dayStr}, ${dateNum} ${monthStr} ${yearCE}`;
+    } else if (slideIndex === 2 && currentWeather) {
+      // 3. สภาพอากาศ (ไทย)
+      const w = getWeatherInfo(currentWeather.code);
+      return `${w.icon} ระยอง ${currentWeather.temp}°C • ${w.th}`;
+    } else if (slideIndex === 3 && currentWeather) {
+      // 4. Weather (English)
+      const w = getWeatherInfo(currentWeather.code);
+      return `${w.icon} Rayong ${currentWeather.temp}°C • ${w.en}`;
+    }
+    return `วัน${dayNamesTh[now.getDay()]} ${now.getDate()} ${monthNamesTh[now.getMonth()]} ${now.getFullYear() + 543}`;
+  }
+
+  function rotateSlide() {
+    if (!dateEl) return;
+    const maxSlides = currentWeather ? 4 : 2;
+    currentMetaSlide = (currentMetaSlide + 1) % maxSlides;
+
+    dateEl.classList.add('fade-out');
+    setTimeout(() => {
+      dateEl.textContent = getSlideContent(currentMetaSlide);
+      dateEl.classList.remove('fade-out');
+    }, 350);
+  }
+
+  updateClock();
+  if (dateEl) dateEl.textContent = getSlideContent(0);
+
+  setInterval(updateClock, 1000);
+  setInterval(rotateSlide, 5000);
+
+  fetchWeather().then(() => {
+    if (dateEl && (currentMetaSlide === 2 || currentMetaSlide === 3)) {
+      dateEl.textContent = getSlideContent(currentMetaSlide);
+    }
+  });
+  setInterval(fetchWeather, 15 * 60 * 1000);
 }
 
 // Initialize
