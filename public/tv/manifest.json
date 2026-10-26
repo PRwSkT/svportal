@@ -1,0 +1,22 @@
+{
+  "name": "Somkidvittaya Signage TV",
+  "short_name": "SV Signage",
+  "description": "Somkidvittaya Digital Signage TV Player",
+  "start_url": "/tv/",
+  "display": "fullscreen",
+  "orientation": "any",
+  "theme_color": "#091b30",
+  "background_color": "#091b30",
+  "icons": [
+    {
+      "src": "/tv/assets/images/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/tv/assets/images/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

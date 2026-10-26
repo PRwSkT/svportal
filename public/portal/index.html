@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SV Portal - Digital Signage Management Module</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="portal-layout">
+    <!-- Left Sidebar of SV Portal -->
+    <aside class="portal-sidebar">
+      <div class="sidebar-header">
+        <div class="portal-brand">
+          <img src="/portal/assets/images/logo-white.png" alt="Somkidvittaya School" class="brand-logo-img" onerror="this.style.display='none'">
+          <div class="portal-brand-title">
+            <h2>Digital Signage</h2>
+            <span class="portal-badge">SV Portal</span>
+          </div>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <button class="nav-item active" onclick="switchTab('screens')">
+          <svg class="icon" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+          <span>หน้าจอทีวี (Screens)</span>
+        </button>
+        <button class="nav-item" onclick="switchTab('zones')">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>จัดการโซน (Zones)</span>
+        </button>
+        <button class="nav-item" onclick="switchTab('campaigns')">
+          <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+          <span>จัดสื่อ & เลือกเป้าหมาย</span>
+        </button>
+        <button class="nav-item" onclick="switchTab('media')">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
+          <span>คลังสื่อ (Media Library)</span>
+        </button>
+        <button class="nav-item" onclick="switchTab('simulator')">
+          <svg class="icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span>ตัวจำลองจอ (Simulator)</span>
+        </button>
+      </nav>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="portal-main">
+      <header class="topbar">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <img src="/portal/assets/images/logo.png" alt="Somkidvittaya" style="height: 38px; width: auto; object-fit: contain;" onerror="this.style.display='none'">
+          <span style="font-size: 14px; color: var(--text-muted); font-weight: 600;">
+            โรงเรียนสมคิดวิทยา • ระบบบริหารจัดการสื่อประชาสัมพันธ์ภายในองค์กร (SV Signage Suite)
+          </span>
+        </div>
+        <div class="user-info">
+          <div class="user-avatar">AD</div>
+          <div>
+            <div style="font-size: 13.5px; font-weight: 600;">Admin User</div>
+            <div style="font-size: 11.5px; color: var(--text-muted);">Signage Administrator</div>
+          </div>
+        </div>
+      </header>
+
+      <div class="content-area">
+        <!-- TAB 1: Screens & Monitoring -->
+        <section id="tab-screens" class="tab-pane active">
+          <div class="grid-stats">
+            <div class="stat-card">
+              <div class="stat-info">
+                <div class="label">หน้าจอทั้งหมด</div>
+                <div class="value" id="stat-total-screens">0</div>
+              </div>
+              <div class="stat-icon-box stat-icon-blue">
+                <svg class="icon icon-lg" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-info">
+                <div class="label">ออนไลน์อยู่ (Online)</div>
+                <div class="value" style="color: var(--success);" id="stat-online-screens">0</div>
+              </div>
+              <div class="stat-icon-box stat-icon-green">
+                <svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-info">
+                <div class="label">ออฟไลน์ (Offline)</div>
+                <div class="value" style="color: var(--danger);" id="stat-offline-screens">0</div>
+              </div>
+              <div class="stat-icon-box stat-icon-red">
+                <svg class="icon icon-lg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" x2="9" y1="9" y2="15"/><line x1="9" x2="15" y1="9" y2="15"/></svg>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-info">
+                <div class="label">สื่อในคลังทั้งหมด</div>
+                <div class="value" id="stat-total-media">0</div>
+              </div>
+              <div class="stat-icon-box stat-icon-purple">
+                <svg class="icon icon-lg" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <svg class="icon" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+                <h3 class="card-title">สถานะหน้าจอ Android TV ทั้งหมด</h3>
+              </div>
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <input type="text" id="screen-search" class="form-control" style="width: 200px; padding: 7px 12px; font-size: 13px;" placeholder="ค้นหาหน้าจอ หรือกลุ่ม..." oninput="filterScreens()">
+                <button class="btn btn-outline btn-sm" onclick="loadScreens()">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                  <span>รีเฟรช</span>
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="switchTab('zones')">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  <span>จัดการโซน</span>
+                </button>
+                <button class="btn btn-primary btn-sm" onclick="openCreateDeviceModal()">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  <span>เพิ่มหน้าจอทีวี</span>
+                </button>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table>
+                <thead>
+                  <tr>
+                    <th>สถานะ</th>
+                    <th>Device ID</th>
+                    <th>ชื่อหน้าจอ / ตำแหน่ง</th>
+                    <th>กลุ่ม / โซน</th>
+                    <th>การวางจอ</th>
+                    <th>ระบบเสียง</th>
+                    <th>IP Address</th>
+                    <th>สื่อที่กำลังเล่น</th>
+                    <th>พื้นที่ว่าง</th>
+                    <th>ความเสถียร (FPS)</th>
+                    <th>Ping ล่าสุด</th>
+                    <th style="text-align: right;">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody id="screens-table-body">
+                  <tr><td colspan="12" style="text-align: center;">กำลังโหลดข้อมูล...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB: Zones & Grouping Management -->
+        <section id="tab-zones" class="tab-pane">
+          <div class="grid-stats">
+            <div class="stat-card">
+              <div class="stat-info">
+                <div class="label">โซนทั้งหมด</div>
+                <div class="value" id="stat-total-zones">0</div>
+              </div>
+              <div class="stat-icon-box stat-icon-blue">
+                <svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-info">
+                <div class="label">หน้าจอที่มีการระบุโซน</div>
+                <div class="value" style="color: var(--success);" id="stat-assigned-screens">0</div>
+              </div>
+              <div class="stat-icon-box stat-icon-green">
+                <svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-info">
+                <div class="label">หน้าจอที่ยังไม่ระบุโซน</div>
+                <div class="value" style="color: #d97706;" id="stat-unassigned-screens">0</div>
+              </div>
+              <div class="stat-icon-box stat-icon-amber">
+                <svg class="icon icon-lg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <h3 class="card-title">รายชื่อโซน / กลุ่มหน้าจอทั้งหมด (Zone Directory)</h3>
+              </div>
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <input type="text" id="zone-search" class="form-control" style="width: 220px; padding: 7px 12px; font-size: 13px;" placeholder="ค้นหาโซน..." oninput="filterZones()">
+                <button class="btn btn-outline btn-sm" onclick="loadGroups()">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                  <span>รีเฟรช</span>
+                </button>
+                <button class="btn btn-primary btn-sm" onclick="openCreateZoneModal()">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  <span>เพิ่มโซนใหม่</span>
+                </button>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table>
+                <thead>
+                  <tr>
+                    <th>รหัสโซน (Zone ID)</th>
+                    <th>ชื่อโซน / แผนก</th>
+                    <th>รายละเอียดพื้นที่</th>
+                    <th>จำนวนจอทีวีที่สังกัด</th>
+                    <th style="text-align: right;">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody id="zones-table-body">
+                  <tr><td colspan="5" style="text-align: center;">กำลังโหลดข้อมูลโซน...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 2: Campaigns & Targeting -->
+        <section id="tab-campaigns" class="tab-pane">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                <h3 class="card-title">สร้างแคมเปญใหม่ & เลือกว่าจะแสดงที่หน้าจอใด</h3>
+              </div>
+            </div>
+            <form id="create-campaign-form" onsubmit="handleCreateCampaign(event)">
+              <div class="form-group">
+                <label>ชื่อแคมเปญ / หัวข้อประชาสัมพันธ์ *</label>
+                <input type="text" id="cmp-name" class="form-control" placeholder="เช่น ประกาศนโยบายความปลอดภัย, เมนูอาหารกลางวัน, ตารางกิจกรรม" required>
+              </div>
+
+              <!-- INTERACTIVE TARGETING SELECTOR CARDS -->
+              <div class="form-group">
+                <label>เลือกว่าจะแสดงที่หน้าจอใดบ้าง (Targeting Distribution) *</label>
+                <div class="target-card-grid">
+                  <!-- Option 1: ALL -->
+                  <label class="target-select-card selected" id="card-target-all" onclick="selectTargetCard('ALL')">
+                    <input type="radio" name="target-type" value="ALL" checked onchange="handleTargetTypeChange()">
+                    <div class="target-card-content">
+                      <h4>
+                        <svg class="icon icon-sm" viewBox="0 0 24 24" style="color: var(--primary);"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+                        ทุกหน้าจอ (Broadcast)
+                      </h4>
+                      <p>กระจายไปยังทีวีทุกเครื่องในองค์กร</p>
+                    </div>
+                  </label>
+
+                  <!-- Option 2: GROUP -->
+                  <label class="target-select-card" id="card-target-group" onclick="selectTargetCard('GROUP')">
+                    <input type="radio" name="target-type" value="GROUP" onchange="handleTargetTypeChange()">
+                    <div class="target-card-content">
+                      <h4>
+                        <svg class="icon icon-sm" viewBox="0 0 24 24" style="color: #92400e;"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        เลือกตามกลุ่ม / แผนก
+                      </h4>
+                      <p>เช่น โซนต้อนรับ, โรงอาหาร, ฝ่ายผลิต</p>
+                    </div>
+                  </label>
+
+                  <!-- Option 3: SPECIFIC -->
+                  <label class="target-select-card" id="card-target-specific" onclick="selectTargetCard('SPECIFIC')">
+                    <input type="radio" name="target-type" value="SPECIFIC" onchange="handleTargetTypeChange()">
+                    <div class="target-card-content">
+                      <h4>
+                        <svg class="icon icon-sm" viewBox="0 0 24 24" style="color: #6b21a8;"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+                        ระบุเฉพาะเจาะจงรายเครื่อง
+                      </h4>
+                      <p>เลือกทีวีรายเครื่องที่ต้องการ</p>
+                    </div>
+                  </label>
+                </div>
+
+                <!-- Sub-options: By Group -->
+                <div id="target-sub-group" class="target-suboptions">
+                  <div style="font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #475569;">
+                    เลือกกลุ่มที่ต้องการให้แสดง:
+                  </div>
+                  <div id="group-checkbox-container" class="checkbox-grid"></div>
+                </div>
+
+                <!-- Sub-options: Specific Screens -->
+                <div id="target-sub-specific" class="target-suboptions">
+                  <div style="font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #475569;">
+                    ติ๊กเลือกหน้าจอที่ต้องการ:
+                  </div>
+                  <div id="device-checkbox-container" class="checkbox-grid"></div>
+                </div>
+              </div>
+
+              <!-- SELECT MEDIA FOR CAMPAIGN -->
+              <div class="form-group">
+                <label>เลือกสื่อจากคลังที่จะนำมาแสดงในแคมเปญนี้ (คลิกเพื่อเลือก) *</label>
+                <div id="campaign-media-picker" class="media-picker-grid">
+                  กำลังโหลดสื่อ...
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>ลำดับความสำคัญ (Priority)</label>
+                <select id="cmp-priority" class="form-control" style="max-width: 220px;">
+                  <option value="0">ปกติ (Normal)</option>
+                  <option value="10" selected>ปานกลาง (Medium)</option>
+                  <option value="20">สูง / เร่งด่วน (Urgent)</option>
+                </select>
+              </div>
+
+              <button type="submit" class="btn btn-primary">
+                <svg class="icon" viewBox="0 0 24 24"><line x1="22" x2="11" y1="2" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                <span>บันทึกและเผยแพร่ไปยังหน้าจอเป้าหมาย</span>
+              </button>
+            </form>
+          </div>
+
+          <!-- Existing Campaigns List -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/></svg>
+                <h3 class="card-title">รายการแคมเปญที่กำลังเผยแพร่ในระบบ</h3>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ชื่อแคมเปญ</th>
+                    <th>เป้าหมายที่แสดง</th>
+                    <th>จำนวนสื่อ</th>
+                    <th>Priority</th>
+                    <th>สร้างเมื่อ</th>
+                    <th style="text-align: right;">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody id="campaigns-table-body">
+                  <tr><td colspan="6" style="text-align: center;">กำลังโหลดข้อมูล...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Bottom Ticker Announcement Bar Settings -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <h3 class="card-title">ข้อความตัววิ่งประชาสัมพันธ์ด้านล่างหน้าจอ (Bottom Ticker Bar)</h3>
+              </div>
+              <button type="button" class="btn btn-outline btn-sm" onclick="loadTickerSetting()">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                <span>รีโหลดข้อความ</span>
+              </button>
+            </div>
+            <form id="ticker-form" onsubmit="handleSaveTicker(event)">
+              <div class="form-group">
+                <label>ข้อความตัววิ่งที่ต้องการให้แสดงบนทุกหน้าจอทีวี</label>
+                <textarea id="ticker-text-input" class="form-control" rows="3" placeholder="ระบุข้อความประกาศ หรือข่าวสารด่วนที่จะวิ่งด้านล่างของหน้าจอทีวี..." required></textarea>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">
+                  ข้อความนี้จะแสดงผลบนแถบด้านล่างของหน้าจอทีวีแบบวิ่งต่อเนื่องอัตโนมัติ (ข้างโลโก้โรงเรียนสมคิดวิทยา) โดยทีวีจะอัปเดตข้อความใหม่ทันที
+                </div>
+              </div>
+              <div>
+                <button type="submit" class="btn btn-primary" id="btn-save-ticker">
+                  <svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>บันทึกข้อความตัววิ่ง</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <!-- TAB 3: Media Library -->
+        <section id="tab-media" class="tab-pane">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                <h3 class="card-title">อัปโหลดไฟล์สื่อใหม่ (วิดีโอ MP4 หรือ ภาพ PNG/JPG/WebP)</h3>
+              </div>
+            </div>
+            <form id="upload-media-form" onsubmit="handleUploadMedia(event)">
+              <div style="display: grid; grid-template-columns: 2fr 1.5fr 1fr auto; gap: 16px; align-items: end;">
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label>เลือกไฟล์สื่อ *</label>
+                  <input type="file" id="media-file-input" class="form-control" accept="video/mp4,image/*" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label>ชื่อสื่อ / คำอธิบาย</label>
+                  <input type="text" id="media-title-input" class="form-control" placeholder="ระบุชื่อสื่อ">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label>เวลาแสดงผล (วินาที)</label>
+                  <input type="number" id="media-duration-input" class="form-control" value="10" min="3" max="300">
+                </div>
+                <button type="submit" class="btn btn-primary" id="btn-upload">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                  <span>Upload สื่อ</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
+                <h3 class="card-title">คลังสื่อทั้งหมด (Media Library)</h3>
+              </div>
+              <button class="btn btn-outline btn-sm" onclick="loadMedia()">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                <span>รีเฟรช</span>
+              </button>
+            </div>
+            <div id="media-gallery" class="media-grid">
+              กำลังโหลดสื่อ...
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 4: TV Simulator -->
+        <section id="tab-simulator" class="tab-pane">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <svg class="icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                <h3 class="card-title">จำลองการแสดงผลสดบนหน้าจอทีวี (Live Screen Simulator)</h3>
+              </div>
+            </div>
+            <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 16px;">
+              ตรวจสอบว่าหน้าจอแต่ละเครื่องกำลังแสดงผลภาพอย่างไร รวมถึงการทดสอบ **ระบบ Ambient Blur พื้นหลังอัตโนมัติ** เมื่อภาพมีสัดส่วนไม่ตรงกับจอ (16:9 vs 9:16)
+            </p>
+            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+              <label style="font-size: 13.5px; font-weight: 600;">เลือกหน้าจอ:</label>
+              <select id="sim-device-select" class="form-control" style="max-width: 320px;" onchange="updateSimulator()">
+                <!-- Populated dynamically -->
+              </select>
+              <button class="btn btn-outline" onclick="toggleSimulatorOrientation()">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+                <span>สลับกรอบ แนวนอน (16:9) / แนวตั้ง (9:16)</span>
+              </button>
+              <button class="btn btn-outline" onclick="updateSimulator()">
+                <svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                <span>Reload สด</span>
+              </button>
+            </div>
+
+            <div class="tv-simulator-container">
+              <div class="tv-frame">
+                <iframe id="tv-sim-iframe" src="about:blank"></iframe>
+              </div>
+              <div style="font-size: 13px; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+                <svg class="icon icon-sm" viewBox="0 0 24 24" style="color: var(--success);"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>ระบบเปิดใช้งาน Dynamic Ambient Blurred Backdrop อัตโนมัติ ป้องกันปัญหาขอบดำเมื่อเปิดสื่อข้ามอัตราส่วน</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- CREATE DEVICE MODAL DIALOG -->
+  <div class="modal-backdrop" id="create-device-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">ลงทะเบียนหน้าจอทีวีใหม่</h3>
+        <button class="btn btn-outline btn-sm" onclick="closeCreateDeviceModal()" style="border: none; padding: 4px;">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="create-device-form" onsubmit="handleCreateDevice(event)">
+        <div class="form-group">
+          <label>Device ID (ภาษาอังกฤษ ตัวพิมพ์เล็ก เช่น tv-hall-01) *</label>
+          <input type="text" id="new-device-id" class="form-control" placeholder="เช่น tv-hall-01, tv-canteen-01" required>
+        </div>
+        <div class="form-group">
+          <label>ชื่อหน้าจอ / ตำแหน่งที่ติดตั้ง *</label>
+          <input type="text" id="new-device-name" class="form-control" placeholder="เช่น ทีวีโถงต้อนรับ อาคารอำนวยการ" required>
+        </div>
+        <div class="form-group">
+          <label>กลุ่ม / โซนของหน้าจอ</label>
+          <select id="new-device-group" class="form-control">
+            <!-- Populated dynamically -->
+          </select>
+        </div>
+        <div class="form-group">
+          <label>ทิศทางการวางจอทีวี (Orientation) *</label>
+          <select id="new-device-orientation" class="form-control">
+            <option value="LANDSCAPE">แนวนอน (Landscape 16:9 ปกติ)</option>
+            <option value="PORTRAIT_90">แนวตั้ง (Portrait 9:16 หมุนตามเข็ม 90°)</option>
+            <option value="PORTRAIT_270">แนวตั้ง (Portrait 9:16 หมุนทวนเข็ม 270°)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>การเปิด/ปิดเสียง (Audio Setting)</label>
+          <select id="new-device-audio" class="form-control">
+            <option value="unmuted">🔊 เปิดเสียงสื่อ (Audio Enabled)</option>
+            <option value="muted">🔇 ปิดเสียง (Muted - สำหรับโซนเงียบ เช่น ห้องสมุด/ห้องเรียน)</option>
+          </select>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeCreateDeviceModal()">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary">ลงทะเบียนหน้าจอ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- EDIT DEVICE MODAL DIALOG (Replaces browser prompt) -->
+  <div class="modal-backdrop" id="edit-device-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">แก้ไขการตั้งค่าหน้าจอทีวี</h3>
+        <button class="btn btn-outline btn-sm" onclick="closeEditDeviceModal()" style="border: none; padding: 4px;">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="edit-device-form" onsubmit="handleSaveDeviceEdit(event)">
+        <input type="hidden" id="edit-device-id">
+        <div class="form-group">
+          <label>Device ID</label>
+          <input type="text" id="edit-device-id-display" class="form-control" disabled style="background: #f1f5f9; color: #64748b;">
+        </div>
+        <div class="form-group">
+          <label>ชื่อหน้าจอ / ตำแหน่งที่ติดตั้ง *</label>
+          <input type="text" id="edit-device-name" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label>กลุ่ม / โซนของหน้าจอ</label>
+          <select id="edit-device-group" class="form-control">
+            <!-- Populated dynamically -->
+          </select>
+        </div>
+        <div class="form-group">
+          <label>ทิศทางการวางจอทีวี (Orientation) *</label>
+          <select id="edit-device-orientation" class="form-control">
+            <option value="LANDSCAPE">แนวนอน (Landscape 16:9 ปกติ)</option>
+            <option value="PORTRAIT_90">แนวตั้ง (Portrait 9:16 หมุนตามเข็ม 90°)</option>
+            <option value="PORTRAIT_270">แนวตั้ง (Portrait 9:16 หมุนทวนเข็ม 270°)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>การเปิด/ปิดเสียง (Audio Setting)</label>
+          <select id="edit-device-audio" class="form-control">
+            <option value="unmuted">🔊 เปิดเสียงสื่อ (Audio Enabled)</option>
+            <option value="muted">🔇 ปิดเสียง (Muted - สำหรับโซนเงียบ เช่น ห้องสมุด/ห้องเรียน)</option>
+          </select>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeEditDeviceModal()">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary">บันทึกการเปลี่ยนแปลง</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- CREATE ZONE MODAL DIALOG -->
+  <div class="modal-backdrop" id="create-zone-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">สร้างโซน / กลุ่มหน้าจอใหม่</h3>
+        <button class="btn btn-outline btn-sm" onclick="closeCreateZoneModal()" style="border: none; padding: 4px;">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="create-zone-form" onsubmit="handleCreateZone(event)">
+        <div class="form-group">
+          <label>รหัสโซน (Zone ID ภาษาอังกฤษ ตัวพิมพ์เล็ก เช่น library, gym) *</label>
+          <input type="text" id="new-zone-id" class="form-control" placeholder="เช่น library, sports-complex, main-gate" required>
+        </div>
+        <div class="form-group">
+          <label>ชื่อโซน / พื้นที่ติดตั้ง *</label>
+          <input type="text" id="new-zone-name" class="form-control" placeholder="เช่น ห้องสมุดเฉลิมพระเกียรติ, ศูนย์กีฬาและนันทนาการ" required>
+        </div>
+        <div class="form-group">
+          <label>คำอธิบาย / รายละเอียดเพิ่มเติม</label>
+          <textarea id="new-zone-desc" class="form-control" rows="2" placeholder="เช่น หน้าจอโถงทางเข้าห้องสมุดและมุมบริการยืม-คืน"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeCreateZoneModal()">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary">สร้างโซน</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- EDIT ZONE MODAL DIALOG -->
+  <div class="modal-backdrop" id="edit-zone-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">แก้ไขข้อมูลโซน</h3>
+        <button class="btn btn-outline btn-sm" onclick="closeEditZoneModal()" style="border: none; padding: 4px;">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="edit-zone-form" onsubmit="handleSaveZoneEdit(event)">
+        <input type="hidden" id="edit-zone-id">
+        <div class="form-group">
+          <label>รหัสโซน (Zone ID)</label>
+          <input type="text" id="edit-zone-id-display" class="form-control" disabled style="background: #f1f5f9; color: #64748b;">
+        </div>
+        <div class="form-group">
+          <label>ชื่อโซน / พื้นที่ติดตั้ง *</label>
+          <input type="text" id="edit-zone-name" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label>คำอธิบาย / รายละเอียด</label>
+          <textarea id="edit-zone-desc" class="form-control" rows="2"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeEditZoneModal()">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary">บันทึกการแก้ไข</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- VIEW ZONE SCREENS MODAL DIALOG -->
+  <div class="modal-backdrop" id="view-zone-screens-modal">
+    <div class="modal-card" style="max-width: 650px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="view-zone-title">หน้าจอทีวีในโซน</h3>
+        <button class="btn btn-outline btn-sm" onclick="closeViewZoneScreensModal()" style="border: none; padding: 4px;">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+        </button>
+      </div>
+      <div id="view-zone-screens-list" style="padding: 12px 0;"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeViewZoneScreensModal()">ปิด</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div id="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -37,11 +37,11 @@ interface DeviceItem {
 
 export default function AdminSignagePage() {
   const [activeTab, setActiveTab] = useState<'console' | 'tv-guide' | 'screens'>('console');
-  const [serverUrl, setServerUrl] = useState<string>('http://localhost:3000');
+  const [serverUrl, setServerUrl] = useState<string>('https://sv-portal.somkidvittaya.ac.th');
   const [isServerOnline, setIsServerOnline] = useState<boolean>(false);
   const [isChecking, setIsChecking] = useState<boolean>(true);
   const [devices, setDevices] = useState<DeviceItem[]>([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('tv-canteen-01');
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('tv-llc-01');
   const [copiedUrl, setCopiedUrl] = useState<boolean>(false);
 
   // Check signage server health
@@ -76,18 +76,10 @@ export default function AdminSignagePage() {
   };
 
   useEffect(() => {
-    // If running in browser and hostname is not localhost, try local network IP or current origin
     if (typeof window !== 'undefined') {
-      const host = window.location.hostname;
-      if (host === 'localhost' || host === '127.0.0.1') {
-        setServerUrl('http://localhost:3000');
-        checkServer('http://localhost:3000');
-      } else {
-        // School LAN fallback
-        const defaultLan = 'http://192.168.0.174:3000';
-        setServerUrl(defaultLan);
-        checkServer(defaultLan);
-      }
+      const origin = window.location.origin;
+      setServerUrl(origin);
+      checkServer(origin);
     }
   }, []);
 

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Android TV Signage Player</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#091b30">
+  <link rel="stylesheet" href="style.css?v=2.5">
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(err => console.log('SW reg fail:', err));
+    }
+  </script>
+</head>
+<body>
+  <div id="player-container">
+    <!-- Media Layer A -->
+    <div id="layer-a" class="media-layer"></div>
+
+    <!-- Media Layer B (Double Buffering for seamless transition) -->
+    <div id="layer-b" class="media-layer"></div>
+
+    <!-- Standby screen when no media is scheduled -->
+    <div id="standby-screen">
+      <img src="assets/images/logo-white.png" alt="Somkidvittaya School" class="standby-logo-img" onerror="this.style.display='none'">
+      <div class="standby-title">โรงเรียนสมคิดวิทยา (Somkidvittaya School)</div>
+      <div class="standby-status" id="standby-status-text">กำลังซิงก์ข้อมูลกับ SV Portal...</div>
+      <div class="device-badge" id="standby-device-id">DEVICE: -</div>
+    </div>
+
+    <!-- Bottom Ticker Bar -->
+    <div id="ticker-bar">
+      <div class="ticker-label">
+        <img src="assets/images/logo.png" alt="Somkidvittaya School" class="ticker-logo-img">
+      </div>
+      <div class="ticker-content">
+        <span class="ticker-text" id="ticker-text">
+          ยินดีต้อนรับสู่โรงเรียนสมคิดวิทยา (Somkidvittaya School) • ระบบสื่อประชาสัมพันธ์ภายในองค์กร SV Portal Signage Suite • ติดต่อสอบถามแผนกเทคโนโลยีสารสนเทศ IT Support
+        </span>
+      </div>
+    </div>
+
+    <!-- Audio Unlock Badge (Only shows if browser blocks unmuted autoplay) -->
+    <div id="audio-unlock-badge" onclick="unlockAudioManual()">
+      <span>🔊 แตะหน้าจอหรือกดปุ่มบนรีโมตเพื่อเปิดเสียง</span>
+    </div>
+
+    <!-- Hidden Diagnostics (Trigger with 'D' key or 5 rapid taps) -->
+    <div id="diagnostic-overlay">
+      <div><strong>[SIGNAGE DIAGNOSTIC]</strong></div>
+      <div>Device: <span id="diag-device"></span></div>
+      <div>Group: <span id="diag-group"></span></div>
+      <div>Orientation: <span id="diag-orientation">LANDSCAPE</span></div>
+      <div>Audio: <span id="diag-audio">UNMUTED (100%)</span></div>
+      <div>Performance: <span id="diag-fps" style="color: #4ade80;">60 FPS (0 dropped)</span></div>
+      <div>Playlist Ver: <span id="diag-ver"></span></div>
+      <div>Items: <span id="diag-items"></span></div>
+      <div>Current: <span id="diag-current"></span></div>
+      <div>Sync: <span id="diag-sync"></span></div>
+      <div>Ping: <span id="diag-ping"></span></div>
+    </div>
+  </div>
+
+  <script src="player.js?v=2.5"></script>
+</body>
+</html>
