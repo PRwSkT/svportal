@@ -6,10 +6,10 @@
   <title>Android TV Signage Player</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#091b30">
-  <link rel="stylesheet" href="style.css?v=3.4">
+  <link rel="stylesheet" href="style.css?v=3.5">
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js?v=3.4').catch(err => console.log('SW reg fail:', err));
+      navigator.serviceWorker.register('sw.js?v=3.5').catch(err => console.log('SW reg fail:', err));
     }
   </script>
 </head>
@@ -18,7 +18,7 @@
     <!-- Top Header Bar (School Brand Identity) -->
     <header id="top-header-bar">
       <div class="header-brand">
-        <img src="assets/images/logo-white.png?v=3.3" alt="Somkidvittaya School" class="header-full-logo">
+        <img src="assets/images/logo.svg?v=3.5" alt="Somkidvittaya School" class="header-full-logo">
       </div>
       <div class="header-right-meta">
         <div class="header-clock" id="header-clock">--:--</div>
@@ -34,7 +34,7 @@
 
     <!-- Standby screen when no media is scheduled -->
     <div id="standby-screen">
-      <img src="assets/images/logo-white.png?v=3.3" alt="Somkidvittaya School" class="standby-logo-img" style="max-height: 85px; width: auto; object-fit: contain;" onerror="this.style.display='none'">
+      <img src="assets/images/logo.svg?v=3.5" alt="Somkidvittaya School" class="standby-logo-img" style="max-height: 85px; width: auto; object-fit: contain;" onerror="this.style.display='none'">
       <div class="standby-title">โรงเรียนสมคิดวิทยา (Somkidvittaya School)</div>
       <div class="standby-status" id="standby-status-text">กำลังซิงก์ข้อมูลกับ SV Portal...</div>
       <div class="device-badge" id="standby-device-id">DEVICE: -</div>
@@ -70,6 +70,6 @@
     </div>
   </div>
 
-  <script src="player.js?v=3.4"></script>
+  <script src="player.js?v=3.5"></script>
 </body>
 </html>
