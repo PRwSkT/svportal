@@ -9,6 +9,7 @@ export async function proxy(request: NextRequest) {
     script-src 'self' 'unsafe-eval' 'unsafe-inline' https: blob: data:;
     style-src 'self' 'unsafe-inline' https:;
     img-src 'self' blob: data: https:;
+    media-src 'self' blob: data: https:;
     font-src 'self' data: https:;
     connect-src 'self' https: wss:;
     frame-src 'self' https:;
@@ -126,7 +127,12 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/api/cron') ||
     request.nextUrl.pathname.startsWith('/api/webhook') ||
     request.nextUrl.pathname.startsWith('/post-assistant') ||
-    request.nextUrl.pathname === '/api/admin/website/sync-post'
+    request.nextUrl.pathname === '/api/admin/website/sync-post' ||
+    request.nextUrl.pathname === '/api/health' ||
+    request.nextUrl.pathname.startsWith('/api/signage') ||
+    request.nextUrl.pathname.startsWith('/tv') ||
+    request.nextUrl.pathname.startsWith('/portal') ||
+    request.nextUrl.pathname.startsWith('/download')
   ) {
     return response;
   }
