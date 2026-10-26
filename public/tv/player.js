@@ -144,24 +144,24 @@ async function fetchWeather() {
 
 function getWeatherInfo(code) {
   const table = {
-    0: { th: 'ท้องฟ้าแจ่มใส', en: 'Clear Sky', icon: '☀️' },
-    1: { th: 'ฟ้าโปร่ง', en: 'Mainly Clear', icon: '🌤️' },
+    0: { th: 'แจ่มใส', en: 'Clear', icon: '☀️' },
+    1: { th: 'โปร่ง', en: 'Fair', icon: '🌤️' },
     2: { th: 'มีเมฆบางส่วน', en: 'Partly Cloudy', icon: '⛅' },
     3: { th: 'มีเมฆมาก', en: 'Overcast', icon: '☁️' },
     45: { th: 'มีหมอก', en: 'Foggy', icon: '🌫️' },
-    48: { th: 'มีหมอกหนา', en: 'Dense Fog', icon: '🌫️' },
-    51: { th: 'ฝนตกปรอยๆ', en: 'Light Drizzle', icon: '🌦️' },
-    53: { th: 'ฝนปรอยปานกลาง', en: 'Moderate Drizzle', icon: '🌦️' },
-    55: { th: 'ฝนปรอยหนาแน่น', en: 'Dense Drizzle', icon: '🌧️' },
-    61: { th: 'ฝนตกเล็กน้อย', en: 'Slight Rain', icon: '🌧️' },
+    48: { th: 'หมอกหนา', en: 'Dense Fog', icon: '🌫️' },
+    51: { th: 'ฝนปรอย', en: 'Light Drizzle', icon: '🌦️' },
+    53: { th: 'ฝนปรอย', en: 'Drizzle', icon: '🌦️' },
+    55: { th: 'ฝนปรอย', en: 'Drizzle', icon: '🌧️' },
+    61: { th: 'ฝนตกเล็กน้อย', en: 'Light Rain', icon: '🌧️' },
     63: { th: 'ฝนตกปานกลาง', en: 'Moderate Rain', icon: '🌧️' },
     65: { th: 'ฝนตกหนัก', en: 'Heavy Rain', icon: '🌧️' },
-    80: { th: 'ฝนโปรยปราย', en: 'Rain Showers', icon: '🌦️' },
-    81: { th: 'ฝนตกชุก', en: 'Moderate Showers', icon: '🌧️' },
-    82: { th: 'ฝนตกหนักมาก', en: 'Heavy Showers', icon: '⛈️' },
-    95: { th: 'พายุฝนฟ้าคะนอง', en: 'Thunderstorm', icon: '⛈️' },
-    96: { th: 'พายุลูกเห็บ', en: 'Thunderstorm & Hail', icon: '⛈️' },
-    99: { th: 'พายุฟ้าคะนองรุนแรง', en: 'Severe Storm', icon: '⛈️' }
+    80: { th: 'ฝนโปรยปราย', en: 'Showers', icon: '🌦️' },
+    81: { th: 'ฝนตกชุก', en: 'Showers', icon: '🌧️' },
+    82: { th: 'ฝนตกหนัก', en: 'Heavy Showers', icon: '⛈️' },
+    95: { th: 'พายุฟ้าคะนอง', en: 'Thunderstorm', icon: '⛈️' },
+    96: { th: 'พายุลูกเห็บ', en: 'Hail Storm', icon: '⛈️' },
+    99: { th: 'พายุฟ้าคะนอง', en: 'Severe Storm', icon: '⛈️' }
   };
   return table[code] || { th: 'มีเมฆบางส่วน', en: 'Partly Cloudy', icon: '🌤️' };
 }
