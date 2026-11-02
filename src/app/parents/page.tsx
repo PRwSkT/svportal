@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { toast } from 'sonner';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { getBangkokDate } from '@/lib/utils';
 import {
   getPipelineState,
   savePipelineState,
@@ -334,10 +335,10 @@ export default function ParentsPortalPage() {
   // Leave Request Form state
   const [leaveType, setLeaveType] = useState<LeaveRequestType>('SICK_LEAVE');
   const [leaveStartDate, setLeaveStartDate] = useState<string>(() =>
-    new Date().toISOString().slice(0, 10)
+    getBangkokDate()
   );
   const [leaveEndDate, setLeaveEndDate] = useState<string>(() =>
-    new Date().toISOString().slice(0, 10)
+    getBangkokDate()
   );
   const [leaveReason, setLeaveReason] = useState<string>('');
 
@@ -843,7 +844,7 @@ export default function ParentsPortalPage() {
       );
       return;
     }
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = getBangkokDate();
     submitMedicationRequest({
       student_id: selectedChild.id,
       medication_name: medName.trim(),

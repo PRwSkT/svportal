@@ -20,3 +20,29 @@ export function getCurrentAcademicYear(): string {
 
   return thaiYear.toString();
 }
+
+/**
+ * Get current date in Asia/Bangkok timezone (YYYY-MM-DD)
+ * Prevents UTC-offset date drift before 07:00 AM local time in Thailand.
+ */
+export function getBangkokDate(date: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(date);
+}
+
+/**
+ * Get current time string in Asia/Bangkok timezone (HH:MM)
+ */
+export function getBangkokTimeString(date: Date = new Date()): string {
+  return new Intl.DateTimeFormat('th-TH', {
+    timeZone: 'Asia/Bangkok',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(date);
+}
+

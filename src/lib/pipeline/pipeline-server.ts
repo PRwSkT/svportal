@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { getAdminClient } from '@/lib/supabase/admin';
+import { getBangkokDate } from '@/lib/utils';
 import type {
   AcademicAssignmentItem,
   AttendanceSource,
@@ -83,7 +84,7 @@ export async function fetchRealPipelineState(
   guardianId?: string
 ): Promise<BidirectionalPipelineState> {
   const supabase = getAdminClient();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = getBangkokDate();
 
   // 1. Fetch core entities in parallel
   const [
@@ -635,7 +636,7 @@ export async function dbRecordAttendance(payload: {
   notes?: string;
 }) {
   const supabase = getAdminClient();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = getBangkokDate();
   const nowIso = new Date().toISOString();
 
   const record = {
@@ -767,7 +768,7 @@ export async function dbUpdatePickupDailyPlan(payload: {
   notes?: string;
 }) {
   const supabase = getAdminClient();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = getBangkokDate();
   const nowIso = new Date().toISOString();
 
   const record: Record<string, unknown> = {
@@ -816,7 +817,7 @@ export async function dbSubmitDropoffNote(payload: {
   special_note?: string;
 }) {
   const supabase = getAdminClient();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = getBangkokDate();
   const nowIso = new Date().toISOString();
 
   const record = {
@@ -886,7 +887,7 @@ export async function dbSaveDailyCare(payload: {
   teacher_note?: string;
 }) {
   const supabase = getAdminClient();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = getBangkokDate();
   const nowIso = new Date().toISOString();
 
   const record = {

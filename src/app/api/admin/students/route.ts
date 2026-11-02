@@ -4,8 +4,8 @@ import { requireAuth } from '@/lib/auth';
 
 export async function GET(request: Request) {
   try {
-    // Add auth check
-    const auth = await requireAuth('admin', 'admin_students');
+    // Add auth check (teachers, academic staff, admins, executives, or admin_students feature)
+    const auth = await requireAuth('teacher', 'admin_students');
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }

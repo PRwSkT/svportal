@@ -5,9 +5,9 @@ import { generateLunchSubsidyWorkbook, generateOn1Workbook } from '@/lib/opec/ps
 
 export async function GET(request: Request) {
   try {
-    const auth = await requireAuth('admin', 'student_nutrition');
+    const auth = await requireAuth('teacher', 'student_nutrition');
     if (auth.error) {
-      const fallbackAuth = await requireAuth('admin', 'admin_students');
+      const fallbackAuth = await requireAuth('teacher', 'admin_students');
       if (fallbackAuth.error) {
         return NextResponse.json({ error: auth.error }, { status: auth.status });
       }

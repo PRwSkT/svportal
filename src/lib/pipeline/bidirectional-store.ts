@@ -37,6 +37,7 @@ import {
   SystemDomainEvent,
   TransportMode,
 } from "@/types/family-pipeline";
+import { getBangkokDate } from "@/lib/utils";
 
 export const PIPELINE_STORAGE_KEY = "sv_bidirectional_pipeline_v2";
 export const PIPELINE_EVENT_NAME = "sv-pipeline-updated";
@@ -168,7 +169,7 @@ export function initRealClientPipelineSync(): void {
 // Initial Real Seed Data from Somkidvittaya Production Database
 // ----------------------------------------------------------------------------
 export function createInitialPipelineState(): BidirectionalPipelineState {
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = getBangkokDate();
 
   // Real Guardian: นายศักดิ์ชัย อุ่นอบ (บิดาของน้องมีฟา และน้องจั๊มเปอร์)
   const guardian: GuardianProfile = {
@@ -1046,7 +1047,7 @@ export function updatePickupDailyPlan(input: {
   actor_name?: string;
 }): PickupDailyPlan | null {
   const state = getPipelineState();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = getBangkokDate();
   const nowIso = new Date().toISOString();
   let idx = state.pickup_plans.findIndex((p) => p.student_id === input.student_id);
 
@@ -1141,7 +1142,7 @@ export function submitEarlyYearsDropoffNote(input: {
 }): EarlyYearsDropoffNote {
   const state = getPipelineState();
   const child = state.children.find((c) => c.id === input.student_id);
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = getBangkokDate();
   const nowIso = new Date().toISOString();
 
   const existingIdx = state.dropoff_notes.findIndex(
@@ -1195,7 +1196,7 @@ export function saveEarlyYearsDailyCare(
   updatedRecord: Partial<EarlyYearsDailyCare> & { student_id: string }
 ): EarlyYearsDailyCare | null {
   const state = getPipelineState();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = getBangkokDate();
   const nowIso = new Date().toISOString();
   let idx = state.early_years_care.findIndex((c) => c.student_id === updatedRecord.student_id);
 
@@ -1696,7 +1697,7 @@ export function recordStudentAttendance(input: {
   notes?: string;
 }): StudentAttendanceLog | null {
   const state = getPipelineState();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = getBangkokDate();
   const nowIso = new Date().toISOString();
   let idx = state.attendance_logs.findIndex((a) => a.student_id === input.student_id);
   const timeStr =

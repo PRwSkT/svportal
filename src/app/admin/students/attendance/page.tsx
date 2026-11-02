@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getBangkokDate } from '@/lib/utils';
 import {
   getPipelineState,
   PIPELINE_EVENT_NAME,
@@ -63,7 +64,7 @@ export default function StudentAttendance360Page() {
   }, [syncPipeline]);
 
   const allStudentAttendance = React.useMemo(() => {
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = getBangkokDate();
     return pipeline.children.map((child) => {
       const existing = pipeline.attendance_logs.find((a) => a.student_id === child.id);
       if (existing) return existing;

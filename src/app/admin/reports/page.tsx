@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { exportToCSV } from '@/lib/export';
+import { getBangkokDate } from '@/lib/utils';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { FileBarChart, Download, Calendar, Activity, Banknote, ShoppingBag, Wallet } from 'lucide-react';
@@ -9,11 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function ReportsPage() {
   const { dict, isThai, formatDate, formatCurrency } = useLanguage();
-  const [dateStr, setDateStr] = useState<string>(() => {
-    const today = new Date();
-    const offset = today.getTimezoneOffset() * 60000;
-    return (new Date(today.getTime() - offset)).toISOString().split('T')[0];
-  });
+  const [dateStr, setDateStr] = useState<string>(() => getBangkokDate());
   
   const [summary, setSummary] = useState<any>(null);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
@@ -111,9 +108,7 @@ export default function ReportsPage() {
           <button
             type="button"
             onClick={() => {
-              const today = new Date();
-              const offset = today.getTimezoneOffset() * 60000;
-              setDateStr((new Date(today.getTime() - offset)).toISOString().split('T')[0]);
+              setDateStr(getBangkokDate());
             }}
             className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-[#7B1C3E]/10 hover:text-[#7B1C3E] text-slate-700 dark:text-slate-300 transition-colors border border-slate-200 dark:border-slate-700"
           >
@@ -123,8 +118,7 @@ export default function ReportsPage() {
             type="button"
             onClick={() => {
               const yesterday = new Date(Date.now() - 86400000);
-              const offset = yesterday.getTimezoneOffset() * 60000;
-              setDateStr((new Date(yesterday.getTime() - offset)).toISOString().split('T')[0]);
+              setDateStr(getBangkokDate(yesterday));
             }}
             className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-[#7B1C3E]/10 hover:text-[#7B1C3E] text-slate-700 dark:text-slate-300 transition-colors border border-slate-200 dark:border-slate-700"
           >

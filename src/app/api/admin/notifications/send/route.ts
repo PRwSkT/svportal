@@ -5,7 +5,7 @@ import { broadcastPushNotifications, sendPushNotification } from '@/lib/notifica
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireAuth('admin');
+    const auth = await requireAuth('admin', 'admin_notifications');
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }

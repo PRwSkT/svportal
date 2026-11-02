@@ -1,6 +1,9 @@
 import { headers } from 'next/headers';
 import AttendanceClient from './AttendanceClient';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default async function AttendancePage() {
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gradient-to-br from-background to-surface py-12 flex flex-col items-center">

@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getAdminClient } from '@/lib/supabase/admin';
 import { getServerUser, requireAuth } from '@/lib/auth';
+import { getBangkokDate } from '@/lib/utils';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(request: Request) {
   try {
@@ -11,10 +16,73 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get today's local date YYYY-MM-DD
-    const today = new Date();
-    const offset = today.getTimezoneOffset() * 60000;
-    const localISODate = (new Date(today.getTime() - offset)).toISOString().split('T')[0];
+    const { searchParams } = new URL(request.url);
+    const isAll = searchParams.get('all') === 'true' || searchParams.has('startDate');
+
+    // Fetch all attendance records (for Attendance Manager / Admin dashboard)
+    if (isAll) {
+      const auth = await requireAuth('admin', 'admin_attendance');
+      if (auth.error) {
+        return NextResponse.json({ error: auth.error }, { status: auth.status });
+      }
+
+      const startDate = searchParams.get('startDate');
+      const endDate = searchParams.get('endDate');
+
+      const supabaseAdmin = getAdminClient();
+
+      let attQuery = supabaseAdmin
+        .from('attendance_records')
+        .select('*')
+        .order('date', { ascending: false })
+        .order('check_in_time', { ascending: true });
+
+      if (startDate) attQuery = attQuery.gte('date', startDate);
+      if (endDate) attQuery = attQuery.lte('date', endDate);
+
+      const [attRes, usersRes, personnelRes] = await Promise.all([
+        attQuery,
+        supabaseAdmin
+          .from('app_users')
+          .select('id, full_name, role, is_active, personnel_id')
+          .order('full_name', { ascending: true }),
+        supabaseAdmin
+          .from('personnel')
+          .select('id, name_th, user_id')
+          .eq('is_active', true)
+      ]);
+
+      if (attRes.error) throw attRes.error;
+      if (usersRes.error) throw usersRes.error;
+
+      const userMap = new Map((usersRes.data || []).map((u: any) => [u.id, u]));
+      const personnelMapByUser = new Map(
+        (personnelRes.data || [])
+          .filter((p: any) => p.user_id)
+          .map((p: any) => [p.user_id, p])
+      );
+
+      const records = (attRes.data || []).map((record: any) => {
+        const appUser = userMap.get(record.user_id);
+        const linkedPersonnel = personnelMapByUser.get(record.user_id);
+        const resolvedName = appUser?.full_name || linkedPersonnel?.name_th || 'ไม่ทราบชื่อ';
+        return {
+          ...record,
+          app_users: {
+            full_name: resolvedName,
+            role: appUser?.role || null,
+          }
+        };
+      });
+
+      return NextResponse.json({
+        records,
+        allUsers: usersRes.data || []
+      });
+    }
+
+    // Default: Fetch today's local date YYYY-MM-DD for current user
+    const localISODate = getBangkokDate();
 
     const supabase = await createClient();
     // Fetch today's attendance record
@@ -30,7 +98,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 
-    return NextResponse.json({ record: data });
+    return NextResponse.json(
+      { record: data || null, serverDate: localISODate },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      }
+    );
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
@@ -88,13 +165,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'กรุณาระบุบุคลากรและวันที่' }, { status: 400 });
       }
 
-      const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
-      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      if (!url || !serviceKey) {
-        throw new Error('Missing Supabase Service Role configuration');
-      }
-      const supabaseAdmin = createSupabaseClient(url, serviceKey);
+      const supabaseAdmin = getAdminClient();
 
       // Check if record exists for this user and date
       const { data: existing } = await supabaseAdmin
@@ -158,22 +229,10 @@ export async function POST(request: Request) {
     }
 
     // Get today's local date in Asia/Bangkok (GMT+7)
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Bangkok',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-    const localISODate = formatter.format(new Date());
+    const localISODate = getBangkokDate();
 
     // We use a service role key to insert/update the timestamp securely on the server
-    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !serviceKey) {
-      throw new Error('Missing Supabase Service Role configuration');
-    }
-    const supabaseAdmin = createSupabaseClient(url, serviceKey);
+    const supabaseAdmin = getAdminClient();
 
     // Check if record exists
     const { data: existingRecord } = await supabaseAdmin
@@ -245,13 +304,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Missing record id' }, { status: 400 });
     }
 
-    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !serviceKey) {
-      throw new Error('Missing Supabase Service Role configuration');
-    }
-    const supabaseAdmin = createSupabaseClient(url, serviceKey);
+    const supabaseAdmin = getAdminClient();
 
     const { data, error } = await supabaseAdmin
       .from('attendance_records')
@@ -285,13 +338,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Missing record id' }, { status: 400 });
     }
 
-    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !serviceKey) {
-      throw new Error('Missing Supabase Service Role configuration');
-    }
-    const supabaseAdmin = createSupabaseClient(url, serviceKey);
+    const supabaseAdmin = getAdminClient();
 
     const { error } = await supabaseAdmin
       .from('attendance_records')

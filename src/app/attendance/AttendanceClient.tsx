@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { getBangkokDate } from '@/lib/utils';
 
 type AttendanceRecord = {
   id: string;
@@ -64,7 +65,13 @@ export default function AttendanceClient() {
   const fetchRecord = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/attendance');
+      const res = await fetch(`/api/attendance?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
       if (res.ok) {
         const data = await res.json();
         setRecord(data.record || null);
@@ -225,11 +232,19 @@ export default function AttendanceClient() {
 
   const formatTime = (dateStr: string | null) => {
     if (!dateStr) return '--:--:--';
-    return new Date(dateStr).toLocaleTimeString('th-TH');
+    return new Date(dateStr).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok' });
   };
 
-  const hasCheckedIn = !!record?.check_in_time;
-  const hasCheckedOut = !!record?.check_out_time;
+  // Strictly bind attendance status to today's date in Bangkok (GMT+7)
+  const todayBangkokDate = getBangkokDate(currentTime);
+  const isTodayRecord = record?.date === todayBangkokDate;
+  const activeRecord = isTodayRecord ? record : null;
+
+  const hasCheckedIn = !!activeRecord?.check_in_time;
+  const hasCheckedOut = !!activeRecord?.check_out_time;
+
+  // Detect unclosed attendance from a previous day
+  const isPastUnclosed = !!(record && record.date !== todayBangkokDate && record.check_in_time && !record.check_out_time);
 
   if (authLoading) return <div className="text-center py-12 text-foreground/50">กำลังตรวจสอบสิทธิ์...</div>;
   if (!user) {
@@ -243,6 +258,17 @@ export default function AttendanceClient() {
       animate={{ opacity: 1, y: 0 }}
       className="bg-surface backdrop-blur-xl p-6 md:p-8 rounded-3xl shadow-xl border border-foreground/5 relative overflow-hidden"
     >
+      {/* Past Unclosed Notice Banner */}
+      {isPastUnclosed && (
+        <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-900 dark:text-amber-200 flex items-start gap-3">
+          <Info className="w-5 h-5 flex-shrink-0 text-amber-600 mt-0.5" />
+          <div className="text-xs leading-relaxed">
+            <span className="font-bold block text-sm mb-0.5">ระบบเริ่มต้นรอบลงเวลาใหม่สำหรับวันนี้เรียบร้อยแล้ว</span>
+            ในวันก่อนหน้า (วันที่ {record?.date}) ไม่ได้มีการบันทึกเวลาออกงาน ระบบได้เปิดรอบลงเวลาเข้างานของวันนี้ ({todayBangkokDate}) ให้โดยอัตโนมัติ คุณสามารถกดปุ่ม <strong>&quot;ลงเวลาเข้างาน&quot;</strong> ได้ทันทีค่ะ
+          </div>
+        </div>
+      )}
+
       {/* LINE In-App Browser Warning Banner */}
       {isLineBrowser && (
         <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 flex items-start gap-3">
@@ -282,7 +308,7 @@ export default function AttendanceClient() {
               </div>
               <div className="text-xs font-bold text-foreground/50 mb-1">เวลาเข้างาน</div>
               <div className={`text-xl font-black ${hasCheckedIn ? 'text-green-600' : 'text-foreground/80'}`}>
-                {formatTime(record?.check_in_time || null)}
+                {formatTime(activeRecord?.check_in_time || null)}
               </div>
             </div>
             <div className={`p-4 rounded-2xl border ${hasCheckedOut ? 'bg-blue-500/10 border-blue-500/20' : 'bg-foreground/5 border-foreground/10'} flex flex-col items-center text-center`}>
@@ -291,7 +317,7 @@ export default function AttendanceClient() {
               </div>
               <div className="text-xs font-bold text-foreground/50 mb-1">เวลาออกงาน</div>
               <div className={`text-xl font-black ${hasCheckedOut ? 'text-blue-600' : 'text-foreground/80'}`}>
-                {formatTime(record?.check_out_time || null)}
+                {formatTime(activeRecord?.check_out_time || null)}
               </div>
             </div>
           </div>

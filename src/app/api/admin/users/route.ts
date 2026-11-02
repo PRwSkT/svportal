@@ -106,16 +106,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: authError.message }, { status: 400 });
     }
 
-    // 2. Insert into app_users
+    // 2. Insert or update into app_users (handle_new_user trigger may have already created the record)
     if (authData.user) {
-      const { error: insertError } = await supabaseAdmin.from('app_users').insert({
+      const { error: insertError } = await supabaseAdmin.from('app_users').upsert({
         id: authData.user.id,
         full_name,
         role,
         is_active: true,
         assigned_features: assigned_features || [],
         personnel_id: personnel_id || null
-      });
+      }, { onConflict: 'id' });
 
       if (insertError) {
         // Rollback auth user creation

@@ -67,7 +67,9 @@ export default function AdminAttendancePage() {
 
   const [isManualModalOpen, setIsManualModalOpen] = useState<boolean>(false);
   const [manualUserId, setManualUserId] = useState<string>('');
-  const [manualDate, setManualDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [manualDate, setManualDate] = useState<string>(() => {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+  });
   const [manualInTime, setManualInTime] = useState<string>('07:15');
   const [manualOutTime, setManualOutTime] = useState<string>('17:00');
   const [isSavingManual, setIsSavingManual] = useState<boolean>(false);
@@ -75,7 +77,6 @@ export default function AdminAttendancePage() {
   const fetchRecords = async (date: Date) => {
     setIsLoading(true);
     setSelectedDateFilter('all');
-    const supabase = createClient();
     
     const year = date.getFullYear();
     const month = date.getMonth() + 1;
@@ -85,38 +86,47 @@ export default function AdminAttendancePage() {
     const endDate = `${year}-${month.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
 
     try {
-      // Parallel fetch attendance records and all app users
-      const [attRes, usersRes] = await Promise.all([
-        supabase
-          .from('attendance_records')
-          .select('*')
-          .gte('date', startDate)
-          .lte('date', endDate)
-          .order('date', { ascending: false })
-          .order('check_in_time', { ascending: true }),
-        supabase
-          .from('app_users')
-          .select('id, full_name')
-          .order('full_name', { ascending: true })
-      ]);
+      // Primary: Fetch attendance and resolved user profiles via server API (bypasses RLS limits)
+      const res = await fetch(`/api/attendance?all=true&startDate=${startDate}&endDate=${endDate}`);
+      if (res.ok) {
+        const data = await res.json();
+        setRecords((data.records || []) as AttendanceRecord[]);
+        setAllUsers((data.allUsers || []) as AppUserItem[]);
+      } else {
+        // Fallback: Parallel fetch attendance records and all app users via client
+        const supabase = createClient();
+        const [attRes, usersRes] = await Promise.all([
+          supabase
+            .from('attendance_records')
+            .select('*')
+            .gte('date', startDate)
+            .lte('date', endDate)
+            .order('date', { ascending: false })
+            .order('check_in_time', { ascending: true }),
+          supabase
+            .from('app_users')
+            .select('id, full_name')
+            .order('full_name', { ascending: true })
+        ]);
 
-      if (usersRes.data) {
-        setAllUsers(usersRes.data as AppUserItem[]);
+        if (usersRes.data) {
+          setAllUsers(usersRes.data as AppUserItem[]);
+        }
+
+        if (attRes.error) {
+          toast.error('ไม่สามารถโหลดข้อมูลได้', { description: attRes.error.message });
+          return;
+        }
+
+        const data = attRes.data || [];
+        const userMap = new Map((usersRes.data || []).map((u: any) => [u.id, u]));
+
+        const mergedData = data.map((record: any) => ({
+          ...record,
+          app_users: userMap.get(record.user_id) || { full_name: 'ไม่ทราบชื่อ' }
+        }));
+        setRecords(mergedData as unknown as AttendanceRecord[]);
       }
-
-      if (attRes.error) {
-        toast.error('ไม่สามารถโหลดข้อมูลได้', { description: attRes.error.message });
-        return;
-      }
-
-      const data = attRes.data || [];
-      const userMap = new Map((usersRes.data || []).map((u: any) => [u.id, u]));
-
-      const mergedData = data.map((record: any) => ({
-        ...record,
-        app_users: userMap.get(record.user_id) || { full_name: 'ไม่ทราบชื่อ' }
-      }));
-      setRecords(mergedData as unknown as AttendanceRecord[]);
     } catch (err: any) {
       toast.error('เกิดข้อผิดพลาดในการโหลดข้อมูล: ' + err.message);
     } finally {
@@ -139,8 +149,14 @@ export default function AdminAttendancePage() {
   const checkIsLate = (timeString: string | null) => {
     if (!timeString) return false;
     const dateObj = new Date(timeString);
-    const hours = dateObj.getHours();
-    const minutes = dateObj.getMinutes();
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Bangkok',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).formatToParts(dateObj);
+    const hours = Number(parts.find(p => p.type === 'hour')?.value || 0);
+    const minutes = Number(parts.find(p => p.type === 'minute')?.value || 0);
     const [cutoffHours, cutoffMinutes] = LATE_CUTOFF_TIME.split(':').map(Number);
     if (hours > cutoffHours) return true;
     if (hours === cutoffHours && minutes > cutoffMinutes) return true;
@@ -150,8 +166,14 @@ export default function AdminAttendancePage() {
   const checkIsEarlyLeave = (timeString: string | null) => {
     if (!timeString) return false;
     const dateObj = new Date(timeString);
-    const hours = dateObj.getHours();
-    const minutes = dateObj.getMinutes();
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Bangkok',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).formatToParts(dateObj);
+    const hours = Number(parts.find(p => p.type === 'hour')?.value || 0);
+    const minutes = Number(parts.find(p => p.type === 'minute')?.value || 0);
     const [cutoffHours, cutoffMinutes] = EARLY_LEAVE_TIME.split(':').map(Number);
     if (hours < cutoffHours) return true;
     if (hours === cutoffHours && minutes < cutoffMinutes) return true;
@@ -160,13 +182,23 @@ export default function AdminAttendancePage() {
 
   const formatTime = (timeString: string | null) => {
     if (!timeString) return '-';
-    return new Date(timeString).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    return new Date(timeString).toLocaleTimeString('th-TH', { 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      timeZone: 'Asia/Bangkok' 
+    });
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('th-TH', { 
-      year: 'numeric', month: 'short', day: 'numeric' 
-    });
+    if (!dateString) return '-';
+    const [year, month, day] = dateString.split('-').map(Number);
+    if (year && month && day) {
+      const d = new Date(year, month - 1, day);
+      return d.toLocaleDateString('th-TH', { 
+        year: 'numeric', month: 'short', day: 'numeric' 
+      });
+    }
+    return dateString;
   };
 
   const monthName = currentDate.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' });
@@ -854,6 +886,7 @@ export default function AdminAttendancePage() {
                     onChange={(e) => setManualUserId(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#7B1C3E]/30"
                   >
+                    <option value="">-- กรุณาเลือกบุคลากร --</option>
                     {allUsers.map((u) => (
                       <option key={u.id} value={u.id}>{u.full_name}</option>
                     ))}
