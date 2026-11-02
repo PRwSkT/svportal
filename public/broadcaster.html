@@ -7,8 +7,7 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#7B1C3E">
   
-  <!-- โหลด YouTube IFrame API -->
-  <script src="https://www.youtube.com/iframe_api"></script>
+  <!-- YouTube IFrame API will be loaded dynamically in the body script -->
   <!-- โหลด Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -69,7 +68,7 @@
 <body class="h-screen overflow-hidden p-4 text-gray-800 flex gap-4">
 
   <!-- Audio Unlock Overlay -->
-  <div id="audio-unlock-overlay" onclick="unlockAudioOverlay()" class="fixed inset-0 bg-gray-900/95 z-[10000] flex flex-col items-center justify-center text-white cursor-pointer backdrop-blur-md transition-opacity duration-500">
+  <div id="audio-unlock-overlay" class="fixed inset-0 bg-gray-900/95 z-[10000] flex flex-col items-center justify-center text-white cursor-pointer backdrop-blur-md transition-opacity duration-500">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-32 h-32 mb-8 animate-bounce text-red-500"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
     <h1 class="text-5xl font-black mb-4">คลิกหน้าจอเพื่อเริ่มระบบ</h1>
     <p class="text-2xl text-gray-300">เบราว์เซอร์จำเป็นต้องให้คุณกดยืนยัน 1 ครั้งเพื่อเปิดระบบเสียงอัตโนมัติ</p>
@@ -79,7 +78,11 @@
   <div id="sos-overlay" class="fixed inset-0 z-[9999] hidden flex-col items-center justify-center animate-pulse">
     <h1 id="sos-overlay-title" class="text-white text-6xl md:text-9xl font-black tracking-widest text-center" style="text-shadow: 0 0 20px rgba(0,0,0,0.5);">EMERGENCY</h1>
     <h2 id="sos-overlay-code" class="text-white text-4xl md:text-7xl font-bold mt-8 bg-black/30 px-12 py-6 rounded-3xl" style="text-shadow: 0 0 10px rgba(0,0,0,0.5);">CODE: -</h2>
-    <p id="sos-overlay-desc" class="text-white text-2xl md:text-4xl font-medium mt-6 text-center px-12" style="text-shadow: 0 0 10px rgba(0,0,0,0.5);"></p>
+    <p id="sos-overlay-desc" class="text-white text-2xl md:text-4xl font-medium mt-6 text-center px-12 max-w-4xl" style="text-shadow: 0 0 10px rgba(0,0,0,0.5);"></p>
+    <button onclick="dismissLocalSOS()" class="mt-10 bg-white/20 hover:bg-white/40 border-2 border-white text-white font-bold text-xl px-10 py-3.5 rounded-full shadow-2xl transition backdrop-blur-md cursor-pointer flex items-center gap-2">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+      รับทราบและปิดสัญญาณเตือนภัย (Acknowledge & Dismiss)
+    </button>
   </div>
 
   <!-- LEFT PANE: Pickups -->
@@ -114,13 +117,13 @@
         </button>
       </div>
       <div class="flex items-center gap-2 mb-3 text-sm text-red-600 bg-red-50 p-2 rounded-lg border border-red-100 font-medium">
-        <input type="checkbox" id="disable-bells" class="rounded text-red-600 focus:ring-red-500 w-4 h-4"> 
+        <input type="checkbox" id="disable-bells" onchange="syncQueueToServer()" class="rounded text-red-600 focus:ring-red-500 w-4 h-4"> 
         <label for="disable-bells" class="cursor-pointer">ปิดระบบออดชั่วคราว (สำหรับวันที่มีกิจกรรมพิเศษ ออดจะไม่ทำงาน)</label>
       </div>
       <div id="music-queue" class="overflow-y-auto flex-grow text-sm flex flex-col gap-2"></div>
       
-      <!-- Hidden YT Player -->
-      <div id="yt-player-container" class="absolute w-0 h-0 overflow-hidden -left-[9999px]">
+      <!-- YT Player (Visible for debugging) -->
+      <div id="yt-player-container" class="mt-4 w-full h-48 rounded-lg overflow-hidden border border-gray-200 shadow-inner">
         <div id="yt-player"></div>
       </div>
     </div>
@@ -241,11 +244,60 @@
     let isPreparingAudio = false;
     const player = document.getElementById('main-player');
     
+    // --- Anti-Audio Collision (Single Audio Master Lock) ---
+    // If multiple windows/tabs are opened, only ONE active master plays audio to prevent overlapping sounds
+    let isAudioMaster = true;
+    const instanceId = 'inst_' + Math.random().toString(36).substring(2, 9);
+    let audioChannel = null;
+
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        audioChannel = new BroadcastChannel('sv_audio_hub_channel');
+        // Announce our presence
+        audioChannel.postMessage({ type: 'PING', id: instanceId });
+
+        audioChannel.onmessage = (event) => {
+          const data = event.data;
+          if (!data) return;
+
+          if (data.type === 'PING') {
+            if (isAudioMaster) {
+              audioChannel.postMessage({ type: 'MASTER_EXISTS', masterId: instanceId });
+            }
+          } else if (data.type === 'MASTER_EXISTS') {
+            if (data.masterId !== instanceId) {
+              console.warn("⚠️ Secondary instance detected. Muting audio to prevent overlapping sounds.");
+              isAudioMaster = false;
+              if (ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
+              showAudioCollisionWarning();
+            }
+          }
+        };
+      } catch(e) {
+        console.warn("BroadcastChannel not supported or error:", e);
+      }
+    }
+
+    function showAudioCollisionWarning() {
+      if (document.getElementById('audio-collision-banner')) return;
+      const banner = document.createElement('div');
+      banner.id = 'audio-collision-banner';
+      banner.className = 'fixed top-0 left-0 right-0 bg-amber-500 text-white text-center py-2 px-4 z-[99999] font-medium text-sm shadow-md flex items-center justify-center gap-2';
+      banner.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+        <span>ตรวจพบโปรแกรมกำลังทำงานอยู่ในเบื้องหลังแล้ว — หน้านี้จะทำงานในโหมดแสดงผลอย่างเดียว และปิดเสียงอัตโนมัติเพื่อป้องกันเสียงซ้อนกัน</span>
+      `;
+      document.body.prepend(banner);
+    }
+    
     // --- State Sync ---
     function syncQueueToServer() {
+      const disableBells = document.getElementById('disable-bells') ? document.getElementById('disable-bells').checked : false;
       const state = {
         musicQueue: musicQueue,
-        currentMusicIndex: currentMusicIndex
+        currentMusicIndex: currentMusicIndex,
+        disableBells: disableBells,
+        bells: bells
       };
       fetch(API_URL, {
         method: 'POST',
@@ -263,13 +315,13 @@
     document.getElementById('audio-unlock-overlay').addEventListener('click', function() {
       try {
         const p1 = document.getElementById('main-player');
-        if(p1) { p1.volume = 1.0; p1.play().catch(e=>{}); p1.pause(); p1.currentTime=0; }
+        if(p1) { p1.play().catch(e=>{}); p1.pause(); p1.currentTime=0; }
         
         const p2 = document.getElementById('bell-player');
         if(p2) { p2.play().catch(e=>{}); p2.pause(); p2.currentTime=0; }
         
         const p3 = document.getElementById('sos-player');
-        if(p3) { p3.volume = 1.0; p3.play().catch(e=>{}); p3.pause(); p3.currentTime=0; }
+        if(p3) { p3.play().catch(e=>{}); p3.pause(); p3.currentTime=0; }
 
         if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.playVideo === 'function') {
           try { ytPlayer.playVideo(); } catch(e) {}
@@ -290,37 +342,177 @@
     }
 
     // ==========================================
-    // 1. YouTube Music Bot Logic
+    // 1. YouTube Music Bot Logic & Break-Time Guard
     // ==========================================
     let ytPlayer;
     let musicQueue = [];
     let currentMusicIndex = -1;
     let fadeInterval = null;
+    let preBellFadeInterval = null;
+    let isPreBellFading = false;
 
     function onYouTubeIframeAPIReady() {
+      console.log("YouTube API Ready!");
       ytPlayer = new YT.Player('yt-player', {
         height: '100', width: '100',
-        playerVars: { 'autoplay': 1, 'controls': 0, 'disablekb': 1, 'rel': 0 },
+        host: 'https://www.youtube.com',
+        playerVars: {
+          'autoplay': 1,
+          'controls': 0,
+          'disablekb': 1,
+          'rel': 0,
+          'origin': 'https://www.youtube.com',
+          'enablejsapi': 1
+        },
         events: {
-          'onReady': (e) => { e.target.setVolume(40); tryPlayMusic(); },
+          'onReady': (e) => { e.target.unMute(); e.target.setVolume(40); tryPlayMusic(); },
           'onStateChange': onPlayerStateChange
         }
       });
     }
 
+    // Load YouTube IFrame API dynamically
+    (function loadYouTubeAPI() {
+      if (typeof module === 'object') {
+        window.module = module;
+        module = undefined;
+      }
+      var tag = document.createElement('script');
+      tag.src = "https://www.youtube.com/iframe_api";
+      tag.onload = function() {
+        if (window.module) module = window.module;
+      };
+      var firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+    })();
+
+    function parseTimeToMinutes(timeStr) {
+      if (!timeStr || !timeStr.includes(':')) return 0;
+      const parts = timeStr.split(':');
+      return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+    }
+
+    // Check if current time is within allowed break periods
+    function getCurrentBreakSlotInfo() {
+      const disableBells = document.getElementById('disable-bells') ? document.getElementById('disable-bells').checked : false;
+      if (disableBells) {
+        return { isAllowed: true, reason: 'ปลดล็อคระบบออดแล้ว (เปิดเพลงได้อิสระ)', nextBellTimeStr: null, remainingSecondsUntilBell: Infinity };
+      }
+
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const currentSeconds = currentMinutes * 60 + now.getSeconds();
+
+      // 1. Morning slot: before assembly bell (default 07:50 or from bell preset)
+      let assemblyBell = bells.find(b => b.preset === 'assembly' || (b.desc && b.desc.includes('แถว')));
+      let assemblyMinutes = assemblyBell ? parseTimeToMinutes(assemblyBell.time) : (7 * 60 + 50);
+
+      if (currentMinutes >= 6 * 60 && currentMinutes < assemblyMinutes) {
+        const bellSec = assemblyMinutes * 60;
+        return {
+          isAllowed: true,
+          slotName: 'ก่อนเข้าแถวเช้า',
+          nextBellTimeStr: assemblyBell ? assemblyBell.time : '07:50',
+          remainingSecondsUntilBell: Math.max(0, bellSec - currentSeconds)
+        };
+      }
+
+      // 2. Lunch slot: between lunch and end_lunch (default 11:30 - 12:30)
+      let lunchBell = bells.find(b => b.preset === 'lunch' || (b.desc && b.desc.includes('กลางวัน') && !b.desc.includes('หมดเวลา')));
+      let endLunchBell = bells.find(b => b.preset === 'end_lunch' || (b.desc && (b.desc.includes('หมดเวลาพัก') || b.desc.includes('เข้าสู่คาบเรียน'))));
+      
+      let lunchStartMin = lunchBell ? parseTimeToMinutes(lunchBell.time) : (11 * 60 + 30);
+      let lunchEndMin = endLunchBell ? parseTimeToMinutes(endLunchBell.time) : (12 * 60 + 30);
+
+      if (currentMinutes >= lunchStartMin && currentMinutes < lunchEndMin) {
+        const bellSec = lunchEndMin * 60;
+        return {
+          isAllowed: true,
+          slotName: 'พักกลางวัน',
+          nextBellTimeStr: endLunchBell ? endLunchBell.time : '12:30',
+          remainingSecondsUntilBell: Math.max(0, bellSec - currentSeconds)
+        };
+      }
+
+      // 3. After dismissal slot: after dismissal bell (default 15:30 - 18:30)
+      let dismissalBell = bells.find(b => b.preset === 'dismissal' || (b.desc && b.desc.includes('เลิกเรียน')));
+      let dismissalMin = dismissalBell ? parseTimeToMinutes(dismissalBell.time) : (15 * 60 + 30);
+
+      if (currentMinutes >= dismissalMin && currentMinutes < (18 * 60 + 30)) {
+        return {
+          isAllowed: true,
+          slotName: 'หลังเลิกเรียน',
+          nextBellTimeStr: null,
+          remainingSecondsUntilBell: Infinity
+        };
+      }
+
+      return {
+        isAllowed: false,
+        reason: 'เปิดเพลงได้เฉพาะช่วงพักเบรก หรือก่อนเข้าแถวเช้าเท่านั้น (เว้นแต่วันที่มีการปลดล็อคระบบออด)',
+        nextBellTimeStr: null,
+        remainingSecondsUntilBell: 0
+      };
+    }
+
+    // Validate if a new song can be queued based on remaining break time
+    function validateQueueTimeWithNewSong(newSongDuration) {
+      const breakInfo = getCurrentBreakSlotInfo();
+      if (!breakInfo.isAllowed) {
+        return { allowed: false, message: breakInfo.reason };
+      }
+      if (breakInfo.remainingSecondsUntilBell === Infinity) {
+        return { allowed: true };
+      }
+
+      // Calculate current active queue duration in seconds
+      let currentActiveQueueSec = 0;
+      if (currentMusicIndex >= 0 && currentMusicIndex < musicQueue.length) {
+        let curTotal = musicQueue[currentMusicIndex].duration || 210;
+        let curPlayed = 0;
+        if (ytPlayer && typeof ytPlayer.getCurrentTime === 'function') {
+          try { curPlayed = ytPlayer.getCurrentTime() || 0; } catch(e) {}
+        }
+        currentActiveQueueSec += Math.max(0, curTotal - curPlayed);
+      }
+      for (let i = currentMusicIndex + 1; i < musicQueue.length; i++) {
+        currentActiveQueueSec += (musicQueue[i].duration || 210);
+      }
+
+      // If active queue is already filling the break
+      if (currentActiveQueueSec >= breakInfo.remainingSecondsUntilBell) {
+        const mins = Math.ceil(currentActiveQueueSec / 60);
+        return {
+          allowed: false,
+          message: `คิวเพลงเต็มช่วงเวลาพักแล้ว (คิวปัจจุบันยาว ~${mins} นาที จะเล่นถึงเวลาออด ${breakInfo.nextBellTimeStr} น. พอดี)`
+        };
+      }
+
+      // If there is still time left, this new song is allowed (it will fade out before bell if it's the last song)
+      return { allowed: true };
+    }
+
     function tryPlayMusic() {
+      if (!isAudioMaster) return;
       if (!ytPlayer || typeof ytPlayer.loadVideoById !== 'function') return;
       
+      const breakInfo = getCurrentBreakSlotInfo();
+      if (!breakInfo.isAllowed) {
+        console.log("Music play blocked: not in break period");
+        return;
+      }
+
       let state = -1;
       if (typeof ytPlayer.getPlayerState === 'function') {
         state = ytPlayer.getPlayerState();
       }
-      // If playing or buffering, do nothing
       if (state === YT.PlayerState.PLAYING || state === YT.PlayerState.BUFFERING) return;
       
       if (currentMusicIndex < 0) currentMusicIndex = 0;
       
       if (currentMusicIndex < musicQueue.length) {
+        ytPlayer.unMute();
+        ytPlayer.setVolume(40);
         ytPlayer.loadVideoById(musicQueue[currentMusicIndex].id);
       }
       renderMusicQueue();
@@ -337,33 +529,81 @@
       return (match && match[1]) ? match[1] : null;
     }
 
-    async function fetchYouTubeTitle(vid) {
+    async function fetchYouTubeInfo(vid) {
+      // In Electron environment, query YouTube directly via Node HTTPS for exact title & approxDurationMs
+      if (typeof require === 'function') {
+        try {
+          const https = require('https');
+          const result = await new Promise((resolve) => {
+            https.get('https://www.youtube.com/watch?v=' + vid, (res) => {
+              let data = '';
+              res.on('data', chunk => data += chunk);
+              res.on('end', () => {
+                const titleMatch = data.match(/<title>(.*?) - YouTube<\/title>/);
+                const durMatch = data.match(/\"approxDurationMs\":\"(\d+)\"/);
+                const durationSec = durMatch ? Math.round(parseInt(durMatch[1], 10) / 1000) : 210;
+                let title = titleMatch ? titleMatch[1].replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&') : `วิดีโอ ${vid}`;
+                resolve({ title, duration: durationSec });
+              });
+            }).on('error', () => resolve({ title: `วิดีโอ ${vid}`, duration: 210 }));
+          });
+          if (result && result.title) return result;
+        } catch(e) {
+          console.warn("Node fetchYouTubeInfo error, fallback to web:", e);
+        }
+      }
+
+      // Web fallback
       try {
         const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${vid}`);
-        if (!res.ok) return `วิดีโอ ${vid}`;
-        const data = await res.json();
-        return data.title || `วิดีโอ ${vid}`;
-      } catch(e) {
-        return `วิดีโอ ${vid}`;
-      }
+        if (res.ok) {
+          const data = await res.json();
+          return { title: data.title || `วิดีโอ ${vid}`, duration: 210 };
+        }
+      } catch(e) {}
+      return { title: `วิดีโอ ${vid}`, duration: 210 };
     }
 
     async function addMusicToQueue() {
       const urlInput = document.getElementById('yt-url');
       const vid = extractVideoID(urlInput.value);
-      if (!vid) return alert('ลิงก์ YouTube ไม่ถูกต้อง');
-      urlInput.value = '';
+      if (!vid) return alert('กรุณาระบุลิงก์ YouTube ที่ถูกต้อง');
 
-      const title = await fetchYouTubeTitle(vid);
-      musicQueue.push({ id: vid, url: 'https://youtu.be/'+vid, title: title });
+      const breakInfo = getCurrentBreakSlotInfo();
+      if (!breakInfo.isAllowed) {
+        return alert('⚠️ ' + breakInfo.reason);
+      }
+
+      urlInput.value = '';
+      const info = await fetchYouTubeInfo(vid);
+
+      const queueCheck = validateQueueTimeWithNewSong(info.duration);
+      if (!queueCheck.allowed) {
+        return alert('⚠️ ' + queueCheck.message);
+      }
+
+      musicQueue.push({ id: vid, url: 'https://youtu.be/' + vid, title: info.title, duration: info.duration });
       renderMusicQueue();
       tryPlayMusic();
+      syncQueueToServer();
     }
 
     function playNextMusic() {
+      const breakInfo = getCurrentBreakSlotInfo();
+      if (!breakInfo.isAllowed) {
+        console.log("Break ended, stopping music queue");
+        if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
+        currentMusicIndex = musicQueue.length;
+        renderMusicQueue();
+        syncQueueToServer();
+        return;
+      }
+
       currentMusicIndex++;
       if (currentMusicIndex < musicQueue.length) {
         if (ytPlayer && typeof ytPlayer.loadVideoById === 'function') {
+          ytPlayer.unMute();
+          ytPlayer.setVolume(40);
           ytPlayer.loadVideoById(musicQueue[currentMusicIndex].id);
         }
       }
@@ -381,11 +621,18 @@
       } else {
         musicQueue.splice(idx, 1);
         if (idx < currentMusicIndex) {
-          currentMusicIndex--; // adjust index if earlier item removed
+          currentMusicIndex--;
         }
         renderMusicQueue();
         syncQueueToServer();
       }
+    }
+
+    function formatDuration(sec) {
+      if (!sec || isNaN(sec)) return '';
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60).toString().padStart(2, '0');
+      return `${m}:${s}`;
     }
 
     function renderMusicQueue() {
@@ -404,10 +651,11 @@
         }
 
         const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 inline-block mr-1"><path fill-rule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clip-rule="evenodd" /></svg>`;
+        const durText = item.duration ? ` (${formatDuration(item.duration)})` : '';
 
         return `
           <div class="${classes}">
-            <span class="truncate pr-2 flex items-center">${isPlaying ? playIcon : ''}${item.title || ('วิดีโอ ' + item.id)}</span>
+            <span class="truncate pr-2 flex items-center">${isPlaying ? playIcon : ''}${item.title || ('วิดีโอ ' + item.id)}<span class="text-xs text-gray-500 ml-1 font-normal">${durText}</span></span>
             <span class="text-xs shrink-0 ${isPlayed ? '' : 'text-gray-400'}">${isPlayed ? 'เล่นแล้ว' : ''}</span>
           </div>
         `;
@@ -434,15 +682,30 @@
       }, 50);
     }
 
+    // Pre-bell gentle fadeout 15-20s before bell
+    function startPreBellFadeout(secondsLeft) {
+      if (!ytPlayer || typeof ytPlayer.getVolume !== 'function') return;
+      clearInterval(preBellFadeInterval);
+      let vol = ytPlayer.getVolume();
+      const step = Math.max(1, vol / (secondsLeft * 8));
+      preBellFadeInterval = setInterval(() => {
+        vol = Math.max(0, vol - step);
+        if (ytPlayer && ytPlayer.setVolume) ytPlayer.setVolume(Math.round(vol));
+        if (vol <= 0) {
+          clearInterval(preBellFadeInterval);
+          if (ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
+        }
+      }, 125);
+    }
+
     function stopMusicForBell() {
+      clearInterval(preBellFadeInterval);
       if (ytPlayer && ytPlayer.stopVideo) {
         duckMusicVolume(true);
         setTimeout(() => ytPlayer.stopVideo(), 1000);
+        currentMusicIndex = musicQueue.length;
+        renderMusicQueue();
       }
-      musicQueue = [];
-      currentMusicIndex = 0;
-      renderMusicQueue();
-      syncQueueToServer();
     }
 
     // ==========================================
@@ -456,13 +719,7 @@
       try {
         const response = await fetch(API_URL + "?action=get_bells&t=" + new Date().getTime());
         const data = await response.json();
-        if (data && data.success && Array.isArray(data.data)) {
-          bells = data.data;
-          localStorage.setItem('sv_bells', JSON.stringify(bells));
-          renderBells();
-          preFetchTTSCache();
-        } else if (Array.isArray(data)) {
-          // Fallback if the API returns just the array directly
+        if (Array.isArray(data)) {
           bells = data;
           localStorage.setItem('sv_bells', JSON.stringify(bells));
           renderBells();
@@ -648,17 +905,37 @@
 
     function checkBells() {
       const disableBells = document.getElementById('disable-bells').checked;
-      if (disableBells) return; // If disabled, don't ring bells at all
+      if (disableBells) return; // If disabled, don't ring bells and don't pre-fade
 
       const now = new Date();
-      const dayOfWeek = now.getDay();
-      
+      const currentSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
       const timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-      
-      const bell = bells.find(b => b.time === timeStr);
-      if (bell && lastRungBell !== timeStr) {
-        lastRungBell = timeStr;
-        triggerBellSequence(bell);
+
+      for (const bell of bells) {
+        if (!bell.time || !bell.time.includes(':')) continue;
+        const [h, m] = bell.time.split(':').map(Number);
+        const bellSec = h * 3600 + m * 60;
+        const diff = bellSec - currentSec;
+
+        // 1. Pre-bell gentle fadeout 15s before bell
+        if (diff > 0 && diff <= 15) {
+          if (!isPreBellFading && ytPlayer && typeof ytPlayer.getPlayerState === 'function') {
+            const state = ytPlayer.getPlayerState();
+            if (state === YT.PlayerState.PLAYING) {
+              isPreBellFading = true;
+              console.log("Starting pre-bell fadeout for bell at " + bell.time);
+              startPreBellFadeout(diff);
+            }
+          }
+        }
+
+        // 2. Bell trigger at exact time
+        if (diff === 0 && lastRungBell !== timeStr) {
+          lastRungBell = timeStr;
+          isPreBellFading = false;
+          triggerBellSequence(bell);
+          break;
+        }
       }
     }
 
@@ -676,19 +953,25 @@
       let hourStr = parseInt(h);
       let ampm = hourStr >= 12 ? 'PM' : 'AM';
       let hour12 = hourStr % 12 || 12;
-      let minVal = parseInt(m);
-      let minStr = minVal === 0 ? "o'clock" : minVal;
+      let minStr = parseInt(m) === 0 ? "o'clock" : parseInt(m);
       
       const enTextDesc = bellObj.descEn ? bellObj.descEn : bellObj.desc;
       const txtEn = "Attention please, the time is now " + hour12 + " " + minStr + " " + ampm + ", " + enTextDesc;
       const audioUrlEn = await fetchAudioData(txtEn, "en-GB");
       if(audioUrlEn) { audioQueue.push(audioUrlEn); }
 
-      let mThai = minVal === 0 ? '' : parseInt(m) + ' นาที ';
-      const txt = "ประกาศ ขณะนี้เวลา " + parseInt(h) + " นาฬิกา " + mThai + bellObj.desc;
+      const txt = "ประกาศ ขณะนี้เวลา " + lastRungBell.replace(':', ' นาฬิกา ') + " นาที " + bellObj.desc;
       const audioUrl = await fetchAudioData(txt, "th-TH");
       if(audioUrl) { audioQueue.push(audioUrl); }
       
+      // If bell signifies end of break or start of class/assembly, stop music queue after speech
+      const isBreakEnding = (bellObj.sound === 'start' || bellObj.preset === 'assembly' || bellObj.preset === 'end_lunch');
+      if (isBreakEnding) {
+        currentMusicIndex = musicQueue.length;
+        renderMusicQueue();
+        syncQueueToServer();
+      }
+
       processAudioQueue();
     }
 
@@ -751,6 +1034,10 @@
     }
 
     async function processAudioQueue() {
+      if (!isAudioMaster) {
+        audioQueue = []; // Clear queue on passive display to ensure zero sound overlap
+        return;
+      }
       if (isPlayingTTS) return;
       isPlayingTTS = true;
       duckMusicVolume(true);
@@ -762,7 +1049,6 @@
           await new Promise(function(resolve) {
             const utterance = new SpeechSynthesisUtterance(item.text);
             utterance.lang = item.lang;
-            utterance.volume = 1.0;
             utterance.onend = resolve;
             utterance.onerror = resolve;
             window.speechSynthesis.speak(utterance);
@@ -786,6 +1072,11 @@
 
       isPlayingTTS = false;
       duckMusicVolume(false);
+      // Restore siren volume to full alert after speech if emergency is still active
+      if (window.isSOSActive) {
+        const sosP = document.getElementById('sos-player');
+        if (sosP && !sosP.paused) sosP.volume = 1.0;
+      }
     }
 
     async function queueStudentPickup(student) {
@@ -797,7 +1088,7 @@
 
       const audios = await Promise.all([
         fetchAudioData("Attention please, student ", "en-GB", true),
-        fetchAudioData(nameForEng, "en-GB", false),
+        fetchAudioData(nameForEng, "th-TH", false),
         fetchAudioData(", please meet your parents at " + gateEng, "en-GB", true),
         fetchAudioData("ประกาศ นักเรียนชื่อ ", "th-TH", true),
         fetchAudioData(nameForThai, "th-TH", false),
@@ -805,7 +1096,6 @@
       ]);
       audioQueue.push('./sounds/ประกาศ.mp3');
       audios.forEach(a => { if(a) audioQueue.push(a); });
-      audioQueue.push('./sounds/ประกาศ.mp3');
       processAudioQueue();
     }
 
@@ -856,6 +1146,26 @@
       }
     }
 
+    function dismissLocalSOS() {
+      window.isSOSActive = false;
+      const overlay = document.getElementById('sos-overlay');
+      if (overlay) {
+        overlay.className = "fixed inset-0 z-[9999] hidden flex-col items-center justify-center animate-pulse";
+      }
+      const sosPlayer = document.getElementById('sos-player');
+      if (sosPlayer) {
+        sosPlayer.pause();
+        sosPlayer.currentTime = 0;
+        sosPlayer.volume = 1.0;
+      }
+      if (typeof player !== 'undefined' && player) {
+        player.pause();
+      }
+      audioQueue = [];
+      isPlayingTTS = false;
+      duckMusicVolume(false);
+    }
+
     function renderAnnouncements(announces) {
       if (!announces) return;
       const listDiv = document.getElementById('announce-list');
@@ -872,7 +1182,17 @@
               const idx = parseInt(cmd.split(':')[1], 10);
               if (!isNaN(idx)) removeMusic(idx);
             }
-            return; // Don't show or speak
+            return;
+          }
+
+          // STOP SOS SILENTLY
+          if (item.th.includes('#STOP_SOS#')) {
+            const div = document.createElement('div');
+            div.className = 'p-3 bg-gray-100 border border-gray-400 rounded-lg shadow-sm animate-slide-in';
+            div.innerHTML = `<div class="font-medium text-gray-700 font-bold">🔇 ปิดเสียงสัญญาณเตือนภัยฉุกเฉิน (Silence SOS)</div>`;
+            listDiv.prepend(div);
+            dismissLocalSOS();
+            return;
           }
 
           // SOS Detection (Color Codes)
@@ -885,103 +1205,70 @@
             const sosConfig = {
               'red': { 
                 th: 'อัคคีภัย / ไฟไหม้',
+                en: 'Fire emergency, please evacuate the building immediately.',
                 action: 'ให้อพยพนักเรียนและบุคลากรออกจากอาคารไปยังจุดรวมพลที่กำหนดไว้ทันที พร้อมเช็คชื่อ',
                 bg: 'bg-red-600', textCode: 'text-red-800', bgCode: 'bg-red-100', borderCode: 'border-red-500'
               },
               'blue': { 
                 th: 'เหตุฉุกเฉินทางการแพทย์',
+                en: 'Medical emergency, please clear the area for the medical team.',
                 action: 'แจ้งทีมพยาบาลเข้าพื้นที่เกิดเหตุทันที พร้อมกันนักเรียนคนอื่นๆ ออกจากบริเวณนั้น',
                 bg: 'bg-blue-600', textCode: 'text-blue-800', bgCode: 'bg-blue-100', borderCode: 'border-blue-500'
               },
               'yellow': {
                 th: 'นักเรียนสูญหาย',
+                en: 'Missing student, staff please secure all gates and check attendance.',
                 action: 'เจ้าหน้าที่รักษาความปลอดภัยปิดล็อกประตูทางเข้า-ออกของโรงเรียนทั้งหมด ครูประจำชั้นตรวจสอบและนับจำนวนนักเรียนทันที',
                 bg: 'bg-yellow-400', textCode: 'text-yellow-800', bgCode: 'bg-yellow-100', borderCode: 'border-yellow-500'
               },
               'orange': {
                 th: 'สารเคมีรั่วไหล / ภัยพิบัติภายนอกอาคาร',
+                en: 'Hazardous materials or external disaster, please shelter in place and seal all doors and windows.',
                 action: 'ให้ทุกคนอยู่ภายในอาคาร ปิดประตู หน้าต่าง และระบบระบายอากาศ เพื่อป้องกันอันตรายจากภายนอก',
                 bg: 'bg-orange-500', textCode: 'text-orange-800', bgCode: 'bg-orange-100', borderCode: 'border-orange-500'
               },
               'silver': {
                 th: 'ภัยคุกคามร้ายแรง / บุคคลมีอาวุธ',
+                en: 'Active threat or armed intruder, initiate immediate lockdown, secure classrooms and stay silent.',
                 action: 'เข้าสู่มาตรการล็อกดาวน์แบบเต็มรูปแบบ ปิดล็อกประตูห้องเรียน ดับไฟ ปิดม่าน ให้นักเรียนซ่อนตัวและงดใช้เสียงเด็ดขาด',
                 bg: 'bg-gray-500', textCode: 'text-gray-800', bgCode: 'bg-gray-200', borderCode: 'border-gray-500'
               },
               'black': {
                 th: 'พบวัตถุต้องสงสัย / ขู่วางระเบิด',
+                en: 'Suspicious object or bomb threat, clear the area and evacuate to a safe perimeter.',
                 action: 'กันพื้นที่และอพยพคนออกจากรัศมีที่คาดว่าจะเป็นอันตราย ห้ามใช้วิทยุสื่อสารหรือโทรศัพท์มือถือในระยะใกล้',
                 bg: 'bg-black', textCode: 'text-gray-900', bgCode: 'bg-gray-300', borderCode: 'border-black'
               }
             };
 
-            // CODE GREEN (ALL CLEAR) OR STOP_SOS
-            if (colorCode === 'green' || item.th.includes('#STOP_SOS#')) {
-              const isSilentStop = item.th.includes('#STOP_SOS#');
-              
-              if (!isSilentStop) {
-                const div = document.createElement('div');
-                div.className = 'p-3 bg-green-100 border border-green-500 rounded-lg shadow-sm animate-slide-in';
-                div.innerHTML = `<div class="font-medium text-green-800 font-bold">✅ ยกเลิกสถานการณ์ฉุกเฉิน (Code Green)</div>`;
-                listDiv.prepend(div);
-              }
+            // CODE GREEN (ALL CLEAR)
+            if (colorCode === 'green') {
+              const div = document.createElement('div');
+              div.className = 'p-3 bg-green-100 border border-green-500 rounded-lg shadow-sm animate-slide-in';
+              div.innerHTML = `<div class="font-medium text-green-800 font-bold">✅ ยกเลิกสถานการณ์ฉุกเฉิน (Code Green - All Clear)</div>`;
+              listDiv.prepend(div);
 
               if (!isInitialLoad) {
-                window.isSOSActive = false;
+                dismissLocalSOS();
 
-                const overlay = document.getElementById('sos-overlay');
-                if (overlay) {
-                  overlay.classList.add('hidden');
-                  overlay.className = 'fixed inset-0 z-50 hidden flex-col items-center justify-center'; // Reset classes
-                }
-                
-                if (typeof player !== 'undefined' && player) {
-                  player.pause();
-                }
-                
-                // Stop the SOS siren alarm!
-                const sosPlayer = document.getElementById('sos-player');
-                if (sosPlayer) {
-                  sosPlayer.pause();
-                  sosPlayer.currentTime = 0;
-                }
-                
-                // Stop any native Web Speech API TTS that is currently playing
-                if (window.speechSynthesis) {
-                  window.speechSynthesis.cancel();
-                }
-
-                if (window.silverTimeout) {
-                  clearTimeout(window.silverTimeout);
-                  window.silverTimeout = null;
-                }
-
-                audioQueue = [];
-                isPlayingTTS = false;
-                duckMusicVolume(false);
-
-                if (!isSilentStop) {
-                  // Speak All Clear ONLY if it's Code Green, NOT #STOP_SOS#
-                  audioQueue.push('./sounds/ประกาศ.mp3');
-                  fetchAudioData(`Code Green, All Clear. Code Green, All Clear.`, "en-GB").then(urlEn => {
-                    if (urlEn) audioQueue.push(urlEn);
-                    return fetchAudioData(`รหัสสีเขียว ยกเลิกสถานการณ์ฉุกเฉิน รหัสสีเขียว ยกเลิกสถานการณ์ฉุกเฉิน`, "th-TH");
-                  }).then(urlTh => {
-                    if (urlTh) audioQueue.push(urlTh);
-                    audioQueue.push('./sounds/ประกาศ.mp3');
-                    processAudioQueue();
-                  }).catch(err => {
-                    console.error("SOS TTS failed:", err);
-                    audioQueue.push('./sounds/ประกาศ.mp3');
-                    processAudioQueue();
-                  });
-                }
+                // Speak All Clear once
+                audioQueue.push('./sounds/ประกาศ.mp3');
+                fetchAudioData(`Attention please, Code Green, All Clear. Code Green, All Clear.`, "en-GB").then(urlEn => {
+                  if (urlEn) audioQueue.push(urlEn);
+                  return fetchAudioData(`ประกาศ ยกเลิกสถานการณ์ฉุกเฉิน รหัสสีเขียว ปลอดภัยแล้ว`, "th-TH");
+                }).then(urlTh => {
+                  if (urlTh) audioQueue.push(urlTh);
+                  processAudioQueue();
+                }).catch(err => {
+                  console.error("SOS TTS failed:", err);
+                  processAudioQueue();
+                });
               }
               return;
             }
 
             // OTHER EMERGENCY CODES
-            const cfg = sosConfig[colorCode];
+            const cfg = sosConfig[colorCode] || { th: 'เหตุฉุกเฉิน', en: 'Emergency situation', action: 'กรุณาปฏิบัติตามคำสั่งของเจ้าหน้าที่', bg: 'bg-red-600', textCode: 'text-red-800', bgCode: 'bg-red-100', borderCode: 'border-red-500' };
             const div = document.createElement('div');
             div.className = `p-3 ${cfg.bgCode} border ${cfg.borderCode} rounded-lg shadow-sm animate-slide-in`;
             div.innerHTML = `<div class="font-medium ${cfg.textCode} font-bold">🚨 สัญญาณเตือนภัยฉุกเฉิน (Code ${colorCode.toUpperCase()}): ${cfg.th}</div>`;
@@ -1004,54 +1291,34 @@
                     currentMusicIndex = musicQueue.length;
                     renderMusicQueue();
                   }
-                } catch(e) { console.warn('SOS YT Stop error:', e); }
+                } catch(e) {}
                 
                 try {
-                  if (typeof player !== 'undefined' && player) {
-                    player.pause();
-                  }
-                } catch(e) { console.warn('SOS Player pause error:', e); }
+                  if (typeof player !== 'undefined' && player) player.pause();
+                } catch(e) {}
                 
+                // Play siren at full volume initially
+                sosPlayer.volume = 1.0;
                 sosPlayer.play().catch(e => console.warn('SOS Play error:', e));
               }
               
               audioQueue = []; // Clear current queue to prioritize SOS
-              isPlayingTTS = false; // Reset TTS state
+              isPlayingTTS = false;
               window.isSOSActive = true;
               
-              // Clear any existing silver timeout
-              if (window.silverTimeout) {
-                clearTimeout(window.silverTimeout);
-                window.silverTimeout = null;
-              }
-              
-              // Code Silver: Auto-mute after 2 minutes (120000 ms) for lockdown safety
-              if (colorCode === 'silver') {
-                window.silverTimeout = setTimeout(() => {
-                  console.log("Auto-muting Code Silver after 2 minutes.");
-                  if (typeof player !== 'undefined' && player) player.pause();
-                  
-                  const sosPlayer = document.getElementById('sos-player');
-                  if (sosPlayer) {
-                    sosPlayer.pause();
-                    sosPlayer.currentTime = 0;
-                  }
-                  
-                  if (window.speechSynthesis) window.speechSynthesis.cancel();
-                  
-                  audioQueue = [];
-                  isPlayingTTS = false;
-                  // Note: window.isSOSActive remains true so the visual warning stays on!
-                }, 120000);
-              }
-              
-              fetchAudioData(`Code ${colorCode}, Emergency Code ${colorCode}.`, "en-GB").then(urlEn => {
+              const txtEn = `Attention please, Emergency Code ${colorCode.toUpperCase()}. ${cfg.en}`;
+              const txtTh = `ประกาศเตือนภัยฉุกเฉิน รหัสสี${getColorThai(colorCode)} ${cfg.th} ${cfg.action}`;
+
+              fetchAudioData(txtEn, "en-GB").then(urlEn => {
                 if (!window.isSOSActive) return;
                 if (urlEn) audioQueue.push(urlEn);
-                return fetchAudioData(`รหัสสี${getColorThai(colorCode)} เหตุฉุกเฉิน รหัสสี${getColorThai(colorCode)}`, "th-TH");
+                return fetchAudioData(txtTh, "th-TH");
               }).then(urlTh => {
                 if (!window.isSOSActive) return;
                 if (urlTh) audioQueue.push(urlTh);
+                
+                // Duck siren to 15% so spoken emergency instructions are heard loud and clear
+                if (sosPlayer) sosPlayer.volume = 0.15;
                 processAudioQueue();
               }).catch(err => {
                 console.error("SOS TTS failed:", err);
@@ -1090,11 +1357,16 @@
                     sessionStorage.setItem('sv_announcedMsgs', JSON.stringify([...announcedIds]));
                     
                     if (!isInitialLoad) {
-                      const title = await fetchYouTubeTitle(item.videoId);
-                      musicQueue.push({ id: item.videoId, url: 'https://youtu.be/' + item.videoId, title: title });
-                      renderMusicQueue();
-                      syncQueueToServer();
-                      tryPlayMusic();
+                      const info = await fetchYouTubeInfo(item.videoId);
+                      const queueCheck = validateQueueTimeWithNewSong(info.duration);
+                      if (queueCheck.allowed) {
+                        musicQueue.push({ id: item.videoId, url: 'https://youtu.be/' + item.videoId, title: info.title, duration: info.duration });
+                        renderMusicQueue();
+                        syncQueueToServer();
+                        tryPlayMusic();
+                      } else {
+                        console.warn("Remote music rejected (outside break or queue full):", info.title, queueCheck.message);
+                      }
                     }
                   }
                 }
@@ -1106,32 +1378,12 @@
     }
 
     // Init
-    function unlockAudioOverlay() {
-      const overlay = document.getElementById('audio-unlock-overlay');
-      if(overlay) {
-        overlay.style.opacity = '0';
-        setTimeout(() => overlay.remove(), 300);
-      }
-      
-      try {
-        const p1 = document.getElementById('main-player');
-        if(p1) p1.volume = 1.0;
-        const p3 = document.getElementById('sos-player');
-        if(p3) p3.volume = 1.0;
-        
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        const ctx = new AudioContext();
-        ctx.resume();
-      } catch (e) {}
-      
-      if (ytPlayer && typeof ytPlayer.playVideo === 'function' && currentMusicIndex < musicQueue.length) {
-        ytPlayer.playVideo();
-      }
-    }
-
     function initApp() {
       fetchBellsFromServer();
       
+      // Precision bell check every 1 second (essential for exact bell seconds and 15s pre-fade)
+      setInterval(checkBells, 1000);
+
       // Load saved state before polling
       fetch(API_URL + "?action=get_state")
         .then(r => r.json())
@@ -1139,6 +1391,10 @@
           let parsedState = state;
           if (typeof parsedState === 'string') {
             try { parsedState = JSON.parse(parsedState); } catch(e) {}
+          }
+          if (parsedState.disableBells !== undefined) {
+            const bellCheck = document.getElementById('disable-bells');
+            if (bellCheck) bellCheck.checked = !!parsedState.disableBells;
           }
           if (parsedState.musicQueue) {
             musicQueue = parsedState.musicQueue;
@@ -1158,8 +1414,8 @@
 
     initApp();
 
-    // Register Service Worker for PWA
-    if ('serviceWorker' in navigator) {
+    // Register Service Worker for PWA (Only on HTTP/HTTPS, not on file:// protocol)
+    if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./service-worker.js')
           .then(reg => console.log('Service Worker registered', reg))
