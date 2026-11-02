@@ -209,7 +209,7 @@ export default function AdminSignagePage() {
                   เปิดคอนโซลเต็มจอ (New Tab)
                 </a>
                 <a 
-                  href={`${serverUrl}/tv/?deviceId=tv-lobby-01`}
+                  href={`${serverUrl}/tv/?deviceId=${encodeURIComponent(selectedDeviceId || 'tv-llc-01')}&preview=1`}
                   target="_blank" 
                   rel="noreferrer"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition border border-emerald-200"

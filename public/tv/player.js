@@ -635,6 +635,11 @@ function hideStandby() {
 // 3. TELEMETRY & HEARTBEAT
 async function sendHeartbeat() {
   try {
+    // Skip heartbeat for test/preview or simulator devices
+    if (deviceId === 'tv-lobby-01' || window.location.search.includes('preview=1') || window.location.search.includes('sim=1')) {
+      return;
+    }
+
     const currentItem = currentPlaylist.items[currentIndex] || null;
     const recentDropped = droppedFrames;
     droppedFrames = 0; // Reset after snapshot so dashboard reflects real-time performance

@@ -20,6 +20,11 @@ export async function POST(
       .maybeSingle();
 
     if (!existing) {
+      // Do not auto-register phantom / demo devices
+      if (deviceId === 'tv-lobby-01' || deviceId.startsWith('test-') || deviceId.startsWith('demo-') || deviceId.startsWith('sim-')) {
+        return NextResponse.json({ success: true, ignored: true });
+      }
+
       await supabase.from('signage_devices').insert({
         id: deviceId,
         name: `TV (${deviceId})`,
