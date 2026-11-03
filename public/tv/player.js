@@ -245,9 +245,61 @@ function startLiveClock() {
   setInterval(fetchWeather, 15 * 60 * 1000);
 }
 
+// Auto-Heal Fully Kiosk Settings (Eliminate PLUS watermark and ensure 60 FPS)
+function autoHealFullyKiosk() {
+  if (!window.fully) return;
+  try {
+    let settingsChanged = false;
+
+    // 1. Clear PLUS Error URL (primary cause of PLUS trial watermark)
+    if (typeof window.fully.getSetting === 'function') {
+      const errUrl = window.fully.getSetting('errorURL');
+      if (errUrl && errUrl.trim() !== '') {
+        console.log('[Fully AutoHeal] Clearing errorURL:', errUrl);
+        if (typeof window.fully.setStringSetting === 'function') {
+          window.fully.setStringSetting('errorURL', '');
+        }
+        settingsChanged = true;
+      }
+    } else if (typeof window.fully.setStringSetting === 'function') {
+      window.fully.setStringSetting('errorURL', '');
+    }
+
+    // 2. Safe Auto-Reload settings (10s retry on boot error, no mid-playback reloads)
+    if (typeof window.fully.setStringSetting === 'function') {
+      window.fully.setStringSetting('reloadPageFailure', '10');
+      window.fully.setStringSetting('timeToScreensaver', '0');
+      window.fully.setStringSetting('screensaverURL', '');
+    }
+
+    // 3. Disable PLUS Kiosk / Motion / Reconnect reload flags
+    if (typeof window.fully.setBooleanSetting === 'function') {
+      window.fully.setBooleanSetting('kioskMode', false);
+      window.fully.setBooleanSetting('motionDetection', false);
+      window.fully.setBooleanSetting('reloadOnInternet', false);
+      window.fully.setBooleanSetting('reloadOnWifiOn', false);
+    }
+
+    // 4. One-time auto-restart to purge trial watermark if settings were cleared
+    const hasRestarted = sessionStorage.getItem('fully_purged_plus_v3');
+    if (!hasRestarted && settingsChanged) {
+      sessionStorage.setItem('fully_purged_plus_v3', 'true');
+      console.log('[Fully AutoHeal] PLUS features cleared! Restarting Fully Kiosk in 1s...');
+      if (typeof window.fully.restartApp === 'function') {
+        setTimeout(() => {
+          window.fully.restartApp();
+        }, 1200);
+      }
+    }
+  } catch (e) {
+    console.warn('[Fully AutoHeal] Failed to heal settings:', e);
+  }
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
   initDeviceId();
+  autoHealFullyKiosk();
   initDiagnosticKey();
   startFrameMonitor();
   setupAudioUnlockListeners();
@@ -306,6 +358,7 @@ function initDeviceId() {
 // 1. PLAYLIST SYNC ENGINE
 async function syncPlaylist() {
   try {
+    autoHealFullyKiosk();
     document.getElementById('diag-sync').textContent = new Date().toLocaleTimeString();
     const res = await fetch(`/api/signage/devices/${deviceId}/playlist`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
