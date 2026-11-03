@@ -265,11 +265,9 @@ function autoHealFullyKiosk() {
       window.fully.setStringSetting('errorURL', '');
     }
 
-    // 2. Safe Auto-Reload settings (10s retry on boot error, no mid-playback reloads)
+    // 2. Disable page failure auto-reload loop (boot polling is handled by local offline.html)
     if (typeof window.fully.setStringSetting === 'function') {
-      window.fully.setStringSetting('reloadPageFailure', '10');
-      window.fully.setStringSetting('timeToScreensaver', '0');
-      window.fully.setStringSetting('screensaverURL', '');
+      window.fully.setStringSetting('reloadPageFailure', '0');
     }
 
     // 3. Disable PLUS Kiosk / Motion / Reconnect reload flags
