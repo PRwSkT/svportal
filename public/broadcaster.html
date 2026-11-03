@@ -1507,17 +1507,27 @@
 
       // Bilingual announcement (English first, Thai second)
       const timeParts = (bellObj.time || '12:00').split(':');
-      const hourStr = parseInt(timeParts[0], 10);
-      const ampm = hourStr >= 12 ? 'PM' : 'AM';
-      const hour12 = hourStr % 12 || 12;
-      const minStr = parseInt(timeParts[1], 10) === 0 ? "o'clock" : parseInt(timeParts[1], 10);
+      const hour24 = parseInt(timeParts[0], 10) || 0;
+      const minNum = parseInt(timeParts[1], 10) || 0;
+      const ampm = hour24 >= 12 ? 'PM' : 'AM';
+      const hour12 = hour24 % 12 || 12;
+
+      let enTimeStr = '';
+      if (minNum === 0) {
+        enTimeStr = `${hour12} ${ampm}`;
+      } else if (minNum < 10) {
+        enTimeStr = `${hour12}:0${minNum} ${ampm}`;
+      } else {
+        enTimeStr = `${hour12}:${minNum} ${ampm}`;
+      }
 
       const enTextDesc = bellObj.descEn || bellObj.desc;
-      const txtEn = `Attention please, the time is now ${hour12} ${minStr} ${ampm}, ${enTextDesc}`;
+      const txtEn = `Attention please, the time is now ${enTimeStr}, ${enTextDesc}`;
       const audioUrlEn = await fetchAudioData(txtEn, "en-GB");
       if (audioUrlEn) audioQueue.push(audioUrlEn);
 
-      const txtTh = `ประกาศ ขณะนี้เวลา ${timeParts[0]} นาฬิกา ${timeParts[1]} นาที ${bellObj.desc}`;
+      const thTimeStr = minNum === 0 ? `${hour24} นาฬิกา` : `${hour24} นาฬิกา ${minNum} นาที`;
+      const txtTh = `ประกาศ ขณะนี้เวลา ${thTimeStr} ${bellObj.desc}`;
       const audioUrlTh = await fetchAudioData(txtTh, "th-TH");
       if (audioUrlTh) audioQueue.push(audioUrlTh);
 
@@ -1546,8 +1556,37 @@
     // ------------------------------------------
     let ttsCache = {};
 
+    function sanitizeTTSText(text, lang) {
+      let s = String(text || '').trim();
+      if (!s) return '';
+
+      if (lang === 'th-TH') {
+        // 1. Convert HH:mm น. or HH.mm น. into natural Thai spoken time
+        s = s.replace(/\b0?(\d{1,2})[:.](\d{2})\s*น\./g, (_, h, m) => {
+          const hr = parseInt(h, 10);
+          const mn = parseInt(m, 10);
+          return mn === 0 ? `${hr} นาฬิกา` : `${hr} นาฬิกา ${mn} นาที`;
+        });
+        // 2. Remove leading zeros before นาฬิกา (e.g. "08 นาฬิกา" -> "8 นาฬิกา")
+        s = s.replace(/\b0+(\d)\s*นาฬิกา/g, '$1 นาฬิกา');
+        // 3. Remove "00 นาที" or "0 นาที" completely (e.g. "16 นาฬิกา 00 นาที" -> "16 นาฬิกา")
+        s = s.replace(/(\d+\s*นาฬิกา)\s*0+\s*นาที/g, '$1');
+        // 4. Remove leading zeros before นาที (e.g. "05 นาที" -> "5 นาที")
+        s = s.replace(/\b0+(\d)\s*นาที/g, '$1 นาที');
+      } else {
+        // English: Fix "4 o'clock PM" -> "4 PM"
+        s = s.replace(/\b(\d{1,2})\s+o'clock\s+(AM|PM)\b/gi, '$1 $2');
+        // Fix "8 5 AM" -> "8:05 AM" and "7 50 AM" -> "7:50 AM"
+        s = s.replace(/\b(\d{1,2})\s+(\d{1,2})\s+(AM|PM)\b/gi, (_, h, m, ap) => {
+          const mn = parseInt(m, 10);
+          return `${h}:${mn < 10 ? '0' + mn : mn} ${ap.toUpperCase()}`;
+        });
+      }
+      return s.replace(/\s{2,}/g, ' ').trim();
+    }
+
     async function fetchAudioData(text, lang) {
-      const cleanText = String(text || '').trim();
+      const cleanText = sanitizeTTSText(text, lang);
       if (!cleanText) return null;
       const cacheKey = lang + ':' + cleanText;
       if (ttsCache[cacheKey]) return ttsCache[cacheKey];
