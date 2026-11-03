@@ -88,8 +88,16 @@ function unlockAudioManual() {
   }
 }
 
+let isDiagnosticOpen = false;
+let frameAnimId = null;
+
 function startFrameMonitor() {
+  if (frameAnimId) {
+    cancelAnimationFrame(frameAnimId);
+    frameAnimId = null;
+  }
   function frameLoop(now) {
+    if (!isDiagnosticOpen) return;
     const delta = now - lastFrameTime;
     
     // Android TV video compositor synchronizes to video native FPS (24-30 FPS, ~33-42ms per frame).
@@ -116,9 +124,9 @@ function startFrameMonitor() {
     }
 
     lastFrameTime = now;
-    requestAnimationFrame(frameLoop);
+    frameAnimId = requestAnimationFrame(frameLoop);
   }
-  requestAnimationFrame(frameLoop);
+  frameAnimId = requestAnimationFrame(frameLoop);
 }
 
 // Live Clock, Date & Weather Rotator
@@ -704,5 +712,13 @@ function initDiagnosticKey() {
 }
 
 function toggleDiagnostic() {
-  diagOverlay.style.display = diagOverlay.style.display === 'block' ? 'none' : 'block';
+  isDiagnosticOpen = diagOverlay.style.display !== 'block';
+  diagOverlay.style.display = isDiagnosticOpen ? 'block' : 'none';
+  if (isDiagnosticOpen) {
+    lastFrameTime = performance.now();
+    startFrameMonitor();
+  } else if (frameAnimId) {
+    cancelAnimationFrame(frameAnimId);
+    frameAnimId = null;
+  }
 }
