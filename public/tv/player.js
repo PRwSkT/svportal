@@ -644,12 +644,24 @@ async function sendHeartbeat() {
     const recentDropped = droppedFrames;
     droppedFrames = 0; // Reset after snapshot so dashboard reflects real-time performance
 
+    let clientIp = null;
+    if (window.fully) {
+      try {
+        if (typeof window.fully.getWifiIpAddress === 'function') {
+          clientIp = window.fully.getWifiIpAddress();
+        } else if (typeof window.fully.getIp4Address === 'function') {
+          clientIp = window.fully.getIp4Address();
+        }
+      } catch (e) {}
+    }
+
     const payload = {
       current_media_id: currentItem ? currentItem.id : null,
       free_storage_mb: 8192, // Simulated available storage
       app_version: '1.2.0-web',
       current_fps: currentFps,
       dropped_frames: recentDropped,
+      ip_address: clientIp || undefined,
       timestamp: new Date().toISOString()
     };
 

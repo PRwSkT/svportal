@@ -10,6 +10,12 @@ export async function POST(
     const body = await request.json().catch(() => ({}));
     const { current_media_id, free_storage_mb, app_version, ip_address, current_fps, dropped_frames } = body;
 
+    const clientIp = ip_address || 
+      request.headers.get('x-nf-client-connection-ip') ||
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+      request.headers.get('x-real-ip') || 
+      null;
+
     const supabase = getAdminClient();
     const now = new Date().toISOString();
 
@@ -28,7 +34,7 @@ export async function POST(
       await supabase.from('signage_devices').insert({
         id: deviceId,
         name: `TV (${deviceId})`,
-        ip_address: ip_address || null,
+        ip_address: clientIp,
         app_version: app_version || '1.0.0',
         status: 'ONLINE',
         last_heartbeat: now,
@@ -46,7 +52,7 @@ export async function POST(
           current_media_id: current_media_id !== undefined ? current_media_id : undefined,
           free_storage_mb: free_storage_mb !== undefined ? free_storage_mb : undefined,
           app_version: app_version !== undefined ? app_version : undefined,
-          ip_address: ip_address !== undefined ? ip_address : undefined,
+          ip_address: clientIp || undefined,
           current_fps: current_fps !== undefined ? current_fps : undefined,
           dropped_frames: dropped_frames !== undefined ? dropped_frames : undefined,
         })
