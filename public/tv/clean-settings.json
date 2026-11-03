@@ -1,0 +1,19 @@
+{
+  "startURL": "https://sv-portal.somkidvittaya.ac.th/tv/?deviceId=tv-llc-01",
+  "errorURL": "",
+  "reloadPageFailure": "10",
+  "reloadOnInternet": false,
+  "reloadOnWifiOn": false,
+  "reloadInterval": "0",
+  "reloadOnIdle": "0",
+  "launchOnBoot": true,
+  "restartOnCrash": true,
+  "keepScreenOn": true,
+  "autoplayAudio": true,
+  "autoplayVideos": true,
+  "timeToScreensaver": "0",
+  "screensaverURL": "",
+  "kioskMode": false,
+  "motionDetection": false,
+  "enableJavaScriptInterface": true
+}
