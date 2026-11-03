@@ -3,11 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>School Broadcasting Hub</title>
+  <title>SV School Broadcasting Hub</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#7B1C3E">
   
-  <!-- YouTube IFrame API will be loaded dynamically in the body script -->
   <!-- โหลด Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -16,11 +15,12 @@
         extend: {
           colors: {
             primary: '#7B1C3E',
+            primaryHover: '#631430',
             secondary: '#1B3A6B',
-            background: '#F5F4F2',
+            background: '#F4F6F9',
           },
           fontFamily: {
-            sans: ['Sukhumvit Set', 'Kanit', 'sans-serif'],
+            sans: ['Sukhumvit Set', 'Kanit', 'Prompt', 'sans-serif'],
           }
         }
       }
@@ -35,225 +35,623 @@
     }
 
     body {
-      background-color: #F5F4F2;
-      background-image: radial-gradient(circle at 100% 0%, #F5E8ED 0%, transparent 40%),
-                        radial-gradient(circle at 0% 100%, #EEF2F8 0%, transparent 40%);
+      background-color: #F4F6F9;
+      background-image: radial-gradient(circle at 100% 0%, #FBEBF1 0%, transparent 40%),
+                        radial-gradient(circle at 0% 100%, #EBF1FA 0%, transparent 40%);
       background-attachment: fixed;
     }
 
     /* ซ่อน scrollbar แต่ยัง scroll ได้ */
     ::-webkit-scrollbar {
       width: 6px;
+      height: 6px;
     }
     ::-webkit-scrollbar-track {
       background: transparent;
     }
     ::-webkit-scrollbar-thumb {
-      background: rgba(0,0,0,0.1);
+      background: rgba(0,0,0,0.15);
       border-radius: 10px;
     }
     ::-webkit-scrollbar-thumb:hover {
-      background: rgba(0,0,0,0.2);
+      background: rgba(0,0,0,0.25);
     }
 
     @keyframes slideIn { 
-      from { opacity: 0; transform: translateX(-10px); } 
-      to { opacity: 1; transform: translateX(0); } 
+      from { opacity: 0; transform: translateY(-8px); } 
+      to { opacity: 1; transform: translateY(0); } 
     }
     .animate-slide-in {
-      animation: slideIn 0.3s ease-out forwards;
+      animation: slideIn 0.25s ease-out forwards;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.02); }
+    }
+    .animate-pulse-glow {
+      animation: pulseGlow 2s infinite ease-in-out;
     }
   </style>
 </head>
-<body class="h-screen overflow-hidden p-4 text-gray-800 flex gap-4">
+<body class="h-screen overflow-hidden p-3 md:p-4 text-gray-800 flex flex-col gap-3 font-sans select-none">
 
-  <!-- Audio Unlock Overlay -->
-  <div id="audio-unlock-overlay" class="fixed inset-0 bg-gray-900/95 z-[10000] flex flex-col items-center justify-center text-white cursor-pointer backdrop-blur-md transition-opacity duration-500">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-32 h-32 mb-8 animate-bounce text-red-500"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
-    <h1 class="text-5xl font-black mb-4">คลิกหน้าจอเพื่อเริ่มระบบ</h1>
-    <p class="text-2xl text-gray-300">เบราว์เซอร์จำเป็นต้องให้คุณกดยืนยัน 1 ครั้งเพื่อเปิดระบบเสียงอัตโนมัติ</p>
+  <!-- Audio Unlock Overlay (First interaction requirement) -->
+  <div id="audio-unlock-overlay" class="fixed inset-0 bg-gray-900/90 z-[10000] flex flex-col items-center justify-center text-white cursor-pointer backdrop-blur-md transition-opacity duration-300">
+    <div class="bg-white/10 p-6 rounded-3xl border border-white/20 text-center max-w-lg shadow-2xl animate-pulse-glow">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-24 h-24 mx-auto mb-4 text-emerald-400"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
+      <h1 class="text-3xl font-black mb-2">คลิกหน้าจอเพื่อเปิดระบบเสียง</h1>
+      <p class="text-gray-200 text-sm mb-4">เบราว์เซอร์ต้องการให้ผู้ใช้กดยืนยัน 1 ครั้งเพื่อเปิดระบบเสียงตามสาย เสียงออดอัตโนมัติ และคิวเพลง</p>
+      <button class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2.5 px-8 rounded-xl shadow-lg transition">
+        เริ่มใช้งานระบบ (Start Hub)
+      </button>
+    </div>
   </div>
 
-  <!-- SOS Flashing Overlay -->
-  <div id="sos-overlay" class="fixed inset-0 z-[9999] hidden flex-col items-center justify-center animate-pulse">
-    <h1 id="sos-overlay-title" class="text-white text-6xl md:text-9xl font-black tracking-widest text-center" style="text-shadow: 0 0 20px rgba(0,0,0,0.5);">EMERGENCY</h1>
-    <h2 id="sos-overlay-code" class="text-white text-4xl md:text-7xl font-bold mt-8 bg-black/30 px-12 py-6 rounded-3xl" style="text-shadow: 0 0 10px rgba(0,0,0,0.5);">CODE: -</h2>
-    <p id="sos-overlay-desc" class="text-white text-2xl md:text-4xl font-medium mt-6 text-center px-12 max-w-4xl" style="text-shadow: 0 0 10px rgba(0,0,0,0.5);"></p>
-    <button onclick="dismissLocalSOS()" class="mt-10 bg-white/20 hover:bg-white/40 border-2 border-white text-white font-bold text-xl px-10 py-3.5 rounded-full shadow-2xl transition backdrop-blur-md cursor-pointer flex items-center gap-2">
+  <!-- SOS Emergency Flashing Overlay -->
+  <div id="sos-overlay" class="fixed inset-0 z-[9999] hidden flex flex-col items-center justify-center animate-pulse">
+    <h1 id="sos-overlay-title" class="text-white text-6xl md:text-8xl font-black tracking-widest text-center" style="text-shadow: 0 0 30px rgba(0,0,0,0.8);">EMERGENCY</h1>
+    <h2 id="sos-overlay-code" class="text-white text-3xl md:text-5xl font-bold mt-6 bg-black/40 px-10 py-4 rounded-2xl" style="text-shadow: 0 0 15px rgba(0,0,0,0.8);">CODE: -</h2>
+    <p id="sos-overlay-desc" class="text-white text-xl md:text-3xl font-medium mt-4 text-center px-8 max-w-4xl" style="text-shadow: 0 0 15px rgba(0,0,0,0.8);"></p>
+    <button onclick="dismissLocalSOS()" class="mt-8 bg-white/20 hover:bg-white/40 border-2 border-white text-white font-bold text-lg px-8 py-3 rounded-full shadow-2xl transition backdrop-blur-md cursor-pointer flex items-center gap-2">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
       รับทราบและปิดสัญญาณเตือนภัย (Acknowledge & Dismiss)
     </button>
   </div>
 
-  <!-- LEFT PANE: Pickups -->
-  <div class="w-1/2 flex flex-col bg-white/80 backdrop-blur-md border border-white rounded-2xl shadow-lg p-4 h-full">
-    <div class="bg-primary text-white text-xl font-semibold text-center py-3 px-4 rounded-xl shadow-sm mb-4 shrink-0 flex items-center justify-center gap-2">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
-      สถานะการรับนักเรียน
-    </div>
-    <div id="pickup-list" class="overflow-y-auto flex-grow pr-2 flex flex-col gap-3">
-      <div class="text-center text-gray-400 mt-8 text-lg">กำลังเชื่อมต่อข้อมูล...</div>
-    </div>
-  </div>
-
-  <!-- RIGHT PANE -->
-  <div class="w-1/2 flex flex-col gap-4 h-full">
-    
-    <!-- Music Player -->
-    <div class="bg-white/80 backdrop-blur-md border border-white rounded-2xl shadow-lg p-4 flex flex-col" style="height: 40%;">
-      <div class="bg-red-600 text-white text-lg font-semibold text-center py-2 px-4 rounded-xl shadow-sm mb-3 shrink-0 flex items-center justify-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z" /></svg>
-        ระบบจัดการเสียงดนตรี
-      </div>
-      <div class="flex gap-2 mb-2">
-        <input type="text" id="yt-url" placeholder="วางลิงก์ YouTube ที่นี่..." class="flex-grow px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
-        <button onclick="addMusicToQueue()" class="bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg transition flex items-center gap-1">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-          เพิ่มรายการเพลง
-        </button>
-        <button onclick="skipMusic()" class="bg-orange-500 hover:bg-orange-600 text-white font-medium px-4 py-2 rounded-lg transition flex items-center gap-1">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8.688c0-.864.933-1.405 1.683-.977l7.108 4.062a1.125 1.125 0 010 1.953l-7.108 4.062A1.125 1.125 0 013 16.81V8.688zM12.75 8.688c0-.864.933-1.405 1.683-.977l7.108 4.062a1.125 1.125 0 010 1.953l-7.108 4.062a1.125 1.125 0 01-1.683-.977V8.688z" /></svg>
-          ข้าม (Skip)
-        </button>
-      </div>
-      <div class="flex items-center gap-2 mb-3 text-sm text-red-600 bg-red-50 p-2 rounded-lg border border-red-100 font-medium">
-        <input type="checkbox" id="disable-bells" onchange="syncQueueToServer()" class="rounded text-red-600 focus:ring-red-500 w-4 h-4"> 
-        <label for="disable-bells" class="cursor-pointer">ปิดระบบออดชั่วคราว (สำหรับวันที่มีกิจกรรมพิเศษ ออดจะไม่ทำงาน)</label>
-      </div>
-      <div id="music-queue" class="overflow-y-auto flex-grow text-sm flex flex-col gap-2"></div>
-      
-      <!-- YT Player (Visible for debugging) -->
-      <div id="yt-player-container" class="mt-4 w-full h-48 rounded-lg overflow-hidden border border-gray-200 shadow-inner">
-        <div id="yt-player"></div>
+  <!-- TOP HEADER / CONTROL BAR -->
+  <header class="bg-white/95 backdrop-blur-md border border-white/80 rounded-2xl shadow-sm px-4 py-2.5 flex items-center justify-between shrink-0">
+    <!-- Brand / Identity -->
+    <div class="flex items-center gap-3">
+      <img src="logo.png" alt="Logo" class="w-10 h-10 object-contain rounded-xl shadow-sm">
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-bold text-gray-900 text-lg leading-tight tracking-tight">SV School Broadcasting Hub</h1>
+          <span class="text-[11px] bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-full border border-primary/20">v1.0.2</span>
+          <span id="active-master-badge" class="text-[11px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+            เครื่องหลัก (Audio Master)
+          </span>
+        </div>
+        <p class="text-xs text-gray-500">ระบบเสียงตามสาย แจ้งเตือนออดอัตโนมัติ และคิวรับนักเรียน โรงเรียนสมคิดวิทยา</p>
       </div>
     </div>
 
-    <!-- Bell Schedule Mini Toggle -->
-    <div class="bg-white/80 backdrop-blur-md border border-white rounded-2xl shadow-lg p-3 flex justify-between items-center shrink-0">
-      <div class="flex items-center gap-2 text-emerald-600 font-bold text-base">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" /></svg>
-        ระบบเสียงออดอัตโนมัติ
+    <!-- Center: Next Bell Countdown & Status -->
+    <div class="hidden lg:flex items-center gap-3">
+      <div id="next-bell-card" class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 px-4 py-1.5 rounded-xl shadow-sm flex items-center gap-2.5">
+        <div class="w-7 h-7 rounded-lg bg-emerald-500 text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+          🔔
+        </div>
+        <div class="flex flex-col">
+          <span class="text-[11px] font-semibold text-emerald-800 uppercase tracking-wider flex items-center gap-1">
+            สัญญาณออดถัดไป (Next Bell)
+          </span>
+          <span id="next-bell-text" class="text-xs font-bold text-gray-800 leading-tight">กำลังตรวจสอบเวลา...</span>
+        </div>
       </div>
-      <button onclick="toggleBellModal(true)" class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-medium transition text-sm flex items-center gap-1">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M10.34 15.84c-.688-.06-1.386-.09-2.09-.09H7.5a4.5 4.5 0 110-9h.75c.704 0 1.402-.03 2.09-.09m0 9.18c.253.962.584 1.892.985 2.783.247.55.06 1.21-.463 1.511l-.657.38c-.551.318-1.26.117-1.527-.461a20.845 20.845 0 01-1.44-4.282m3.102.069a18.03 18.03 0 01-.59-4.59c0-1.586.205-3.124.59-4.59m0 9.18a23.848 23.848 0 018.835 2.535M10.34 6.66a23.847 23.847 0 008.835-2.535m0 0A23.74 23.74 0 0018.795 3m.38 1.125a23.91 23.91 0 011.014 5.395m-1.014 8.855c-.118.38-.245.754-.38 1.125m.38-1.125a23.91 23.91 0 001.014-5.395m0-3.46c.495.413.811 1.035.811 1.73 0 .695-.316 1.317-.811 1.73m0-3.46a24.347 24.347 0 010 3.46" /></svg>
-        ตั้งค่าเวลาออด
+    </div>
+
+    <!-- Right: Bell Master Toggle, Schedule Modal & Live Clock -->
+    <div class="flex items-center gap-3">
+      <!-- Master Bell Toggle Switch -->
+      <div class="flex items-center gap-2 bg-gray-50/90 border border-gray-200 px-3 py-1.5 rounded-xl shadow-2xs hover:border-emerald-300 transition select-none">
+        <label for="bell-master-toggle" class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="bell-master-toggle" onchange="toggleBellSystem(this.checked)" checked class="sr-only peer">
+          <div class="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+        </label>
+        <div class="flex flex-col text-left">
+          <span id="bell-toggle-label" class="text-xs font-bold text-emerald-800 leading-tight">ระบบออด: เปิด</span>
+          <span id="bell-toggle-subtext" class="text-[10px] text-gray-500 leading-none">ดังตามตาราง</span>
+        </div>
+      </div>
+
+      <!-- Bell Schedule Modal Button -->
+      <button onclick="toggleBellModal(true)" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-semibold shadow-sm transition flex items-center gap-1.5 cursor-pointer">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+        <span>ตารางออด (<b id="bell-count-badge">0</b>)</span>
       </button>
-    </div>
 
-    <!-- Announcements -->
-    <div class="bg-white/80 backdrop-blur-md border border-white rounded-2xl shadow-lg p-4 flex flex-col flex-grow">
-      <div class="bg-purple-600 text-white text-lg font-semibold text-center py-2 px-4 rounded-xl shadow-sm mb-3 shrink-0 flex items-center justify-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
-        ประวัติการประกาศข่าวสาร
+      <!-- Live Clock -->
+      <div class="text-right pl-2 border-l border-gray-200">
+        <div id="live-clock" class="text-2xl font-black text-gray-800 font-mono tracking-tight leading-none">00:00:00</div>
+        <div id="live-date" class="text-[11px] text-gray-500 mt-0.5 font-medium">กำลังโหลดวันที่...</div>
       </div>
-      <div id="announce-list" class="overflow-y-auto flex-grow flex flex-col gap-2"></div>
     </div>
+  </header>
 
-  </div>
+  <!-- MAIN DUAL-PANE WORKSPACE -->
+  <main class="flex-grow flex gap-4 overflow-hidden min-h-0">
 
-  <!-- Bell Schedule Modal -->
-  <div id="bell-modal" class="fixed inset-0 bg-gray-900/60 z-[9900] hidden flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden">
-      <!-- Modal Header -->
-      <div class="bg-emerald-500 p-4 flex justify-between items-center text-white shrink-0">
-        <h2 class="text-xl font-bold flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" /></svg>
-          ตั้งค่าตารางเวลาเสียงออด
-        </h2>
-        <button onclick="toggleBellModal(false)" class="text-white hover:text-gray-200 transition p-1">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-        </button>
+    <!-- LEFT PANE: Student Pickup Queue (50%) -->
+    <section class="w-1/2 flex flex-col bg-white/90 backdrop-blur-md border border-white/80 rounded-2xl shadow-sm p-4 h-full overflow-hidden">
+      <!-- Section Header -->
+      <div class="bg-primary text-white py-2.5 px-4 rounded-xl shadow-sm mb-3 shrink-0 flex items-center justify-between">
+        <div class="flex items-center gap-2 font-bold text-base">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
+          <span>สถานะการรับนักเรียน (Student Pickups)</span>
+        </div>
+        <span id="pickup-count-badge" class="bg-white/20 text-white text-xs px-2.5 py-0.5 rounded-full font-semibold">
+          รอรับ 0 คน
+        </span>
       </div>
 
-      <!-- Modal Body (List) -->
-      <div id="bell-list" class="overflow-y-auto p-4 flex-grow flex flex-col gap-2 bg-gray-50 min-h-[250px]"></div>
+      <!-- Pickups List -->
+      <div id="pickup-list" class="overflow-y-auto flex-grow pr-1 flex flex-col gap-2.5">
+        <div class="text-center text-gray-400 py-16 text-sm flex flex-col items-center justify-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <span>ยังไม่มีข้อมูลการรับนักเรียนในขณะนี้</span>
+        </div>
+      </div>
+    </section>
 
-      <!-- Modal Footer (Add Form) -->
-      <div class="p-4 border-t border-gray-200 bg-white flex flex-col gap-3 shrink-0">
-        <div class="flex gap-2 items-end">
-          <div class="w-1/4">
-            <label class="block text-sm text-gray-600 mb-1">เวลา</label>
-            <input type="time" id="bell-time" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
+    <!-- RIGHT PANE: Music Hub & School Announcements (50%) -->
+    <section class="w-1/2 flex flex-col gap-3 h-full overflow-hidden">
+      
+      <!-- 1. Music Hub (Flex proportioned, fits compact screens) -->
+      <div class="bg-white/90 backdrop-blur-md border border-white/80 rounded-2xl shadow-sm p-3.5 flex flex-col shrink-0" style="max-height: 52%; min-height: 250px;">
+        <!-- Card Header -->
+        <div class="flex items-center justify-between mb-2 shrink-0">
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-red-500 animate-pulse"></span>
+            <h2 class="font-bold text-gray-900 text-sm flex items-center gap-1.5">
+              ระบบจัดการเพลง (School Music Hub)
+            </h2>
           </div>
-          <div class="w-3/4">
-            <label class="block text-sm text-gray-600 mb-1">รูปแบบเหตุการณ์ (Preset)</label>
-            <select id="bell-preset" onchange="handlePresetChange()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
-              <option value="custom">กำหนดเอง (Custom)</option>
-              <option value="assembly">เข้าเรียน / เคารพธงชาติ (Morning Assembly)</option>
-              <option value="change_period">เปลี่ยนคาบเรียน (Change Period)</option>
-              <option value="lunch">พักรับประทานอาหารกลางวัน (Lunch Break)</option>
-              <option value="end_lunch">หมดเวลาพัก / เข้าเรียนภาคบ่าย (End of Lunch Break)</option>
-              <option value="dismissal">เลิกเรียน (School Dismissed)</option>
+
+          <!-- Volume Slider & Skip -->
+          <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1.5 bg-gray-100 px-2.5 py-1 rounded-lg border border-gray-200 text-xs">
+              <span class="text-gray-500">🔊</span>
+              <input type="range" id="music-vol" min="0" max="100" value="50" oninput="changeMusicVolume(this.value)" class="w-20 h-1 bg-gray-300 rounded-lg cursor-pointer accent-red-600">
+              <span id="vol-text" class="font-mono text-gray-700 w-8 text-right font-medium">50%</span>
+            </div>
+            <button onclick="skipMusic()" class="bg-amber-500 hover:bg-amber-600 text-white font-medium px-2.5 py-1 rounded-lg transition text-xs flex items-center gap-1 cursor-pointer shadow-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M4.555 5.168A1 1 0 003 6v8a1 1 0 001.555.832L10 11.202V14a1 1 0 001.555.832l6-4a1 1 0 000-1.664l-6-4A1 1 0 0010 6v2.798L4.555 5.168z" /></svg>
+              ข้าม (Skip)
+            </button>
+            <button onclick="clearMusicQueue()" class="text-gray-400 hover:text-red-500 p-1 transition" title="ล้างคิวเพลงทั้งหมด">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Music Input Bar -->
+        <div class="flex gap-2 mb-2 shrink-0">
+          <input type="text" id="yt-url" placeholder="วางลิงก์ YouTube ที่นี่..." class="flex-grow text-xs px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 bg-white">
+          <button onclick="addMusicToQueue()" class="bg-red-600 hover:bg-red-700 text-white font-medium px-3 py-1.5 rounded-lg transition text-xs flex items-center gap-1 shadow-sm cursor-pointer shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+            เพิ่มเพลง
+          </button>
+        </div>
+
+        <!-- Mode & Status Indicator Banner -->
+        <div id="music-status-banner" class="mb-2 shrink-0 rounded-lg p-2 text-xs border transition-all flex items-center justify-between">
+          <!-- Populated by updateMusicStatusBanner() -->
+        </div>
+
+        <!-- Music Playlist Queue (Scrollable) -->
+        <div id="music-queue" class="overflow-y-auto flex-grow text-xs flex flex-col gap-1.5 pr-1 min-h-[60px] bg-gray-50/50 rounded-lg p-1.5 border border-gray-100"></div>
+
+        <!-- Compact / Collapsible Video Box -->
+        <div class="mt-2 shrink-0">
+          <div class="flex justify-between items-center text-[11px] text-gray-500 mb-1">
+            <span class="truncate">กำลังเล่น: <b id="now-playing-title" class="text-gray-700">-</b></span>
+            <button onclick="toggleVideoView()" id="btn-toggle-video" class="hover:text-red-600 cursor-pointer font-medium text-[11px]">
+              👁️ ซ่อนหน้าต่างวิดีโอ
+            </button>
+          </div>
+          <div id="yt-player-container" class="w-full h-28 rounded-lg overflow-hidden border border-gray-200 shadow-inner bg-black">
+            <div id="yt-player"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. School Announcements History (Takes remaining space) -->
+      <div class="bg-white/90 backdrop-blur-md border border-white/80 rounded-2xl shadow-sm p-3.5 flex flex-col flex-grow overflow-hidden">
+        <div class="bg-secondary text-white py-2 px-3.5 rounded-xl shadow-sm mb-2.5 shrink-0 flex items-center justify-between">
+          <div class="flex items-center gap-2 font-bold text-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
+            <span>ประวัติการประกาศข่าวสาร (Announcements)</span>
+          </div>
+          <span class="text-[11px] bg-white/20 px-2 py-0.5 rounded font-medium">เสียงหัว-ท้ายอัตโนมัติ</span>
+        </div>
+        <div id="announce-list" class="overflow-y-auto flex-grow flex flex-col gap-2 pr-1">
+          <div class="text-center text-gray-400 py-6 text-xs">ยังไม่มีประวัติการประกาศในวันนี้</div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ========================================== -->
+  <!-- MODAL: Bell Schedule Management            -->
+  <!-- ========================================== -->
+  <div id="bell-modal" class="fixed inset-0 bg-gray-900/60 z-[9900] hidden flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[92vh] overflow-hidden border border-gray-100">
+      
+      <!-- Modal Header -->
+      <div class="bg-emerald-600 p-4 flex justify-between items-center text-white shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-lg">🔔</div>
+          <div>
+            <h2 class="text-lg font-bold leading-tight">จัดการตารางเวลาเสียงออดโรงเรียน</h2>
+            <p class="text-xs text-emerald-100">ซิงค์อัตโนมัติกับ Google Sheets และระบบเสียงของโรงเรียน</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <!-- Modal Bell System Toggle -->
+          <div class="flex items-center gap-1.5 bg-emerald-700/60 px-2.5 py-1 rounded-lg border border-emerald-400/30 select-none">
+            <label for="modal-bell-toggle" class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="modal-bell-toggle" onchange="toggleBellSystem(this.checked)" checked class="sr-only peer">
+              <div class="w-7 h-4 bg-emerald-900 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-300"></div>
+            </label>
+            <span id="modal-bell-toggle-label" class="text-xs font-semibold text-white">ระบบออด: เปิด</span>
+          </div>
+
+          <button onclick="toggleBellModal(false)" class="text-white hover:text-emerald-200 transition p-1 cursor-pointer">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Full-Day Schedule Presets Toolbar -->
+      <div class="bg-emerald-50/90 border-b border-emerald-200/80 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 shrink-0">
+        <div class="flex items-center gap-2 flex-grow max-w-md">
+          <label for="day-preset-select" class="text-xs font-bold text-emerald-900 shrink-0 flex items-center gap-1">
+            <span>📁 ชุดตารางประจำวัน:</span>
+          </label>
+          <select id="day-preset-select" onchange="updateDeletePresetButtonState()" class="text-xs font-medium px-2.5 py-1.5 border border-emerald-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500 flex-grow shadow-2xs">
+            <!-- Populated dynamically -->
+          </select>
+          <button onclick="applySelectedDayPreset()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition flex items-center gap-1 shrink-0 cursor-pointer" title="นำชุดตารางนี้มาใช้งาน">
+            ⚡ โหลดตารางนี้
+          </button>
+        </div>
+
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button onclick="saveCurrentAsNewDayPreset()" class="bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold px-3 py-1.5 rounded-lg shadow-2xs transition flex items-center gap-1 cursor-pointer" title="บันทึกตารางที่จัดเสร็จแล้วไว้เป็น Preset ใหม่">
+            💾 บันทึกตารางปัจจุบันเป็น Preset ใหม่
+          </button>
+          <button onclick="deleteSelectedDayPreset()" id="btn-del-preset" class="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-lg transition" title="ลบ Preset ที่เลือก (เฉพาะ Preset ที่สร้างเอง)">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+          </button>
+        </div>
+      </div>
+      </div>
+
+      <!-- Modal Body (Bells List) -->
+      <div id="bell-list" class="overflow-y-auto p-4 flex-grow flex flex-col gap-2.5 bg-gray-50 min-h-[220px]">
+        <!-- Populated by renderBells() -->
+      </div>
+
+      <!-- Modal Footer (Add/Edit Form) -->
+      <div class="p-4 border-t border-gray-200 bg-white flex flex-col gap-3 shrink-0">
+        <div class="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
+          <span>➕ เพิ่ม / แก้ไขเวลาออด</span>
+          <span id="bell-form-mode" class="text-emerald-600 font-normal"></span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+          <!-- Time Input -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">เวลา (HH:mm)</label>
+            <input type="time" id="bell-time" class="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-semibold bg-white">
+          </div>
+
+          <!-- Preset Selector -->
+          <div class="md:col-span-2">
+            <label class="block text-xs font-semibold text-gray-600 mb-1">เลือกรูปแบบเหตุการณ์ (Preset)</label>
+            <select id="bell-preset" onchange="handlePresetChange()" class="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-xs bg-white font-medium">
+              <option value="custom">✏️ กำหนดเอง (Custom)</option>
+              <option value="assembly">🔔 07:50 - เข้าแถวเคารพธงชาติ (Morning Assembly)</option>
+              <option value="homeroom">🔔 08:10 - เข้าโฮมรูม (Morning Homeroom)</option>
+              <option value="start_period_1">🔔 08:30 - เริ่มคาบเรียนที่ 1 (Start Period 1)</option>
+              <option value="break_morning">☕ 09:30 - พักเบรกเช้า 10 นาที (Morning Break)</option>
+              <option value="end_break_morning">🔔 09:40 - หมดเวลาพักเช้า เข้าเรียนต่อ (End Morning Break)</option>
+              <option value="change_period">🔄 เปลี่ยนคาบเรียน (Change Period)</option>
+              <option value="lunch">🍱 11:40 - พักรับประทานอาหารกลางวัน (Lunch Break)</option>
+              <option value="end_lunch">🔔 12:40 - หมดเวลาพักกลางวัน เข้าเรียนบ่าย (End Lunch Break)</option>
+              <option value="break_afternoon">☕ 14:40 - พักเบรกบ่าย 10 นาที (Afternoon Break)</option>
+              <option value="end_break_afternoon">🔔 14:50 - หมดเวลาพักบ่าย เข้าเรียนต่อ (End Afternoon Break)</option>
+              <option value="homeroom_afternoon">🔔 15:50 - โฮมรูมก่อนเลิกเรียน (Afternoon Homeroom)</option>
+              <option value="dismissal">🎒 16:00 - เลิกเรียน กลับบ้านโดยสวัสดิภาพ (Dismissal)</option>
             </select>
           </div>
         </div>
 
-        <!-- Period Input (Hidden by default) -->
-        <div id="bell-period-container" class="hidden flex gap-2 items-center bg-emerald-50 p-3 rounded-lg border border-emerald-100">
-          <span class="text-sm text-gray-700">หมดคาบที่</span>
-          <input type="number" id="bell-period-current" min="1" max="10" value="1" oninput="updatePresetDesc()" class="w-16 px-2 py-1 border border-emerald-300 rounded-lg text-center font-medium bg-white outline-none focus:ring-2 focus:ring-emerald-500">
-          <span class="text-sm text-gray-700">เตรียมเข้าคาบที่</span>
-          <input type="number" id="bell-period-next" min="1" max="10" value="2" oninput="updatePresetDesc()" class="w-16 px-2 py-1 border border-emerald-300 rounded-lg text-center font-medium bg-white outline-none focus:ring-2 focus:ring-emerald-500">
+        <!-- Period Selectors (Visible for change_period) -->
+        <div id="bell-period-container" class="hidden flex gap-2 items-center bg-emerald-50 p-2.5 rounded-lg border border-emerald-200 text-xs">
+          <span class="text-gray-700 font-medium">หมดคาบที่</span>
+          <input type="number" id="bell-period-current" min="1" max="10" value="2" oninput="updatePresetDesc()" class="w-16 px-2 py-1 border border-emerald-300 rounded-lg text-center font-bold bg-white outline-none focus:ring-2 focus:ring-emerald-500">
+          <span class="text-gray-700 font-medium">เตรียมเข้าคาบที่</span>
+          <input type="number" id="bell-period-next" min="1" max="10" value="3" oninput="updatePresetDesc()" class="w-16 px-2 py-1 border border-emerald-300 rounded-lg text-center font-bold bg-white outline-none focus:ring-2 focus:ring-emerald-500">
         </div>
 
-        <!-- Custom Details Input -->
-        <div id="bell-custom-container" class="flex flex-col gap-2">
-          <div class="flex gap-2">
-            <input type="text" id="bell-desc" placeholder="ประกาศ (ไทย) เช่น หมดเวลาเรียน" class="w-1/2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
-            <input type="text" id="bell-desc-en" placeholder="(อังกฤษ) เช่น Class dismissed" class="w-1/2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
+        <!-- Description & Sound Inputs -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+          <div class="md:col-span-2 flex flex-col gap-1.5">
+            <input type="text" id="bell-desc" placeholder="ข้อความเสียงไทย เช่น ถึงเวลาเข้าแถวเคารพธงชาติ" class="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-xs">
+            <input type="text" id="bell-desc-en" placeholder="ข้อความเสียงภาษาอังกฤษ เช่น It's time for the morning assembly." class="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-xs italic text-gray-600">
           </div>
           <div>
-            <select id="bell-sound" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none">
-              <option value="default">เสียงมาตรฐาน</option>
-              <option value="start">เสียงเข้าเรียน</option>
-              <option value="end">เสียงเลิกเรียน/เปลี่ยนคาบ</option>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">เสียงดนตรีออด</label>
+            <select id="bell-sound" class="w-full px-3 py-1.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-medium">
+              <option value="start">🎵 เสียงเข้าเรียน (Start Chime)</option>
+              <option value="end">🎵 เสียงเลิกเรียน/เปลี่ยนคาบ (End Chime)</option>
+              <option value="default">🎵 เสียงมาตรฐาน (Standard Chime)</option>
             </select>
           </div>
         </div>
 
-        <button id="bell-add-btn" onclick="addBell()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium px-4 py-2.5 rounded-lg transition flex justify-center items-center gap-2 mt-1">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-          บันทึกเวลาออด
-        </button>
+        <!-- Action Button -->
+        <div class="flex gap-2">
+          <button id="bell-add-btn" onclick="addBell()" class="flex-grow bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-xl transition text-xs flex justify-center items-center gap-1.5 shadow-sm cursor-pointer">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+            บันทึกเวลาออด
+          </button>
+          <button id="bell-cancel-btn" onclick="resetBellForm()" class="hidden bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-xl transition text-xs cursor-pointer">
+            ยกเลิก
+          </button>
+        </div>
+
       </div>
+
     </div>
   </div>
 
-  <!-- Hidden HTML5 Audio for TTS and Bells -->
+  <!-- HTML5 Audio Elements for Local Chimes and TTS -->
   <audio id="main-player" class="hidden"></audio>
-  <audio id="bell-player" class="hidden" src="https://assets.mixkit.co/active_storage/sfx/2042/2042-preview.mp3"></audio>
+  <audio id="bell-player" class="hidden"></audio>
   <audio id="sos-player" class="hidden" src="./sounds/SOS_Alarm.mp3" loop></audio>
 
+  <!-- ========================================== -->
+  <!-- JAVASCRIPT APPLICATION CORE                -->
+  <!-- ========================================== -->
   <script>
-    // ==========================================
-    // ⚙️ Configurations & Global State
-    // ==========================================
-    const API_URL = "https://script.google.com/macros/s/AKfycbyDmhCMyqQdnF3LdDSR_sFzCW3dj5C5Oh7D-ToR529Ij01nQLCjZM7Iqec6E_VqDlSGtg/exec"; 
-    
-    // Pickups
-    let lastPickupString = "";
+    const API_URL = "https://script.google.com/macros/s/AKfycbyDmhCMyqQdnF3LdDSR_sFzCW3dj5C5Oh7D-ToR529Ij01nQLCjZM7Iqec6E_VqDlSGtg/exec";
+
+    // ------------------------------------------
+    // Full-Day Bell Presets Catalog
+    // ------------------------------------------
+    const DEFAULT_DAY_PRESETS = {
+      "ตารางเรียนปกติ (13 คาบ)": [
+        { time: "07:50", sound: "start", desc: "ถึงเวลาเข้าแถวเคารพธงชาติ", descEn: "It's time for the morning assembly.", preset: "assembly", pCur: "", pNext: "" },
+        { time: "08:10", sound: "start", desc: "ถึงเวลาเข้าโฮมรูม", descEn: "It's time for the morning brief.", preset: "homeroom", pCur: "", pNext: "" },
+        { time: "08:30", sound: "end", desc: "หมดเวลาโฮมรูม เตรียมเข้าสู่คาบเรียนที่ 1", descEn: "The morning brief is over. Please prepare for period 1.", preset: "start_period_1", pCur: "", pNext: "" },
+        { time: "09:30", sound: "end", desc: "หมดเวลาคาบเรียน พัก 10 นาที", descEn: "It is now morning break.", preset: "break_morning", pCur: "", pNext: "" },
+        { time: "09:40", sound: "start", desc: "หมดเวลาพัก เตรียมเข้าสู่คาบเรียน", descEn: "Morning break is over. Please prepare for classes.", preset: "end_break_morning", pCur: "", pNext: "" },
+        { time: "10:40", sound: "end", desc: "หมดเวลาคาบเรียนที่ 2 เตรียมเข้าสู่คาบเรียนที่ 3", descEn: "Period 2 is over. Please prepare for period 3.", preset: "change_period", pCur: "2", pNext: "3" },
+        { time: "11:40", sound: "end", desc: "หมดเวลาคาบเรียน พักรับประทานอาหารกลางวัน", descEn: "It is now lunch break.", preset: "lunch", pCur: "", pNext: "" },
+        { time: "12:40", sound: "start", desc: "หมดเวลาพักรับประทานอาหารกลางวัน เตรียมเข้าสู่คาบเรียน", descEn: "Lunch break is over. Please prepare for classes.", preset: "end_lunch", pCur: "", pNext: "" },
+        { time: "13:40", sound: "end", desc: "หมดเวลาคาบเรียนที่ 4 เตรียมเข้าสู่คาบเรียนที่ 5", descEn: "Period 4 is over. Please prepare for period 5.", preset: "change_period", pCur: "4", pNext: "5" },
+        { time: "14:40", sound: "end", desc: "หมดเวลาคาบเรียน พัก 10 นาที", descEn: "It is now afternoon break.", preset: "break_afternoon", pCur: "", pNext: "" },
+        { time: "14:50", sound: "start", desc: "หมดเวลาพัก เตรียมเข้าสู่คาบเรียน", descEn: "Afternoon break is over. Please prepare for classes.", preset: "end_break_afternoon", pCur: "", pNext: "" },
+        { time: "15:50", sound: "end", desc: "หมดเวลาคาบเรียนที่ 6 เตรียมโฮมรูมก่อนกลับบ้าน", descEn: "Period 6 is over. Please prepare for the afternoon brief before going home.", preset: "homeroom_afternoon", pCur: "", pNext: "" },
+        { time: "16:00", sound: "end", desc: "หมดเวลาเรียน เลิกเรียน ขอให้นักเรียนเดินทางกลับบ้านโดยสวัสดิภาพ", descEn: "Classes are dismissed for today. Please travel home safely and have a wonderful evening.", preset: "dismissal", pCur: "", pNext: "" }
+      ],
+      "ตารางวันศุกร์ (กิจกรรมพัฒนาผู้เรียน)": [
+        { time: "07:50", sound: "start", desc: "ถึงเวลาเข้าแถวเคารพธงชาติ", descEn: "It's time for the morning assembly.", preset: "assembly", pCur: "", pNext: "" },
+        { time: "08:10", sound: "start", desc: "ถึงเวลาเข้าโฮมรูม", descEn: "It's time for the morning brief.", preset: "homeroom", pCur: "", pNext: "" },
+        { time: "08:30", sound: "end", desc: "หมดเวลาโฮมรูม เตรียมเข้าสู่คาบเรียนที่ 1", descEn: "The morning brief is over. Please prepare for period 1.", preset: "start_period_1", pCur: "", pNext: "" },
+        { time: "09:30", sound: "end", desc: "หมดเวลาคาบเรียน พัก 10 นาที", descEn: "It is now morning break.", preset: "break_morning", pCur: "", pNext: "" },
+        { time: "09:40", sound: "start", desc: "หมดเวลาพัก เตรียมเข้าสู่คาบเรียน", descEn: "Morning break is over. Please prepare for classes.", preset: "end_break_morning", pCur: "", pNext: "" },
+        { time: "10:40", sound: "end", desc: "หมดเวลาคาบเรียนที่ 2 เตรียมเข้าสู่คาบเรียนที่ 3", descEn: "Period 2 is over. Please prepare for period 3.", preset: "change_period", pCur: "2", pNext: "3" },
+        { time: "11:40", sound: "end", desc: "หมดเวลาคาบเรียน พักรับประทานอาหารกลางวัน", descEn: "It is now lunch break.", preset: "lunch", pCur: "", pNext: "" },
+        { time: "12:40", sound: "start", desc: "หมดเวลาพักกลางวัน เข้ากิจกรรมพัฒนาผู้เรียน (ลูกเสือ/ชุมนุม)", descEn: "Lunch break is over. Please attend your clubs and scout activities.", preset: "custom", pCur: "", pNext: "" },
+        { time: "14:20", sound: "end", desc: "หมดเวลากิจกรรมพัฒนาผู้เรียน พัก 10 นาที", descEn: "Activity period is over. 10 minutes break.", preset: "custom", pCur: "", pNext: "" },
+        { time: "14:30", sound: "start", desc: "หมดเวลาพัก เข้ากิจกรรมแนะแนวและคุณธรรม", descEn: "Please attend moral and guidance activity.", preset: "custom", pCur: "", pNext: "" },
+        { time: "15:30", sound: "end", desc: "สรุปกิจกรรมประจำสัปดาห์ และโฮมรูมก่อนเลิกเรียน", descEn: "Weekly summary and homeroom brief before going home.", preset: "custom", pCur: "", pNext: "" },
+        { time: "15:50", sound: "end", desc: "เลิกเรียนวันศุกร์ ขอให้นักเรียนเดินทางกลับบ้านโดยสวัสดิภาพ", descEn: "Friday classes are dismissed. Have a safe trip home and enjoy your weekend.", preset: "dismissal", pCur: "", pNext: "" }
+      ],
+      "ตารางวันสอบ (Exam Schedule)": [
+        { time: "07:50", sound: "start", desc: "เข้าแถวเคารพธงชาติ และฟังคำชี้แจงการสอบ", descEn: "Morning assembly and exam briefing.", preset: "assembly", pCur: "", pNext: "" },
+        { time: "08:20", sound: "start", desc: "เตรียมตัวเข้าห้องสอบช่วงเช้า", descEn: "Please prepare to enter the exam room.", preset: "custom", pCur: "", pNext: "" },
+        { time: "08:30", sound: "start", desc: "เริ่มการสอบช่วงเช้า วิชาที่ 1", descEn: "Morning examination period 1 starts now.", preset: "custom", pCur: "", pNext: "" },
+        { time: "09:45", sound: "end", desc: "หมดเวลาสอบวิชาที่ 1 พัก 15 นาที", descEn: "Exam 1 is finished. 15 minutes break.", preset: "custom", pCur: "", pNext: "" },
+        { time: "10:00", sound: "start", desc: "เริ่มการสอบช่วงเช้า วิชาที่ 2", descEn: "Morning examination period 2 starts now.", preset: "custom", pCur: "", pNext: "" },
+        { time: "11:30", sound: "end", desc: "หมดเวลาสอบวิชาที่ 2 พักรับประทานอาหารกลางวัน", descEn: "Exam 2 is finished. Lunch break.", preset: "lunch", pCur: "", pNext: "" },
+        { time: "12:50", sound: "start", desc: "เตรียมตัวเข้าห้องสอบภาคบ่าย", descEn: "Please prepare to enter the afternoon exam room.", preset: "custom", pCur: "", pNext: "" },
+        { time: "13:00", sound: "start", desc: "เริ่มการสอบช่วงบ่าย วิชาที่ 3", descEn: "Afternoon examination period 3 starts now.", preset: "custom", pCur: "", pNext: "" },
+        { time: "14:30", sound: "end", desc: "หมดเวลาสอบวิชาที่ 3 พัก 15 นาที", descEn: "Exam 3 is finished. 15 minutes break.", preset: "custom", pCur: "", pNext: "" },
+        { time: "14:45", sound: "start", desc: "เริ่มการสอบช่วงบ่าย วิชาที่ 4", descEn: "Afternoon examination period 4 starts now.", preset: "custom", pCur: "", pNext: "" },
+        { time: "15:45", sound: "end", desc: "สิ้นสุดการสอบประจำวันนี้ เลิกเรียน เดินทางกลับบ้านโดยสวัสดิภาพ", descEn: "Today's examinations are finished. Please travel home safely.", preset: "dismissal", pCur: "", pNext: "" }
+      ],
+      "ตารางกิจกรรมพิเศษ / ครึ่งวัน": [
+        { time: "07:50", sound: "start", desc: "ถึงเวลาเข้าแถวเคารพธงชาติและเตรียมพิธีการ", descEn: "Morning assembly and preparation for special ceremony.", preset: "assembly", pCur: "", pNext: "" },
+        { time: "08:30", sound: "start", desc: "เริ่มพิธีการและกิจกรรมพิเศษ", descEn: "Special ceremony and activities begin.", preset: "custom", pCur: "", pNext: "" },
+        { time: "10:30", sound: "end", desc: "พักรับประทานอาหารว่าง 20 นาที", descEn: "Snack break for 20 minutes.", preset: "custom", pCur: "", pNext: "" },
+        { time: "10:50", sound: "start", desc: "ดำเนินกิจกรรมพิเศษต่อ", descEn: "Special activities resume.", preset: "custom", pCur: "", pNext: "" },
+        { time: "11:30", sound: "end", desc: "สิ้นสุดกิจกรรมพิเศษ พักรับประทานอาหารกลางวัน", descEn: "Activities completed. Lunch break.", preset: "lunch", pCur: "", pNext: "" },
+        { time: "12:30", sound: "end", desc: "เลิกเรียนกิจกรรมพิเศษ ขอให้นักเรียนเดินทางกลับบ้านโดยสวัสดิภาพ", descEn: "School dismissed for special day. Please travel home safely.", preset: "dismissal", pCur: "", pNext: "" }
+      ]
+    };
+
+    const STANDARD_BELLS = DEFAULT_DAY_PRESETS["ตารางเรียนปกติ (13 คาบ)"];
+
+    let dayPresets = {};
+
+    function initDayPresets() {
+      const saved = localStorage.getItem('sv_day_presets');
+      if (saved) {
+        try {
+          dayPresets = Object.assign({}, DEFAULT_DAY_PRESETS, JSON.parse(saved));
+        } catch(e) {
+          dayPresets = JSON.parse(JSON.stringify(DEFAULT_DAY_PRESETS));
+        }
+      } else {
+        dayPresets = JSON.parse(JSON.stringify(DEFAULT_DAY_PRESETS));
+      }
+      renderDayPresetDropdown();
+    }
+
+    function renderDayPresetDropdown() {
+      const select = document.getElementById('day-preset-select');
+      if (!select) return;
+      const currentVal = select.value;
+
+      select.innerHTML = Object.keys(dayPresets).map(name => {
+        const isCustom = !DEFAULT_DAY_PRESETS[name];
+        const icon = isCustom ? '⭐' : '📅';
+        const count = (dayPresets[name] || []).length;
+        return `<option value="${name}">${icon} ${name} (${count} คาบ)</option>`;
+      }).join('');
+
+      if (currentVal && dayPresets[currentVal]) {
+        select.value = currentVal;
+      }
+      updateDeletePresetButtonState();
+    }
+
+    function updateDeletePresetButtonState() {
+      const select = document.getElementById('day-preset-select');
+      const btnDel = document.getElementById('btn-del-preset');
+      if (!select || !btnDel) return;
+      const selectedName = select.value;
+      const isCustom = selectedName && !DEFAULT_DAY_PRESETS[selectedName];
+      btnDel.style.display = isCustom ? 'inline-flex' : 'none';
+    }
+
+    function applySelectedDayPreset() {
+      const select = document.getElementById('day-preset-select');
+      if (!select || !select.value) return;
+      const name = select.value;
+      const presetBells = dayPresets[name];
+      if (!presetBells || presetBells.length === 0) return alert('ไม่พบข้อมูลตารางใน Preset นี้');
+
+      if (bells.length > 0) {
+        if (!confirm(`ต้องการโหลดชุดตาราง "${name}" (${presetBells.length} คาบ) มาใช้งานแทนที่ตารางปัจจุบันหรือไม่?`)) return;
+      }
+
+      bells = JSON.parse(JSON.stringify(presetBells));
+      localStorage.setItem('sv_bells', JSON.stringify(bells));
+      renderBells();
+      updateNextBellBanner();
+      saveBellsToServer();
+      alert(`✅ โหลดชุดตาราง "${name}" สำเร็จเรียบร้อยแล้ว (${bells.length} คาบ)`);
+    }
+
+    function saveCurrentAsNewDayPreset() {
+      if (!bells || bells.length === 0) {
+        return alert('ยังไม่มีรายการเวลาออดในตารางปัจจุบัน กรุณาเพิ่มเวลาก่อนบันทึก');
+      }
+
+      const name = prompt('กรุณาตั้งชื่อชุดตารางประจำวัน (เช่น ตารางวันสอบ, ตารางวันกีฬาสี, ตารางติว):');
+      if (!name || !name.trim()) return;
+
+      const trimmedName = name.trim();
+      dayPresets[trimmedName] = JSON.parse(JSON.stringify(bells));
+      
+      const customOnly = {};
+      for (const k in dayPresets) {
+        if (!DEFAULT_DAY_PRESETS[k]) {
+          customOnly[k] = dayPresets[k];
+        }
+      }
+      localStorage.setItem('sv_day_presets', JSON.stringify(customOnly));
+      renderDayPresetDropdown();
+      document.getElementById('day-preset-select').value = trimmedName;
+      updateDeletePresetButtonState();
+      alert(`💾 บันทึกชุดตาราง "${trimmedName}" (${bells.length} คาบ) เรียบร้อยแล้ว! สามารถสลับกลับมาใช้ได้ทุกเมื่อ`);
+    }
+
+    function deleteSelectedDayPreset() {
+      const select = document.getElementById('day-preset-select');
+      if (!select || !select.value) return;
+      const name = select.value;
+      if (DEFAULT_DAY_PRESETS[name]) {
+        return alert('ไม่สามารถลบตารางมาตรฐานของระบบได้');
+      }
+      if (!confirm(`ต้องการลบ Preset "${name}" หรือไม่?`)) return;
+
+      delete dayPresets[name];
+      const customOnly = {};
+      for (const k in dayPresets) {
+        if (!DEFAULT_DAY_PRESETS[k]) customOnly[k] = dayPresets[k];
+      }
+      localStorage.setItem('sv_day_presets', JSON.stringify(customOnly));
+      renderDayPresetDropdown();
+      alert(`ลบ Preset "${name}" เรียบร้อยแล้ว`);
+    }
+
+    // Global State
+    let bells = [];
+    let lastRungBell = null;
+    let editBellIndex = -1;
+    let isBellsEnabled = localStorage.getItem('sv_bells_enabled') !== 'false';
+
+    function toggleBellSystem(enabled) {
+      isBellsEnabled = enabled;
+      localStorage.setItem('sv_bells_enabled', enabled ? 'true' : 'false');
+      updateBellToggleUI();
+      updateNextBellBanner();
+      syncQueueToServer();
+    }
+
+    function updateBellToggleUI() {
+      const masterToggle = document.getElementById('bell-master-toggle');
+      const modalToggle = document.getElementById('modal-bell-toggle');
+      const label = document.getElementById('bell-toggle-label');
+      const subtext = document.getElementById('bell-toggle-subtext');
+      const modalLabel = document.getElementById('modal-bell-toggle-label');
+      const card = document.getElementById('next-bell-card');
+
+      if (masterToggle) masterToggle.checked = isBellsEnabled;
+      if (modalToggle) modalToggle.checked = isBellsEnabled;
+
+      if (isBellsEnabled) {
+        if (label) {
+          label.innerText = 'ระบบออด: เปิด';
+          label.className = 'text-xs font-bold text-emerald-800 leading-tight';
+        }
+        if (subtext) {
+          subtext.innerText = 'ดังตามตาราง';
+          subtext.className = 'text-[10px] text-gray-500 leading-none';
+        }
+        if (modalLabel) modalLabel.innerText = 'ระบบออด: เปิด';
+        if (card) {
+          card.className = 'bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 px-4 py-1.5 rounded-xl shadow-sm flex items-center gap-2.5';
+        }
+      } else {
+        if (label) {
+          label.innerText = 'ระบบออด: ปิดชั่วคราว';
+          label.className = 'text-xs font-bold text-amber-700 leading-tight';
+        }
+        if (subtext) {
+          subtext.innerText = 'วันกิจกรรมพิเศษ';
+          subtext.className = 'text-[10px] text-amber-600 font-semibold leading-none';
+        }
+        if (modalLabel) modalLabel.innerText = 'ระบบออด: ปิดชั่วคราว';
+        if (card) {
+          card.className = 'bg-amber-50 border border-amber-300 px-4 py-1.5 rounded-xl shadow-sm flex items-center gap-2.5';
+        }
+      }
+    }
+
+    let musicQueue = [];
+    let currentMusicIndex = -1;
+    let currentVolume = parseInt(localStorage.getItem('sv_music_vol') || '50');
+    let musicMode = localStorage.getItem('sv_music_mode') || 'schedule'; // 'schedule' or 'unlocked'
+    let isVideoVisible = true;
+
     let announcedNames = new Set(JSON.parse(sessionStorage.getItem('sv_announcedNames') || '[]'));
-    let pendingAnnouncements = [];
-    
-    // Announcements
     let announcedIds = new Set(JSON.parse(sessionStorage.getItem('sv_announcedMsgs') || '[]'));
 
-    // Audio / TTS
     let audioQueue = [];
     let isPlayingTTS = false;
-    let isPreparingAudio = false;
-    const player = document.getElementById('main-player');
-    
-    // --- Anti-Audio Collision (Single Audio Master Lock) ---
-    // If multiple windows/tabs are opened, only ONE active master plays audio to prevent overlapping sounds
+    let isPreBellFading = false;
     let isAudioMaster = true;
-    const instanceId = 'inst_' + Math.random().toString(36).substring(2, 9);
     let audioChannel = null;
+    const instanceId = 'inst_' + Math.random().toString(36).substring(2, 9);
+    const mainPlayer = document.getElementById('main-player');
 
+    // ------------------------------------------
+    // 1. Single-Instance Audio Lock (Anti-Collision)
+    // ------------------------------------------
     if (typeof BroadcastChannel !== 'undefined') {
       try {
         audioChannel = new BroadcastChannel('sv_audio_hub_channel');
-        // Announce our presence
         audioChannel.postMessage({ type: 'PING', id: instanceId });
 
         audioChannel.onmessage = (event) => {
@@ -266,112 +664,79 @@
             }
           } else if (data.type === 'MASTER_EXISTS') {
             if (data.masterId !== instanceId) {
-              console.warn("⚠️ Secondary instance detected. Muting audio to prevent overlapping sounds.");
+              console.warn("⚠️ Secondary instance detected. Running in passive display mode.");
               isAudioMaster = false;
+              const badge = document.getElementById('active-master-badge');
+              if (badge) {
+                badge.className = 'text-[11px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full border border-amber-200';
+                badge.innerText = 'โหมดแสดงผล (Passive Mode - เสียงปิด)';
+              }
               if (ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
-              showAudioCollisionWarning();
             }
           }
         };
       } catch(e) {
-        console.warn("BroadcastChannel not supported or error:", e);
+        console.warn("BroadcastChannel error:", e);
       }
     }
 
-    function showAudioCollisionWarning() {
-      if (document.getElementById('audio-collision-banner')) return;
-      const banner = document.createElement('div');
-      banner.id = 'audio-collision-banner';
-      banner.className = 'fixed top-0 left-0 right-0 bg-amber-500 text-white text-center py-2 px-4 z-[99999] font-medium text-sm shadow-md flex items-center justify-center gap-2';
-      banner.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
-        <span>ตรวจพบโปรแกรมกำลังทำงานอยู่ในเบื้องหลังแล้ว — หน้านี้จะทำงานในโหมดแสดงผลอย่างเดียว และปิดเสียงอัตโนมัติเพื่อป้องกันเสียงซ้อนกัน</span>
-      `;
-      document.body.prepend(banner);
-    }
-    
-    // --- State Sync ---
-    function syncQueueToServer() {
-      const disableBells = document.getElementById('disable-bells') ? document.getElementById('disable-bells').checked : false;
-      const state = {
-        musicQueue: musicQueue,
-        currentMusicIndex: currentMusicIndex,
-        disableBells: disableBells,
-        bells: bells
-      };
-      fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'sync_state', state: JSON.stringify(state) })
-      }).catch(e => console.warn("Sync error:", e));
-    }
-    
-    function getColorThai(color) {
-      const colors = { red: 'แดง', blue: 'น้ำเงิน', yellow: 'เหลือง', orange: 'ส้ม', silver: 'เงิน', black: 'ดำ', green: 'เขียว' };
-      return colors[color] || '';
-    }
-
-    // Unlock Audio on First Click
+    // ------------------------------------------
+    // 2. Audio Unlock First-Click Overlay
+    // ------------------------------------------
     document.getElementById('audio-unlock-overlay').addEventListener('click', function() {
-      try {
-        const p1 = document.getElementById('main-player');
-        if(p1) { p1.play().catch(e=>{}); p1.pause(); p1.currentTime=0; }
-        
-        const p2 = document.getElementById('bell-player');
-        if(p2) { p2.play().catch(e=>{}); p2.pause(); p2.currentTime=0; }
-        
-        const p3 = document.getElementById('sos-player');
-        if(p3) { p3.play().catch(e=>{}); p3.pause(); p3.currentTime=0; }
+      this.classList.add('opacity-0');
+      setTimeout(() => this.classList.add('hidden'), 300);
 
-        if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.playVideo === 'function') {
-          try { ytPlayer.playVideo(); } catch(e) {}
-        }
-      } catch (err) {
-        console.error("Audio unlock error:", err);
-      } finally {
-        this.classList.add('opacity-0');
-        setTimeout(() => this.classList.add('hidden'), 500);
+      // Silent unlock sound
+      try {
+        const dummyAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+        dummyAudio.play().catch(() => {});
+      } catch(e) {}
+
+      if (ytPlayer && typeof ytPlayer.unMute === 'function') {
+        ytPlayer.unMute();
+        ytPlayer.setVolume(currentVolume);
       }
+      tryPlayMusic();
     });
 
-    // If running inside Electron, auto-unlock audio because autoplay-policy is disabled
-    if (navigator.userAgent.toLowerCase().includes('electron')) {
-      setTimeout(() => {
-        document.getElementById('audio-unlock-overlay').click();
-      }, 500);
-    }
-
-    // ==========================================
-    // 1. YouTube Music Bot Logic & Break-Time Guard
-    // ==========================================
-    let ytPlayer;
-    let musicQueue = [];
-    let currentMusicIndex = -1;
-    let fadeInterval = null;
-    let preBellFadeInterval = null;
-    let isPreBellFading = false;
+    // ------------------------------------------
+    // 3. YouTube Player Management
+    // ------------------------------------------
+    let ytPlayer = null;
 
     function onYouTubeIframeAPIReady() {
-      console.log("YouTube API Ready!");
+      console.log("YouTube API Loaded!");
+      const playerVars = {
+        'autoplay': 1,
+        'controls': 0,
+        'disablekb': 1,
+        'rel': 0,
+        'enablejsapi': 1
+      };
+
+      if (window.location.protocol.startsWith('http')) {
+        playerVars.origin = window.location.origin;
+      }
+
       ytPlayer = new YT.Player('yt-player', {
-        height: '100', width: '100',
-        host: 'https://www.youtube.com',
-        playerVars: {
-          'autoplay': 1,
-          'controls': 0,
-          'disablekb': 1,
-          'rel': 0,
-          'origin': 'https://www.youtube.com',
-          'enablejsapi': 1
-        },
+        height: '100%',
+        width: '100%',
+        playerVars: playerVars,
         events: {
-          'onReady': (e) => { e.target.unMute(); e.target.setVolume(40); tryPlayMusic(); },
-          'onStateChange': onPlayerStateChange
+          'onReady': (e) => {
+            console.log("YouTube Player is ready!");
+            e.target.unMute();
+            e.target.setVolume(currentVolume);
+            tryPlayMusic();
+          },
+          'onStateChange': onPlayerStateChange,
+          'onError': onPlayerError
         }
       });
     }
 
-    // Load YouTube IFrame API dynamically
+    // Load YouTube IFrame API
     (function loadYouTubeAPI() {
       if (typeof module === 'object') {
         window.module = module;
@@ -386,24 +751,72 @@
       firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
     })();
 
+    function onPlayerStateChange(event) {
+      if (event.data === YT.PlayerState.ENDED) {
+        playNextMusic();
+      } else if (event.data === YT.PlayerState.PLAYING) {
+        isPreBellFading = false;
+      }
+    }
+
+    function onPlayerError(event) {
+      console.warn("YouTube player encountered an error (Code: " + event.data + "). Auto-skipping...");
+      playNextMusic();
+    }
+
+    function changeMusicVolume(vol) {
+      currentVolume = parseInt(vol, 10);
+      localStorage.setItem('sv_music_vol', currentVolume);
+      document.getElementById('vol-text').innerText = currentVolume + '%';
+      if (ytPlayer && typeof ytPlayer.setVolume === 'function') {
+        ytPlayer.setVolume(currentVolume);
+      }
+    }
+
+    function toggleVideoView() {
+      isVideoVisible = !isVideoVisible;
+      const box = document.getElementById('yt-player-container');
+      const btn = document.getElementById('btn-toggle-video');
+      if (isVideoVisible) {
+        box.classList.remove('hidden');
+        btn.innerText = '👁️ ซ่อนหน้าต่างวิดีโอ';
+      } else {
+        box.classList.add('hidden');
+        btn.innerText = '👁️ แสดงหน้าต่างวิดีโอ';
+      }
+    }
+
+    function setMusicMode(mode) {
+      musicMode = mode;
+      localStorage.setItem('sv_music_mode', mode);
+      updateMusicStatusBanner();
+      if (mode === 'unlocked') {
+        tryPlayMusic();
+      } else {
+        const breakInfo = getCurrentBreakSlotInfo();
+        if (!breakInfo.isAllowed && ytPlayer && typeof ytPlayer.pauseVideo === 'function') {
+          ytPlayer.pauseVideo();
+        }
+      }
+    }
+
     function parseTimeToMinutes(timeStr) {
       if (!timeStr || !timeStr.includes(':')) return 0;
       const parts = timeStr.split(':');
       return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
     }
 
-    // Check if current time is within allowed break periods
+    // Determine if current time allows music playback
     function getCurrentBreakSlotInfo() {
-      const disableBells = document.getElementById('disable-bells') ? document.getElementById('disable-bells').checked : false;
-      if (disableBells) {
-        return { isAllowed: true, reason: 'ปลดล็อคระบบออดแล้ว (เปิดเพลงได้อิสระ)', nextBellTimeStr: null, remainingSecondsUntilBell: Infinity };
+      if (musicMode === 'unlocked') {
+        return { isAllowed: true, slotName: 'โหมดปลดล็อคอิสระ', nextBellTimeStr: null, remainingSecondsUntilBell: Infinity };
       }
 
       const now = new Date();
       const currentMinutes = now.getHours() * 60 + now.getMinutes();
       const currentSeconds = currentMinutes * 60 + now.getSeconds();
 
-      // 1. Morning slot: before assembly bell (default 07:50 or from bell preset)
+      // 1. Morning slot: before assembly bell (default 07:50)
       let assemblyBell = bells.find(b => b.preset === 'assembly' || (b.desc && b.desc.includes('แถว')));
       let assemblyMinutes = assemblyBell ? parseTimeToMinutes(assemblyBell.time) : (7 * 60 + 50);
 
@@ -411,32 +824,32 @@
         const bellSec = assemblyMinutes * 60;
         return {
           isAllowed: true,
-          slotName: 'ก่อนเข้าแถวเช้า',
+          slotName: 'ก่อนเข้าแถวเคารพธงชาติ',
           nextBellTimeStr: assemblyBell ? assemblyBell.time : '07:50',
           remainingSecondsUntilBell: Math.max(0, bellSec - currentSeconds)
         };
       }
 
-      // 2. Lunch slot: between lunch and end_lunch (default 11:30 - 12:30)
-      let lunchBell = bells.find(b => b.preset === 'lunch' || (b.desc && b.desc.includes('กลางวัน') && !b.desc.includes('หมดเวลา')));
-      let endLunchBell = bells.find(b => b.preset === 'end_lunch' || (b.desc && (b.desc.includes('หมดเวลาพัก') || b.desc.includes('เข้าสู่คาบเรียน'))));
+      // 2. Lunch break slot: default 11:40 - 12:40
+      let lunchBell = bells.find(b => b.preset === 'lunch' || (b.desc && b.desc.includes('อาหารกลางวัน')));
+      let endLunchBell = bells.find(b => b.preset === 'end_lunch' || (b.desc && b.desc.includes('หมดเวลาพักรับประทานอาหารกลางวัน')));
       
-      let lunchStartMin = lunchBell ? parseTimeToMinutes(lunchBell.time) : (11 * 60 + 30);
-      let lunchEndMin = endLunchBell ? parseTimeToMinutes(endLunchBell.time) : (12 * 60 + 30);
+      let lunchStartMin = lunchBell ? parseTimeToMinutes(lunchBell.time) : (11 * 60 + 40);
+      let lunchEndMin = endLunchBell ? parseTimeToMinutes(endLunchBell.time) : (12 * 60 + 40);
 
       if (currentMinutes >= lunchStartMin && currentMinutes < lunchEndMin) {
         const bellSec = lunchEndMin * 60;
         return {
           isAllowed: true,
-          slotName: 'พักกลางวัน',
-          nextBellTimeStr: endLunchBell ? endLunchBell.time : '12:30',
+          slotName: 'พักรับประทานอาหารกลางวัน',
+          nextBellTimeStr: endLunchBell ? endLunchBell.time : '12:40',
           remainingSecondsUntilBell: Math.max(0, bellSec - currentSeconds)
         };
       }
 
-      // 3. After dismissal slot: after dismissal bell (default 15:30 - 18:30)
+      // 3. Afternoon dismissal slot: after 15:50
       let dismissalBell = bells.find(b => b.preset === 'dismissal' || (b.desc && b.desc.includes('เลิกเรียน')));
-      let dismissalMin = dismissalBell ? parseTimeToMinutes(dismissalBell.time) : (15 * 60 + 30);
+      let dismissalMin = dismissalBell ? parseTimeToMinutes(dismissalBell.time) : (16 * 60);
 
       if (currentMinutes >= dismissalMin && currentMinutes < (18 * 60 + 30)) {
         return {
@@ -449,56 +862,137 @@
 
       return {
         isAllowed: false,
-        reason: 'เปิดเพลงได้เฉพาะช่วงพักเบรก หรือก่อนเข้าแถวเช้าเท่านั้น (เว้นแต่วันที่มีการปลดล็อคระบบออด)',
+        slotName: 'เวลาเรียน',
+        reason: 'ขณะนี้อยู่ในเวลาเรียน (เพลงจะเริ่มเล่นอัตโนมัติในช่วงเวลาพัก)',
         nextBellTimeStr: null,
         remainingSecondsUntilBell: 0
       };
     }
 
-    // Validate if a new song can be queued based on remaining break time
-    function validateQueueTimeWithNewSong(newSongDuration) {
+    function updateMusicStatusBanner() {
+      const banner = document.getElementById('music-status-banner');
+      if (!banner) return;
+
       const breakInfo = getCurrentBreakSlotInfo();
-      if (!breakInfo.isAllowed) {
-        return { allowed: false, message: breakInfo.reason };
-      }
-      if (breakInfo.remainingSecondsUntilBell === Infinity) {
-        return { allowed: true };
-      }
 
-      // Calculate current active queue duration in seconds
-      let currentActiveQueueSec = 0;
-      if (currentMusicIndex >= 0 && currentMusicIndex < musicQueue.length) {
-        let curTotal = musicQueue[currentMusicIndex].duration || 210;
-        let curPlayed = 0;
-        if (ytPlayer && typeof ytPlayer.getCurrentTime === 'function') {
-          try { curPlayed = ytPlayer.getCurrentTime() || 0; } catch(e) {}
+      if (musicMode === 'unlocked') {
+        banner.className = 'mb-2 shrink-0 rounded-lg p-2 text-xs border border-amber-300 bg-amber-50 text-amber-900 flex items-center justify-between shadow-sm';
+        banner.innerHTML = `
+          <div class="flex items-center gap-1.5 font-medium">
+            <span class="text-sm">🔓</span>
+            <span><b>โหมดปลดล็อคอิสระ:</b> เพลงสามารถเล่นต่อเนื่องได้ตลอดเวลา</span>
+          </div>
+          <button onclick="setMusicMode('schedule')" class="bg-amber-600 hover:bg-amber-700 text-white font-bold px-2 py-0.5 rounded text-[11px] transition cursor-pointer">
+            สลับเป็นโหมดตารางเวลา
+          </button>
+        `;
+      } else {
+        if (breakInfo.isAllowed) {
+          banner.className = 'mb-2 shrink-0 rounded-lg p-2 text-xs border border-emerald-300 bg-emerald-50 text-emerald-900 flex items-center justify-between shadow-sm';
+          banner.innerHTML = `
+            <div class="flex items-center gap-1.5 font-medium">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+              <span><b>ช่วงเวลาพัก (${breakInfo.slotName}):</b> เพลงกำลังทำงานตามตารางเวลา</span>
+            </div>
+            <button onclick="setMusicMode('unlocked')" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-2 py-0.5 rounded text-[11px] transition cursor-pointer">
+              ปลดล็อคเล่นตลอดเวลา
+            </button>
+          `;
+        } else {
+          banner.className = 'mb-2 shrink-0 rounded-lg p-2 text-xs border border-gray-200 bg-gray-100 text-gray-700 flex items-center justify-between shadow-sm';
+          banner.innerHTML = `
+            <div class="flex items-center gap-1.5">
+              <span>⏸️</span>
+              <span><b>ขณะนี้เป็นเวลาเรียน:</b> เพลงพักชั่วคราว (จะเล่นเมื่อถึงเวลาพัก)</span>
+            </div>
+            <button onclick="setMusicMode('unlocked')" class="bg-red-600 hover:bg-red-700 text-white font-bold px-2 py-0.5 rounded text-[11px] transition cursor-pointer">
+              ⚡ ปลดล็อคเล่นทันที
+            </button>
+          `;
         }
-        currentActiveQueueSec += Math.max(0, curTotal - curPlayed);
       }
-      for (let i = currentMusicIndex + 1; i < musicQueue.length; i++) {
-        currentActiveQueueSec += (musicQueue[i].duration || 210);
+    }
+
+    function extractVideoID(url) {
+      if (!url) return null;
+      let match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/);
+      return (match && match[1]) ? match[1] : null;
+    }
+
+    async function fetchYouTubeInfo(vid) {
+      try {
+        const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${vid}`);
+        if (res.ok) {
+          const data = await res.json();
+          return { title: data.title || `วิดีโอ ${vid}`, duration: 210 };
+        }
+      } catch(e) {}
+      return { title: `เพลง YouTube (${vid})`, duration: 210 };
+    }
+
+    async function addMusicToQueue() {
+      const input = document.getElementById('yt-url');
+      const vid = extractVideoID(input.value);
+      if (!vid) {
+        alert('กรุณาวางลิงก์ YouTube ที่ถูกต้อง (เช่น https://youtu.be/...)');
+        return;
       }
 
-      // If active queue is already filling the break
-      if (currentActiveQueueSec >= breakInfo.remainingSecondsUntilBell) {
-        const mins = Math.ceil(currentActiveQueueSec / 60);
-        return {
-          allowed: false,
-          message: `คิวเพลงเต็มช่วงเวลาพักแล้ว (คิวปัจจุบันยาว ~${mins} นาที จะเล่นถึงเวลาออด ${breakInfo.nextBellTimeStr} น. พอดี)`
-        };
+      input.value = '';
+      const info = await fetchYouTubeInfo(vid);
+      musicQueue.push({ id: vid, url: 'https://youtu.be/' + vid, title: info.title, duration: info.duration });
+      
+      renderMusicQueue();
+      syncQueueToServer();
+      tryPlayMusic();
+    }
+
+    function renderMusicQueue() {
+      const container = document.getElementById('music-queue');
+      const nowPlayingSpan = document.getElementById('now-playing-title');
+      if (!container) return;
+
+      if (musicQueue.length === 0) {
+        container.innerHTML = '<div class="text-center text-gray-400 py-3 text-xs">ไม่มีเพลงในคิว — วางลิงก์ YouTube ด้านบนเพื่อเพิ่มเพลง</div>';
+        if (nowPlayingSpan) nowPlayingSpan.innerText = '-';
+        return;
       }
 
-      // If there is still time left, this new song is allowed (it will fade out before bell if it's the last song)
-      return { allowed: true };
+      if (currentMusicIndex >= 0 && currentMusicIndex < musicQueue.length) {
+        if (nowPlayingSpan) nowPlayingSpan.innerText = musicQueue[currentMusicIndex].title;
+      } else {
+        if (nowPlayingSpan) nowPlayingSpan.innerText = 'รอเริ่มเล่น...';
+      }
+
+      container.innerHTML = musicQueue.map((item, idx) => {
+        const isCurrent = (idx === currentMusicIndex);
+        return `
+          <div class="flex items-center justify-between px-2 py-1 rounded border text-xs transition ${isCurrent ? 'bg-red-50 border-red-200 text-red-900 font-semibold shadow-xs' : 'bg-white border-gray-100 text-gray-700'}">
+            <div class="flex items-center gap-1.5 truncate pr-2">
+              <span class="w-4 text-center font-mono text-[11px] ${isCurrent ? 'text-red-600 font-bold' : 'text-gray-400'}">${idx + 1}</span>
+              ${isCurrent ? '<span class="text-xs">▶️</span>' : ''}
+              <span class="truncate">${item.title}</span>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+              <button onclick="playSpecificMusic(${idx})" class="text-gray-400 hover:text-emerald-600 p-0.5" title="เล่นเพลงนี้">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>
+              </button>
+              <button onclick="removeMusic(${idx})" class="text-gray-400 hover:text-red-500 p-0.5" title="ลบออกจากคิว">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
     }
 
     function tryPlayMusic() {
       if (!isAudioMaster) return;
       if (!ytPlayer || typeof ytPlayer.loadVideoById !== 'function') return;
-      
+
       const breakInfo = getCurrentBreakSlotInfo();
       if (!breakInfo.isAllowed) {
-        console.log("Music play blocked: not in break period");
+        console.log("Music play paused: not in break period and mode is scheduled.");
         return;
       }
 
@@ -507,105 +1001,50 @@
         state = ytPlayer.getPlayerState();
       }
       if (state === YT.PlayerState.PLAYING || state === YT.PlayerState.BUFFERING) return;
-      
+
       if (currentMusicIndex < 0) currentMusicIndex = 0;
-      
+
       if (currentMusicIndex < musicQueue.length) {
         ytPlayer.unMute();
-        ytPlayer.setVolume(40);
+        ytPlayer.setVolume(currentVolume);
         ytPlayer.loadVideoById(musicQueue[currentMusicIndex].id);
       }
       renderMusicQueue();
     }
 
-    function onPlayerStateChange(event) {
-      if (event.data === YT.PlayerState.ENDED) {
-        playNextMusic();
-      }
-    }
-
-    function extractVideoID(url) {
-      let match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/);
-      return (match && match[1]) ? match[1] : null;
-    }
-
-    async function fetchYouTubeInfo(vid) {
-      // In Electron environment, query YouTube directly via Node HTTPS for exact title & approxDurationMs
-      if (typeof require === 'function') {
-        try {
-          const https = require('https');
-          const result = await new Promise((resolve) => {
-            https.get('https://www.youtube.com/watch?v=' + vid, (res) => {
-              let data = '';
-              res.on('data', chunk => data += chunk);
-              res.on('end', () => {
-                const titleMatch = data.match(/<title>(.*?) - YouTube<\/title>/);
-                const durMatch = data.match(/\"approxDurationMs\":\"(\d+)\"/);
-                const durationSec = durMatch ? Math.round(parseInt(durMatch[1], 10) / 1000) : 210;
-                let title = titleMatch ? titleMatch[1].replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&') : `วิดีโอ ${vid}`;
-                resolve({ title, duration: durationSec });
-              });
-            }).on('error', () => resolve({ title: `วิดีโอ ${vid}`, duration: 210 }));
-          });
-          if (result && result.title) return result;
-        } catch(e) {
-          console.warn("Node fetchYouTubeInfo error, fallback to web:", e);
-        }
-      }
-
-      // Web fallback
-      try {
-        const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${vid}`);
-        if (res.ok) {
-          const data = await res.json();
-          return { title: data.title || `วิดีโอ ${vid}`, duration: 210 };
-        }
-      } catch(e) {}
-      return { title: `วิดีโอ ${vid}`, duration: 210 };
-    }
-
-    async function addMusicToQueue() {
-      const urlInput = document.getElementById('yt-url');
-      const vid = extractVideoID(urlInput.value);
-      if (!vid) return alert('กรุณาระบุลิงก์ YouTube ที่ถูกต้อง');
-
-      const breakInfo = getCurrentBreakSlotInfo();
-      if (!breakInfo.isAllowed) {
-        return alert('⚠️ ' + breakInfo.reason);
-      }
-
-      urlInput.value = '';
-      const info = await fetchYouTubeInfo(vid);
-
-      const queueCheck = validateQueueTimeWithNewSong(info.duration);
-      if (!queueCheck.allowed) {
-        return alert('⚠️ ' + queueCheck.message);
-      }
-
-      musicQueue.push({ id: vid, url: 'https://youtu.be/' + vid, title: info.title, duration: info.duration });
-      renderMusicQueue();
-      tryPlayMusic();
-      syncQueueToServer();
-    }
-
     function playNextMusic() {
+      // Auto-clear / remove played song from queue so completed songs don't linger
+      if (musicQueue.length > 0) {
+        const removeIdx = (currentMusicIndex >= 0 && currentMusicIndex < musicQueue.length) ? currentMusicIndex : 0;
+        musicQueue.splice(removeIdx, 1);
+        currentMusicIndex = 0;
+      }
+
       const breakInfo = getCurrentBreakSlotInfo();
-      if (!breakInfo.isAllowed) {
-        console.log("Break ended, stopping music queue");
+      // If break ended or no more songs in queue, auto-clear and stop
+      if (!breakInfo.isAllowed || musicQueue.length === 0) {
         if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
-        currentMusicIndex = musicQueue.length;
+        musicQueue = [];
+        currentMusicIndex = -1;
         renderMusicQueue();
         syncQueueToServer();
         return;
       }
 
-      currentMusicIndex++;
-      if (currentMusicIndex < musicQueue.length) {
-        if (ytPlayer && typeof ytPlayer.loadVideoById === 'function') {
-          ytPlayer.unMute();
-          ytPlayer.setVolume(40);
-          ytPlayer.loadVideoById(musicQueue[currentMusicIndex].id);
-        }
+      currentMusicIndex = 0;
+      ytPlayer.unMute();
+      ytPlayer.setVolume(currentVolume);
+      ytPlayer.loadVideoById(musicQueue[0].id);
+      renderMusicQueue();
+      syncQueueToServer();
+    }
+
+    function playSpecificMusic(idx) {
+      currentMusicIndex = idx;
+      if (ytPlayer && ytPlayer.loadVideoById && idx < musicQueue.length) {
+        ytPlayer.unMute();
+        ytPlayer.setVolume(currentVolume);
+        ytPlayer.loadVideoById(musicQueue[idx].id);
       }
       renderMusicQueue();
       syncQueueToServer();
@@ -614,159 +1053,178 @@
     function skipMusic() {
       playNextMusic();
     }
-    
+
     function removeMusic(idx) {
       if (idx === currentMusicIndex) {
         skipMusic();
+      }
+      musicQueue.splice(idx, 1);
+      if (currentMusicIndex > idx) currentMusicIndex--;
+      renderMusicQueue();
+      syncQueueToServer();
+    }
+
+    function clearMusicQueue() {
+      if (!confirm('ต้องการล้างคิวเพลงทั้งหมดหรือไม่?')) return;
+      musicQueue = [];
+      currentMusicIndex = -1;
+      if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
+      renderMusicQueue();
+      syncQueueToServer();
+    }
+
+    function duckMusicVolume(duck) {
+      if (!ytPlayer || typeof ytPlayer.setVolume !== 'function') return;
+      if (duck) {
+        ytPlayer.setVolume(Math.min(currentVolume, 10));
       } else {
-        musicQueue.splice(idx, 1);
-        if (idx < currentMusicIndex) {
-          currentMusicIndex--;
-        }
-        renderMusicQueue();
-        syncQueueToServer();
+        ytPlayer.setVolume(currentVolume);
       }
     }
 
-    function formatDuration(sec) {
-      if (!sec || isNaN(sec)) return '';
-      const m = Math.floor(sec / 60);
-      const s = Math.floor(sec % 60).toString().padStart(2, '0');
-      return `${m}:${s}`;
-    }
-
-    function renderMusicQueue() {
-      const qBox = document.getElementById('music-queue');
-      qBox.innerHTML = musicQueue.map((item, idx) => {
-        let isPlaying = (idx === currentMusicIndex);
-        let isPlayed = (idx < currentMusicIndex);
-        
-        let classes = "px-3 py-2 rounded-lg flex justify-between items-center ";
-        if (isPlaying) {
-          classes += "bg-amber-100 border-l-4 border-amber-500 font-semibold text-amber-900";
-        } else if (isPlayed) {
-          classes += "bg-gray-100 text-gray-400 opacity-60";
-        } else {
-          classes += "bg-white border border-gray-100 shadow-sm";
-        }
-
-        const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 inline-block mr-1"><path fill-rule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clip-rule="evenodd" /></svg>`;
-        const durText = item.duration ? ` (${formatDuration(item.duration)})` : '';
-
-        return `
-          <div class="${classes}">
-            <span class="truncate pr-2 flex items-center">${isPlaying ? playIcon : ''}${item.title || ('วิดีโอ ' + item.id)}<span class="text-xs text-gray-500 ml-1 font-normal">${durText}</span></span>
-            <span class="text-xs shrink-0 ${isPlayed ? '' : 'text-gray-400'}">${isPlayed ? 'เล่นแล้ว' : ''}</span>
-          </div>
-        `;
-      }).join('');
-      qBox.scrollTop = qBox.scrollHeight;
-    }
-
-    // --- Audio Ducking ---
-    function duckMusicVolume(isDucking) {
-      if (!ytPlayer || !ytPlayer.setVolume) return;
-      clearInterval(fadeInterval);
-      let vol = ytPlayer.getVolume();
-      let target = isDucking ? 10 : 40;
-      let step = isDucking ? -5 : 5;
-      
-      fadeInterval = setInterval(() => {
-        vol += step;
-        if ((isDucking && vol <= target) || (!isDucking && vol >= target)) {
-          ytPlayer.setVolume(target);
-          clearInterval(fadeInterval);
-        } else {
-          ytPlayer.setVolume(vol);
-        }
-      }, 50);
-    }
-
-    // Pre-bell gentle fadeout 15-20s before bell
-    function startPreBellFadeout(secondsLeft) {
-      if (!ytPlayer || typeof ytPlayer.getVolume !== 'function') return;
-      clearInterval(preBellFadeInterval);
-      let vol = ytPlayer.getVolume();
-      const step = Math.max(1, vol / (secondsLeft * 8));
-      preBellFadeInterval = setInterval(() => {
-        vol = Math.max(0, vol - step);
-        if (ytPlayer && ytPlayer.setVolume) ytPlayer.setVolume(Math.round(vol));
-        if (vol <= 0) {
-          clearInterval(preBellFadeInterval);
+    function startPreBellFadeout(secondsRemaining) {
+      if (!ytPlayer || typeof ytPlayer.setVolume !== 'function') return;
+      let vol = currentVolume;
+      const step = Math.max(1, Math.floor(vol / (secondsRemaining || 15)));
+      const interval = setInterval(() => {
+        vol -= step;
+        if (vol <= 0 || !isPreBellFading) {
+          vol = 0;
+          clearInterval(interval);
           if (ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
         }
-      }, 125);
+        try { ytPlayer.setVolume(Math.max(0, vol)); } catch(e) {}
+      }, 1000);
     }
 
     function stopMusicForBell() {
-      clearInterval(preBellFadeInterval);
-      if (ytPlayer && ytPlayer.stopVideo) {
-        duckMusicVolume(true);
-        setTimeout(() => ytPlayer.stopVideo(), 1000);
-        currentMusicIndex = musicQueue.length;
-        renderMusicQueue();
+      if (ytPlayer && typeof ytPlayer.pauseVideo === 'function') {
+        ytPlayer.pauseVideo();
       }
     }
 
-    // ==========================================
-    // 2. Bell Schedule System
-    // ==========================================
-    let bells = JSON.parse(localStorage.getItem('sv_bells') || '[]');
-    let lastRungBell = null;
-    let editBellIndex = -1;
-
+    // ------------------------------------------
+    // 4. Bell Schedule System & Presets
+    // ------------------------------------------
     async function fetchBellsFromServer() {
       try {
         const response = await fetch(API_URL + "?action=get_bells&t=" + new Date().getTime());
         const data = await response.json();
-        if (Array.isArray(data)) {
-          bells = data;
+        const bellsList = Array.isArray(data) ? data : (data && Array.isArray(data.data) ? data.data : (data && Array.isArray(data.bells) ? data.bells : []));
+        
+        if (bellsList.length > 0) {
+          bells = bellsList;
           localStorage.setItem('sv_bells', JSON.stringify(bells));
           renderBells();
-          preFetchTTSCache();
+          updateNextBellBanner();
+        } else {
+          // If server is empty, load from localStorage or standards
+          const localSaved = localStorage.getItem('sv_bells');
+          if (localSaved) {
+            bells = JSON.parse(localSaved);
+            renderBells();
+            updateNextBellBanner();
+          } else {
+            loadStandardSchedule();
+          }
         }
-      } catch (e) { console.warn("Cannot fetch bells from server, using local storage", e); }
+      } catch (e) {
+        console.warn("Cannot fetch bells from server, using local fallback", e);
+        const localSaved = localStorage.getItem('sv_bells');
+        if (localSaved) {
+          bells = JSON.parse(localSaved);
+          renderBells();
+          updateNextBellBanner();
+        }
+      }
     }
 
     async function saveBellsToServer() {
       const btn = document.getElementById('bell-add-btn');
       const originalText = btn ? btn.innerHTML : '';
       if (btn) { btn.innerHTML = 'กำลังบันทึก...'; btn.disabled = true; }
+
       try {
         await fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({ action: 'save_bells', bells: JSON.stringify(bells) })
         });
-      } catch (e) { console.warn("Cannot save bells to server", e); }
+      } catch (e) {
+        console.warn("Cannot save bells to server", e);
+      }
+
       if (btn) { btn.innerHTML = originalText; btn.disabled = false; }
-      preFetchTTSCache();
+    }
+
+    function loadStandardSchedule() {
+      if (bells.length > 0) {
+        if (!confirm('ต้องการแทนที่ตารางออดปัจจุบันด้วย "ตารางออดมาตรฐานของโรงเรียน (13 คาบ)" หรือไม่?')) return;
+      }
+      bells = JSON.parse(JSON.stringify(STANDARD_BELLS));
+      localStorage.setItem('sv_bells', JSON.stringify(bells));
+      renderBells();
+      updateNextBellBanner();
+      saveBellsToServer();
     }
 
     function renderBells() {
-      bells.sort((a,b) => a.time.localeCompare(b.time));
-      document.getElementById('bell-list').innerHTML = bells.map((b, idx) => {
-        let soundName = 'มาตรฐาน';
-        if (b.sound === 'start') soundName = 'เข้าเรียน';
-        else if (b.sound === 'end') soundName = 'เลิกเรียน';
-        
+      bells.sort((a,b) => (a.time || '').localeCompare(b.time || ''));
+      const listEl = document.getElementById('bell-list');
+      const badgeEl = document.getElementById('bell-count-badge');
+      if (badgeEl) badgeEl.innerText = bells.length;
+
+      if (!listEl) return;
+
+      if (bells.length === 0) {
+        listEl.innerHTML = `
+          <div class="text-center text-gray-400 py-12 text-sm flex flex-col items-center justify-center gap-2">
+            <span>ยังไม่มีการตั้งเวลาออด</span>
+            <button onclick="loadStandardSchedule()" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg shadow-sm">
+              ✨ โหลดตารางออดมาตรฐานของโรงเรียน (13 คาบ)
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      listEl.innerHTML = bells.map((b, idx) => {
+        let soundName = 'เสียงมาตรฐาน';
+        let soundBadge = 'bg-gray-100 text-gray-700 border-gray-200';
+        if (b.sound === 'start') {
+          soundName = 'เสียงเข้าเรียน';
+          soundBadge = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+        } else if (b.sound === 'end') {
+          soundName = 'เสียงเลิกเรียน/เปลี่ยนคาบ';
+          soundBadge = 'bg-amber-100 text-amber-800 border-amber-200';
+        }
+
         return `
-        <div class="flex justify-between items-center px-3 py-2 bg-white rounded-lg border border-gray-100 shadow-sm">
-          <div class="flex flex-col">
-            <span class="text-gray-700"><b>${b.time}</b> - ${b.desc}</span>
-            ${b.descEn ? `<span class="text-sm text-gray-500 italic">${b.descEn}</span>` : ''}
-            <span class="text-xs text-emerald-600 mt-1">🎵 เสียง: ${soundName}</span>
+          <div class="flex justify-between items-center p-3 bg-white rounded-xl border border-gray-200/80 shadow-xs hover:border-emerald-300 transition">
+            <div class="flex flex-col">
+              <div class="flex items-center gap-2">
+                <span class="text-base font-black text-gray-800 font-mono">${b.time} น.</span>
+                <span class="text-xs font-semibold text-gray-800">${b.desc}</span>
+              </div>
+              ${b.descEn ? `<span class="text-xs text-gray-500 italic mt-0.5">${b.descEn}</span>` : ''}
+              <div class="mt-1 flex items-center gap-1.5">
+                <span class="text-[10px] px-2 py-0.5 rounded border font-semibold ${soundBadge}">${soundName}</span>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-1">
+              <button onclick="testBellSound(${idx})" class="p-1.5 text-gray-400 hover:text-emerald-600 rounded-lg hover:bg-emerald-50 transition" title="ทดสอบเสียงออดนี้">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
+              </button>
+              <button onclick="editBell(${idx})" class="p-1.5 text-gray-400 hover:text-amber-600 rounded-lg hover:bg-amber-50 transition" title="แก้ไข">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+              </button>
+              <button onclick="removeBell(${idx})" class="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition" title="ลบ">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              </button>
+            </div>
           </div>
-          <div class="flex gap-2">
-            <button onclick="editBell(${idx})" class="text-amber-500 hover:text-amber-600 transition" title="แก้ไข">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" /></svg>
-            </button>
-            <button onclick="removeBell(${idx})" class="text-red-500 hover:text-red-600 transition" title="ลบ">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
-            </button>
-          </div>
-        </div>
-        `
+        `;
       }).join('');
     }
 
@@ -787,61 +1245,64 @@
       document.getElementById('bell-desc').value = '';
       document.getElementById('bell-desc-en').value = '';
       document.getElementById('bell-sound').value = 'default';
-      document.getElementById('bell-add-btn').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg> บันทึกเวลาออด';
+      document.getElementById('bell-form-mode').innerText = '';
+      document.getElementById('bell-cancel-btn').classList.add('hidden');
+      document.getElementById('bell-add-btn').innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+        บันทึกเวลาออด
+      `;
       handlePresetChange();
     }
 
     function handlePresetChange() {
       const preset = document.getElementById('bell-preset').value;
-      const customContainer = document.getElementById('bell-custom-container');
       const periodContainer = document.getElementById('bell-period-container');
-      
-      if (preset === 'custom') {
-        customContainer.classList.remove('hidden');
+      const timeInput = document.getElementById('bell-time');
+      const descTh = document.getElementById('bell-desc');
+      const descEn = document.getElementById('bell-desc-en');
+      const sound = document.getElementById('bell-sound');
+
+      if (preset === 'change_period') {
+        periodContainer.classList.remove('hidden');
+        periodContainer.classList.add('flex');
+      } else {
         periodContainer.classList.add('hidden');
         periodContainer.classList.remove('flex');
-      } else {
-        customContainer.classList.add('hidden');
-        if (preset === 'change_period') {
-          periodContainer.classList.remove('hidden');
-          periodContainer.classList.add('flex');
-        } else {
-          periodContainer.classList.add('hidden');
-          periodContainer.classList.remove('flex');
-        }
+      }
+
+      // Pre-fill fields according to selected preset
+      const presetData = {
+        assembly: { time: '07:50', th: 'ถึงเวลาเข้าแถวเคารพธงชาติ', en: "It's time for the morning assembly.", sound: 'start' },
+        homeroom: { time: '08:10', th: 'ถึงเวลาเข้าโฮมรูม', en: "It's time for the morning brief.", sound: 'start' },
+        start_period_1: { time: '08:30', th: 'หมดเวลาโฮมรูม เตรียมเข้าสู่คาบเรียนที่ 1', en: 'The morning brief is over. Please prepare for period 1.', sound: 'end' },
+        break_morning: { time: '09:30', th: 'หมดเวลาคาบเรียน พัก 10 นาที', en: 'It is now morning break.', sound: 'end' },
+        end_break_morning: { time: '09:40', th: 'หมดเวลาพัก เตรียมเข้าสู่คาบเรียน', en: 'Morning break is over. Please prepare for classes.', sound: 'start' },
+        lunch: { time: '11:40', th: 'หมดเวลาคาบเรียน พักรับประทานอาหารกลางวัน', en: 'It is now lunch break.', sound: 'end' },
+        end_lunch: { time: '12:40', th: 'หมดเวลาพักรับประทานอาหารกลางวัน เตรียมเข้าสู่คาบเรียน', en: 'Lunch break is over. Please prepare for classes.', sound: 'start' },
+        break_afternoon: { time: '14:40', th: 'หมดเวลาคาบเรียน พัก 10 นาที', en: 'It is now afternoon break.', sound: 'end' },
+        end_break_afternoon: { time: '14:50', th: 'หมดเวลาพัก เตรียมเข้าสู่คาบเรียน', en: 'Afternoon break is over. Please prepare for classes.', sound: 'start' },
+        homeroom_afternoon: { time: '15:50', th: 'หมดเวลาคาบเรียนที่ 6 เตรียมโฮมรูมก่อนกลับบ้าน', en: 'Period 6 is over. Please prepare for the afternoon brief before going home.', sound: 'end' },
+        dismissal: { time: '16:00', th: 'หมดเวลาเรียน เลิกเรียน ขอให้นักเรียนเดินทางกลับบ้านโดยสวัสดิภาพ', en: 'Classes are dismissed for today. Please travel home safely and have a wonderful evening.', sound: 'end' }
+      };
+
+      if (presetData[preset]) {
+        if (!timeInput.value || editBellIndex === -1) timeInput.value = presetData[preset].time;
+        descTh.value = presetData[preset].th;
+        descEn.value = presetData[preset].en;
+        sound.value = presetData[preset].sound;
+      } else if (preset === 'change_period') {
         updatePresetDesc();
       }
     }
 
     function updatePresetDesc() {
       const preset = document.getElementById('bell-preset').value;
-      const descTh = document.getElementById('bell-desc');
-      const descEn = document.getElementById('bell-desc-en');
-      const sound = document.getElementById('bell-sound');
-
-      if (preset === 'assembly') {
-        descTh.value = 'ถึงเวลาเข้าแถวเคารพธงชาติ';
-        descEn.value = "It's time for the morning assembly.";
-        sound.value = 'start';
-      } else if (preset === 'change_period') {
-        const cur = document.getElementById('bell-period-current').value;
-        const next = document.getElementById('bell-period-next').value;
-        descTh.value = `หมดเวลาคาบเรียนที่ ${cur} เตรียมเข้าสู่คาบเรียนที่ ${next}`;
-        descEn.value = `Period ${cur} is over. Please prepare for period ${next}.`;
-        sound.value = 'end';
-      } else if (preset === 'lunch') {
-        descTh.value = 'หมดเวลาคาบเรียน พักรับประทานอาหารกลางวัน';
-        descEn.value = 'It is now lunch break.';
-        sound.value = 'end';
-      } else if (preset === 'end_lunch') {
-        descTh.value = 'หมดเวลาพักรับประทานอาหารกลางวัน เตรียมเข้าสู่คาบเรียน';
-        descEn.value = 'Lunch break is over. Please prepare for classes.';
-        sound.value = 'start';
-      } else if (preset === 'dismissal') {
-        descTh.value = 'หมดเวลาเรียน เลิกเรียน';
-        descEn.value = 'Classes are dismissed for today.';
-        sound.value = 'end';
-      }
+      if (preset !== 'change_period') return;
+      const cur = document.getElementById('bell-period-current').value || '1';
+      const next = document.getElementById('bell-period-next').value || '2';
+      document.getElementById('bell-desc').value = `หมดเวลาคาบเรียนที่ ${cur} เตรียมเข้าสู่คาบเรียนที่ ${next}`;
+      document.getElementById('bell-desc-en').value = `Period ${cur} is over. Please prepare for period ${next}.`;
+      document.getElementById('bell-sound').value = 'end';
     }
 
     function addBell() {
@@ -850,66 +1311,101 @@
       const descEn = document.getElementById('bell-desc-en').value;
       const sound = document.getElementById('bell-sound').value;
       const preset = document.getElementById('bell-preset').value;
-      
-      let pCur = null;
-      let pNext = null;
-      if(preset === 'change_period') {
-         pCur = document.getElementById('bell-period-current').value;
-         pNext = document.getElementById('bell-period-next').value;
+      const pCur = document.getElementById('bell-period-current').value;
+      const pNext = document.getElementById('bell-period-next').value;
+
+      if (!time) return alert('กรุณาระบุเวลาออด');
+      if (!desc) return alert('กรุณาระบุข้อความประกาศ');
+
+      const bellObj = { time, sound, desc, descEn, preset, pCur, pNext };
+
+      if (editBellIndex >= 0) {
+        bells[editBellIndex] = bellObj;
+      } else {
+        bells.push(bellObj);
       }
 
-      if(time && desc) {
-        if (editBellIndex > -1) {
-          bells[editBellIndex] = {time, desc, descEn, sound, preset, pCur, pNext};
-          editBellIndex = -1;
-          document.getElementById('bell-add-btn').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg> บันทึกเวลาออด';
-        } else {
-          bells.push({time, desc, descEn, sound, preset, pCur, pNext});
-        }
-        localStorage.setItem('sv_bells', JSON.stringify(bells));
-        renderBells();
-        saveBellsToServer();
-        toggleBellModal(false);
-      } else {
-        alert("กรุณาระบุเวลาและรูปแบบให้ครบถ้วน");
-      }
+      localStorage.setItem('sv_bells', JSON.stringify(bells));
+      renderBells();
+      updateNextBellBanner();
+      saveBellsToServer();
+      resetBellForm();
     }
-    
+
     function editBell(idx) {
       editBellIndex = idx;
       const b = bells[idx];
       document.getElementById('bell-time').value = b.time;
       document.getElementById('bell-preset').value = b.preset || 'custom';
-      
-      if(b.preset === 'change_period') {
-        document.getElementById('bell-period-current').value = b.pCur || 1;
-        document.getElementById('bell-period-next').value = b.pNext || 2;
-      }
-      
-      handlePresetChange();
-      
-      // Override desc and sound in case it was a custom setting
       document.getElementById('bell-desc').value = b.desc;
       document.getElementById('bell-desc-en').value = b.descEn || '';
       document.getElementById('bell-sound').value = b.sound || 'default';
+      if (b.pCur) document.getElementById('bell-period-current').value = b.pCur;
+      if (b.pNext) document.getElementById('bell-period-next').value = b.pNext;
 
-      document.getElementById('bell-add-btn').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" /></svg> บันทึกการแก้ไข';
+      document.getElementById('bell-form-mode').innerText = `(กำลังแก้ไขเวลา ${b.time})`;
+      document.getElementById('bell-cancel-btn').classList.remove('hidden');
+      document.getElementById('bell-add-btn').innerHTML = 'บันทึกการแก้ไข';
+
+      handlePresetChange();
     }
 
     function removeBell(idx) {
+      if (!confirm(`ต้องการลบเวลาออด ${bells[idx].time} หรือไม่?`)) return;
       bells.splice(idx, 1);
       localStorage.setItem('sv_bells', JSON.stringify(bells));
       renderBells();
+      updateNextBellBanner();
       saveBellsToServer();
     }
 
-    function checkBells() {
-      const disableBells = document.getElementById('disable-bells').checked;
-      if (disableBells) return; // If disabled, don't ring bells and don't pre-fade
+    function updateNextBellBanner() {
+      const banner = document.getElementById('next-bell-text');
+      if (!banner) return;
+
+      if (!isBellsEnabled) {
+        banner.innerHTML = `<span class="text-amber-700 font-bold">⏸️ ปิดระบบออดชั่วคราว (วันกิจกรรมพิเศษ — ออดจะไม่ดัง)</span>`;
+        return;
+      }
+
+      if (!bells || bells.length === 0) {
+        banner.innerText = 'ยังไม่ได้ตั้งตารางออด';
+        return;
+      }
 
       const now = new Date();
       const currentSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-      const timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+
+      let nextBell = null;
+      let minDiff = Infinity;
+
+      for (const bell of bells) {
+        if (!bell.time || !bell.time.includes(':')) continue;
+        const [h, m] = bell.time.split(':').map(Number);
+        const bellSec = h * 3600 + m * 60;
+        const diff = bellSec - currentSec;
+        if (diff > 0 && diff < minDiff) {
+          minDiff = diff;
+          nextBell = bell;
+        }
+      }
+
+      if (nextBell) {
+        const remainingMinutes = Math.floor(minDiff / 60);
+        const remainingSec = minDiff % 60;
+        const timeCountdown = remainingMinutes > 0 ? `${remainingMinutes} นาที ${remainingSec} วิ` : `${remainingSec} วินาที`;
+        banner.innerHTML = `<b class="text-emerald-700">${nextBell.time} น.</b> - ${nextBell.desc} <span class="text-gray-500 font-normal">(อีก ${timeCountdown})</span>`;
+      } else {
+        banner.innerHTML = `<span class="text-gray-500 font-normal">สิ้นสุดตารางออดประจำวันนี้แล้ว (เลิกเรียน)</span>`;
+      }
+    }
+
+    function checkBells() {
+      if (!isBellsEnabled) return; // Bell system paused for special activity day
+
+      const now = new Date();
+      const currentSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+      const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
 
       for (const bell of bells) {
         if (!bell.time || !bell.time.includes(':')) continue;
@@ -917,22 +1413,23 @@
         const bellSec = h * 3600 + m * 60;
         const diff = bellSec - currentSec;
 
-        // 1. Pre-bell gentle fadeout 15s before bell
+        // 1. Pre-bell gentle fadeout 15 seconds before bell
         if (diff > 0 && diff <= 15) {
           if (!isPreBellFading && ytPlayer && typeof ytPlayer.getPlayerState === 'function') {
             const state = ytPlayer.getPlayerState();
             if (state === YT.PlayerState.PLAYING) {
               isPreBellFading = true;
-              console.log("Starting pre-bell fadeout for bell at " + bell.time);
+              console.log("Starting 15s pre-bell fadeout for bell at " + bell.time);
               startPreBellFadeout(diff);
             }
           }
         }
 
-        // 2. Bell trigger at exact time
-        if (diff === 0 && lastRungBell !== timeStr) {
+        // 2. Bell trigger (Minute-based match to avoid missing due to timer drift)
+        if (timeStr === bell.time && lastRungBell !== timeStr) {
           lastRungBell = timeStr;
           isPreBellFading = false;
+          console.log("🔔 Rung bell at " + timeStr);
           triggerBellSequence(bell);
           break;
         }
@@ -942,32 +1439,39 @@
     async function triggerBellSequence(bellObj) {
       stopMusicForBell();
 
-      let bellSoundUrl = "https://assets.mixkit.co/active_storage/sfx/2042/2042-preview.mp3";
-      if (bellObj.sound === 'start') bellSoundUrl = encodeURI("./sounds/เข้าเรียน.mp3");
-      else if (bellObj.sound === 'end') bellSoundUrl = encodeURI("./sounds/เลิกเรียน-เปลี่ยนคาบ.mp3");
+      // Sound chime selection
+      let chimeFile = "./sounds/chime_default.mp3";
+      if (bellObj.sound === 'start') {
+        chimeFile = "./sounds/chime_start.mp3";
+      } else if (bellObj.sound === 'end') {
+        chimeFile = "./sounds/chime_end.mp3";
+      }
 
-      audioQueue.push(bellSoundUrl);
+      audioQueue.push(chimeFile);
 
-      // Parse time for English announcement
-      const [h, m] = lastRungBell.split(':');
-      let hourStr = parseInt(h);
-      let ampm = hourStr >= 12 ? 'PM' : 'AM';
-      let hour12 = hourStr % 12 || 12;
-      let minStr = parseInt(m) === 0 ? "o'clock" : parseInt(m);
-      
-      const enTextDesc = bellObj.descEn ? bellObj.descEn : bellObj.desc;
-      const txtEn = "Attention please, the time is now " + hour12 + " " + minStr + " " + ampm + ", " + enTextDesc;
+      // Bilingual announcement (English first, Thai second)
+      const timeParts = (bellObj.time || '12:00').split(':');
+      const hourStr = parseInt(timeParts[0], 10);
+      const ampm = hourStr >= 12 ? 'PM' : 'AM';
+      const hour12 = hourStr % 12 || 12;
+      const minStr = parseInt(timeParts[1], 10) === 0 ? "o'clock" : parseInt(timeParts[1], 10);
+
+      const enTextDesc = bellObj.descEn || bellObj.desc;
+      const txtEn = `Attention please, the time is now ${hour12} ${minStr} ${ampm}, ${enTextDesc}`;
       const audioUrlEn = await fetchAudioData(txtEn, "en-GB");
-      if(audioUrlEn) { audioQueue.push(audioUrlEn); }
+      if (audioUrlEn) audioQueue.push(audioUrlEn);
 
-      const txt = "ประกาศ ขณะนี้เวลา " + lastRungBell.replace(':', ' นาฬิกา ') + " นาที " + bellObj.desc;
-      const audioUrl = await fetchAudioData(txt, "th-TH");
-      if(audioUrl) { audioQueue.push(audioUrl); }
-      
-      // If bell signifies end of break or start of class/assembly, stop music queue after speech
-      const isBreakEnding = (bellObj.sound === 'start' || bellObj.preset === 'assembly' || bellObj.preset === 'end_lunch');
-      if (isBreakEnding) {
-        currentMusicIndex = musicQueue.length;
+      const txtTh = `ประกาศ ขณะนี้เวลา ${timeParts[0]} นาฬิกา ${timeParts[1]} นาที ${bellObj.desc}`;
+      const audioUrlTh = await fetchAudioData(txtTh, "th-TH");
+      if (audioUrlTh) audioQueue.push(audioUrlTh);
+
+      // If class/assembly starts, finish and auto-clear active music queue
+      const isClassStarting = (bellObj.sound === 'start' || bellObj.preset === 'assembly' || bellObj.preset === 'end_lunch' || bellObj.preset === 'end_break_morning' || bellObj.preset === 'end_break_afternoon');
+      if (isClassStarting) {
+        console.log("Class/Assembly started by bell: Auto-clearing music queue");
+        if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
+        musicQueue = [];
+        currentMusicIndex = -1;
         renderMusicQueue();
         syncQueueToServer();
       }
@@ -975,29 +1479,18 @@
       processAudioQueue();
     }
 
-    // ==========================================
-    // 3. Audio & TTS System (Pickups & Announce)
-    // ==========================================
-    let ttsCache = JSON.parse(localStorage.getItem('sv_tts_cache') || '{}');
-
-    async function preFetchTTSCache() {
-      // Pre-fetch all bells when saved/loaded
-      for (const b of bells) {
-        const [h, m] = b.time.split(':');
-        let hourStr = parseInt(h);
-        let ampm = hourStr >= 12 ? 'PM' : 'AM';
-        let hour12 = hourStr % 12 || 12;
-        let minStr = parseInt(m) === 0 ? "o'clock" : parseInt(m);
-        const enTextDesc = b.descEn ? b.descEn : b.desc;
-        const txtEn = "Attention please, the time is now " + hour12 + " " + minStr + " " + ampm + ", " + enTextDesc;
-        const txt = "ประกาศ ขณะนี้เวลา " + b.time.replace(':', ' นาฬิกา ') + " นาที " + b.desc;
-        
-        await fetchAudioData(txtEn, "en-GB");
-        await fetchAudioData(txt, "th-TH");
-      }
+    function testBellSound(idx) {
+      const b = bells[idx];
+      if (!b) return;
+      triggerBellSequence(b);
     }
 
-    async function fetchAudioData(text, lang, persistToDisk = true) {
+    // ------------------------------------------
+    // 5. Audio & TTS Playback Engine
+    // ------------------------------------------
+    let ttsCache = {};
+
+    async function fetchAudioData(text, lang) {
       const cleanText = String(text || '').trim();
       if (!cleanText) return null;
       const cacheKey = lang + ':' + cleanText;
@@ -1011,31 +1504,20 @@
         });
         const data = await response.json();
         if (data.success && data.audioContent) {
-          const audioDataUri = 'data:audio/mp3;base64,' + data.audioContent;
-          ttsCache[cacheKey] = audioDataUri; // Save to RAM for this session
-          
-          if (persistToDisk) {
-            try {
-              localStorage.setItem('sv_tts_cache', JSON.stringify(ttsCache));
-            } catch(e) {
-              console.warn("Storage full, clearing TTS cache");
-              ttsCache = {};
-              ttsCache[cacheKey] = audioDataUri;
-              localStorage.setItem('sv_tts_cache', JSON.stringify(ttsCache));
-            }
-          }
-          return audioDataUri;
+          const audioUri = 'data:audio/mp3;base64,' + data.audioContent;
+          ttsCache[cacheKey] = audioUri;
+          return audioUri;
         }
-      } catch (e) { 
-        console.error('TTS Fetch Error (Offline Mode):', e); 
-        return { isWebSpeech: true, text: cleanText, lang: lang };
+      } catch (e) {
+        console.warn('TTS API unavailable, using Web Speech API fallback:', e);
       }
-      return null;
+
+      return { isWebSpeech: true, text: cleanText, lang: lang };
     }
 
     async function processAudioQueue() {
       if (!isAudioMaster) {
-        audioQueue = []; // Clear queue on passive display to ensure zero sound overlap
+        audioQueue = []; // Clear queue on secondary instances
         return;
       }
       if (isPlayingTTS) return;
@@ -1044,9 +1526,9 @@
 
       while (audioQueue.length > 0) {
         const item = audioQueue.shift();
-        
+
         if (typeof item === 'object' && item.isWebSpeech) {
-          await new Promise(function(resolve) {
+          await new Promise((resolve) => {
             const utterance = new SpeechSynthesisUtterance(item.text);
             utterance.lang = item.lang;
             utterance.onend = resolve;
@@ -1054,17 +1536,16 @@
             window.speechSynthesis.speak(utterance);
           });
         } else {
-          await new Promise(function(resolve) {
-            player.src = item;
-            player.onended = resolve;
-            player.onerror = resolve;
-            player.play().catch(function(e) {
-              console.warn("Audio blocked:", e);
-              if (e.name === 'NotAllowedError') {
-                audioQueue.unshift(item);
-                const unlock = () => { document.removeEventListener('click', unlock); resolve(); };
-                document.addEventListener('click', unlock);
-              } else resolve();
+          await new Promise((resolve) => {
+            mainPlayer.src = item;
+            mainPlayer.onended = resolve;
+            mainPlayer.onerror = (e) => {
+              console.warn("Audio element error, continuing queue:", e);
+              resolve();
+            };
+            mainPlayer.play().catch((err) => {
+              console.warn("Autoplay blocked, continuing:", err);
+              resolve();
             });
           });
         }
@@ -1072,274 +1553,220 @@
 
       isPlayingTTS = false;
       duckMusicVolume(false);
-      // Restore siren volume to full alert after speech if emergency is still active
-      if (window.isSOSActive) {
-        const sosP = document.getElementById('sos-player');
-        if (sosP && !sosP.paused) sosP.volume = 1.0;
-      }
     }
 
-    async function queueStudentPickup(student) {
-      const name = student.name;
-      const gateThai = student.gate || "จุดรับนักเรียน";
-      let gateEng = gateThai.includes("1") ? "Gate Number 1" : (gateThai.includes("3") ? "Gate Number 3" : "the pickup point");
-      let nameForEng = name.replace(/ด\.ช\.|ด\.ญ\.|ดช\.|ดญ\.|เด็กชาย|เด็กหญิง/g, "").trim();
-      let nameForThai = name.replace(/ด\.ช\.|ดช\./g, "เด็กชาย ").replace(/ด\.ญ\.|ดญ\./g, "เด็กหญิง ");
-
-      const audios = await Promise.all([
-        fetchAudioData("Attention please, student ", "en-GB", true),
-        fetchAudioData(nameForEng, "th-TH", false),
-        fetchAudioData(", please meet your parents at " + gateEng, "en-GB", true),
-        fetchAudioData("ประกาศ นักเรียนชื่อ ", "th-TH", true),
-        fetchAudioData(nameForThai, "th-TH", false),
-        fetchAudioData(`ขณะนี้ผู้ปกครอง มารอรับแล้ว ที่ ${gateThai} ค่ะ`, "th-TH", true)
-      ]);
-      audioQueue.push('./sounds/ประกาศ.mp3');
-      audios.forEach(a => { if(a) audioQueue.push(a); });
-      processAudioQueue();
-    }
-
+    // Teacher Announcements with Head & Tail Chimes
     async function queueTeacherAnnouncement(item) {
       const audios = await Promise.all([
         fetchAudioData("Attention please, " + item.en, "en-GB"),
         fetchAudioData("ประกาศ " + item.th, "th-TH")
       ]);
-      audioQueue.push('./sounds/ประกาศ.mp3');
-      audios.forEach(a => { if(a) audioQueue.push(a); });
-      audioQueue.push('./sounds/ประกาศ.mp3');
+
+      // Chime Start
+      audioQueue.push('./sounds/chime_announce.mp3');
+      audios.forEach(a => { if (a) audioQueue.push(a); });
+      // Chime End
+      audioQueue.push('./sounds/chime_announce.mp3');
+
       processAudioQueue();
     }
 
-    // ==========================================
-    // 4. Unified Polling Loop
-    // ==========================================
-    let isInitialLoad = true;
+    // Pickup Announcement
+    async function queuePickupAnnouncement(name, classRoom) {
+      let nameForThai = name.replace(/ด\.ช\.|ดช\./g, "เด็กชาย ").replace(/ด\.ญ\.|ดญ\./g, "เด็กหญิง ");
 
-    function renderPickups(pickups) {
-      if (!pickups || pickups.length === 0) {
-        document.getElementById('pickup-list').innerHTML = '<div class="text-center text-gray-400 mt-8 text-lg">ไม่มีรายการนักเรียนรอรับกลับ...</div>';
-        lastPickupString = "";
-        return;
-      }
-      const html = pickups.map(item => `
-        <div class="bg-white border-l-8 border-secondary rounded-xl p-4 shadow-sm flex justify-between items-center animate-slide-in">
-          <div>
-            <div class="text-2xl font-bold text-gray-800">${item.name}</div>
-            <div class="text-secondary font-medium mt-1">${item.gate || 'จุดรับนักเรียน'}</div>
-          </div>
-          <span class="bg-secondary text-white px-4 py-1.5 rounded-full text-lg font-medium shadow-sm">${item.time} น.</span>
-        </div>
-      `).join('');
-      
-      if (html !== lastPickupString) {
-        document.getElementById('pickup-list').innerHTML = html;
-        lastPickupString = html;
-        
-        pickups.forEach(item => {
-          const key = item.name + '_' + item.time;
-          if (!announcedNames.has(key)) {
-            announcedNames.add(key);
-            sessionStorage.setItem('sv_announcedNames', JSON.stringify([...announcedNames]));
-            if (!isInitialLoad) queueStudentPickup(item);
-          }
-        });
-      }
+      const audios = await Promise.all([
+        fetchAudioData(`Attention please, ${name}, please come to the pickup station.`, "en-GB"),
+        fetchAudioData(`ประกาศ ขอเชิญ ${nameForThai} ไปยังจุดรับส่งนักเรียนค่ะ`, "th-TH")
+      ]);
+
+      audioQueue.push('./sounds/chime_default.mp3');
+      audios.forEach(a => { if (a) audioQueue.push(a); });
+      processAudioQueue();
     }
 
+    // Emergency SOS Management
     function dismissLocalSOS() {
       window.isSOSActive = false;
       const overlay = document.getElementById('sos-overlay');
-      if (overlay) {
-        overlay.className = "fixed inset-0 z-[9999] hidden flex-col items-center justify-center animate-pulse";
-      }
+      if (overlay) overlay.classList.add('hidden');
       const sosPlayer = document.getElementById('sos-player');
       if (sosPlayer) {
         sosPlayer.pause();
         sosPlayer.currentTime = 0;
-        sosPlayer.volume = 1.0;
-      }
-      if (typeof player !== 'undefined' && player) {
-        player.pause();
       }
       audioQueue = [];
       isPlayingTTS = false;
       duckMusicVolume(false);
     }
 
+    function triggerEmergencySOS(colorCode, cfg) {
+      const overlay = document.getElementById('sos-overlay');
+      const title = document.getElementById('sos-overlay-title');
+      const code = document.getElementById('sos-overlay-code');
+      const desc = document.getElementById('sos-overlay-desc');
+      const sosPlayer = document.getElementById('sos-player');
+
+      const bgColors = {
+        red: 'bg-red-600',
+        orange: 'bg-amber-600',
+        yellow: 'bg-yellow-500',
+        blue: 'bg-blue-600',
+        purple: 'bg-purple-600',
+        black: 'bg-gray-900',
+        green: 'bg-emerald-600'
+      };
+
+      if (overlay) {
+        overlay.className = `fixed inset-0 z-[9999] flex flex-col items-center justify-center animate-pulse ${bgColors[colorCode] || 'bg-red-600'}`;
+        title.innerText = 'EMERGENCY ALERT';
+        code.innerText = `CODE: ${colorCode.toUpperCase()}`;
+        desc.innerText = `${cfg.th} — ${cfg.en}`;
+        overlay.classList.remove('hidden');
+      }
+
+      if (sosPlayer && isAudioMaster) {
+        try { if (mainPlayer) mainPlayer.pause(); } catch(e) {}
+        sosPlayer.volume = 1.0;
+        sosPlayer.play().catch(e => console.warn('SOS Alarm error:', e));
+      }
+
+      audioQueue = [];
+      isPlayingTTS = false;
+      window.isSOSActive = true;
+
+      const txtEn = `Attention please, Emergency Code ${colorCode.toUpperCase()}. ${cfg.en}`;
+      const txtTh = `ประกาศเตือนภัยฉุกเฉิน รหัสสี${getColorThai(colorCode)} ${cfg.th} ${cfg.action}`;
+
+      fetchAudioData(txtEn, "en-GB").then(urlEn => {
+        if (!window.isSOSActive) return;
+        if (urlEn) audioQueue.push(urlEn);
+        return fetchAudioData(txtTh, "th-TH");
+      }).then(urlTh => {
+        if (!window.isSOSActive) return;
+        if (urlTh) audioQueue.push(urlTh);
+        if (sosPlayer) sosPlayer.volume = 0.15; // Duck siren so TTS is clear
+        processAudioQueue();
+      }).catch(err => {
+        console.error("SOS TTS failed:", err);
+        if (window.isSOSActive) processAudioQueue();
+      });
+    }
+
+    function getColorThai(c) {
+      const map = { red: 'แดง', orange: 'ส้ม', yellow: 'เหลือง', blue: 'น้ำเงิน', purple: 'ม่วง', black: 'ดำ', green: 'เขียว' };
+      return map[c] || c;
+    }
+
+    // ------------------------------------------
+    // 6. Polling & Sync Loop
+    // ------------------------------------------
+    let isInitialLoad = true;
+
+    function renderPickups(pickups) {
+      const listDiv = document.getElementById('pickup-list');
+      const badge = document.getElementById('pickup-count-badge');
+      if (!listDiv) return;
+
+      if (!pickups || pickups.length === 0) {
+        listDiv.innerHTML = `
+          <div class="text-center text-gray-400 py-16 text-sm flex flex-col items-center justify-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span>ยังไม่มีข้อมูลการรับนักเรียนในขณะนี้</span>
+          </div>
+        `;
+        if (badge) badge.innerText = 'รอรับ 0 คน';
+        return;
+      }
+
+      if (badge) badge.innerText = `รอรับ ${pickups.length} คน`;
+
+      listDiv.innerHTML = pickups.map(item => {
+        const studentName = item.studentName || item.name || 'ไม่ระบุชื่อ';
+        const className = item.className || item.class || 'ชั้นเรียน -';
+        const pickerName = item.pickerName || 'ผู้ปกครอง';
+        const timeStr = item.time || '';
+
+        // If newly arrived, queue speech announcement
+        if (!isInitialLoad && !announcedNames.has(studentName)) {
+          announcedNames.add(studentName);
+          sessionStorage.setItem('sv_announcedNames', JSON.stringify([...announcedNames]));
+          queuePickupAnnouncement(studentName, className);
+        }
+
+        return `
+          <div class="p-3 bg-white border border-gray-200/80 rounded-xl shadow-xs flex items-center justify-between hover:border-primary/40 transition animate-slide-in">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary font-bold flex items-center justify-center text-sm shrink-0">
+                🎓
+              </div>
+              <div>
+                <div class="font-bold text-gray-900 text-sm leading-tight">${studentName}</div>
+                <div class="text-xs text-gray-500 mt-0.5">ห้อง: <b class="text-gray-700">${className}</b> | ผู้รับ: ${pickerName}</div>
+              </div>
+            </div>
+            <div class="text-right shrink-0">
+              <span class="text-xs font-mono font-bold text-primary">${timeStr}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
     function renderAnnouncements(announces) {
       if (!announces) return;
       const listDiv = document.getElementById('announce-list');
+      if (!listDiv) return;
+
       announces.forEach(item => {
         if (!announcedIds.has(item.row)) {
           announcedIds.add(item.row);
           sessionStorage.setItem('sv_announcedMsgs', JSON.stringify([...announcedIds]));
-          
-          if (item.th.startsWith('REMOTE_CMD:')) {
-            const cmd = item.th.replace('REMOTE_CMD:', '').trim();
-            if (cmd === 'skip_music') {
-              skipMusic();
-            } else if (cmd.startsWith('remove_music:')) {
-              const idx = parseInt(cmd.split(':')[1], 10);
-              if (!isNaN(idx)) removeMusic(idx);
-            }
-            return;
-          }
 
-          // STOP SOS SILENTLY
-          if (item.th.includes('#STOP_SOS#')) {
-            const div = document.createElement('div');
-            div.className = 'p-3 bg-gray-100 border border-gray-400 rounded-lg shadow-sm animate-slide-in';
-            div.innerHTML = `<div class="font-medium text-gray-700 font-bold">🔇 ปิดเสียงสัญญาณเตือนภัยฉุกเฉิน (Silence SOS)</div>`;
-            listDiv.prepend(div);
-            dismissLocalSOS();
-            return;
-          }
-
-          // SOS Detection (Color Codes)
-          const sosMatch = item.th.match(/code\s*(red|blue|yellow|orange|silver|black|green)/i) || 
-                           item.en.match(/code\s*(red|blue|yellow|orange|silver|black|green)/i);
-          
+          // Check Emergency SOS
+          const sosMatch = (item.th || '').match(/EMERGENCY_CODE_([A-Z]+)/);
           if (sosMatch) {
             const colorCode = sosMatch[1].toLowerCase();
-            
-            const sosConfig = {
-              'red': { 
-                th: 'อัคคีภัย / ไฟไหม้',
-                en: 'Fire emergency, please evacuate the building immediately.',
-                action: 'ให้อพยพนักเรียนและบุคลากรออกจากอาคารไปยังจุดรวมพลที่กำหนดไว้ทันที พร้อมเช็คชื่อ',
-                bg: 'bg-red-600', textCode: 'text-red-800', bgCode: 'bg-red-100', borderCode: 'border-red-500'
-              },
-              'blue': { 
-                th: 'เหตุฉุกเฉินทางการแพทย์',
-                en: 'Medical emergency, please clear the area for the medical team.',
-                action: 'แจ้งทีมพยาบาลเข้าพื้นที่เกิดเหตุทันที พร้อมกันนักเรียนคนอื่นๆ ออกจากบริเวณนั้น',
-                bg: 'bg-blue-600', textCode: 'text-blue-800', bgCode: 'bg-blue-100', borderCode: 'border-blue-500'
-              },
-              'yellow': {
-                th: 'นักเรียนสูญหาย',
-                en: 'Missing student, staff please secure all gates and check attendance.',
-                action: 'เจ้าหน้าที่รักษาความปลอดภัยปิดล็อกประตูทางเข้า-ออกของโรงเรียนทั้งหมด ครูประจำชั้นตรวจสอบและนับจำนวนนักเรียนทันที',
-                bg: 'bg-yellow-400', textCode: 'text-yellow-800', bgCode: 'bg-yellow-100', borderCode: 'border-yellow-500'
-              },
-              'orange': {
-                th: 'สารเคมีรั่วไหล / ภัยพิบัติภายนอกอาคาร',
-                en: 'Hazardous materials or external disaster, please shelter in place and seal all doors and windows.',
-                action: 'ให้ทุกคนอยู่ภายในอาคาร ปิดประตู หน้าต่าง และระบบระบายอากาศ เพื่อป้องกันอันตรายจากภายนอก',
-                bg: 'bg-orange-500', textCode: 'text-orange-800', bgCode: 'bg-orange-100', borderCode: 'border-orange-500'
-              },
-              'silver': {
-                th: 'ภัยคุกคามร้ายแรง / บุคคลมีอาวุธ',
-                en: 'Active threat or armed intruder, initiate immediate lockdown, secure classrooms and stay silent.',
-                action: 'เข้าสู่มาตรการล็อกดาวน์แบบเต็มรูปแบบ ปิดล็อกประตูห้องเรียน ดับไฟ ปิดม่าน ให้นักเรียนซ่อนตัวและงดใช้เสียงเด็ดขาด',
-                bg: 'bg-gray-500', textCode: 'text-gray-800', bgCode: 'bg-gray-200', borderCode: 'border-gray-500'
-              },
-              'black': {
-                th: 'พบวัตถุต้องสงสัย / ขู่วางระเบิด',
-                en: 'Suspicious object or bomb threat, clear the area and evacuate to a safe perimeter.',
-                action: 'กันพื้นที่และอพยพคนออกจากรัศมีที่คาดว่าจะเป็นอันตราย ห้ามใช้วิทยุสื่อสารหรือโทรศัพท์มือถือในระยะใกล้',
-                bg: 'bg-black', textCode: 'text-gray-900', bgCode: 'bg-gray-300', borderCode: 'border-black'
-              }
+            const emergencyData = {
+              red: { th: "มีเหตุกราดยิงหรือผู้ไม่ประสงค์ดีติดอาวุธ", en: "Active shooter or armed intruder reported on campus.", action: "หลบซ่อนตัว ปิดประตูหน้าต่าง ล็อคกลอน และปิดไฟทันที" },
+              orange: { th: "เกิดเหตุเพลิงไหม้ในอาคาร", en: "Fire incident detected inside the facility.", action: "อพยพออกจากอาคารไปยังจุดรวมพลอย่างสงบ" },
+              yellow: { th: "มีผู้ต้องสงสัยหรือเหตุทะเลาะวิวาท", en: "Suspicious intruder or altercation in progress.", action: "ให้อยู่ภายในห้องเรียนและรอคำแนะนำจากเจ้าหน้าที่" },
+              blue: { th: "มีเหตุฉุกเฉินทางการแพทย์", en: "Critical medical emergency in progress.", action: "ขอให้เปิดทางให้ทีมแพทย์และครูพยาบาล" },
+              purple: { th: "ตรวจพบวัตถุต้องสงสัย", en: "Suspicious unattended package detected.", action: "ห้ามแตะต้องวัตถุและถอยห่างจากพื้นที่อย่างน้อย 100 เมตร" },
+              black: { th: "ภัยพิบัติทางธรรมชาติรุนแรง", en: "Severe natural disaster alert.", action: "หมอบกำบังใต้โต๊ะและระวังสิ่งของตกหล่น" },
+              green: { th: "ยกเลิกสถานการณ์ฉุกเฉิน ปลอดภัยแล้ว", en: "Emergency cancelled, all clear.", action: "ดำเนินกิจกรรมตามปกติได้" }
             };
 
-            // CODE GREEN (ALL CLEAR)
+            const cfg = emergencyData[colorCode] || { th: item.th, en: item.en, action: "" };
+
             if (colorCode === 'green') {
-              const div = document.createElement('div');
-              div.className = 'p-3 bg-green-100 border border-green-500 rounded-lg shadow-sm animate-slide-in';
-              div.innerHTML = `<div class="font-medium text-green-800 font-bold">✅ ยกเลิกสถานการณ์ฉุกเฉิน (Code Green - All Clear)</div>`;
-              listDiv.prepend(div);
-
-              if (!isInitialLoad) {
-                dismissLocalSOS();
-
-                // Speak All Clear once
-                audioQueue.push('./sounds/ประกาศ.mp3');
-                fetchAudioData(`Attention please, Code Green, All Clear. Code Green, All Clear.`, "en-GB").then(urlEn => {
-                  if (urlEn) audioQueue.push(urlEn);
-                  return fetchAudioData(`ประกาศ ยกเลิกสถานการณ์ฉุกเฉิน รหัสสีเขียว ปลอดภัยแล้ว`, "th-TH");
-                }).then(urlTh => {
-                  if (urlTh) audioQueue.push(urlTh);
-                  processAudioQueue();
-                }).catch(err => {
-                  console.error("SOS TTS failed:", err);
-                  processAudioQueue();
-                });
-              }
-              return;
-            }
-
-            // OTHER EMERGENCY CODES
-            const cfg = sosConfig[colorCode] || { th: 'เหตุฉุกเฉิน', en: 'Emergency situation', action: 'กรุณาปฏิบัติตามคำสั่งของเจ้าหน้าที่', bg: 'bg-red-600', textCode: 'text-red-800', bgCode: 'bg-red-100', borderCode: 'border-red-500' };
-            const div = document.createElement('div');
-            div.className = `p-3 ${cfg.bgCode} border ${cfg.borderCode} rounded-lg shadow-sm animate-slide-in`;
-            div.innerHTML = `<div class="font-medium ${cfg.textCode} font-bold">🚨 สัญญาณเตือนภัยฉุกเฉิน (Code ${colorCode.toUpperCase()}): ${cfg.th}</div>`;
-            listDiv.prepend(div);
-            
-            if (!isInitialLoad) {
-              const overlay = document.getElementById('sos-overlay');
-              if (overlay) {
-                document.getElementById('sos-overlay-code').innerText = "CODE: " + colorCode.toUpperCase();
-                document.getElementById('sos-overlay-title').innerText = cfg.th;
-                document.getElementById('sos-overlay-desc').innerText = cfg.action;
-                overlay.className = `fixed inset-0 z-[9999] flex flex-col items-center justify-center animate-pulse ${cfg.bg}`;
-              }
-              
-              const sosPlayer = document.getElementById('sos-player');
-              if (sosPlayer) {
-                try {
-                  if (typeof ytPlayer !== 'undefined' && ytPlayer && ytPlayer.stopVideo) {
-                    ytPlayer.stopVideo();
-                    currentMusicIndex = musicQueue.length;
-                    renderMusicQueue();
-                  }
-                } catch(e) {}
-                
-                try {
-                  if (typeof player !== 'undefined' && player) player.pause();
-                } catch(e) {}
-                
-                // Play siren at full volume initially
-                sosPlayer.volume = 1.0;
-                sosPlayer.play().catch(e => console.warn('SOS Play error:', e));
-              }
-              
-              audioQueue = []; // Clear current queue to prioritize SOS
-              isPlayingTTS = false;
-              window.isSOSActive = true;
-              
-              const txtEn = `Attention please, Emergency Code ${colorCode.toUpperCase()}. ${cfg.en}`;
-              const txtTh = `ประกาศเตือนภัยฉุกเฉิน รหัสสี${getColorThai(colorCode)} ${cfg.th} ${cfg.action}`;
-
-              fetchAudioData(txtEn, "en-GB").then(urlEn => {
-                if (!window.isSOSActive) return;
-                if (urlEn) audioQueue.push(urlEn);
-                return fetchAudioData(txtTh, "th-TH");
-              }).then(urlTh => {
-                if (!window.isSOSActive) return;
-                if (urlTh) audioQueue.push(urlTh);
-                
-                // Duck siren to 15% so spoken emergency instructions are heard loud and clear
-                if (sosPlayer) sosPlayer.volume = 0.15;
-                processAudioQueue();
-              }).catch(err => {
-                console.error("SOS TTS failed:", err);
-                if (window.isSOSActive) processAudioQueue();
-              });
+              dismissLocalSOS();
+            } else {
+              triggerEmergencySOS(colorCode, cfg);
             }
             return;
           }
-          
-          const div = document.createElement('div');
-          div.className = 'p-3 bg-white border border-gray-100 rounded-lg shadow-sm animate-slide-in';
-          div.innerHTML = `<div class="font-medium text-gray-800">${item.th}</div><div class="text-gray-500 text-sm italic mt-1">${item.en}</div>`;
-          listDiv.prepend(div);
-          
-          if (!isInitialLoad) queueTeacherAnnouncement(item);
+
+          // Normal Teacher Announcement Card
+          const card = document.createElement('div');
+          card.className = 'p-3 bg-white border border-gray-200/80 rounded-xl shadow-xs animate-slide-in';
+          card.innerHTML = `
+            <div class="font-bold text-gray-800 text-xs">${item.th}</div>
+            ${item.en ? `<div class="text-gray-500 text-[11px] italic mt-0.5">${item.en}</div>` : ''}
+          `;
+          listDiv.prepend(card);
+
+          if (!isInitialLoad) {
+            queueTeacherAnnouncement(item);
+          }
         }
       });
     }
 
     function pollServer() {
-      checkBells(); 
+      checkBells();
+      updateNextBellBanner();
+      updateMusicStatusBanner();
 
       fetch(API_URL + "?action=get_dashboard_data&t=" + new Date().getTime())
         .then(r => r.json())
@@ -1347,44 +1774,104 @@
           if (res.success) {
             renderPickups(res.pickups);
             renderAnnouncements(res.announcements);
-            
-            // Handle Remote Music Queue
+
+            // Sync bells from server if changed
+            if (res.bells && Array.isArray(res.bells) && res.bells.length > 0 && editBellIndex === -1) {
+              const serverJson = JSON.stringify(res.bells);
+              if (JSON.stringify(bells) !== serverJson) {
+                bells = res.bells;
+                localStorage.setItem('sv_bells', serverJson);
+                renderBells();
+                updateNextBellBanner();
+              }
+            }
+
+            // Sync remote music requests
             if (res.musicQueue && res.musicQueue.length > 0) {
               for (const item of res.musicQueue) {
-                if (item.videoId) {
-                  if (!announcedIds.has('music_' + item.row)) {
-                    announcedIds.add('music_' + item.row);
-                    sessionStorage.setItem('sv_announcedMsgs', JSON.stringify([...announcedIds]));
-                    
-                    if (!isInitialLoad) {
-                      const info = await fetchYouTubeInfo(item.videoId);
-                      const queueCheck = validateQueueTimeWithNewSong(info.duration);
-                      if (queueCheck.allowed) {
-                        musicQueue.push({ id: item.videoId, url: 'https://youtu.be/' + item.videoId, title: info.title, duration: info.duration });
-                        renderMusicQueue();
-                        syncQueueToServer();
-                        tryPlayMusic();
-                      } else {
-                        console.warn("Remote music rejected (outside break or queue full):", info.title, queueCheck.message);
-                      }
-                    }
+                if (item.videoId && !announcedIds.has('music_' + item.row)) {
+                  announcedIds.add('music_' + item.row);
+                  sessionStorage.setItem('sv_announcedMsgs', JSON.stringify([...announcedIds]));
+
+                  if (!isInitialLoad) {
+                    const info = await fetchYouTubeInfo(item.videoId);
+                    musicQueue.push({ id: item.videoId, url: 'https://youtu.be/' + item.videoId, title: info.title, duration: info.duration });
+                    renderMusicQueue();
+                    syncQueueToServer();
+                    tryPlayMusic();
                   }
                 }
               }
             }
           }
           isInitialLoad = false;
-        }).catch(err => console.error(err));
+        })
+        .catch(err => console.error("Poll error:", err));
     }
 
-    // Init
+    function syncQueueToServer() {
+      const state = {
+        musicQueue: musicQueue,
+        currentMusicIndex: currentMusicIndex,
+        musicMode: musicMode,
+        isBellsEnabled: isBellsEnabled,
+        bells: bells
+      };
+      fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'sync_state', state: JSON.stringify(state) })
+      }).catch(e => console.warn("Sync error:", e));
+    }
+
+    // ------------------------------------------
+    // 7. Clock & Live Indicators
+    // ------------------------------------------
+    function updateClock() {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+      document.getElementById('live-clock').innerText = `${h}:${m}:${s}`;
+
+      const days = ['วันอาทิตย์', 'วันจันทร์', 'วันอังคาร', 'วันพุธ', 'วันพฤหัสบดี', 'วันศุกร์', 'วันเสาร์'];
+      const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+      const thaiYear = now.getFullYear() + 543;
+      document.getElementById('live-date').innerText = `${days[now.getDay()]}ที่ ${now.getDate()} ${months[now.getMonth()]} ${thaiYear}`;
+
+      updateNextBellBanner();
+    }
+
+    // ------------------------------------------
+    // 8. Initialization
+    // ------------------------------------------
     function initApp() {
-      fetchBellsFromServer();
-      
-      // Precision bell check every 1 second (essential for exact bell seconds and 15s pre-fade)
+      // 1. Initial UI setup
+      updateClock();
+      setInterval(updateClock, 1000);
       setInterval(checkBells, 1000);
 
-      // Load saved state before polling
+      document.getElementById('music-vol').value = currentVolume;
+      document.getElementById('vol-text').innerText = currentVolume + '%';
+      updateMusicStatusBanner();
+      updateBellToggleUI();
+      initDayPresets();
+
+      // Auto-clear stale queue if date changed
+      const todayDateStr = new Date().toDateString();
+      const lastQueueDate = localStorage.getItem('sv_queue_date');
+      const isSameDay = (lastQueueDate === todayDateStr);
+      if (!isSameDay) {
+        console.log("New day detected: Auto-cleared stale music queue");
+        musicQueue = [];
+        currentMusicIndex = -1;
+        localStorage.setItem('sv_queue_date', todayDateStr);
+      }
+
+      // 2. Fetch Bells
+      fetchBellsFromServer();
+
+      // 3. Load State from Server
       fetch(API_URL + "?action=get_state")
         .then(r => r.json())
         .then(state => {
@@ -1392,21 +1879,28 @@
           if (typeof parsedState === 'string') {
             try { parsedState = JSON.parse(parsedState); } catch(e) {}
           }
-          if (parsedState.disableBells !== undefined) {
-            const bellCheck = document.getElementById('disable-bells');
-            if (bellCheck) bellCheck.checked = !!parsedState.disableBells;
+          if (parsedState && parsedState.isBellsEnabled !== undefined) {
+            isBellsEnabled = !!parsedState.isBellsEnabled;
+            localStorage.setItem('sv_bells_enabled', isBellsEnabled ? 'true' : 'false');
+            updateBellToggleUI();
+            updateNextBellBanner();
           }
-          if (parsedState.musicQueue) {
+          if (isSameDay && parsedState && parsedState.musicQueue && parsedState.musicQueue.length > 0) {
             musicQueue = parsedState.musicQueue;
             currentMusicIndex = parsedState.currentMusicIndex || 0;
             renderMusicQueue();
-            tryPlayMusic();
+          } else {
+            // Stale or empty: start clean
+            musicQueue = [];
+            currentMusicIndex = -1;
+            renderMusicQueue();
+            syncQueueToServer();
           }
           pollServer();
           setInterval(pollServer, 8000);
         })
         .catch(err => {
-          console.error("Init state error:", err);
+          console.warn("Init state error:", err);
           pollServer();
           setInterval(pollServer, 8000);
         });
@@ -1414,15 +1908,14 @@
 
     initApp();
 
-    // Register Service Worker for PWA (Only on HTTP/HTTPS, not on file:// protocol)
+    // Register Service Worker safely (Only on HTTP/HTTPS localhost/web)
     if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./service-worker.js')
           .then(reg => console.log('Service Worker registered', reg))
-          .catch(err => console.error('Service Worker registration failed', err));
+          .catch(err => console.warn('Service Worker register notice:', err));
       });
     }
-
   </script>
 </body>
 </html>
