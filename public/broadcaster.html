@@ -7,7 +7,14 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#7B1C3E">
   
-  <!-- โหลด Tailwind CSS -->
+  <!-- โหลด Tailwind CSS (ปิดการแสดง Dev Warning ใน Console) -->
+  <script>
+    const _warn = console.warn;
+    console.warn = function(...args) {
+      if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) return;
+      _warn.apply(console, args);
+    };
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -76,14 +83,14 @@
 </head>
 <body class="h-screen overflow-hidden p-3 md:p-4 text-gray-800 flex flex-col gap-3 font-sans select-none">
 
-  <!-- Audio Unlock Overlay (First interaction requirement) -->
-  <div id="audio-unlock-overlay" class="fixed inset-0 bg-gray-900/90 z-[10000] flex flex-col items-center justify-center text-white cursor-pointer backdrop-blur-md transition-opacity duration-300">
+  <!-- Audio Unlock Overlay (ซ่อนเป็นค่าเริ่มต้น ออโต้ปลดล็อคทันทีเมื่อโหลด ไม่ต้องคอยกดเปิดเสียง) -->
+  <div id="audio-unlock-overlay" class="fixed inset-0 bg-gray-900/80 z-[10000] hidden flex flex-col items-center justify-center text-white cursor-pointer backdrop-blur-md transition-opacity duration-300">
     <div class="bg-white/10 p-6 rounded-3xl border border-white/20 text-center max-w-lg shadow-2xl animate-pulse-glow">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-24 h-24 mx-auto mb-4 text-emerald-400"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
-      <h1 class="text-3xl font-black mb-2">คลิกหน้าจอเพื่อเปิดระบบเสียง</h1>
-      <p class="text-gray-200 text-sm mb-4">เบราว์เซอร์ต้องการให้ผู้ใช้กดยืนยัน 1 ครั้งเพื่อเปิดระบบเสียงตามสาย เสียงออดอัตโนมัติ และคิวเพลง</p>
-      <button class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2.5 px-8 rounded-xl shadow-lg transition">
-        เริ่มใช้งานระบบ (Start Hub)
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-20 h-20 mx-auto mb-3 text-emerald-400"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
+      <h1 class="text-2xl font-black mb-2">คลิกหน้าจอเพื่อเปิดระบบเสียง</h1>
+      <p class="text-gray-200 text-xs mb-4">คลิกที่ใดก็ได้บนหน้าจอเพื่อเริ่มระบบเสียงตามสายและเพลง</p>
+      <button class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-6 rounded-xl shadow-lg transition text-sm">
+        เปิดระบบเสียง (Enable Audio)
       </button>
     </div>
   </div>
@@ -103,11 +110,11 @@
   <header class="bg-white/95 backdrop-blur-md border border-white/80 rounded-2xl shadow-sm px-4 py-2.5 flex items-center justify-between shrink-0">
     <!-- Brand / Identity -->
     <div class="flex items-center gap-3">
-      <img src="logo.png" alt="Logo" class="w-10 h-10 object-contain rounded-xl shadow-sm">
+      <img src="logo.png" alt="Broadcasting Hub Icon" class="w-11 h-11 object-contain rounded-xl shadow-xs border border-gray-200/60">
       <div>
         <div class="flex items-center gap-2">
           <h1 class="font-bold text-gray-900 text-lg leading-tight tracking-tight">SV School Broadcasting Hub</h1>
-          <span class="text-[11px] bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-full border border-primary/20">v1.0.2</span>
+          <span class="text-[11px] bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-full border border-primary/20">v1.0.3</span>
           <span id="active-master-badge" class="text-[11px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
             <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
             เครื่องหลัก (Audio Master)
@@ -120,8 +127,8 @@
     <!-- Center: Next Bell Countdown & Status -->
     <div class="hidden lg:flex items-center gap-3">
       <div id="next-bell-card" class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 px-4 py-1.5 rounded-xl shadow-sm flex items-center gap-2.5">
-        <div class="w-7 h-7 rounded-lg bg-emerald-500 text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
-          🔔
+        <div class="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-sm shadow-sm shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
         </div>
         <div class="flex flex-col">
           <span class="text-[11px] font-semibold text-emerald-800 uppercase tracking-wider flex items-center gap-1">
@@ -202,7 +209,7 @@
           <!-- Volume Slider & Skip -->
           <div class="flex items-center gap-2">
             <div class="flex items-center gap-1.5 bg-gray-100 px-2.5 py-1 rounded-lg border border-gray-200 text-xs">
-              <span class="text-gray-500">🔊</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
               <input type="range" id="music-vol" min="0" max="100" value="50" oninput="changeMusicVolume(this.value)" class="w-20 h-1 bg-gray-300 rounded-lg cursor-pointer accent-red-600">
               <span id="vol-text" class="font-mono text-gray-700 w-8 text-right font-medium">50%</span>
             </div>
@@ -237,8 +244,9 @@
         <div class="mt-2 shrink-0">
           <div class="flex justify-between items-center text-[11px] text-gray-500 mb-1">
             <span class="truncate">กำลังเล่น: <b id="now-playing-title" class="text-gray-700">-</b></span>
-            <button onclick="toggleVideoView()" id="btn-toggle-video" class="hover:text-red-600 cursor-pointer font-medium text-[11px]">
-              👁️ ซ่อนหน้าต่างวิดีโอ
+            <button onclick="toggleVideoView()" id="btn-toggle-video" class="hover:text-red-600 cursor-pointer font-medium text-[11px] flex items-center gap-1">
+              <svg id="icon-toggle-video" xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+              <span id="text-toggle-video">ซ่อนหน้าต่างวิดีโอ</span>
             </button>
           </div>
           <div id="yt-player-container" class="w-full h-28 rounded-lg overflow-hidden border border-gray-200 shadow-inner bg-black">
@@ -274,7 +282,9 @@
       <!-- Modal Header -->
       <div class="bg-emerald-600 p-4 flex justify-between items-center text-white shrink-0">
         <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-lg">🔔</div>
+          <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-white">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+          </div>
           <div>
             <h2 class="text-lg font-bold leading-tight">จัดการตารางเวลาเสียงออดโรงเรียน</h2>
             <p class="text-xs text-emerald-100">ซิงค์อัตโนมัติกับ Google Sheets และระบบเสียงของโรงเรียน</p>
@@ -300,25 +310,27 @@
       <div class="bg-emerald-50/90 border-b border-emerald-200/80 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 shrink-0">
         <div class="flex items-center gap-2 flex-grow max-w-md">
           <label for="day-preset-select" class="text-xs font-bold text-emerald-900 shrink-0 flex items-center gap-1">
-            <span>📁 ชุดตารางประจำวัน:</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+            <span>ชุดตารางประจำวัน:</span>
           </label>
           <select id="day-preset-select" onchange="updateDeletePresetButtonState()" class="text-xs font-medium px-2.5 py-1.5 border border-emerald-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500 flex-grow shadow-2xs">
             <!-- Populated dynamically -->
           </select>
           <button onclick="applySelectedDayPreset()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition flex items-center gap-1 shrink-0 cursor-pointer" title="นำชุดตารางนี้มาใช้งาน">
-            ⚡ โหลดตารางนี้
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+            <span>โหลดตารางนี้</span>
           </button>
         </div>
 
         <div class="flex items-center gap-1.5 shrink-0">
           <button onclick="saveCurrentAsNewDayPreset()" class="bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold px-3 py-1.5 rounded-lg shadow-2xs transition flex items-center gap-1 cursor-pointer" title="บันทึกตารางที่จัดเสร็จแล้วไว้เป็น Preset ใหม่">
-            💾 บันทึกตารางปัจจุบันเป็น Preset ใหม่
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+            <span>บันทึกตารางเป็น Preset ใหม่</span>
           </button>
           <button onclick="deleteSelectedDayPreset()" id="btn-del-preset" class="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-lg transition" title="ลบ Preset ที่เลือก (เฉพาะ Preset ที่สร้างเอง)">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
           </button>
         </div>
-      </div>
       </div>
 
       <!-- Modal Body (Bells List) -->
@@ -328,8 +340,9 @@
 
       <!-- Modal Footer (Add/Edit Form) -->
       <div class="p-4 border-t border-gray-200 bg-white flex flex-col gap-3 shrink-0">
-        <div class="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
-          <span>➕ เพิ่ม / แก้ไขเวลาออด</span>
+        <div class="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+          <span>เพิ่ม / แก้ไขเวลาออด</span>
           <span id="bell-form-mode" class="text-emerald-600 font-normal"></span>
         </div>
 
@@ -344,19 +357,19 @@
           <div class="md:col-span-2">
             <label class="block text-xs font-semibold text-gray-600 mb-1">เลือกรูปแบบเหตุการณ์ (Preset)</label>
             <select id="bell-preset" onchange="handlePresetChange()" class="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-xs bg-white font-medium">
-              <option value="custom">✏️ กำหนดเอง (Custom)</option>
-              <option value="assembly">🔔 07:50 - เข้าแถวเคารพธงชาติ (Morning Assembly)</option>
-              <option value="homeroom">🔔 08:10 - เข้าโฮมรูม (Morning Homeroom)</option>
-              <option value="start_period_1">🔔 08:30 - เริ่มคาบเรียนที่ 1 (Start Period 1)</option>
-              <option value="break_morning">☕ 09:30 - พักเบรกเช้า 10 นาที (Morning Break)</option>
-              <option value="end_break_morning">🔔 09:40 - หมดเวลาพักเช้า เข้าเรียนต่อ (End Morning Break)</option>
-              <option value="change_period">🔄 เปลี่ยนคาบเรียน (Change Period)</option>
-              <option value="lunch">🍱 11:40 - พักรับประทานอาหารกลางวัน (Lunch Break)</option>
-              <option value="end_lunch">🔔 12:40 - หมดเวลาพักกลางวัน เข้าเรียนบ่าย (End Lunch Break)</option>
-              <option value="break_afternoon">☕ 14:40 - พักเบรกบ่าย 10 นาที (Afternoon Break)</option>
-              <option value="end_break_afternoon">🔔 14:50 - หมดเวลาพักบ่าย เข้าเรียนต่อ (End Afternoon Break)</option>
-              <option value="homeroom_afternoon">🔔 15:50 - โฮมรูมก่อนเลิกเรียน (Afternoon Homeroom)</option>
-              <option value="dismissal">🎒 16:00 - เลิกเรียน กลับบ้านโดยสวัสดิภาพ (Dismissal)</option>
+              <option value="custom">กำหนดเอง (Custom)</option>
+              <option value="assembly">07:50 - เข้าแถวเคารพธงชาติ (Morning Assembly)</option>
+              <option value="homeroom">08:10 - เข้าโฮมรูม (Morning Homeroom)</option>
+              <option value="start_period_1">08:30 - เริ่มคาบเรียนที่ 1 (Start Period 1)</option>
+              <option value="break_morning">09:30 - พักเบรกเช้า 10 นาที (Morning Break)</option>
+              <option value="end_break_morning">09:40 - หมดเวลาพักเช้า เข้าเรียนต่อ (End Morning Break)</option>
+              <option value="change_period">เปลี่ยนคาบเรียน (Change Period)</option>
+              <option value="lunch">11:40 - พักรับประทานอาหารกลางวัน (Lunch Break)</option>
+              <option value="end_lunch">12:40 - หมดเวลาพักกลางวัน เข้าเรียนบ่าย (End Lunch Break)</option>
+              <option value="break_afternoon">14:40 - พักเบรกบ่าย 10 นาที (Afternoon Break)</option>
+              <option value="end_break_afternoon">14:50 - หมดเวลาพักบ่าย เข้าเรียนต่อ (End Afternoon Break)</option>
+              <option value="homeroom_afternoon">15:50 - โฮมรูมก่อนเลิกเรียน (Afternoon Homeroom)</option>
+              <option value="dismissal">16:00 - เลิกเรียน กลับบ้านโดยสวัสดิภาพ (Dismissal)</option>
             </select>
           </div>
         </div>
@@ -378,9 +391,9 @@
           <div>
             <label class="block text-xs font-semibold text-gray-600 mb-1">เสียงดนตรีออด</label>
             <select id="bell-sound" class="w-full px-3 py-1.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-medium">
-              <option value="start">🎵 เสียงเข้าเรียน (Start Chime)</option>
-              <option value="end">🎵 เสียงเลิกเรียน/เปลี่ยนคาบ (End Chime)</option>
-              <option value="default">🎵 เสียงมาตรฐาน (Standard Chime)</option>
+              <option value="start">เสียงเข้าเรียน (Start Chime)</option>
+              <option value="end">เสียงเลิกเรียน/เปลี่ยนคาบ (End Chime)</option>
+              <option value="default">เสียงมาตรฐาน (Standard Chime)</option>
             </select>
           </div>
         </div>
@@ -493,9 +506,9 @@
 
       select.innerHTML = Object.keys(dayPresets).map(name => {
         const isCustom = !DEFAULT_DAY_PRESETS[name];
-        const icon = isCustom ? '⭐' : '📅';
+        const tag = isCustom ? '[กำหนดเอง]' : '[มาตรฐาน]';
         const count = (dayPresets[name] || []).length;
-        return `<option value="${name}">${icon} ${name} (${count} คาบ)</option>`;
+        return `<option value="${name}">${tag} ${name} (${count} คาบ)</option>`;
       }).join('');
 
       if (currentVal && dayPresets[currentVal]) {
@@ -529,7 +542,7 @@
       renderBells();
       updateNextBellBanner();
       saveBellsToServer();
-      alert(`✅ โหลดชุดตาราง "${name}" สำเร็จเรียบร้อยแล้ว (${bells.length} คาบ)`);
+      alert(`โหลดชุดตาราง "${name}" สำเร็จเรียบร้อยแล้ว (${bells.length} คาบ)`);
     }
 
     function saveCurrentAsNewDayPreset() {
@@ -553,7 +566,7 @@
       renderDayPresetDropdown();
       document.getElementById('day-preset-select').value = trimmedName;
       updateDeletePresetButtonState();
-      alert(`💾 บันทึกชุดตาราง "${trimmedName}" (${bells.length} คาบ) เรียบร้อยแล้ว! สามารถสลับกลับมาใช้ได้ทุกเมื่อ`);
+      alert(`บันทึกชุดตาราง "${trimmedName}" (${bells.length} คาบ) เรียบร้อยแล้ว! สามารถสลับกลับมาใช้ได้ทุกเมื่อ`);
     }
 
     function deleteSelectedDayPreset() {
@@ -664,7 +677,7 @@
             }
           } else if (data.type === 'MASTER_EXISTS') {
             if (data.masterId !== instanceId) {
-              console.warn("⚠️ Secondary instance detected. Running in passive display mode.");
+              console.warn("Secondary instance detected. Running in passive display mode.");
               isAudioMaster = false;
               const badge = document.getElementById('active-master-badge');
               if (badge) {
@@ -681,22 +694,54 @@
     }
 
     // ------------------------------------------
-    // 2. Audio Unlock First-Click Overlay
+    // 2. Automatic Audio Unlock (No Click Required)
     // ------------------------------------------
-    document.getElementById('audio-unlock-overlay').addEventListener('click', function() {
-      this.classList.add('opacity-0');
-      setTimeout(() => this.classList.add('hidden'), 300);
+    let isAudioUnlocked = false;
 
-      // Silent unlock sound
+    function autoUnlockAudio() {
+      if (isAudioUnlocked) return;
+      
       try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          const ctx = new AudioContextClass();
+          if (ctx.state === 'suspended') {
+            ctx.resume().catch(() => {});
+          }
+        }
+
+        // Silent unlock sound
         const dummyAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
-        dummyAudio.play().catch(() => {});
+        const playPromise = dummyAudio.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            isAudioUnlocked = true;
+            console.log("Audio system automatically unlocked.");
+            const overlay = document.getElementById('audio-unlock-overlay');
+            if (overlay) overlay.classList.add('hidden');
+          }).catch(err => {
+            // Only if browser strictly blocks autoplay in non-electron web view
+            console.warn("Autoplay notice:", err.message);
+          });
+        }
       } catch(e) {}
 
       if (ytPlayer && typeof ytPlayer.unMute === 'function') {
         ytPlayer.unMute();
         ytPlayer.setVolume(currentVolume);
       }
+    }
+
+    // Try auto-unlocking on DOM ready and on any user pointer down
+    window.addEventListener('DOMContentLoaded', autoUnlockAudio);
+    document.addEventListener('pointerdown', function onFirstPointer() {
+      autoUnlockAudio();
+      document.removeEventListener('pointerdown', onFirstPointer);
+    }, { once: true });
+
+    document.getElementById('audio-unlock-overlay').addEventListener('click', function() {
+      this.classList.add('hidden');
+      autoUnlockAudio();
       tryPlayMusic();
     });
 
@@ -776,13 +821,13 @@
     function toggleVideoView() {
       isVideoVisible = !isVideoVisible;
       const box = document.getElementById('yt-player-container');
-      const btn = document.getElementById('btn-toggle-video');
+      const textSpan = document.getElementById('text-toggle-video');
       if (isVideoVisible) {
         box.classList.remove('hidden');
-        btn.innerText = '👁️ ซ่อนหน้าต่างวิดีโอ';
+        if (textSpan) textSpan.innerText = 'ซ่อนหน้าต่างวิดีโอ';
       } else {
         box.classList.add('hidden');
-        btn.innerText = '👁️ แสดงหน้าต่างวิดีโอ';
+        if (textSpan) textSpan.innerText = 'แสดงหน้าต่างวิดีโอ';
       }
     }
 
@@ -878,11 +923,11 @@
       if (musicMode === 'unlocked') {
         banner.className = 'mb-2 shrink-0 rounded-lg p-2 text-xs border border-amber-300 bg-amber-50 text-amber-900 flex items-center justify-between shadow-sm';
         banner.innerHTML = `
-          <div class="flex items-center gap-1.5 font-medium">
-            <span class="text-sm">🔓</span>
+          <div class="flex items-center gap-2 font-medium">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>
             <span><b>โหมดปลดล็อคอิสระ:</b> เพลงสามารถเล่นต่อเนื่องได้ตลอดเวลา</span>
           </div>
-          <button onclick="setMusicMode('schedule')" class="bg-amber-600 hover:bg-amber-700 text-white font-bold px-2 py-0.5 rounded text-[11px] transition cursor-pointer">
+          <button onclick="setMusicMode('schedule')" class="bg-amber-600 hover:bg-amber-700 text-white font-bold px-2.5 py-1 rounded-lg text-[11px] transition cursor-pointer shadow-2xs">
             สลับเป็นโหมดตารางเวลา
           </button>
         `;
@@ -890,23 +935,24 @@
         if (breakInfo.isAllowed) {
           banner.className = 'mb-2 shrink-0 rounded-lg p-2 text-xs border border-emerald-300 bg-emerald-50 text-emerald-900 flex items-center justify-between shadow-sm';
           banner.innerHTML = `
-            <div class="flex items-center gap-1.5 font-medium">
-              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+            <div class="flex items-center gap-2 font-medium">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping shrink-0"></span>
               <span><b>ช่วงเวลาพัก (${breakInfo.slotName}):</b> เพลงกำลังทำงานตามตารางเวลา</span>
             </div>
-            <button onclick="setMusicMode('unlocked')" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-2 py-0.5 rounded text-[11px] transition cursor-pointer">
+            <button onclick="setMusicMode('unlocked')" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-2.5 py-1 rounded-lg text-[11px] transition cursor-pointer shadow-2xs">
               ปลดล็อคเล่นตลอดเวลา
             </button>
           `;
         } else {
           banner.className = 'mb-2 shrink-0 rounded-lg p-2 text-xs border border-gray-200 bg-gray-100 text-gray-700 flex items-center justify-between shadow-sm';
           banner.innerHTML = `
-            <div class="flex items-center gap-1.5">
-              <span>⏸️</span>
+            <div class="flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               <span><b>ขณะนี้เป็นเวลาเรียน:</b> เพลงพักชั่วคราว (จะเล่นเมื่อถึงเวลาพัก)</span>
             </div>
-            <button onclick="setMusicMode('unlocked')" class="bg-red-600 hover:bg-red-700 text-white font-bold px-2 py-0.5 rounded text-[11px] transition cursor-pointer">
-              ⚡ ปลดล็อคเล่นทันที
+            <button onclick="setMusicMode('unlocked')" class="bg-red-600 hover:bg-red-700 text-white font-bold px-2.5 py-1 rounded-lg text-[11px] transition cursor-pointer flex items-center gap-1 shadow-2xs">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+              <span>ปลดล็อคเล่นทันที</span>
             </button>
           `;
         }
@@ -947,13 +993,18 @@
       tryPlayMusic();
     }
 
+    let lastMusicQueueCache = '';
+
     function renderMusicQueue() {
       const container = document.getElementById('music-queue');
       const nowPlayingSpan = document.getElementById('now-playing-title');
       if (!container) return;
 
       if (musicQueue.length === 0) {
-        container.innerHTML = '<div class="text-center text-gray-400 py-3 text-xs">ไม่มีเพลงในคิว — วางลิงก์ YouTube ด้านบนเพื่อเพิ่มเพลง</div>';
+        if (lastMusicQueueCache !== 'empty') {
+          container.innerHTML = '<div class="text-center text-gray-400 py-3 text-xs">ไม่มีเพลงในคิว — วางลิงก์ YouTube ด้านบนเพื่อเพิ่มเพลง</div>';
+          lastMusicQueueCache = 'empty';
+        }
         if (nowPlayingSpan) nowPlayingSpan.innerText = '-';
         return;
       }
@@ -964,13 +1015,17 @@
         if (nowPlayingSpan) nowPlayingSpan.innerText = 'รอเริ่มเล่น...';
       }
 
+      const queueCacheKey = currentMusicIndex + '_' + JSON.stringify(musicQueue);
+      if (queueCacheKey === lastMusicQueueCache) return;
+      lastMusicQueueCache = queueCacheKey;
+
       container.innerHTML = musicQueue.map((item, idx) => {
         const isCurrent = (idx === currentMusicIndex);
         return `
           <div class="flex items-center justify-between px-2 py-1 rounded border text-xs transition ${isCurrent ? 'bg-red-50 border-red-200 text-red-900 font-semibold shadow-xs' : 'bg-white border-gray-100 text-gray-700'}">
             <div class="flex items-center gap-1.5 truncate pr-2">
               <span class="w-4 text-center font-mono text-[11px] ${isCurrent ? 'text-red-600 font-bold' : 'text-gray-400'}">${idx + 1}</span>
-              ${isCurrent ? '<span class="text-xs">▶️</span>' : ''}
+              ${isCurrent ? '<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-red-600 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>' : ''}
               <span class="truncate">${item.title}</span>
             </div>
             <div class="flex items-center gap-1 shrink-0">
@@ -1180,8 +1235,9 @@
         listEl.innerHTML = `
           <div class="text-center text-gray-400 py-12 text-sm flex flex-col items-center justify-center gap-2">
             <span>ยังไม่มีการตั้งเวลาออด</span>
-            <button onclick="loadStandardSchedule()" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg shadow-sm">
-              ✨ โหลดตารางออดมาตรฐานของโรงเรียน (13 คาบ)
+            <button onclick="loadStandardSchedule()" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3 py-1.5 rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              <span>โหลดตารางออดมาตรฐานของโรงเรียน (13 คาบ)</span>
             </button>
           </div>
         `;
@@ -1429,7 +1485,7 @@
         if (timeStr === bell.time && lastRungBell !== timeStr) {
           lastRungBell = timeStr;
           isPreBellFading = false;
-          console.log("🔔 Rung bell at " + timeStr);
+          console.log("Rung bell at " + timeStr);
           triggerBellSequence(bell);
           break;
         }
@@ -1662,6 +1718,7 @@
     // 6. Polling & Sync Loop
     // ------------------------------------------
     let isInitialLoad = true;
+    let lastPickupsCache = '';
 
     function renderPickups(pickups) {
       const listDiv = document.getElementById('pickup-list');
@@ -1669,17 +1726,36 @@
       if (!listDiv) return;
 
       if (!pickups || pickups.length === 0) {
-        listDiv.innerHTML = `
-          <div class="text-center text-gray-400 py-16 text-sm flex flex-col items-center justify-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            <span>ยังไม่มีข้อมูลการรับนักเรียนในขณะนี้</span>
-          </div>
-        `;
+        if (lastPickupsCache !== 'empty') {
+          listDiv.innerHTML = `
+            <div class="text-center text-gray-400 py-16 text-sm flex flex-col items-center justify-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <span>ยังไม่มีข้อมูลการรับนักเรียนในขณะนี้</span>
+            </div>
+          `;
+          lastPickupsCache = 'empty';
+        }
         if (badge) badge.innerText = 'รอรับ 0 คน';
         return;
       }
 
       if (badge) badge.innerText = `รอรับ ${pickups.length} คน`;
+
+      // Announce newly arrived students
+      pickups.forEach(item => {
+        const studentName = item.studentName || item.name || 'ไม่ระบุชื่อ';
+        const className = item.className || item.class || 'ชั้นเรียน -';
+        if (!isInitialLoad && !announcedNames.has(studentName)) {
+          announcedNames.add(studentName);
+          sessionStorage.setItem('sv_announcedNames', JSON.stringify([...announcedNames]));
+          queuePickupAnnouncement(studentName, className);
+        }
+      });
+
+      // Avoid DOM thrashing if list data hasn't changed
+      const pickupsCacheKey = JSON.stringify(pickups);
+      if (pickupsCacheKey === lastPickupsCache) return;
+      lastPickupsCache = pickupsCacheKey;
 
       listDiv.innerHTML = pickups.map(item => {
         const studentName = item.studentName || item.name || 'ไม่ระบุชื่อ';
@@ -1687,18 +1763,11 @@
         const pickerName = item.pickerName || 'ผู้ปกครอง';
         const timeStr = item.time || '';
 
-        // If newly arrived, queue speech announcement
-        if (!isInitialLoad && !announcedNames.has(studentName)) {
-          announcedNames.add(studentName);
-          sessionStorage.setItem('sv_announcedNames', JSON.stringify([...announcedNames]));
-          queuePickupAnnouncement(studentName, className);
-        }
-
         return `
           <div class="p-3 bg-white border border-gray-200/80 rounded-xl shadow-xs flex items-center justify-between hover:border-primary/40 transition animate-slide-in">
             <div class="flex items-center gap-3">
               <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary font-bold flex items-center justify-center text-sm shrink-0">
-                🎓
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" /></svg>
               </div>
               <div>
                 <div class="font-bold text-gray-900 text-sm leading-tight">${studentName}</div>
