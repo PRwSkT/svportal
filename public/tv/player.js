@@ -312,8 +312,57 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(sendHeartbeat, CONFIG.heartbeatIntervalMs);
 });
 
-// 24/7 Watchdog: Ensures screen never goes black, stuck, or frozen
+// 24/7 Watchdog & Mid-Playback Wi-Fi Drop/Reconnect Recovery
+let lastWatchdogVideoTime = -1;
+let videoStallTicks = 0;
+
+function recoverStalledVideo(activeVideo, reason) {
+  if (!activeVideo) return;
+  try {
+    const savedTime = activeVideo.currentTime || 0;
+    const currentItem = currentPlaylist && currentPlaylist.items ? currentPlaylist.items[currentIndex] : null;
+    const targetSrc = (currentItem && currentItem.url) || activeVideo.src;
+    console.warn(`[Watchdog] Recovering video (${reason}) at ${savedTime.toFixed(1)}s`);
+    videoStallTicks = 0;
+    if (targetSrc) {
+      activeVideo.src = targetSrc;
+      activeVideo.load();
+      activeVideo.onloadedmetadata = () => {
+        if (savedTime > 0 && isFinite(activeVideo.duration) && savedTime < activeVideo.duration - 2) {
+          activeVideo.currentTime = savedTime;
+        }
+        activeVideo.play().catch(() => {});
+      };
+      activeVideo.play().catch(() => {});
+    } else {
+      playNext();
+    }
+  } catch (e) {
+    playNext();
+  }
+}
+
 function startHealthWatchdog() {
+  // Instant recovery as soon as Wi-Fi reconnects
+  window.addEventListener('online', () => {
+    console.log('[Network] Wi-Fi reconnected! Syncing and verifying video stream...');
+    syncPlaylist();
+    sendHeartbeat();
+
+    const activeEl = activeLayer === 'a' ? layerA : layerB;
+    const activeVideo = activeEl ? activeEl.querySelector('video.foreground-media') : null;
+    if (activeVideo) {
+      if (activeVideo.error || activeVideo.readyState < 3 || videoStallTicks > 0) {
+        recoverStalledVideo(activeVideo, 'wifi_reconnected');
+      } else if (activeVideo.paused) {
+        activeVideo.play().catch(() => {});
+      }
+    } else if (currentPlaylist && currentPlaylist.items.length > 0 && !isPlaying) {
+      currentIndex = 0;
+      playNext();
+    }
+  });
+
   setInterval(() => {
     if (!isPlaying || !currentPlaylist || currentPlaylist.items.length === 0) return;
 
@@ -321,10 +370,44 @@ function startHealthWatchdog() {
     const activeVideo = activeEl ? activeEl.querySelector('video.foreground-media') : null;
 
     if (activeVideo) {
-      // If video is paused unexpectedly, resume it
-      if (activeVideo.paused && !activeVideo.ended) {
+      // 1. Hardware/Network decode error after Wi-Fi drop
+      if (activeVideo.error) {
+        recoverStalledVideo(activeVideo, 'media_error');
+        return;
+      }
+
+      // 2. Video ended without looping
+      if (activeVideo.ended) {
+        if (currentPlaylist.items.length === 1) {
+          activeVideo.currentTime = 0;
+          activeVideo.play().catch(() => {});
+        } else {
+          currentIndex++;
+          playNext();
+        }
+        return;
+      }
+
+      // 3. Video paused unexpectedly
+      if (activeVideo.paused) {
         console.warn('[Watchdog] Video paused unexpectedly, resuming...');
         activeVideo.play().catch(() => {});
+        return;
+      }
+
+      // 4. Detect freeze/buffer stall (e.g., Wi-Fi dropped mid-stream and came back)
+      if (Math.abs(activeVideo.currentTime - lastWatchdogVideoTime) < 0.05) {
+        videoStallTicks++;
+        if (videoStallTicks === 2) {
+          // Soft nudge at 10s stall
+          activeVideo.play().catch(() => {});
+        } else if (videoStallTicks >= 4) {
+          // Hard stream recovery at 20s stall (resumes from exact timestamp)
+          recoverStalledVideo(activeVideo, 'stream_stalled_20s');
+        }
+      } else {
+        videoStallTicks = 0;
+        lastWatchdogVideoTime = activeVideo.currentTime;
       }
     } else {
       // If no media is present or both layers are blank, restart playback
@@ -335,7 +418,7 @@ function startHealthWatchdog() {
         playNext();
       }
     }
-  }, 10000);
+  }, 5000);
 }
 
 function initDeviceId() {
@@ -476,18 +559,41 @@ function silenceAndCleanLayer(layer) {
 function playNext() {
   if (currentPlaylist.items.length === 0) return;
 
-  // 1. Immediately cancel pending watchdog timer and silence ALL previous audio
-  clearTimeout(playbackTimer);
-  playbackTimer = null;
-  silenceAllExistingVideos();
-
   isPlaying = true;
-  if (currentIndex >= currentPlaylist.items.length) {
+  if (currentIndex >= currentPlaylist.items.length || currentIndex < 0) {
     currentIndex = 0; // Loop back to start
   }
 
   const item = currentPlaylist.items[currentIndex];
   document.getElementById('diag-current').textContent = `[${currentIndex + 1}/${currentPlaylist.items.length}] ${item.title}`;
+
+  // 24/7 OPTIMIZATION: If playlist has only 1 video, reuse existing healthy video element directly
+  // BEFORE calling silenceAllExistingVideos() so handlers and hardware MediaCodec stay intact!
+  if (item.type === 'video' && currentPlaylist.items.length === 1) {
+    const activeEl = activeLayer === 'a' ? layerA : layerB;
+    const existingVideo = activeEl ? activeEl.querySelector('video.foreground-media') : null;
+    if (existingVideo && existingVideo.src && existingVideo.src.includes(item.url) && !existingVideo.error) {
+      const isMutedByConfig = currentPlaylist.is_muted === true || currentPlaylist.is_muted === 1;
+      const volumeLevel = (currentPlaylist.volume !== undefined && currentPlaylist.volume !== null ? currentPlaylist.volume : 100) / 100;
+      existingVideo.loop = true;
+      if (existingVideo.ended || existingVideo.currentTime >= (existingVideo.duration || Infinity) - 0.5) {
+        existingVideo.currentTime = 0;
+      }
+      if (!isMutedByConfig) {
+        existingVideo.muted = false;
+        existingVideo.volume = volumeLevel;
+      } else {
+        existingVideo.muted = true;
+      }
+      existingVideo.play().catch(() => {});
+      return;
+    }
+  }
+
+  // 1. Immediately cancel pending watchdog timer and silence ALL previous audio
+  clearTimeout(playbackTimer);
+  playbackTimer = null;
+  silenceAllExistingVideos();
 
   // Swap buffers
   const nextLayer = activeLayer === 'a' ? layerB : layerA;
@@ -507,6 +613,13 @@ function playNext() {
     clearTimeout(playbackTimer);
     playbackTimer = null;
 
+    // For single-video playlist, loop seamlessly without silencing/destroying decoder
+    if (currentPlaylist.items.length === 1 && reason === 'video_ended') {
+      currentIndex = 0;
+      playNext();
+      return;
+    }
+
     // Silence this item immediately when advancing
     silenceAllExistingVideos();
 
@@ -523,27 +636,12 @@ function playNext() {
       diagAudio.textContent = isMutedByConfig ? 'MUTED' : `AUDIO ON (${Math.round(volumeLevel * 100)}%)`;
     }
 
-    // 24/7 OPTIMIZATION: If playlist has only 1 video, loop directly on the existing video element
-    // This avoids tearing down and recreating MediaCodec hardware decoders on embedded Android TV SoC!
-    if (currentPlaylist.items.length === 1) {
-      const activeEl = activeLayer === 'a' ? layerA : layerB;
-      const existingVideo = activeEl ? activeEl.querySelector('video.foreground-media') : null;
-      if (existingVideo && existingVideo.src && existingVideo.src.includes(item.url)) {
-        existingVideo.currentTime = 0;
-        if (!isMutedByConfig) {
-          existingVideo.muted = false;
-          existingVideo.volume = volumeLevel;
-        }
-        existingVideo.play().catch(() => {});
-        return;
-      }
-    }
-
     // Foreground crisp video (fit contain, hardware accelerated, unmuted if allowed)
     const video = document.createElement('video');
     video.src = item.url;
     video.autoplay = true;
     video.playsInline = true;
+    video.loop = (currentPlaylist.items.length === 1);
     video.className = 'foreground-media';
 
     if (isMutedByConfig) {
@@ -571,16 +669,23 @@ function playNext() {
     };
 
     video.onerror = () => {
-      console.warn('Video playback error, skipping to next');
-      advanceToNext('video_error');
+      console.warn('Video playback error (network/decode), retrying after 4s...');
+      setTimeout(() => {
+        advanceToNext('video_error');
+      }, 4000);
     };
 
-    // EMERGENCY WATCHDOG TIMER ONLY:
-    // Once metadata is loaded, give the video its FULL natural duration + 3s buffer
+    // EMERGENCY WATCHDOG TIMER ONLY (for multi-item playlists):
+    // Once metadata is loaded, give the video its FULL natural duration + 5s buffer
     video.onloadedmetadata = () => {
+      if (currentPlaylist.items.length === 1) {
+        clearTimeout(playbackTimer);
+        playbackTimer = null;
+        return;
+      }
       if (video.duration && isFinite(video.duration) && video.duration > 0) {
         clearTimeout(playbackTimer);
-        const maxDurationMs = (video.duration * 1000) + 3000;
+        const maxDurationMs = (video.duration * 1000) + 5000;
         playbackTimer = setTimeout(() => {
           console.warn('[Watchdog] Video exceeded natural duration, advancing');
           advanceToNext('watchdog_video_duration_exceeded');
@@ -588,12 +693,13 @@ function playNext() {
       }
     };
 
-    // Fallback if metadata fails to load within 15 seconds
+    // Fallback if metadata fails to load within 20 seconds
     clearTimeout(playbackTimer);
     playbackTimer = setTimeout(() => {
+      if (video.readyState >= 2) return;
       console.warn('[Watchdog] Video metadata/playback timed out, advancing');
       advanceToNext('watchdog_metadata_timeout');
-    }, Math.max((item.duration_seconds || 15) * 1000, 15000));
+    }, 20000);
 
     wrapper.appendChild(video);
     nextLayer.appendChild(wrapper);
