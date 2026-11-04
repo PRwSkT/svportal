@@ -423,7 +423,7 @@
       checkRemoteBreakStatus();
       const qBox = document.getElementById('remote-queue-list');
       const queue = dashboardState.musicQueue || [];
-      const currIdx = dashboardState.currentMusicIndex || 0;
+      const currIdx = (dashboardState.currentMusicIndex !== undefined && dashboardState.currentMusicIndex >= 0) ? dashboardState.currentMusicIndex : 0;
 
       if (queue.length === 0) {
         qBox.innerHTML = '<div class="text-sm text-gray-400 text-center py-4">ไม่มีคิวเพลงในขณะนี้</div>';
@@ -435,24 +435,34 @@
         let isPlayed = (idx < currIdx);
         
         let classes = "px-3 py-2 rounded-lg flex justify-between items-center text-sm ";
-        if (isPlaying) classes += "bg-red-50 border border-red-200";
+        if (item.error) classes += "bg-amber-50 border border-amber-300";
+        else if (isPlaying) classes += "bg-red-50 border border-red-200";
         else if (isPlayed) classes += "bg-gray-50 opacity-50";
         else classes += "bg-gray-50 border border-gray-200";
 
         let controls = '';
         if (isPlaying) {
-          controls = `<button onclick="sendCommand('skip_music')" class="p-1 text-red-600 hover:bg-red-100 rounded" title="ข้ามเพลงนี้">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8.688c0-.864.933-1.405 1.683-.977l7.108 4.062a1.125 1.125 0 010 1.953l-7.108 4.062A1.125 1.125 0 013 16.81V8.688zM12.75 8.688c0-.864.933-1.405 1.683-.977l7.108 4.062a1.125 1.125 0 010 1.953l-7.108 4.062a1.125 1.125 0 01-1.683-.977V8.688z" /></svg>
-          </button>`;
+          controls = `<div class="flex items-center gap-1">
+            <button onclick="sendCommand('skip_music')" class="p-1 text-red-600 hover:bg-red-100 rounded" title="ข้ามเพลงนี้">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8.688c0-.864.933-1.405 1.683-.977l7.108 4.062a1.125 1.125 0 010 1.953l-7.108 4.062A1.125 1.125 0 013 16.81V8.688zM12.75 8.688c0-.864.933-1.405 1.683-.977l7.108 4.062a1.125 1.125 0 010 1.953l-7.108 4.062a1.125 1.125 0 01-1.683-.977V8.688z" /></svg>
+            </button>
+            <button onclick="sendCommand('remove_music:${idx}')" class="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded" title="ลบเพลงนี้">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+            </button>
+          </div>`;
         } else if (!isPlayed) {
           controls = `<button onclick="sendCommand('remove_music:${idx}')" class="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded" title="ลบเพลงนี้">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
           </button>`;
         }
 
+        const statusBadge = item.error
+          ? `<span class="text-[11px] bg-amber-600 text-white px-1.5 py-0.5 rounded font-bold mr-1.5 inline-block">${item.error}</span>`
+          : (isPlaying ? '<span class="text-[11px] bg-red-600 text-white px-1.5 py-0.5 rounded font-bold mr-1.5 inline-block">กำลังเล่น</span>' : '');
+
         return `<div class="${classes}">
-          <div class="truncate flex-1 pr-2 ${isPlaying ? 'font-medium text-red-700' : 'text-gray-700'}">
-            ${isPlaying ? '<span class="text-[11px] bg-red-600 text-white px-1.5 py-0.5 rounded font-bold mr-1.5 inline-block">กำลังเล่น</span>' : ''}${item.title || 'Unknown Video'}
+          <div class="truncate flex-1 pr-2 ${item.error ? 'font-medium text-amber-900' : (isPlaying ? 'font-medium text-red-700' : 'text-gray-700')}">
+            ${statusBadge}${item.title || 'Unknown Video'}
           </div>
           <div class="flex-shrink-0">${controls}</div>
         </div>`;
@@ -464,17 +474,39 @@
       
       const btn = document.getElementById('btn-add-music');
       btn.classList.add('is-loading');
-      fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'remote_command', command: cmd })
-      })
-      .then(r => r.json())
-      .then(res => {
+
+      // Optimistically update local dashboardState for instant UI feedback
+      if (cmd === 'skip_music' && Array.isArray(dashboardState.musicQueue)) {
+        const cIdx = (dashboardState.currentMusicIndex >= 0) ? dashboardState.currentMusicIndex : 0;
+        dashboardState.musicQueue.splice(cIdx, 1);
+        dashboardState.currentMusicIndex = dashboardState.musicQueue.length > 0 ? 0 : -1;
+        renderRemoteQueue();
+      } else if (cmd.startsWith('remove_music:') && Array.isArray(dashboardState.musicQueue)) {
+        const rIdx = parseInt(cmd.split(':')[1], 10);
+        if (!isNaN(rIdx)) {
+          dashboardState.musicQueue.splice(rIdx, 1);
+          if (dashboardState.musicQueue.length === 0) dashboardState.currentMusicIndex = -1;
+          renderRemoteQueue();
+        }
+      }
+
+      Promise.all([
+        fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'remote_command', command: cmd })
+        }).then(r => r.json()),
+        fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'sync_state', state: JSON.stringify(dashboardState) })
+        }).catch(() => {})
+      ])
+      .then(([res]) => {
         btn.classList.remove('is-loading');
-        if (res.success) {
-          setTimeout(fetchState, 1500); // Wait a bit for Dashboard to process and sync back
-        } else {
+        if (res && res.success) {
+          setTimeout(fetchState, 1500);
+        } else if (res) {
           alert('เกิดข้อผิดพลาด: ' + res.message);
         }
       })
@@ -484,7 +516,18 @@
       });
     }
 
-    function addMusic() {
+    async function fetchRemoteYouTubeTitle(vid) {
+      try {
+        const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${vid}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.title) return data.title;
+        }
+      } catch (e) {}
+      return `เพลง YouTube (${vid})`;
+    }
+
+    async function addMusic() {
       const input = document.getElementById('yt-url');
       const btn = document.getElementById('btn-add-music');
       const vid = extractVideoID(input.value);
@@ -501,26 +544,47 @@
       }
 
       btn.classList.add('is-loading');
-      fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'add_music', videoId: vid })
-      })
-      .then(r => r.json())
-      .then(res => {
+      try {
+        const title = await fetchRemoteYouTubeTitle(vid);
+        if (!Array.isArray(dashboardState.musicQueue)) {
+          dashboardState.musicQueue = [];
+        }
+        dashboardState.musicQueue.push({
+          id: vid,
+          url: 'https://youtu.be/' + vid,
+          title: title,
+          duration: 210
+        });
+        if (dashboardState.currentMusicIndex === undefined || dashboardState.currentMusicIndex < 0) {
+          dashboardState.currentMusicIndex = 0;
+        }
+        renderRemoteQueue();
+
+        const [res] = await Promise.all([
+          fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'add_music', videoId: vid })
+          }).then(r => r.json()),
+          fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'sync_state', state: JSON.stringify(dashboardState) })
+          }).catch(() => {})
+        ]);
+
         btn.classList.remove('is-loading');
-        if (res.success) {
+        if (res && res.success) {
           input.value = '';
           alert('เพิ่มลงในรายการเพลงเรียบร้อยแล้ว');
-          setTimeout(fetchState, 1500);
+          setTimeout(fetchState, 2000);
         } else {
-          alert('เกิดข้อผิดพลาด: ' + res.message);
+          alert('เกิดข้อผิดพลาด: ' + (res ? res.message : 'Unknown error'));
         }
-      })
-      .catch(err => {
+      } catch (err) {
         btn.classList.remove('is-loading');
         alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
-      });
+      }
     }
 
     function addAnnouncement() {

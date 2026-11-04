@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>SV School Broadcasting Hub</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#7B1C3E">
@@ -760,7 +761,7 @@
         'enablejsapi': 1
       };
 
-      if (window.location.protocol.startsWith('http')) {
+      if (window.location.protocol.startsWith('http') && window.location.hostname !== '127.0.0.1' && window.location.hostname !== 'localhost') {
         playerVars.origin = window.location.origin;
       }
 
@@ -805,8 +806,21 @@
     }
 
     function onPlayerError(event) {
-      console.warn("YouTube player encountered an error (Code: " + event.data + "). Auto-skipping...");
-      playNextMusic();
+      console.warn("YouTube player encountered an error (Code: " + event.data + ").");
+      if (currentMusicIndex >= 0 && currentMusicIndex < musicQueue.length) {
+        musicQueue[currentMusicIndex].error = 'ช่องต้นทางไม่อนุญาตให้เล่นนอก YouTube (แนะนำใช้คลิป Lyrics)';
+      }
+      if (currentMusicIndex + 1 < musicQueue.length) {
+        currentMusicIndex++;
+        const breakInfo = getCurrentBreakSlotInfo();
+        if (breakInfo.isAllowed && ytPlayer && typeof ytPlayer.loadVideoById === 'function') {
+          ytPlayer.unMute();
+          ytPlayer.setVolume(currentVolume);
+          ytPlayer.loadVideoById(musicQueue[currentMusicIndex].id);
+        }
+      }
+      renderMusicQueue();
+      syncQueueToServer();
     }
 
     function changeMusicVolume(vol) {
@@ -1082,10 +1096,11 @@
       container.innerHTML = musicQueue.map((item, idx) => {
         const isCurrent = (idx === currentMusicIndex);
         return `
-          <div class="flex items-center justify-between px-2 py-1 rounded border text-xs transition ${isCurrent ? 'bg-red-50 border-red-200 text-red-900 font-semibold shadow-xs' : 'bg-white border-gray-100 text-gray-700'}">
+          <div class="flex items-center justify-between px-2 py-1 rounded border text-xs transition ${item.error ? 'bg-amber-50 border-amber-300 text-amber-900 font-medium' : (isCurrent ? 'bg-red-50 border-red-200 text-red-900 font-semibold shadow-xs' : 'bg-white border-gray-100 text-gray-700')}">
             <div class="flex items-center gap-1.5 truncate pr-2">
               <span class="w-4 text-center font-mono text-[11px] ${isCurrent ? 'text-red-600 font-bold' : 'text-gray-400'}">${idx + 1}</span>
               ${isCurrent ? '<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-red-600 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>' : ''}
+              ${item.error ? `<span class="text-[10px] bg-amber-600 text-white px-1.5 py-0.5 rounded font-bold shrink-0">${item.error}</span>` : ''}
               <span class="truncate">${item.title}</span>
             </div>
             <div class="flex items-center gap-1 shrink-0">
@@ -1104,6 +1119,7 @@
     function tryPlayMusic() {
       if (!isAudioMaster) return;
       if (!ytPlayer || typeof ytPlayer.loadVideoById !== 'function') return;
+      if (musicQueue.length === 0) return;
 
       const breakInfo = getCurrentBreakSlotInfo();
       if (!breakInfo.isAllowed) {
@@ -1117,13 +1133,24 @@
       }
       if (state === YT.PlayerState.PLAYING || state === YT.PlayerState.BUFFERING) return;
 
-      if (currentMusicIndex < 0) currentMusicIndex = 0;
-
-      if (currentMusicIndex < musicQueue.length) {
-        ytPlayer.unMute();
-        ytPlayer.setVolume(currentVolume);
-        ytPlayer.loadVideoById(musicQueue[currentMusicIndex].id);
+      if (currentMusicIndex < 0 || currentMusicIndex >= musicQueue.length) {
+        currentMusicIndex = 0;
       }
+
+      // Find first non-errored song starting from currentMusicIndex
+      let playIdx = -1;
+      for (let i = currentMusicIndex; i < musicQueue.length; i++) {
+        if (!musicQueue[i].error) {
+          playIdx = i;
+          break;
+        }
+      }
+      if (playIdx === -1) return;
+
+      currentMusicIndex = playIdx;
+      ytPlayer.unMute();
+      ytPlayer.setVolume(currentVolume);
+      ytPlayer.loadVideoById(musicQueue[currentMusicIndex].id);
       renderMusicQueue();
     }
 
@@ -1172,6 +1199,7 @@
     function removeMusic(idx) {
       if (idx === currentMusicIndex) {
         skipMusic();
+        return;
       }
       musicQueue.splice(idx, 1);
       if (currentMusicIndex > idx) currentMusicIndex--;
@@ -2007,21 +2035,48 @@
             }
 
             // Sync remote music requests
+            let addedAnyMusic = false;
             if (res.musicQueue && res.musicQueue.length > 0) {
               for (const item of res.musicQueue) {
-                if (item.videoId && !announcedIds.has('music_' + item.row)) {
-                  announcedIds.add('music_' + item.row);
-                  sessionStorage.setItem('sv_announcedMsgs', JSON.stringify([...announcedIds]));
-
-                  if (!isInitialLoad) {
-                    const info = await fetchYouTubeInfo(item.videoId);
+                if (item.videoId) {
+                  const info = await fetchYouTubeInfo(item.videoId);
+                  if (!musicQueue.some(m => m.id === item.videoId && !m.error)) {
                     musicQueue.push({ id: item.videoId, url: 'https://youtu.be/' + item.videoId, title: info.title, duration: info.duration });
-                    renderMusicQueue();
-                    syncQueueToServer();
-                    tryPlayMusic();
+                    addedAnyMusic = true;
                   }
                 }
               }
+            }
+
+            // Also check State sheet in case audio-remote.html added songs directly to State
+            try {
+              const stateRes = await fetch(API_URL + "?action=get_state&t=" + new Date().getTime()).then(r => r.json());
+              let parsedState = stateRes;
+              if (typeof parsedState === 'string') {
+                try { parsedState = JSON.parse(parsedState); } catch (e) {}
+              }
+              if (parsedState && Array.isArray(parsedState.musicQueue) && parsedState.musicQueue.length > 0) {
+                for (const sItem of parsedState.musicQueue) {
+                  if (sItem && sItem.id && !musicQueue.some(m => m.id === sItem.id)) {
+                    musicQueue.push({
+                      id: sItem.id,
+                      url: sItem.url || ('https://youtu.be/' + sItem.id),
+                      title: sItem.title || ('เพลง YouTube (' + sItem.id + ')'),
+                      duration: sItem.duration || 210
+                    });
+                    addedAnyMusic = true;
+                  }
+                }
+              }
+            } catch (e) {}
+
+            if (addedAnyMusic) {
+              if (currentMusicIndex < 0) currentMusicIndex = 0;
+              renderMusicQueue();
+              syncQueueToServer();
+            }
+            if (musicQueue.length > 0) {
+              tryPlayMusic();
             }
           }
           isInitialLoad = false;
@@ -2030,6 +2085,7 @@
     }
 
     function syncQueueToServer() {
+      if (!isAudioMaster) return;
       const state = {
         musicQueue: musicQueue,
         currentMusicIndex: currentMusicIndex,
