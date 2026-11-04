@@ -1775,16 +1775,29 @@
       processAudioQueue();
     }
 
-    // Pickup Announcement
-    async function queuePickupAnnouncement(name, classRoom) {
-      let nameForThai = name.replace(/ด\.ช\.|ดช\./g, "เด็กชาย ").replace(/ด\.ญ\.|ดญ\./g, "เด็กหญิง ");
+    // Pickup Announcement (Original Classic SV Style)
+    async function queuePickupAnnouncement(item) {
+      const name = (typeof item === 'object') ? (item.studentName || item.name || 'ไม่ระบุชื่อ') : item;
+      const gateThai = (typeof item === 'object') ? (item.gate || 'จุดรับนักเรียน') : 'จุดรับนักเรียน';
+      
+      let gateEng = 'the pickup point';
+      if (gateThai.includes('1')) gateEng = 'Gate Number 1';
+      else if (gateThai.includes('3')) gateEng = 'Gate Number 3';
+
+      let nameForEng = name.replace(/ด\.ช\.|ด\.ญ\.|ดช\.|ดญ\.|เด็กชาย|เด็กหญิง/g, '').trim();
+      let nameForThai = name.replace(/ด\.ช\.|ดช\./g, 'เด็กชาย ').replace(/ด\.ญ\.|ดญ\./g, 'เด็กหญิง ');
 
       const audios = await Promise.all([
-        fetchAudioData(`Attention please, ${name}, please come to the pickup station.`, "en-GB"),
-        fetchAudioData(`ประกาศ ขอเชิญ ${nameForThai} ไปยังจุดรับส่งนักเรียนค่ะ`, "th-TH")
+        fetchAudioData("Attention please, student ", "en-GB"),
+        fetchAudioData(nameForEng, "th-TH"),
+        fetchAudioData(", please meet your parents at " + gateEng, "en-GB"),
+        fetchAudioData("ประกาศ นักเรียนชื่อ ", "th-TH"),
+        fetchAudioData(nameForThai, "th-TH"),
+        fetchAudioData(`ขณะนี้ผู้ปกครอง มารอรับแล้ว ที่ ${gateThai} ค่ะ`, "th-TH")
       ]);
 
-      audioQueue.push('./sounds/chime_default.mp3');
+      // Use the original announcement chime (ประกาศ.mp3)
+      audioQueue.push('./sounds/ประกาศ.mp3');
       audios.forEach(a => { if (a) audioQueue.push(a); });
       processAudioQueue();
     }
@@ -1897,7 +1910,7 @@
         if (!isInitialLoad && !announcedNames.has(studentName)) {
           announcedNames.add(studentName);
           sessionStorage.setItem('sv_announcedNames', JSON.stringify([...announcedNames]));
-          queuePickupAnnouncement(studentName, className);
+          queuePickupAnnouncement(item);
         }
       });
 
