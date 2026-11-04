@@ -121,6 +121,7 @@ export function AppNav() {
     { id: 'post_assistant', href: '/post-assistant', label: dict.nav.postAssistant, category: dict.nav.pr, icon: Sparkles, colorClass: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
     { id: 'audio_remote', href: '/audio-remote', label: dict.nav.audioRemote, category: dict.nav.pr, icon: Radio, colorClass: 'text-amber-600 bg-amber-50 border-amber-200' },
     { id: 'admin_signage', href: '/admin/signage', label: language === 'th' ? 'จอประชาสัมพันธ์ทีวี (Signage)' : 'Digital Signage TV', category: dict.nav.pr, icon: Tv, colorClass: 'text-blue-700 bg-blue-50 border-blue-200' },
+    { id: 'room_booking', href: '/admin/room-booking', label: language === 'th' ? 'ระบบจองห้อง & จอแสดงผลหน้าห้อง' : 'Smart Room Booking & Display', category: dict.nav.pr, icon: CalendarDays, colorClass: 'text-[#091b30] bg-amber-50 border-amber-200' },
     { id: 'qr_generator', href: '/qr-generator', label: dict.nav.qrGenerator, category: dict.nav.pr, icon: QrCode, colorClass: 'text-pink-600 bg-pink-50 border-pink-200' },
     // Academic Affairs (งานวิชาการและงานวัดผล)
     { id: 'academic_hub', href: '/academic', label: language === 'th' ? 'ศูนย์รวมวิชาการ' : 'Academic Hub', category: language === 'th' ? 'งานวิชาการ' : 'Academic Affairs', icon: GraduationCap, colorClass: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
@@ -135,7 +136,7 @@ export function AppNav() {
     { id: 'calendar', href: '/calendar', label: language === 'th' ? 'ปฏิทินปฏิบัติงาน & เวรครู' : 'Operational Calendar', category: language === 'th' ? 'งานวิชาการ' : 'Academic Affairs', icon: CalendarDays, colorClass: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
   ], [dict, language]);
 
-  if (pathname === '/' || pathname === '/login' || pathname.startsWith('/website') || pathname.startsWith('/forms/') || pathname.startsWith('/parents')) return null;
+  if (pathname === '/' || pathname === '/login' || pathname.startsWith('/website') || pathname.startsWith('/forms/') || pathname.startsWith('/parents') || pathname.startsWith('/room-checkin')) return null;
   if (isLoading || !user) return null;
 
   const isAdmin = role === 'admin' || appUser?.role === 'admin' || isSystemAdmin(user?.email);

@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="SV Room">
+  <meta name="format-detection" content="telephone=no">
+  <meta http-equiv="refresh" content="1800">
+  <title>หน้าจอแสดงสถานะห้อง - SV Portal</title>
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <style type="text/css">
+    @font-face {
+      font-family: 'Sukhumvit Set';
+      src: url('/SukhumvitSet-Text.ttf') format('truetype');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Sukhumvit Set';
+      src: url('/sukhumvit.ttf') format('truetype');
+      font-weight: 500;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Sukhumvit Set';
+      src: url('/SukhumvitSet-Bold.ttf') format('truetype');
+      font-weight: 700;
+      font-style: normal;
+    }
+
+    *, *::before, *::after, button, input, select, textarea {
+      box-sizing: border-box;
+      -webkit-box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Sukhumvit Set', -apple-system, 'Helvetica Neue', sans-serif !important;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #F5F4F2;
+      color: #1A1A1A;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-flex-direction: column;
+      flex-direction: column;
+      padding: 20px 24px;
+      background-color: #F5F4F2;
+      background-image: -webkit-radial-gradient(100% 0%, circle farthest-corner, #F5E8ED 0%, rgba(245, 244, 242, 0) 45%),
+                        -webkit-radial-gradient(0% 100%, circle farthest-corner, #EEF2F8 0%, rgba(245, 244, 242, 0) 45%);
+    }
+
+    /* Top Header Card */
+    .top-header {
+      display: -webkit-flex;
+      display: flex;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+      height: 98px;
+      padding: 14px 24px;
+      background-color: #FFFFFF;
+      border: 1px solid #E4E0DA;
+      border-radius: 18px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.035);
+      margin-bottom: 18px;
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+    }
+
+    .brand-cluster {
+      display: -webkit-flex;
+      display: flex;
+      -webkit-align-items: center;
+      align-items: center;
+      max-width: 68%;
+    }
+
+    .room-logo-box {
+      width: 66px;
+      height: 66px;
+      margin-right: 16px;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-justify-content: center;
+      justify-content: center;
+      overflow: hidden;
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+    }
+
+    .logo-style-rounded {
+      background-color: #FFFFFF;
+      border-radius: 14px;
+      border: 1px solid #E4E0DA;
+      padding: 6px;
+    }
+
+    .logo-style-circle {
+      background-color: #FFFFFF;
+      border-radius: 33px;
+      border: 1px solid #E4E0DA;
+      padding: 6px;
+    }
+
+    .logo-style-plain {
+      background-color: transparent;
+      border: none;
+      padding: 2px;
+    }
+
+    .room-logo-box img {
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      display: block;
+    }
+
+    .room-identity {
+      overflow: hidden;
+    }
+
+    .room-title-line {
+      display: -webkit-flex;
+      display: flex;
+      -webkit-align-items: center;
+      align-items: center;
+    }
+
+    .room-code-pill {
+      display: inline-block;
+      background-color: #7B1C3E;
+      color: #FFFFFF;
+      font-size: 17px;
+      font-weight: 700;
+      padding: 3px 12px;
+      border-radius: 8px;
+      margin-right: 10px;
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+    }
+
+    .room-main-name {
+      font-size: 29px;
+      font-weight: 700;
+      color: #1A1A1A;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .room-sub-building {
+      font-size: 15px;
+      font-weight: 500;
+      color: #6B6560;
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .clock-cluster {
+      text-align: right;
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+    }
+
+    .clock-digits {
+      font-size: 38px;
+      font-weight: 700;
+      color: #1A1A1A;
+      line-height: 1.05;
+    }
+
+    .clock-sec {
+      font-size: 20px;
+      font-weight: 500;
+      color: #7B1C3E;
+      margin-left: 2px;
+    }
+
+    .clock-date-label {
+      font-size: 14px;
+      font-weight: 500;
+      color: #6B6560;
+      margin-top: 3px;
+    }
+
+    /* Main Split Content */
+    .main-grid {
+      display: -webkit-flex;
+      display: flex;
+      -webkit-flex: 1;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* Left Status Column (60%) */
+    .hero-col {
+      width: 60%;
+      padding-right: 18px;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-flex-direction: column;
+      flex-direction: column;
+    }
+
+    .hero-card {
+      -webkit-flex: 1;
+      flex: 1;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-flex-direction: column;
+      flex-direction: column;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+      background-color: #FFFFFF;
+      border: 1px solid #E4E0DA;
+      border-top: 6px solid #2D6A4F;
+      border-radius: 18px;
+      padding: 26px 28px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-card-available {
+      border-top-color: #2D6A4F;
+    }
+
+    .hero-card-waiting {
+      border-top-color: #D97706;
+    }
+
+    .hero-card-inuse {
+      border-top-color: #7B1C3E;
+    }
+
+    .status-top-row {
+      display: -webkit-flex;
+      display: flex;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .status-tag {
+      display: -webkit-inline-flex;
+      display: inline-flex;
+      -webkit-align-items: center;
+      align-items: center;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .tag-available {
+      background-color: #EAF4EF;
+      color: #2D6A4F;
+    }
+
+    .tag-waiting {
+      background-color: #FEF3C7;
+      color: #B45309;
+    }
+
+    .tag-inuse {
+      background-color: #F5E8ED;
+      color: #7B1C3E;
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 5px;
+      margin-right: 8px;
+    }
+
+    .dot-available { background-color: #2D6A4F; }
+    .dot-waiting { background-color: #D97706; }
+    .dot-inuse { background-color: #7B1C3E; }
+
+    .operating-badge {
+      font-size: 14px;
+      font-weight: 500;
+      color: #6B6560;
+      background-color: #F5F4F2;
+      padding: 5px 12px;
+      border-radius: 8px;
+      border: 1px solid #E4E0DA;
+    }
+
+    .hero-status-title {
+      font-size: 40px;
+      font-weight: 700;
+      color: #1A1A1A;
+      line-height: 1.15;
+      margin-bottom: 4px;
+    }
+
+    .hero-status-desc {
+      font-size: 16px;
+      font-weight: 400;
+      color: #6B6560;
+      line-height: 1.4;
+      margin-bottom: 16px;
+    }
+
+    /* Active Session Box */
+    .session-panel {
+      background-color: #FAF9F7;
+      border: 1px solid #E4E0DA;
+      border-radius: 14px;
+      padding: 18px 20px;
+    }
+
+    .session-kicker {
+      font-size: 13px;
+      font-weight: 700;
+      color: #7B1C3E;
+      margin-bottom: 3px;
+    }
+
+    .session-main-subject {
+      font-size: 23px;
+      font-weight: 700;
+      color: #1A1A1A;
+      line-height: 1.25;
+      margin-bottom: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .session-progress-wrap {
+      width: 100%;
+      height: 6px;
+      background-color: #E4E0DA;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+
+    .session-progress-bar {
+      height: 100%;
+      width: 0%;
+      background-color: #2D6A4F;
+      border-radius: 4px;
+    }
+
+    /* Clean Info Table inside Session Box */
+    .info-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .info-table tr {
+      border-bottom: 1px solid #ECE9E2;
+    }
+
+    .info-table tr:last-child {
+      border-bottom: none;
+    }
+
+    .info-table td {
+      padding: 8px 0;
+      font-size: 16px;
+    }
+
+    .info-key {
+      width: 34%;
+      color: #6B6560;
+      font-weight: 500;
+    }
+
+    .info-val {
+      width: 66%;
+      color: #1A1A1A;
+      font-weight: 700;
+      text-align: right;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .hero-footer-bar {
+      display: -webkit-flex;
+      display: flex;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+      font-size: 13px;
+      color: #6B6560;
+      padding-top: 12px;
+      border-top: 1px solid #E4E0DA;
+      margin-top: 12px;
+    }
+
+    /* Right Column (40%) */
+    .side-col {
+      width: 40%;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-flex-direction: column;
+      flex-direction: column;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+    }
+
+    .timeline-card {
+      -webkit-flex: 1;
+      flex: 1;
+      background-color: #FFFFFF;
+      border: 1px solid #E4E0DA;
+      border-radius: 18px;
+      padding: 18px 20px;
+      margin-bottom: 16px;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-flex-direction: column;
+      flex-direction: column;
+      min-height: 0;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.035);
+    }
+
+    .timeline-header {
+      display: -webkit-flex;
+      display: flex;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #E4E0DA;
+    }
+
+    .timeline-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1A1A1A;
+    }
+
+    .timeline-count {
+      font-size: 13px;
+      font-weight: 700;
+      background-color: #F5E8ED;
+      color: #7B1C3E;
+      padding: 2px 10px;
+      border-radius: 999px;
+    }
+
+    .timeline-body {
+      -webkit-flex: 1;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .slot-row {
+      background-color: #FAF9F7;
+      border: 1px solid #E4E0DA;
+      border-left: 4px solid #1B3A6B;
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-bottom: 9px;
+    }
+
+    .slot-row-active {
+      background-color: #FDF8FA;
+      border-color: #E8C5D1;
+      border-left: 4px solid #7B1C3E;
+    }
+
+    .slot-row-waiting {
+      background-color: #FFFBEB;
+      border-color: #FDE68A;
+      border-left: 4px solid #D97706;
+    }
+
+    .slot-top {
+      display: -webkit-flex;
+      display: flex;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+      margin-bottom: 2px;
+    }
+
+    .slot-time {
+      font-size: 15px;
+      font-weight: 700;
+      color: #1A1A1A;
+    }
+
+    .slot-pill {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 1px 8px;
+      border-radius: 999px;
+      background-color: #EEF2F8;
+      color: #1B3A6B;
+    }
+
+    .slot-pill-active {
+      background-color: #7B1C3E;
+      color: #FFFFFF;
+    }
+
+    .slot-pill-waiting {
+      background-color: #FEF3C7;
+      color: #B45309;
+    }
+
+    .slot-subject {
+      font-size: 15px;
+      font-weight: 700;
+      color: #1A1A1A;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .slot-booker {
+      font-size: 13px;
+      font-weight: 400;
+      color: #6B6560;
+      margin-top: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .empty-timeline {
+      height: 100%;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-flex-direction: column;
+      flex-direction: column;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-justify-content: center;
+      justify-content: center;
+      text-align: center;
+      color: #A09890;
+      padding: 20px;
+    }
+
+    /* Single Touch Button Zone at Bottom-Right (126px tall) */
+    .touch-zone {
+      height: 126px;
+      width: 100%;
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+    }
+
+    .primary-qr-btn {
+      width: 100%;
+      height: 126px;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-align-items: center;
+      align-items: center;
+      background-color: #7B1C3E;
+      background-image: -webkit-linear-gradient(135deg, #8B2248 0%, #631530 100%);
+      border: 1px solid #5E1530;
+      border-radius: 18px;
+      padding: 16px 20px;
+      cursor: pointer;
+      text-align: left;
+      box-shadow: 0 8px 24px rgba(123, 28, 62, 0.22);
+    }
+
+    .primary-qr-btn:active {
+      background-color: #5E1530;
+      -webkit-transform: scale(0.99);
+      transform: scale(0.99);
+    }
+
+    .qr-icon-box {
+      width: 72px;
+      height: 72px;
+      border-radius: 14px;
+      background-color: rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      display: -webkit-flex;
+      display: flex;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-justify-content: center;
+      justify-content: center;
+      margin-right: 16px;
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+    }
+
+    .qr-btn-copy {
+      -webkit-flex: 1;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .qr-btn-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #FFFFFF;
+      line-height: 1.2;
+    }
+
+    .qr-btn-sub {
+      font-size: 14px;
+      font-weight: 400;
+      color: #F5E8ED;
+      margin-top: 4px;
+    }
+
+    /* Fullscreen QR Check-in Modal (Clean SV Portal Theme) */
+    .qr-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(245, 244, 242, 0.97);
+      z-index: 950;
+      padding: 20px 24px;
+    }
+
+    .qr-overlay-inner {
+      width: 100%;
+      height: 100%;
+      display: -webkit-flex;
+      display: flex;
+    }
+
+    .qr-left-stage {
+      width: 60%;
+      padding-right: 18px;
+      display: -webkit-flex;
+      display: flex;
+    }
+
+    .qr-showcase-card {
+      -webkit-flex: 1;
+      flex: 1;
+      background-color: #FFFFFF;
+      border: 1px solid #E4E0DA;
+      border-top: 6px solid #7B1C3E;
+      border-radius: 18px;
+      padding: 26px 30px;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-flex-direction: column;
+      flex-direction: column;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+      text-align: center;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.06);
+    }
+
+    .qr-frame-box {
+      width: 300px;
+      height: 300px;
+      background-color: #FFFFFF;
+      border-radius: 18px;
+      padding: 12px;
+      border: 2px solid #E4E0DA;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-justify-content: center;
+      justify-content: center;
+    }
+
+    .qr-frame-box img {
+      width: 268px;
+      height: 268px;
+      display: block;
+    }
+
+    .qr-slot-banner {
+      width: 100%;
+      background-color: #FAF9F7;
+      border: 1px solid #E4E0DA;
+      border-radius: 14px;
+      padding: 14px 18px;
+      text-align: left;
+    }
+
+    .qr-right-stage {
+      width: 40%;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-flex-direction: column;
+      flex-direction: column;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+    }
+
+    .qr-steps-card {
+      -webkit-flex: 1;
+      flex: 1;
+      background-color: #FFFFFF;
+      border: 1px solid #E4E0DA;
+      border-radius: 18px;
+      padding: 24px 22px;
+      margin-bottom: 16px;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-flex-direction: column;
+      flex-direction: column;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.035);
+    }
+
+    .step-row {
+      display: -webkit-flex;
+      display: flex;
+      -webkit-align-items: flex-start;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+
+    .step-badge {
+      width: 30px;
+      height: 30px;
+      border-radius: 10px;
+      background-color: #F5E8ED;
+      color: #7B1C3E;
+      font-size: 15px;
+      font-weight: 700;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-justify-content: center;
+      justify-content: center;
+      margin-right: 12px;
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+    }
+
+    .step-text {
+      font-size: 15px;
+      color: #1A1A1A;
+      line-height: 1.45;
+    }
+
+    .timer-pill-box {
+      background-color: #FAF9F7;
+      border: 1px solid #E4E0DA;
+      border-radius: 12px;
+      padding: 12px 14px;
+      text-align: center;
+    }
+
+    /* Close Button in exact same bottom-right touch zone */
+    .close-qr-btn {
+      width: 100%;
+      height: 126px;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-justify-content: center;
+      justify-content: center;
+      -webkit-flex-direction: column;
+      flex-direction: column;
+      background-color: #1B3A6B;
+      border: 1px solid #142B50;
+      border-radius: 18px;
+      color: #FFFFFF;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(27, 58, 107, 0.2);
+    }
+
+    /* BLACKOUT SLEEP OVERLAY (Off-hours 17:00 - 07:30 Mon-Fri & Weekends) */
+    .sleep-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #000000;
+      z-index: 9999;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- BLACKOUT SLEEP SCREEN (Pure #000000 during off-hours) -->
+  <div id="sleep-overlay" class="sleep-overlay"></div>
+
+  <!-- MAIN FULLSCREEN STAGE -->
+  <div id="ui-stage" class="stage">
+
+    <!-- TOP HEADER -->
+    <div class="top-header">
+      <div class="brand-cluster">
+        <div id="ui-logo-box" class="room-logo-box logo-style-rounded">
+          <img id="ui-room-logo" src="/tv/assets/images/emblem-navy.png" alt="Room Logo">
+        </div>
+        <div class="room-identity">
+          <div class="room-title-line">
+            <span id="ui-room-number" class="room-code-pill">LLC-101</span>
+            <span id="ui-room-name" class="room-main-name">ห้อง LLC</span>
+          </div>
+          <div id="ui-room-building" class="room-sub-building">ศูนย์การเรียนรู้ภาษา • โรงเรียนสมคิดวิทยา</div>
+        </div>
+      </div>
+
+      <div class="clock-cluster">
+        <div>
+          <span id="ui-clock-hm" class="clock-digits">--:--</span><span id="ui-clock-sec" class="clock-sec">--</span>
+        </div>
+        <div id="ui-clock-date" class="clock-date-label">กำลังโหลดวันที่...</div>
+      </div>
+    </div>
+
+    <!-- MAIN 2-COLUMN BODY -->
+    <div class="main-grid">
+
+      <!-- LEFT STATUS CARD -->
+      <div class="hero-col">
+        <div id="ui-hero-card" class="hero-card hero-card-available">
+          <div>
+            <div class="status-top-row">
+              <div id="ui-status-tag" class="status-tag tag-available">
+                <span id="ui-pulse-dot" class="status-dot dot-available"></span>
+                <span id="ui-status-label">สถานะปัจจุบัน • ห้องว่าง</span>
+              </div>
+              <div id="ui-hours-badge" class="operating-badge">เวลาเปิดทำการ 07:30 – 17:00 น.</div>
+            </div>
+
+            <div id="ui-status-headline" class="hero-status-title">ห้องว่างพร้อมใช้งาน</div>
+            <div id="ui-status-subtext" class="hero-status-desc">
+              สงวนสิทธิ์การเข้าใช้งานสำหรับครูและนักเรียนที่ทำรายการจองล่วงหน้าในระบบ SV Portal
+            </div>
+          </div>
+
+          <!-- ACTIVE / NEXT SESSION PANEL -->
+          <div class="session-panel">
+            <div id="ui-detail-kicker" class="session-kicker">รายละเอียดการจองรอบปัจจุบัน / รอบถัดไป</div>
+            <div id="ui-detail-title" class="session-main-subject">ยังไม่มีรายการจองในขณะนี้</div>
+
+            <div class="session-progress-wrap">
+              <div id="ui-progress-bar" class="session-progress-bar" style="width: 0%;"></div>
+            </div>
+
+            <table class="info-table">
+              <tr>
+                <td class="info-key">ช่วงเวลาใช้งาน</td>
+                <td id="ui-detail-time" class="info-val">-</td>
+              </tr>
+              <tr>
+                <td class="info-key">ผู้จองห้อง</td>
+                <td id="ui-detail-booker" class="info-val">-</td>
+              </tr>
+              <tr>
+                <td class="info-key">ระดับชั้น / ตำแหน่ง</td>
+                <td id="ui-detail-role" class="info-val">-</td>
+              </tr>
+              <tr>
+                <td class="info-key">การยืนยันเข้าห้อง</td>
+                <td id="ui-detail-checkin" class="info-val">-</td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="hero-footer-bar">
+            <span id="ui-footer-note">กรุณาจองล่วงหน้าในระบบ SV Portal และสแกน QR Code หน้าห้องเพื่อยืนยันเข้าใช้งาน</span>
+            <span style="color:#7B1C3E; font-weight:700;">SV Portal</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT TIMELINE & SINGLE TOUCH BUTTON -->
+      <div class="side-col">
+        <div class="timeline-card">
+          <div class="timeline-header">
+            <span class="timeline-title">ตารางการจองวันนี้</span>
+            <span id="ui-schedule-count" class="timeline-count">0 รายการ</span>
+          </div>
+          <div id="ui-schedule-list" class="timeline-body">
+            <div class="empty-timeline">
+              <div style="font-size:16px; font-weight:700; color:#6B6560; margin-bottom:4px;">ไม่มีรายการจองสำหรับวันนี้</div>
+              <div style="font-size:13px; color:#A09890;">สามารถลงเวลาจองล่วงหน้าได้ในระบบ SV Portal</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SINGLE TOUCH BUTTON ZONE (Guided Access Safe Zone) -->
+        <div class="touch-zone">
+          <button type="button" class="primary-qr-btn" onclick="openQrModal()">
+            <div class="qr-icon-box">
+              <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+                <path d="M7 7h.01"></path>
+                <path d="M17 7h.01"></path>
+                <path d="M7 17h.01"></path>
+                <path d="M17 17h.01"></path>
+              </svg>
+            </div>
+            <div class="qr-btn-copy">
+              <div class="qr-btn-title">สแกน QR Code เข้าใช้งานห้อง</div>
+              <div class="qr-btn-sub">สำหรับครูและนักเรียนที่จองล่วงหน้าในระบบ SV Portal</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FULLSCREEN QR CODE CHECK-IN MODAL -->
+  <div id="qr-modal" class="qr-overlay">
+    <div class="qr-overlay-inner">
+      <div class="qr-left-stage">
+        <div class="qr-showcase-card">
+          <div>
+            <div style="font-size:14px; font-weight:700; color:#7B1C3E; margin-bottom:2px;">
+              ระบบยืนยันการเข้าใช้งานห้อง • SV Portal
+            </div>
+            <div style="font-size:28px; font-weight:700; color:#1A1A1A;">
+              สแกน QR Code เพื่อเช็คอินเข้าห้อง
+            </div>
+            <div style="font-size:15px; color:#6B6560; margin-top:2px;">
+              ใช้กล้องโทรศัพท์มือถือ หรือแอป LINE สแกนคิวอาร์โค้ดด้านล่าง
+            </div>
+          </div>
+
+          <div class="qr-frame-box">
+            <img id="ui-qr-img" src="/tv/assets/images/emblem-navy.png" alt="QR Code">
+          </div>
+
+          <div class="qr-slot-banner">
+            <div style="font-size:13px; color:#6B6560; margin-bottom:2px;">รายการจองที่เปิดให้เช็คอิน:</div>
+            <div id="ui-qr-booking-title" style="font-size:19px; font-weight:700; color:#7B1C3E;">-</div>
+            <div id="ui-qr-booking-meta" style="font-size:15px; color:#1A1A1A; margin-top:2px;">-</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="qr-right-stage">
+        <div class="qr-steps-card">
+          <div>
+            <div style="font-size:20px; font-weight:700; color:#1A1A1A; margin-bottom:16px; padding-bottom:10px; border-bottom:1px solid #E4E0DA;">
+              ขั้นตอนการยืนยันเข้าใช้งาน
+            </div>
+
+            <div class="step-row">
+              <div class="step-badge">1</div>
+              <div class="step-text">
+                <strong>เปิดกล้องโทรศัพท์มือถือ</strong> ส่องที่คิวอาร์โค้ดฝั่งซ้ายเพื่อเปิดหน้าเช็คอินของห้อง
+              </div>
+            </div>
+
+            <div class="step-row">
+              <div class="step-badge">2</div>
+              <div class="step-text">
+                <strong>กรณีครูและบุคลากร:</strong> กดปุ่มยืนยันการเข้าใช้งานตามชื่อผู้จองได้ทันที
+              </div>
+            </div>
+
+            <div class="step-row">
+              <div class="step-badge">3</div>
+              <div class="step-text">
+                <strong>กรณีนักเรียน:</strong> กรอกรหัสนักเรียน หรือชื่อที่ใช้จองห้อง แล้วกดปุ่มยืนยัน
+              </div>
+            </div>
+          </div>
+
+          <div class="timer-pill-box">
+            <div style="font-size:15px; color:#1A1A1A;">
+              หน้าต่างนี้จะปิดอัตโนมัติใน <strong id="ui-qr-countdown" style="color:#7B1C3E; font-size:22px;">45</strong> วินาที
+            </div>
+            <div style="font-size:13px; color:#6B6560; margin-top:2px;">
+              หน้าจอจะเปลี่ยนเป็นสถานะ &quot;กำลังใช้งาน&quot; ทันทีเมื่อเช็คอินสำเร็จ
+            </div>
+          </div>
+        </div>
+
+        <!-- Close Button in exact same bottom-right touch zone -->
+        <div class="touch-zone">
+          <button type="button" class="close-qr-btn" onclick="closeQrModal()">
+            <div style="font-size:22px; font-weight:700;">ปิดหน้าต่าง QR Code</div>
+            <div style="font-size:14px; color:#DCE5F2; margin-top:2px;">แตะเพื่อกลับสู่หน้าจอแสดงสถานะห้อง</div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STRICT ES5 JAVASCRIPT FOR UNIVERSAL + iOS 9.3.6 COMPATIBILITY -->
+  <script type="text/javascript">
+    document.addEventListener('touchmove', function(e) {
+      e.preventDefault();
+    }, false);
+
+    var ROOM_CODE = 'LLC';
+    var FORCE_PREVIEW = false;
+    var currentState = null;
+    var qrModalOpen = false;
+    var qrCountdownSec = 45;
+    var qrCountdownTimer = null;
+    var lastCheckedInId = null;
+
+    function getQueryParam(name) {
+      var search = window.location.search.substring(1);
+      var vars = search.split('&');
+      for (var i = 0; i < vars.length; i++) {
+        var pair = vars[i].split('=');
+        if (decodeURIComponent(pair[0]) === name) {
+          return decodeURIComponent(pair[1] || '');
+        }
+      }
+      return '';
+    }
+
+    var roomParam = getQueryParam('room');
+    if (roomParam) {
+      ROOM_CODE = roomParam.toUpperCase();
+      try { window.localStorage.setItem('svportal_bound_room', ROOM_CODE); } catch (e) {}
+    } else {
+      try {
+        var savedRoom = window.localStorage.getItem('svportal_bound_room');
+        if (savedRoom) ROOM_CODE = savedRoom.toUpperCase();
+      } catch (e) {}
+    }
+    if (getQueryParam('preview') === '1' || getQueryParam('forceWake') === '1') {
+      FORCE_PREVIEW = true;
+    }
+
+    var THAI_DAYS = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+    var THAI_MONTHS = [
+      'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+      'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+    ];
+
+    function pad2(n) {
+      return n < 10 ? '0' + n : '' + n;
+    }
+
+    function timeStrToMin(str) {
+      if (!str) return 0;
+      var p = str.split(':');
+      return parseInt(p[0], 10) * 60 + parseInt(p[1] || '0', 10);
+    }
+
+    function updateClockAndSleepState() {
+      var now = new Date();
+      var hh = pad2(now.getHours());
+      var mm = pad2(now.getMinutes());
+      var ss = pad2(now.getSeconds());
+      var dayIdx = now.getDay();
+      var dateNum = now.getDate();
+      var monthName = THAI_MONTHS[now.getMonth()];
+      var buddhistYear = now.getFullYear() + 543;
+
+      var hmEl = document.getElementById('ui-clock-hm');
+      var secEl = document.getElementById('ui-clock-sec');
+      var dateEl = document.getElementById('ui-clock-date');
+      if (hmEl) hmEl.innerHTML = hh + ':' + mm;
+      if (secEl) secEl.innerHTML = ':' + ss;
+      if (dateEl) dateEl.innerHTML = 'วัน' + THAI_DAYS[dayIdx] + 'ที่ ' + dateNum + ' ' + monthName + ' ' + buddhistYear;
+
+      var openTime = '07:30';
+      var closeTime = '17:00';
+      var activeDays = [1, 2, 3, 4, 5];
+
+      if (currentState && currentState.config) {
+        if (currentState.config.open_time) openTime = currentState.config.open_time;
+        if (currentState.config.close_time) closeTime = currentState.config.close_time;
+        if (currentState.config.active_days && currentState.config.active_days.length) {
+          activeDays = currentState.config.active_days;
+        }
+      }
+
+      var nowMinutes = now.getHours() * 60 + now.getMinutes();
+      var openMinutes = timeStrToMin(openTime);
+      var closeMinutes = timeStrToMin(closeTime);
+
+      var isAllowedDay = false;
+      for (var i = 0; i < activeDays.length; i++) {
+        if (activeDays[i] === dayIdx) {
+          isAllowedDay = true;
+          break;
+        }
+      }
+
+      var shouldWake = FORCE_PREVIEW || (isAllowedDay && nowMinutes >= openMinutes && nowMinutes < closeMinutes);
+      var sleepOverlay = document.getElementById('sleep-overlay');
+      if (sleepOverlay) {
+        if (shouldWake) {
+          sleepOverlay.style.display = 'none';
+        } else {
+          sleepOverlay.style.display = 'block';
+          if (qrModalOpen) {
+            closeQrModal();
+          }
+        }
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function computeProgressPercent(startStr, endStr) {
+      var now = new Date();
+      var nowM = now.getHours() * 60 + now.getMinutes();
+      var sM = timeStrToMin(startStr);
+      var eM = timeStrToMin(endStr);
+      if (eM <= sM) return 0;
+      if (nowM <= sM) return 8;
+      if (nowM >= eM) return 100;
+      var pct = Math.round(((nowM - sM) / (eM - sM)) * 100);
+      if (pct < 8) pct = 8;
+      if (pct > 100) pct = 100;
+      return pct;
+    }
+
+    function renderDisplayState(data) {
+      if (!data || !data.success) return;
+      currentState = data;
+
+      var cfg = data.config || {};
+      var roomNumEl = document.getElementById('ui-room-number');
+      var roomNameEl = document.getElementById('ui-room-name');
+      var roomBldgEl = document.getElementById('ui-room-building');
+      var hoursBadgeEl = document.getElementById('ui-hours-badge');
+      var footerEl = document.getElementById('ui-footer-note');
+      var logoImgEl = document.getElementById('ui-room-logo');
+      var logoBoxEl = document.getElementById('ui-logo-box');
+
+      if (roomNumEl) roomNumEl.innerHTML = escapeHtml(cfg.room_number || 'LLC-101');
+      if (roomNameEl) roomNameEl.innerHTML = escapeHtml(cfg.room_name || 'ห้อง LLC');
+      if (cfg.room_name) {
+        document.title = cfg.room_name + ' (' + (cfg.room_number || ROOM_CODE) + ') - SV Portal';
+      }
+      if (roomBldgEl) roomBldgEl.innerHTML = escapeHtml(cfg.building || 'ศูนย์การเรียนรู้ภาษา • โรงเรียนสมคิดวิทยา');
+      if (hoursBadgeEl) hoursBadgeEl.innerHTML = 'เวลาเปิดทำการ ' + escapeHtml(cfg.open_time || '07:30') + ' – ' + escapeHtml(cfg.close_time || '17:00') + ' น.';
+      if (footerEl) footerEl.innerHTML = escapeHtml(cfg.subtitle || 'กรุณาจองล่วงหน้าในระบบ SV Portal และสแกน QR Code หน้าห้องเพื่อยืนยันเข้าใช้งาน');
+
+      if (logoImgEl) {
+        var nextLogo = (cfg.logo_url && cfg.logo_url !== '/logo.png') ? cfg.logo_url : '/tv/assets/images/emblem-navy.png';
+        if (logoImgEl.getAttribute('src') !== nextLogo) {
+          logoImgEl.setAttribute('src', nextLogo);
+        }
+      }
+      if (logoBoxEl) {
+        var styleMode = cfg.logo_style || 'rounded';
+        logoBoxEl.className = 'room-logo-box logo-style-' + styleMode;
+      }
+
+      var heroCardEl = document.getElementById('ui-hero-card');
+      var statusTagEl = document.getElementById('ui-status-tag');
+      var pulseDotEl = document.getElementById('ui-pulse-dot');
+      var statusLabelEl = document.getElementById('ui-status-label');
+      var statusHeadlineEl = document.getElementById('ui-status-headline');
+      var statusSubtextEl = document.getElementById('ui-status-subtext');
+
+      var detailKicker = document.getElementById('ui-detail-kicker');
+      var detailTitle = document.getElementById('ui-detail-title');
+      var detailTime = document.getElementById('ui-detail-time');
+      var detailBooker = document.getElementById('ui-detail-booker');
+      var detailRole = document.getElementById('ui-detail-role');
+      var detailCheckin = document.getElementById('ui-detail-checkin');
+      var progressBar = document.getElementById('ui-progress-bar');
+
+      var cur = data.current_booking;
+      var nxt = data.next_booking;
+
+      if (cur && cur.status === 'CHECKED_IN') {
+        if (qrModalOpen && lastCheckedInId !== cur.id) {
+          closeQrModal();
+        }
+        lastCheckedInId = cur.id;
+      }
+
+      if (cur && cur.status === 'CHECKED_IN') {
+        heroCardEl.className = 'hero-card hero-card-inuse';
+        statusTagEl.className = 'status-tag tag-inuse';
+        pulseDotEl.className = 'status-dot dot-inuse';
+        statusLabelEl.innerHTML = 'สถานะปัจจุบัน • ไม่ว่าง';
+        statusHeadlineEl.innerHTML = 'กำลังมีการใช้งานห้อง';
+        statusSubtextEl.innerHTML = 'ผู้จองได้ทำการสแกน QR Code ยืนยันเข้าใช้งานห้องเรียบร้อยแล้ว';
+
+        detailKicker.innerHTML = 'รายละเอียดผู้ใช้งานขณะนี้';
+        detailTitle.innerHTML = escapeHtml(cur.title);
+        detailTime.innerHTML = escapeHtml(cur.start_time + ' – ' + cur.end_time + ' น.');
+        detailBooker.innerHTML = escapeHtml(cur.booker_name) + ' (' + (cur.participants_count || 1) + ' คน)';
+        detailRole.innerHTML = escapeHtml(cur.booker_role_label || '-');
+        detailCheckin.innerHTML = 'เช็คอินแล้วเมื่อ ' + escapeHtml(cur.checked_in_at || '-') + ' น.';
+        if (progressBar) {
+          progressBar.style.width = computeProgressPercent(cur.start_time, cur.end_time) + '%';
+          progressBar.style.backgroundColor = '#7B1C3E';
+        }
+      } else if (cur && cur.status === 'BOOKED') {
+        heroCardEl.className = 'hero-card hero-card-waiting';
+        statusTagEl.className = 'status-tag tag-waiting';
+        pulseDotEl.className = 'status-dot dot-waiting';
+        statusLabelEl.innerHTML = 'สถานะปัจจุบัน • รอยืนยันเข้าห้อง';
+        statusHeadlineEl.innerHTML = 'ถึงเวลาจอง – รอสแกนเข้าห้อง';
+        statusSubtextEl.innerHTML = 'กรุณาแตะปุ่มด้านขวาล่างเพื่อสแกน QR Code ยืนยันการเข้าใช้งาน';
+
+        detailKicker.innerHTML = 'รายการจองที่กำลังรอสแกนเข้าใช้งาน';
+        detailTitle.innerHTML = escapeHtml(cur.title);
+        detailTime.innerHTML = escapeHtml(cur.start_time + ' – ' + cur.end_time + ' น.');
+        detailBooker.innerHTML = escapeHtml(cur.booker_name) + ' (' + (cur.participants_count || 1) + ' คน)';
+        detailRole.innerHTML = escapeHtml(cur.booker_role_label || '-');
+        detailCheckin.innerHTML = 'รอผู้จองสแกน QR Code หน้าห้อง';
+        if (progressBar) {
+          progressBar.style.width = '35%';
+          progressBar.style.backgroundColor = '#D97706';
+        }
+      } else {
+        heroCardEl.className = 'hero-card hero-card-available';
+        statusTagEl.className = 'status-tag tag-available';
+        pulseDotEl.className = 'status-dot dot-available';
+        statusLabelEl.innerHTML = 'สถานะปัจจุบัน • ห้องว่าง';
+        statusHeadlineEl.innerHTML = 'ห้องว่างพร้อมใช้งาน';
+        statusSubtextEl.innerHTML = 'ขณะนี้ไม่มีคิวใช้งาน สงวนสิทธิ์สำหรับผู้ที่จองล่วงหน้าในระบบ SV Portal';
+
+        if (nxt) {
+          detailKicker.innerHTML = 'รายการจองคิวถัดไปของวันนี้';
+          detailTitle.innerHTML = escapeHtml(nxt.title);
+          detailTime.innerHTML = escapeHtml(nxt.start_time + ' – ' + nxt.end_time + ' น.');
+          detailBooker.innerHTML = escapeHtml(nxt.booker_name) + ' (' + (nxt.participants_count || 1) + ' คน)';
+          detailRole.innerHTML = escapeHtml(nxt.booker_role_label || '-');
+          detailCheckin.innerHTML = 'เปิดให้สแกนก่อนเวลา ' + (cfg.checkin_grace_minutes || 15) + ' นาที';
+          if (progressBar) {
+            progressBar.style.width = '12%';
+            progressBar.style.backgroundColor = '#2D6A4F';
+          }
+        } else {
+          detailKicker.innerHTML = 'ตารางการใช้งานถัดไป';
+          detailTitle.innerHTML = 'ไม่มีรายการจองต่อจากนี้ในวันนี้';
+          detailTime.innerHTML = '-';
+          detailBooker.innerHTML = '-';
+          detailRole.innerHTML = '-';
+          detailCheckin.innerHTML = '-';
+          if (progressBar) {
+            progressBar.style.width = '100%';
+            progressBar.style.backgroundColor = '#2D6A4F';
+          }
+        }
+      }
+
+      var listEl = document.getElementById('ui-schedule-list');
+      var countEl = document.getElementById('ui-schedule-count');
+      var bookings = data.today_bookings || [];
+      if (countEl) countEl.innerHTML = bookings.length + ' รายการ';
+
+      if (bookings.length === 0) {
+        listEl.innerHTML = '<div class="empty-timeline">' +
+          '<div style="font-size:16px; font-weight:700; color:#6B6560; margin-bottom:4px;">วันนี้ยังไม่มีรายการจอง</div>' +
+          '<div style="font-size:13px; color:#A09890;">สามารถลงเวลาจองล่วงหน้าได้ในระบบ SV Portal</div>' +
+        '</div>';
+      } else {
+        var html = '';
+        var maxItems = bookings.length > 4 ? 4 : bookings.length;
+        for (var i = 0; i < maxItems; i++) {
+          var b = bookings[i];
+          var rowClass = 'slot-row';
+          var pillClass = 'slot-pill';
+          var pillText = 'จองล่วงหน้า';
+
+          if (b.status === 'CHECKED_IN') {
+            rowClass += ' slot-row-active';
+            pillClass += ' slot-pill-active';
+            pillText = 'กำลังใช้งาน';
+          } else if (cur && cur.id === b.id && b.status === 'BOOKED') {
+            rowClass += ' slot-row-waiting';
+            pillClass += ' slot-pill-waiting';
+            pillText = 'รอเช็คอิน';
+          } else if (b.status === 'COMPLETED') {
+            pillText = 'เสร็จสิ้น';
+          }
+
+          html += '<div class="' + rowClass + '">' +
+            '<div class="slot-top">' +
+              '<span class="slot-time">' + escapeHtml(b.start_time + ' – ' + b.end_time + ' น.') + '</span>' +
+              '<span class="' + pillClass + '">' + pillText + '</span>' +
+            '</div>' +
+            '<div class="slot-subject">' + escapeHtml(b.title) + '</div>' +
+            '<div class="slot-booker">' + escapeHtml(b.booker_name) + ' • ' + escapeHtml(b.booker_role_label || '') + '</div>' +
+          '</div>';
+        }
+        listEl.innerHTML = html;
+      }
+
+      updateClockAndSleepState();
+    }
+
+    function fetchRoomData() {
+      var xhr = new XMLHttpRequest();
+      var url = '/api/room-booking?room=' + encodeURIComponent(ROOM_CODE) + '&_t=' + new Date().getTime();
+      xhr.open('GET', url, true);
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4 && xhr.status === 200) {
+          try {
+            var json = JSON.parse(xhr.responseText);
+            renderDisplayState(json);
+          } catch (e) {}
+        }
+      };
+      xhr.send(null);
+    }
+
+    function openQrModal() {
+      qrModalOpen = true;
+      qrCountdownSec = 45;
+
+      var modal = document.getElementById('qr-modal');
+      var qrImg = document.getElementById('ui-qr-img');
+      var titleEl = document.getElementById('ui-qr-booking-title');
+      var metaEl = document.getElementById('ui-qr-booking-meta');
+      var countEl = document.getElementById('ui-qr-countdown');
+
+      var targetBooking = null;
+      if (currentState) {
+        targetBooking = currentState.current_booking || currentState.next_booking || null;
+      }
+
+      var hostPart = window.location.host;
+      if ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && currentState && currentState.lan_ip) {
+        var portPart = window.location.port ? (':' + window.location.port) : '';
+        hostPart = currentState.lan_ip + portPart;
+      }
+      var origin = window.location.protocol + '//' + hostPart;
+      var checkinUrl = origin + '/room-checkin?room=' + encodeURIComponent(ROOM_CODE);
+      if (targetBooking && targetBooking.id) {
+        checkinUrl += '&bookingId=' + encodeURIComponent(targetBooking.id);
+      }
+      if (currentState && currentState.qr_token) {
+        checkinUrl += '&token=' + encodeURIComponent(currentState.qr_token);
+      }
+
+      if (qrImg) {
+        qrImg.src = '/api/room-booking/qr-svg?text=' + encodeURIComponent(checkinUrl) + '&_t=' + new Date().getTime();
+      }
+
+      if (targetBooking) {
+        titleEl.innerHTML = escapeHtml(targetBooking.title);
+        metaEl.innerHTML = 'เวลา ' + escapeHtml(targetBooking.start_time + ' – ' + targetBooking.end_time) + ' น. • ผู้จอง: ' + escapeHtml(targetBooking.booker_name);
+      } else {
+        titleEl.innerHTML = 'ขณะนี้ยังไม่มีคิวจองในรอบเวลานี้';
+        metaEl.innerHTML = 'สแกนเพื่อตรวจสอบตารางการจองล่วงหน้าของคุณ';
+      }
+
+      if (countEl) countEl.innerHTML = '' + qrCountdownSec;
+      if (modal) modal.style.display = 'block';
+
+      if (qrCountdownTimer) clearInterval(qrCountdownTimer);
+      qrCountdownTimer = setInterval(function() {
+        qrCountdownSec--;
+        if (countEl) countEl.innerHTML = '' + qrCountdownSec;
+        if (qrCountdownSec <= 0) {
+          closeQrModal();
+        }
+      }, 1000);
+    }
+
+    function closeQrModal() {
+      qrModalOpen = false;
+      var modal = document.getElementById('qr-modal');
+      if (modal) modal.style.display = 'none';
+      if (qrCountdownTimer) {
+        clearInterval(qrCountdownTimer);
+        qrCountdownTimer = null;
+      }
+    }
+
+    updateClockAndSleepState();
+    fetchRoomData();
+
+    setInterval(updateClockAndSleepState, 1000);
+    setInterval(function() {
+      var sleepOverlay = document.getElementById('sleep-overlay');
+      var isSleeping = sleepOverlay && sleepOverlay.style.display === 'block';
+      if (!isSleeping || qrModalOpen) {
+        fetchRoomData();
+      }
+    }, 6000);
+  </script>
+</body>
+</html>

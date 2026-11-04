@@ -45,6 +45,26 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: '/room-display',
+        destination: '/room-display/index.html',
+      },
+      {
+        source: '/room-display/',
+        destination: '/room-display/index.html',
+      },
+      {
+        source: '/llc-display',
+        destination: '/llc-display/index.html',
+      },
+      {
+        source: '/llc-display/',
+        destination: '/llc-display/index.html',
+      },
+    ];
+  },
   async headers() {
     return [
       {

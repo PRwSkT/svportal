@@ -130,10 +130,20 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname === '/api/admin/website/sync-post' ||
     request.nextUrl.pathname === '/api/health' ||
     request.nextUrl.pathname.startsWith('/api/signage') ||
+    request.nextUrl.pathname.startsWith('/api/room-booking') ||
+    request.nextUrl.pathname.startsWith('/room-checkin') ||
+    request.nextUrl.pathname.startsWith('/room-display') ||
+    request.nextUrl.pathname.startsWith('/llc-display') ||
     request.nextUrl.pathname.startsWith('/tv') ||
     request.nextUrl.pathname.startsWith('/portal') ||
     request.nextUrl.pathname.startsWith('/download')
   ) {
+    if (
+      request.nextUrl.pathname.startsWith('/llc-display') ||
+      request.nextUrl.pathname.startsWith('/room-display')
+    ) {
+      response.headers.delete('Content-Security-Policy');
+    }
     return response;
   }
 

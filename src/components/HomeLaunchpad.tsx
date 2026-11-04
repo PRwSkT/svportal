@@ -120,6 +120,7 @@ export default function HomeLaunchpad() {
         { id: "post_assistant", name: dict.nav.postAssistant, href: "/post-assistant", icon: <MessageSquare className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
         { id: "audio_remote", name: dict.nav.audioRemote, href: "/audio-remote", icon: <Radio className="w-6 h-6" />, color: "bg-rose-500 text-white" },
         { id: "admin_signage", name: language === 'th' ? "จอประชาสัมพันธ์ทีวี (Signage)" : "Digital Signage TV", href: "/admin/signage", icon: <Tv className="w-6 h-6" />, color: "bg-blue-600 text-white" },
+        { id: "room_booking", name: language === 'th' ? "ระบบจองห้อง & จอหน้าห้อง" : "Smart Room Booking", href: "/admin/room-booking", icon: <CalendarDays className="w-6 h-6" />, color: "bg-[#091b30] text-[#dfce91]" },
         { id: "qr_generator", name: dict.nav.qrGenerator, href: "/qr-generator", icon: <QrCode className="w-6 h-6" />, color: "bg-rose-500 text-white" }
       ]
     },
