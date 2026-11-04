@@ -1032,7 +1032,36 @@
 
   <!-- STRICT ES5 JAVASCRIPT FOR UNIVERSAL + iOS 9.3.6 COMPATIBILITY -->
   <script type="text/javascript">
+    function isInsideAllowedButton(el) {
+      while (el && el !== document.body) {
+        var cls = el.className || '';
+        if (typeof cls === 'string' && (cls.indexOf('primary-qr-btn') !== -1 || cls.indexOf('close-qr-btn') !== -1)) {
+          return true;
+        }
+        el = el.parentNode;
+      }
+      return false;
+    }
+
+    document.addEventListener('touchstart', function(e) {
+      if (e.touches && e.touches.length > 1) {
+        e.preventDefault();
+        return;
+      }
+      if (!isInsideAllowedButton(e.target)) {
+        e.preventDefault();
+      }
+    }, false);
+
     document.addEventListener('touchmove', function(e) {
+      e.preventDefault();
+    }, false);
+
+    document.addEventListener('gesturestart', function(e) {
+      e.preventDefault();
+    }, false);
+
+    document.addEventListener('contextmenu', function(e) {
       e.preventDefault();
     }, false);
 
