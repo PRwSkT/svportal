@@ -835,6 +835,7 @@
       musicMode = mode;
       localStorage.setItem('sv_music_mode', mode);
       updateMusicStatusBanner();
+      syncQueueToServer();
       if (mode === 'unlocked') {
         tryPlayMusic();
       } else {
@@ -853,17 +854,28 @@
 
     // Determine if current time allows music playback
     function getCurrentBreakSlotInfo() {
-      if (musicMode === 'unlocked') {
+      if (musicMode === 'unlocked' || !isBellsEnabled) {
         return { isAllowed: true, slotName: 'โหมดปลดล็อคอิสระ', nextBellTimeStr: null, remainingSecondsUntilBell: Infinity };
       }
 
       const now = new Date();
       const currentMinutes = now.getHours() * 60 + now.getMinutes();
       const currentSeconds = currentMinutes * 60 + now.getSeconds();
+      const sortedBells = [...(bells || [])]
+        .filter(b => b && b.time && b.time.includes(':'))
+        .sort((a, b) => parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time));
+
+      function findEndBellAfter(startMin, defaultEndMin, defaultEndStr) {
+        const nextBell = sortedBells.find(b => parseTimeToMinutes(b.time) > startMin);
+        if (nextBell) {
+          return { min: parseTimeToMinutes(nextBell.time), timeStr: nextBell.time };
+        }
+        return { min: defaultEndMin, timeStr: defaultEndStr };
+      }
 
       // 1. Morning slot: before assembly bell (default 07:50)
-      let assemblyBell = bells.find(b => b.preset === 'assembly' || (b.desc && b.desc.includes('แถว')));
-      let assemblyMinutes = assemblyBell ? parseTimeToMinutes(assemblyBell.time) : (7 * 60 + 50);
+      const assemblyBell = sortedBells.find(b => b.preset === 'assembly' || (b.desc && b.desc.includes('แถว')));
+      const assemblyMinutes = assemblyBell ? parseTimeToMinutes(assemblyBell.time) : (7 * 60 + 50);
 
       if (currentMinutes >= 6 * 60 && currentMinutes < assemblyMinutes) {
         const bellSec = assemblyMinutes * 60;
@@ -875,26 +887,74 @@
         };
       }
 
-      // 2. Lunch break slot: default 11:40 - 12:40
-      let lunchBell = bells.find(b => b.preset === 'lunch' || (b.desc && b.desc.includes('อาหารกลางวัน')));
-      let endLunchBell = bells.find(b => b.preset === 'end_lunch' || (b.desc && b.desc.includes('หมดเวลาพักรับประทานอาหารกลางวัน')));
-      
-      let lunchStartMin = lunchBell ? parseTimeToMinutes(lunchBell.time) : (11 * 60 + 40);
-      let lunchEndMin = endLunchBell ? parseTimeToMinutes(endLunchBell.time) : (12 * 60 + 40);
+      // 2. Morning break slot: default 09:30 - 09:40
+      const morningBreakBell = sortedBells.find(b =>
+        b.preset === 'break_morning' ||
+        (parseTimeToMinutes(b.time) < 11 * 60 && b.desc && b.desc.includes('พัก') && !b.desc.includes('หมดเวลาพัก'))
+      );
+      const morningStartMin = morningBreakBell ? parseTimeToMinutes(morningBreakBell.time) : (9 * 60 + 30);
+      const morningEndObj = morningBreakBell
+        ? findEndBellAfter(morningStartMin, 9 * 60 + 40, '09:40')
+        : { min: 9 * 60 + 40, timeStr: '09:40' };
+
+      if (currentMinutes >= morningStartMin && currentMinutes < morningEndObj.min) {
+        const bellSec = morningEndObj.min * 60;
+        return {
+          isAllowed: true,
+          slotName: 'พักเบรกเช้า',
+          nextBellTimeStr: morningEndObj.timeStr,
+          remainingSecondsUntilBell: Math.max(0, bellSec - currentSeconds)
+        };
+      }
+
+      // 3. Lunch break slot: default 11:30/11:40 - 12:40
+      const lunchBell = sortedBells.find(b =>
+        b.preset === 'lunch' ||
+        (b.desc && b.desc.includes('กลางวัน') && !b.desc.includes('หมดเวลาพัก'))
+      );
+      const endLunchBell = sortedBells.find(b =>
+        b.preset === 'end_lunch' ||
+        (b.desc && b.desc.includes('หมดเวลาพัก') && b.desc.includes('กลางวัน'))
+      );
+      const lunchStartMin = lunchBell ? Math.min(parseTimeToMinutes(lunchBell.time), 11 * 60 + 40) : (11 * 60 + 30);
+      const lunchEndObj = endLunchBell
+        ? { min: parseTimeToMinutes(endLunchBell.time), timeStr: endLunchBell.time }
+        : findEndBellAfter(lunchBell ? parseTimeToMinutes(lunchBell.time) : (11 * 60 + 40), 12 * 60 + 40, '12:40');
+      const lunchEndMin = lunchEndObj.min > lunchStartMin ? lunchEndObj.min : (12 * 60 + 40);
 
       if (currentMinutes >= lunchStartMin && currentMinutes < lunchEndMin) {
         const bellSec = lunchEndMin * 60;
         return {
           isAllowed: true,
           slotName: 'พักรับประทานอาหารกลางวัน',
-          nextBellTimeStr: endLunchBell ? endLunchBell.time : '12:40',
+          nextBellTimeStr: lunchEndObj.timeStr || '12:40',
           remainingSecondsUntilBell: Math.max(0, bellSec - currentSeconds)
         };
       }
 
-      // 3. Afternoon dismissal slot: after 15:50
-      let dismissalBell = bells.find(b => b.preset === 'dismissal' || (b.desc && b.desc.includes('เลิกเรียน')));
-      let dismissalMin = dismissalBell ? parseTimeToMinutes(dismissalBell.time) : (16 * 60);
+      // 4. Afternoon break slot: default 14:40 - 14:50
+      const afternoonBreakBell = sortedBells.find(b =>
+        b.preset === 'break_afternoon' ||
+        (parseTimeToMinutes(b.time) >= 13 * 60 && b.desc && b.desc.includes('พัก') && !b.desc.includes('หมดเวลาพัก'))
+      );
+      const afternoonStartMin = afternoonBreakBell ? parseTimeToMinutes(afternoonBreakBell.time) : (14 * 60 + 40);
+      const afternoonEndObj = afternoonBreakBell
+        ? findEndBellAfter(afternoonStartMin, 14 * 60 + 50, '14:50')
+        : { min: 14 * 60 + 50, timeStr: '14:50' };
+
+      if (currentMinutes >= afternoonStartMin && currentMinutes < afternoonEndObj.min) {
+        const bellSec = afternoonEndObj.min * 60;
+        return {
+          isAllowed: true,
+          slotName: 'พักเบรกบ่าย',
+          nextBellTimeStr: afternoonEndObj.timeStr,
+          remainingSecondsUntilBell: Math.max(0, bellSec - currentSeconds)
+        };
+      }
+
+      // 5. Afternoon dismissal slot: after 15:50
+      const dismissalBell = sortedBells.find(b => b.preset === 'dismissal' || (b.desc && b.desc.includes('เลิกเรียน')));
+      const dismissalMin = dismissalBell ? parseTimeToMinutes(dismissalBell.time) : (15 * 60 + 50);
 
       if (currentMinutes >= dismissalMin && currentMinutes < (18 * 60 + 30)) {
         return {
@@ -1420,7 +1480,7 @@
       if (!banner) return;
 
       if (!isBellsEnabled) {
-        banner.innerHTML = `<span class="text-amber-700 font-bold">⏸️ ปิดระบบออดชั่วคราว (วันกิจกรรมพิเศษ — ออดจะไม่ดัง)</span>`;
+        banner.innerHTML = `<span class="text-amber-700 font-bold">ปิดระบบออดชั่วคราว (วันกิจกรรมพิเศษ — ออดจะไม่ดัง)</span>`;
         return;
       }
 
@@ -1708,6 +1768,7 @@
         yellow: 'bg-yellow-500',
         blue: 'bg-blue-600',
         purple: 'bg-purple-600',
+        silver: 'bg-slate-700',
         black: 'bg-gray-900',
         green: 'bg-emerald-600'
       };
@@ -1749,7 +1810,7 @@
     }
 
     function getColorThai(c) {
-      const map = { red: 'แดง', orange: 'ส้ม', yellow: 'เหลือง', blue: 'น้ำเงิน', purple: 'ม่วง', black: 'ดำ', green: 'เขียว' };
+      const map = { red: 'แดง', orange: 'ส้ม', yellow: 'เหลือง', blue: 'น้ำเงิน', purple: 'ม่วง', silver: 'เงิน', black: 'ดำ', green: 'เขียว' };
       return map[c] || c;
     }
 
@@ -1831,17 +1892,47 @@
           announcedIds.add(item.row);
           sessionStorage.setItem('sv_announcedMsgs', JSON.stringify([...announcedIds]));
 
-          // Check Emergency SOS
-          const sosMatch = (item.th || '').match(/EMERGENCY_CODE_([A-Z]+)/);
+          const rawText = (item.th || '').trim();
+
+          // 1. Intercept Remote Commands from audio-remote.html
+          if (rawText.startsWith('REMOTE_CMD:')) {
+            if (!isInitialLoad) {
+              const cmd = rawText.substring('REMOTE_CMD:'.length).trim();
+              if (cmd === 'skip_music') {
+                skipMusic();
+              } else if (cmd.startsWith('remove_music:')) {
+                const idx = parseInt(cmd.split(':')[1], 10);
+                if (!isNaN(idx)) removeMusic(idx);
+              } else if (cmd === 'unlock_music') {
+                setMusicMode('unlocked');
+              } else if (cmd === 'schedule_music') {
+                setMusicMode('schedule');
+              }
+            }
+            return;
+          }
+
+          // 2. Intercept Silent SOS Stop (#STOP_SOS#)
+          if (rawText === '#STOP_SOS#') {
+            if (!isInitialLoad) {
+              dismissLocalSOS();
+            }
+            return;
+          }
+
+          // 3. Check Emergency SOS (EMERGENCY_CODE_<COLOR> or "Code <color>")
+          const sosMatch = rawText.match(/EMERGENCY_CODE_([A-Z]+)/i) || rawText.match(/^Code\s+(red|orange|yellow|blue|purple|silver|black|green)$/i);
           if (sosMatch) {
+            if (isInitialLoad) return;
             const colorCode = sosMatch[1].toLowerCase();
             const emergencyData = {
-              red: { th: "มีเหตุกราดยิงหรือผู้ไม่ประสงค์ดีติดอาวุธ", en: "Active shooter or armed intruder reported on campus.", action: "หลบซ่อนตัว ปิดประตูหน้าต่าง ล็อคกลอน และปิดไฟทันที" },
-              orange: { th: "เกิดเหตุเพลิงไหม้ในอาคาร", en: "Fire incident detected inside the facility.", action: "อพยพออกจากอาคารไปยังจุดรวมพลอย่างสงบ" },
-              yellow: { th: "มีผู้ต้องสงสัยหรือเหตุทะเลาะวิวาท", en: "Suspicious intruder or altercation in progress.", action: "ให้อยู่ภายในห้องเรียนและรอคำแนะนำจากเจ้าหน้าที่" },
+              red: { th: "อัคคีภัย หรือมีเหตุฉุกเฉินร้ายแรง", en: "Fire or critical emergency reported on campus.", action: "ขอให้ปฏิบัติตามแผนเผชิญเหตุทันที" },
+              orange: { th: "เกิดเหตุเพลิงไหม้หรือสารเคมีรั่วไหล", en: "Fire or hazardous material incident detected.", action: "อพยพออกจากอาคารไปยังจุดรวมพลอย่างสงบ" },
+              yellow: { th: "นักเรียนสูญหาย หรือมีผู้ต้องสงสัย", en: "Missing student or suspicious person alert.", action: "ให้อยู่ภายในห้องเรียนและรอคำแนะนำจากเจ้าหน้าที่" },
               blue: { th: "มีเหตุฉุกเฉินทางการแพทย์", en: "Critical medical emergency in progress.", action: "ขอให้เปิดทางให้ทีมแพทย์และครูพยาบาล" },
               purple: { th: "ตรวจพบวัตถุต้องสงสัย", en: "Suspicious unattended package detected.", action: "ห้ามแตะต้องวัตถุและถอยห่างจากพื้นที่อย่างน้อย 100 เมตร" },
-              black: { th: "ภัยพิบัติทางธรรมชาติรุนแรง", en: "Severe natural disaster alert.", action: "หมอบกำบังใต้โต๊ะและระวังสิ่งของตกหล่น" },
+              silver: { th: "ภัยคุกคาม หรือบุคคลมีอาวุธ", en: "Security threat or armed intruder reported.", action: "หลบซ่อนตัว ปิดประตูหน้าต่าง ล็อคกลอน และปิดไฟทันที" },
+              black: { th: "วัตถุต้องสงสัย หรือภัยพิบัติรุนแรง", en: "Severe hazard or bomb threat alert.", action: "หมอบกำบังหรืออพยพตามคำสั่งเจ้าหน้าที่ทันที" },
               green: { th: "ยกเลิกสถานการณ์ฉุกเฉิน ปลอดภัยแล้ว", en: "Emergency cancelled, all clear.", action: "ดำเนินกิจกรรมตามปกติได้" }
             };
 
@@ -1923,6 +2014,7 @@
         currentMusicIndex: currentMusicIndex,
         musicMode: musicMode,
         isBellsEnabled: isBellsEnabled,
+        disableBells: (musicMode === 'unlocked' || !isBellsEnabled),
         bells: bells
       };
       fetch(API_URL, {
