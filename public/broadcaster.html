@@ -1586,7 +1586,7 @@
       const audioUrlEn = await fetchAudioData(txtEn, "en-GB");
       if (audioUrlEn) audioQueue.push(audioUrlEn);
 
-      const thTimeStr = minNum === 0 ? `${hour24} นาฬิกา` : `${hour24} นาฬิกา ${minNum} นาที`;
+      const thTimeStr = formatThaiTimeWords(hour24, minNum);
       const txtTh = `ประกาศ ขณะนี้เวลา ${thTimeStr} ${bellObj.desc}`;
       const audioUrlTh = await fetchAudioData(txtTh, "th-TH");
       if (audioUrlTh) audioQueue.push(audioUrlTh);
@@ -1616,30 +1616,51 @@
     // ------------------------------------------
     let ttsCache = {};
 
+    function numberToThaiWords(num) {
+      const n = parseInt(num, 10);
+      if (isNaN(n) || n < 0) return '';
+      if (n === 0) return 'ศูนย์';
+      const digits = ['', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า'];
+      if (n < 10) return digits[n];
+      const tens = Math.floor(n / 10);
+      const ones = n % 10;
+      let res = '';
+      if (tens === 1) res = 'สิบ';
+      else if (tens === 2) res = 'ยี่สิบ';
+      else res = digits[tens] + 'สิบ';
+      if (ones === 1) res += 'เอ็ด';
+      else if (ones > 1) res += digits[ones];
+      return res;
+    }
+
+    function formatThaiTimeWords(hour24, minNum) {
+      const hr = parseInt(hour24, 10) || 0;
+      const mn = parseInt(minNum, 10) || 0;
+      const hWords = `${numberToThaiWords(hr)}นาฬิกา`;
+      return mn === 0 ? hWords : `${hWords} ${numberToThaiWords(mn)}นาที`;
+    }
+
     function sanitizeTTSText(text, lang) {
       let s = String(text || '').trim();
       if (!s) return '';
 
       if (lang === 'th-TH') {
-        // 1. Convert HH:mm น. or HH.mm น. into natural Thai spoken time
+        // 1. Convert HH:mm น. or HH.mm น. into explicit Thai words
         s = s.replace(/\b0?(\d{1,2})[:.](\d{2})\s*น\./g, (_, h, m) => {
-          const hr = parseInt(h, 10);
-          const mn = parseInt(m, 10);
-          return mn === 0 ? `${hr} นาฬิกา` : `${hr} นาฬิกา ${mn} นาที`;
+          return formatThaiTimeWords(h, m);
         });
-        // 2. Remove leading zeros before นาฬิกา (e.g. "08 นาฬิกา" -> "8 นาฬิกา")
-        s = s.replace(/\b0+(\d)\s*นาฬิกา/g, '$1 นาฬิกา');
-        // 3. Remove "00 นาที" or "0 นาที" completely (e.g. "16 นาฬิกา 00 นาที" -> "16 นาฬิกา")
-        s = s.replace(/(\d+\s*นาฬิกา)\s*0+\s*นาที/g, '$1');
-        // 4. Remove leading zeros before นาที (e.g. "05 นาที" -> "5 นาที")
-        s = s.replace(/\b0+(\d)\s*นาที/g, '$1 นาที');
+        // 2. Convert "<hour> นาฬิกา <min> นาที" or "<hour> นาฬิกา" into explicit Thai words so TTS never reorders digits
+        s = s.replace(/\b(\d{1,2})\s*นาฬิกา(?:\s*(\d{1,2})\s*นาที)?/g, (_, h, m) => {
+          return formatThaiTimeWords(h, m !== undefined ? m : 0);
+        });
       } else {
         // English: Fix "4 o'clock PM" -> "4 PM"
         s = s.replace(/\b(\d{1,2})\s+o'clock\s+(AM|PM)\b/gi, '$1 $2');
         // Fix "8 5 AM" -> "8:05 AM" and "7 50 AM" -> "7:50 AM"
         s = s.replace(/\b(\d{1,2})\s+(\d{1,2})\s+(AM|PM)\b/gi, (_, h, m, ap) => {
           const mn = parseInt(m, 10);
-          return `${h}:${mn < 10 ? '0' + mn : mn} ${ap.toUpperCase()}`;
+          if (mn === 0) return `${parseInt(h, 10)} ${ap.toUpperCase()}`;
+          return `${parseInt(h, 10)}:${mn < 10 ? '0' + mn : mn} ${ap.toUpperCase()}`;
         });
       }
       return s.replace(/\s{2,}/g, ' ').trim();
