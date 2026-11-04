@@ -92,7 +92,7 @@
           </h2>
           <div class="flex items-center gap-1.5">
             <span id="music-status-badge" class="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 font-medium inline-flex items-center gap-1.5">กำลังตรวจสอบ...</span>
-            <button id="btn-toggle-music-mode" onclick="toggleRemoteMusicMode()" class="hidden text-[11px] px-2.5 py-1 rounded-full font-semibold transition border shadow-2xs"></button>
+            <button id="btn-toggle-music-mode" onclick="toggleRemoteMusicMode()" class="text-[11px] px-2.5 py-1 rounded-full font-semibold transition border border-red-200 bg-white hover:bg-red-50 text-red-700 shadow-2xs cursor-pointer">ปลดล็อคเล่นอิสระ</button>
           </div>
         </div>
         <div class="mb-4">
@@ -538,10 +538,6 @@
       }
 
       const breakStatus = checkRemoteBreakStatus();
-      if (!breakStatus.isAllowed) {
-        alert('ไม่สามารถเพิ่มเพลงได้ในขณะนี้:\n' + breakStatus.reason);
-        return;
-      }
 
       btn.classList.add('is-loading');
       try {
@@ -576,7 +572,11 @@
         btn.classList.remove('is-loading');
         if (res && res.success) {
           input.value = '';
-          alert('เพิ่มลงในรายการเพลงเรียบร้อยแล้ว');
+          if (!breakStatus.isAllowed) {
+            alert('เพิ่มเพลงลงในคิวเรียบร้อยแล้ว\n(ขณะนี้เป็นเวลาเรียน ระบบจะเริ่มเล่นเพลงตามคิวอัตโนมัติเมื่อถึงเวลาพักตามตารางออด หรือกดปุ่ม "ปลดล็อคเล่นอิสระ" หากต้องการเปิดเพลงทันที)');
+          } else {
+            alert('เพิ่มลงในรายการเพลงเรียบร้อยแล้ว');
+          }
           setTimeout(fetchState, 2000);
         } else {
           alert('เกิดข้อผิดพลาด: ' + (res ? res.message : 'Unknown error'));
