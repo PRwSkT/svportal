@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sv-tv-shell-v2';
+const CACHE_NAME = 'sv-tv-shell-v4';
 const SHELL_URLS = [
   '/tv/',
   '/tv/index.html',

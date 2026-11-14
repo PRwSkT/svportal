@@ -9,9 +9,13 @@
  */
 
 const CONFIG = {
-  syncIntervalMs: 30 * 1000,      // Check for new playlist every 30s
-  heartbeatIntervalMs: 30 * 1000,  // Ping health every 30s
-  defaultImageDuration: 10 * 1000, // 10s default
+  syncIntervalMs: 60 * 1000,           // Check for new playlist & ping health every 60s during active hours
+  offHoursSyncIntervalMs: 5 * 60 * 1000, // Every 5 minutes during off-hours (19:00 - 06:00)
+  heartbeatIntervalMs: 60 * 1000,      // Unified with sync interval
+  defaultImageDuration: 10 * 1000,     // 10s default
+  ecoRestEnabled: true,                // Hourly screen rest to cool TV hardware
+  ecoRestDurationMinutes: 10,          // 10 minutes rest every hour
+  ecoRestStartMinute: 50,              // Starts at :50 of every hour (50 to 59)
 };
 
 // State
@@ -23,6 +27,8 @@ let activeLayer = 'a'; // 'a' or 'b'
 let isPlaying = false;
 let tapCount = 0;
 let lastTapTime = 0;
+let isEcoRestMode = false;
+let manualWakeHour = -1;
 
 // Elements
 const layerA = document.getElementById('layer-a');
@@ -31,6 +37,10 @@ const standbyScreen = document.getElementById('standby-screen');
 const standbyStatus = document.getElementById('standby-status-text');
 const standbyDevice = document.getElementById('standby-device-id');
 const diagOverlay = document.getElementById('diagnostic-overlay');
+const ecoRestScreen = document.getElementById('eco-rest-screen');
+const ecoRestClock = document.getElementById('eco-rest-clock');
+const ecoRestCountdown = document.getElementById('eco-rest-countdown');
+const diagEco = document.getElementById('diag-eco');
 
 // Performance & Frame Drop Tracker
 let lastFrameTime = performance.now();
@@ -184,6 +194,7 @@ function startLiveClock() {
     if (clockEl) {
       clockEl.textContent = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
     }
+    checkEcoRestSchedule(now);
   }
 
   function getSlideContent(slideIndex) {
@@ -301,16 +312,46 @@ document.addEventListener('DOMContentLoaded', () => {
   initDiagnosticKey();
   startFrameMonitor();
   setupAudioUnlockListeners();
+  setupEcoRestListeners();
   startHealthWatchdog();
   startLiveClock();
   
-  // Start Heartbeat & Sync Loops
-  sendHeartbeat();
-  syncPlaylist();
+  // Check initial eco rest schedule on boot
+  checkEcoRestSchedule(new Date());
 
-  setInterval(syncPlaylist, CONFIG.syncIntervalMs);
-  setInterval(sendHeartbeat, CONFIG.heartbeatIntervalMs);
+  // Start Unified Heartbeat & Sync Loop (adaptive day/night interval)
+  runUnifiedSync();
+  scheduleNextUnifiedSync();
 });
+
+function getAdaptiveSyncIntervalMs() {
+  const hour = new Date().getHours();
+  // Active school hours: 06:00 - 18:59 (60s), Off-hours: 19:00 - 05:59 (5 mins)
+  return (hour >= 6 && hour < 19) ? CONFIG.syncIntervalMs : CONFIG.offHoursSyncIntervalMs;
+}
+
+async function runUnifiedSync() {
+  const isPreviewOrSim =
+    deviceId === 'tv-lobby-01' ||
+    window.location.search.includes('preview=1') ||
+    window.location.search.includes('sim=1');
+
+  if (isPreviewOrSim) {
+    await syncPlaylist();
+  } else {
+    const syncedViaHeartbeat = await sendHeartbeat(true);
+    if (!syncedViaHeartbeat) {
+      await syncPlaylist();
+    }
+  }
+}
+
+function scheduleNextUnifiedSync() {
+  setTimeout(async () => {
+    await runUnifiedSync();
+    scheduleNextUnifiedSync();
+  }, getAdaptiveSyncIntervalMs());
+}
 
 // 24/7 Watchdog & Mid-Playback Wi-Fi Drop/Reconnect Recovery
 let lastWatchdogVideoTime = -1;
@@ -346,8 +387,9 @@ function startHealthWatchdog() {
   // Instant recovery as soon as Wi-Fi reconnects
   window.addEventListener('online', () => {
     console.log('[Network] Wi-Fi reconnected! Syncing and verifying video stream...');
-    syncPlaylist();
-    sendHeartbeat();
+    runUnifiedSync();
+
+    if (isEcoRestMode) return;
 
     const activeEl = activeLayer === 'a' ? layerA : layerB;
     const activeVideo = activeEl ? activeEl.querySelector('video.foreground-media') : null;
@@ -364,6 +406,7 @@ function startHealthWatchdog() {
   });
 
   setInterval(() => {
+    if (isEcoRestMode) return;
     if (!isPlaying || !currentPlaylist || currentPlaylist.items.length === 0) return;
 
     const activeEl = activeLayer === 'a' ? layerA : layerB;
@@ -436,7 +479,157 @@ function initDeviceId() {
   document.getElementById('diag-device').textContent = deviceId;
 }
 
+// ----------------------------------------------------
+// ECO REST ENGINE (Hourly 10-Minute Thermal Cooldown)
+// ----------------------------------------------------
+function setupEcoRestListeners() {
+  if (ecoRestScreen) {
+    ecoRestScreen.addEventListener('click', () => {
+      if (isEcoRestMode) exitEcoRestMode(true);
+    });
+  }
+
+  window.addEventListener('keydown', (e) => {
+    // Wake immediately on any key press (except diagnostic toggle 'D')
+    if (isEcoRestMode && e.key !== 'd' && e.key !== 'D') {
+      exitEcoRestMode(true);
+    }
+  });
+}
+
+function checkEcoRestSchedule(now = new Date()) {
+  if (!CONFIG.ecoRestEnabled) {
+    if (isEcoRestMode) exitEcoRestMode();
+    return;
+  }
+
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+
+  // Reset manual wake override if the hour has rolled over
+  if (manualWakeHour !== -1 && manualWakeHour !== currentHour) {
+    manualWakeHour = -1;
+  }
+
+  // Active rest window: minutes 50 through 59 of every hour
+  const isRestTime = currentMinute >= CONFIG.ecoRestStartMinute &&
+                     currentMinute < (CONFIG.ecoRestStartMinute + CONFIG.ecoRestDurationMinutes);
+
+  if (isRestTime && manualWakeHour !== currentHour) {
+    if (!isEcoRestMode) {
+      enterEcoRestMode(currentHour, currentMinute, now);
+    } else {
+      updateEcoRestDisplay(currentHour, currentMinute, now);
+    }
+  } else {
+    if (isEcoRestMode) {
+      exitEcoRestMode();
+    }
+    if (diagEco) {
+      const nextRestHour = currentMinute < CONFIG.ecoRestStartMinute ? currentHour : (currentHour + 1) % 24;
+      diagEco.textContent = `PLAYING (Next rest at ${String(nextRestHour).padStart(2, '0')}:${String(CONFIG.ecoRestStartMinute).padStart(2, '0')})`;
+      diagEco.style.color = '#94a3b8';
+    }
+  }
+}
+
+function updateEcoRestDisplay(currentHour, currentMinute, now) {
+  if (ecoRestClock) {
+    ecoRestClock.textContent = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+  }
+  const nextHour = (currentHour + 1) % 24;
+  const remainingMin = Math.max(1, 60 - currentMinute);
+  if (ecoRestCountdown) {
+    ecoRestCountdown.textContent = `จะกลับมาทำงานตามปกติเวลา ${String(nextHour).padStart(2, '0')}:00 น. (อีก ${remainingMin} นาที)`;
+  }
+  if (diagEco) {
+    diagEco.textContent = `RESTING (Cooling down until ${String(nextHour).padStart(2, '0')}:00)`;
+    diagEco.style.color = '#6ee7b7';
+  }
+}
+
+function enterEcoRestMode(currentHour, currentMinute, now) {
+  console.log('[EcoRest] Entering 10-minute hourly cooldown to protect TV from heat...');
+  isEcoRestMode = true;
+
+  // Completely silence and tear down video decoders to drop SoC CPU/GPU load to ~0%
+  stopPlayback();
+
+  if (ecoRestScreen) {
+    ecoRestScreen.style.display = 'flex';
+    setTimeout(() => {
+      ecoRestScreen.classList.add('active');
+    }, 20);
+  }
+
+  updateEcoRestDisplay(currentHour, currentMinute, now);
+}
+
+function exitEcoRestMode(isManual = false) {
+  console.log(`[EcoRest] Exiting rest mode (${isManual ? 'MANUAL OVERRIDE' : 'SCHEDULED RESUME'}).`);
+  if (isManual) {
+    manualWakeHour = new Date().getHours();
+  }
+
+  isEcoRestMode = false;
+
+  if (ecoRestScreen) {
+    ecoRestScreen.classList.remove('active');
+    setTimeout(() => {
+      if (!isEcoRestMode) {
+        ecoRestScreen.style.display = 'none';
+      }
+    }, 600);
+  }
+
+  // Resume media playback
+  if (currentPlaylist && currentPlaylist.items && currentPlaylist.items.length > 0) {
+    hideStandby();
+    currentIndex = 0;
+    playNext();
+  } else {
+    showStandby('พร้อมสำหรับการแสดงผลสื่อประชาสัมพันธ์ • รอการจัดคิวจาก SV Portal');
+  }
+}
+
 // 1. PLAYLIST SYNC ENGINE
+function applyPlaylistData(newPlaylist) {
+  if (!newPlaylist) return;
+  document.getElementById('diag-group').textContent = newPlaylist.group_id || 'None';
+  document.getElementById('diag-ver').textContent = newPlaylist.version.substring(0, 8);
+  document.getElementById('diag-items').textContent = newPlaylist.total_items;
+
+  // Update Ticker text if provided by backend
+  if (newPlaylist.ticker_text) {
+    const tickerEl = document.getElementById('ticker-text');
+    if (tickerEl && tickerEl.textContent.trim() !== newPlaylist.ticker_text.trim()) {
+      tickerEl.textContent = newPlaylist.ticker_text;
+    }
+  }
+
+  // Detect if playlist has changed
+  if (newPlaylist.version !== currentPlaylist.version) {
+    console.log('[Sync] Playlist updated! New version:', newPlaylist.version);
+    currentPlaylist = newPlaylist;
+
+    // Apply screen orientation (Landscape / Portrait 90° / Portrait 270°)
+    applyOrientation(currentPlaylist.orientation || 'LANDSCAPE');
+
+    if (currentPlaylist.items.length === 0) {
+      showStandby('พร้อมสำหรับการแสดงผลสื่อประชาสัมพันธ์ • รอการจัดคิวจาก SV Portal');
+      stopPlayback();
+    } else {
+      hideStandby();
+      // Prefetch media files for smooth offline playback
+      prefetchMedia(currentPlaylist.items);
+      if (!isPlaying && !isEcoRestMode) {
+        currentIndex = 0;
+        playNext();
+      }
+    }
+  }
+}
+
 async function syncPlaylist() {
   try {
     autoHealFullyKiosk();
@@ -447,40 +640,7 @@ async function syncPlaylist() {
     const json = await res.json();
     if (!json.success || !json.data) return;
 
-    const newPlaylist = json.data;
-    document.getElementById('diag-group').textContent = newPlaylist.group_id || 'None';
-    document.getElementById('diag-ver').textContent = newPlaylist.version.substring(0, 8);
-    document.getElementById('diag-items').textContent = newPlaylist.total_items;
-
-    // Update Ticker text if provided by backend
-    if (newPlaylist.ticker_text) {
-      const tickerEl = document.getElementById('ticker-text');
-      if (tickerEl && tickerEl.textContent.trim() !== newPlaylist.ticker_text.trim()) {
-        tickerEl.textContent = newPlaylist.ticker_text;
-      }
-    }
-
-    // Detect if playlist has changed
-    if (newPlaylist.version !== currentPlaylist.version) {
-      console.log('[Sync] Playlist updated! New version:', newPlaylist.version);
-      currentPlaylist = newPlaylist;
-
-      // Apply screen orientation (Landscape / Portrait 90° / Portrait 270°)
-      applyOrientation(currentPlaylist.orientation || 'LANDSCAPE');
-
-      if (currentPlaylist.items.length === 0) {
-        showStandby('พร้อมสำหรับการแสดงผลสื่อประชาสัมพันธ์ • รอการจัดคิวจาก SV Portal');
-        stopPlayback();
-      } else {
-        hideStandby();
-        // Prefetch media files for smooth offline playback
-        prefetchMedia(currentPlaylist.items);
-        if (!isPlaying) {
-          currentIndex = 0;
-          playNext();
-        }
-      }
-    }
+    applyPlaylistData(json.data);
   } catch (err) {
     console.warn('[Sync] Failed to fetch playlist:', err.message);
     if (currentPlaylist.items.length === 0) {
@@ -798,11 +958,15 @@ function hideStandby() {
 }
 
 // 3. TELEMETRY & HEARTBEAT
-async function sendHeartbeat() {
+async function sendHeartbeat(includePlaylist = false) {
   try {
     // Skip heartbeat for test/preview or simulator devices
     if (deviceId === 'tv-lobby-01' || window.location.search.includes('preview=1') || window.location.search.includes('sim=1')) {
-      return;
+      return false;
+    }
+
+    if (includePlaylist) {
+      autoHealFullyKiosk();
     }
 
     const currentItem = currentPlaylist.items[currentIndex] || null;
@@ -823,10 +987,11 @@ async function sendHeartbeat() {
     const payload = {
       current_media_id: currentItem ? currentItem.id : null,
       free_storage_mb: 8192, // Simulated available storage
-      app_version: '1.2.0-web',
+      app_version: '1.3.0-web',
       current_fps: currentFps,
       dropped_frames: recentDropped,
       ip_address: clientIp || undefined,
+      include_playlist: includePlaylist,
       timestamp: new Date().toISOString()
     };
 
@@ -837,10 +1002,21 @@ async function sendHeartbeat() {
     });
 
     if (res.ok) {
-      document.getElementById('diag-ping').textContent = new Date().toLocaleTimeString();
+      const nowStr = new Date().toLocaleTimeString();
+      document.getElementById('diag-ping').textContent = nowStr;
+      if (includePlaylist) {
+        const json = await res.json();
+        if (json && json.success && json.data) {
+          document.getElementById('diag-sync').textContent = nowStr;
+          applyPlaylistData(json.data);
+          return true;
+        }
+      }
     }
+    return false;
   } catch (err) {
     console.warn('[Heartbeat] Ping failed:', err.message);
+    return false;
   }
 }
 

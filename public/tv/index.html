@@ -10,7 +10,7 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function() {
-        navigator.serviceWorker.register('sw.js?v=2.0').catch(function(err) {
+        navigator.serviceWorker.register('sw.js?v=2.1').catch(function(err) {
           console.warn('[SW] Registration failed:', err);
         });
       });
@@ -128,6 +128,23 @@
     <!-- Media Layer B (Double Buffering for seamless transition) -->
     <div id="layer-b" class="media-layer"></div>
 
+    <!-- Eco Rest Screen (Hourly 10-Minute Cooldown to Prevent Overheating) -->
+    <div id="eco-rest-screen" style="display: none;">
+      <div class="eco-rest-content">
+        <div class="eco-rest-icon-ring">
+          <span class="eco-rest-icon">🍃</span>
+        </div>
+        <div class="eco-rest-clock" id="eco-rest-clock">--:--</div>
+        <div class="eco-rest-title">โหมดพักหน้าจอถนอมเครื่อง (Eco Rest Mode)</div>
+        <div class="eco-rest-desc">ระบบพักการทำงาน 10 นาทีทุกชั่วโมง เพื่อระบายความร้อนสะสมและยืดอายุการใช้งานจอภาพ</div>
+        <div class="eco-rest-badge">
+          <span class="eco-rest-pulse"></span>
+          <span id="eco-rest-countdown">จะกลับมาทำงานตามปกติเวลา --:-- น.</span>
+        </div>
+        <div class="eco-rest-hint">กดปุ่มใดก็ได้บนรีโมต หรือแตะหน้าจอเพื่อเริ่มเล่นทันที</div>
+      </div>
+    </div>
+
     <!-- Standby screen when no media is scheduled -->
     <div id="standby-screen">
       <img src="assets/images/logo.svg?v=3.5" alt="Somkidvittaya School" class="standby-logo-img" style="max-height: 85px; width: auto; object-fit: contain;" onerror="this.style.display='none'">
@@ -161,11 +178,12 @@
       <div>Playlist Ver: <span id="diag-ver"></span></div>
       <div>Items: <span id="diag-items"></span></div>
       <div>Current: <span id="diag-current"></span></div>
+      <div>Eco Rest: <span id="diag-eco">Active (50m Play / 10m Rest)</span></div>
       <div>Sync: <span id="diag-sync"></span></div>
       <div>Ping: <span id="diag-ping"></span></div>
     </div>
   </div>
 
-  <script src="player.js?v=4.1"></script>
+  <script src="player.js?v=4.3"></script>
 </body>
 </html>
