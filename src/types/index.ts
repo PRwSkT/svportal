@@ -245,6 +245,11 @@ export type Personnel = {
   linkedin_url?: string | null;
   office_room?: string | null;
   card_bio?: string | null;
+  education_history?: string | null;
+  experience_history?: string | null;
+  academic_year?: string | null;
+  card_issue_date?: string | null;
+  card_expire_date?: string | null;
   social_links?: Record<string, string> | null;
   user_id?: string | null;
   sort_order: number;

@@ -43,6 +43,7 @@ export default function StaffIdCardSelfServicePage() {
   const [isExporting, setIsExporting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+  const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
 
   const frontRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLDivElement>(null);
@@ -86,13 +87,20 @@ export default function StaffIdCardSelfServicePage() {
     if (!targetRef) return;
 
     setIsExporting(true);
-    const toastId = toast.loading(`กำลังสร้างรูปภาพบัตร (${side === 'front' ? 'ด้านหน้า' : 'ด้านหลัง'})...`);
+    const sideTitle = side === 'front' ? 'หน้าบัตร' : 'หลังบัตร';
+    const toastId = toast.loading(`กำลังสร้างรูปภาพบัตร (${sideTitle})...`);
 
     try {
       const cleanName = (nameInfo.fullNameEn || 'staff').toLowerCase().replace(/\s+/g, '_');
       const filename = `somkid_card_${cleanName}_${side}.png`;
-      await exportCardToPng(targetRef, filename);
-      toast.success(`ดาวน์โหลดรูปบัตร (${side === 'front' ? 'ด้านหน้า' : 'ด้านหลัง'}) สำเร็จ!`, { id: toastId });
+      const dataUrl = await exportCardToPng(targetRef, filename);
+      
+      // Also open in image preview modal for easy tap-and-hold saving on mobile
+      setPreviewImage({ url: dataUrl, title: `รูปภาพ${sideTitle}` });
+      toast.success(`ดาวน์โหลดรูปบัตร (${sideTitle}) สำเร็จ!`, { 
+        id: toastId, 
+        description: 'หากต้องการบันทึกลงแกลเลอรี่ สามารถแตะค้างที่รูปภาพแล้วเลือก "บันทึกรูปภาพ" ได้เลยครับ' 
+      });
     } catch (err: any) {
       toast.error('เกิดข้อผิดพลาดในการดาวน์โหลด', { id: toastId, description: err.message });
     } finally {
@@ -292,6 +300,42 @@ export default function StaffIdCardSelfServicePage() {
                 </div>
               )}
 
+              {/* Education History */}
+              {personnel?.education_history && (
+                <div className="py-2 border-b border-slate-100 dark:border-slate-700/60">
+                  <span className="text-slate-400 block mb-1">ประวัติการศึกษา:</span>
+                  <p className="text-slate-700 dark:text-slate-200 text-[11px] leading-relaxed bg-slate-50 dark:bg-slate-700/40 p-2.5 rounded-xl whitespace-pre-line font-medium">
+                    {personnel.education_history}
+                  </p>
+                </div>
+              )}
+
+              {/* Experience History */}
+              {personnel?.experience_history && (
+                <div className="py-2 border-b border-slate-100 dark:border-slate-700/60">
+                  <span className="text-slate-400 block mb-1">ประวัติการทำงาน / ผลงาน:</span>
+                  <p className="text-slate-700 dark:text-slate-200 text-[11px] leading-relaxed bg-slate-50 dark:bg-slate-700/40 p-2.5 rounded-xl whitespace-pre-line font-medium">
+                    {personnel.experience_history}
+                  </p>
+                </div>
+              )}
+
+              {/* Card Validity Info */}
+              <div className="py-2 border-b border-slate-100 dark:border-slate-700/60 grid grid-cols-3 gap-2 text-center bg-slate-50 dark:bg-slate-700/40 p-2 rounded-xl">
+                <div>
+                  <span className="block text-[10px] text-slate-400">ปีการศึกษา</span>
+                  <span className="font-bold text-[#183e66] dark:text-sky-300 text-xs">{personnel?.academic_year || '2567'}</span>
+                </div>
+                <div>
+                  <span className="block text-[10px] text-slate-400">วันออกบัตร</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300 text-[11px]">{personnel?.card_issue_date || '16 พ.ค. 2567'}</span>
+                </div>
+                <div>
+                  <span className="block text-[10px] text-slate-400">วันหมดอายุ</span>
+                  <span className="font-bold text-rose-600 dark:text-rose-400 text-[11px]">{personnel?.card_expire_date || '15 พ.ค. 2569'}</span>
+                </div>
+              </div>
+
               {/* Social Media Preview */}
               {(personnel?.facebook_url || personnel?.instagram_url || personnel?.tiktok_url || personnel?.linkedin_url) && (
                 <div className="py-2 flex items-center gap-2">
@@ -335,6 +379,46 @@ export default function StaffIdCardSelfServicePage() {
         onClose={() => setIsContactModalOpen(false)}
         onUpdated={(updated) => setPersonnel(updated)}
       />
+
+      {/* Image Preview / Save to Photos Modal for iOS and Mobile */}
+      {previewImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-2xl flex flex-col items-center border border-slate-200 dark:border-slate-800">
+            <h3 className="text-sm font-bold text-[#183e66] dark:text-sky-300 mb-1">
+              {previewImage.title} (ความละเอียดสูง)
+            </h3>
+            <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mb-3 text-center">
+              💡 สำหรับ iPhone/iPad: แตะค้างที่รูปภาพด้านล่าง แล้วเลือก &quot;บันทึกรูปภาพ&quot; (Save Image) เพื่อเก็บเข้าแกลเลอรี่ได้ทันที
+            </p>
+
+            <div className="max-h-[60vh] overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 shadow-inner mb-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={previewImage.url}
+                alt={previewImage.title}
+                className="w-full h-auto object-contain max-h-[58vh]"
+              />
+            </div>
+
+            <div className="w-full flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <a
+                href={previewImage.url}
+                download={`somkid_${previewImage.title}.png`}
+                className="flex-1 py-2.5 px-3 rounded-xl text-xs font-bold bg-[#183e66] hover:bg-[#122f4d] text-white text-center shadow-xs transition-colors"
+              >
+                ดาวน์โหลดไฟล์
+              </a>
+              <button
+                type="button"
+                onClick={() => setPreviewImage(null)}
+                className="py-2.5 px-4 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
+              >
+                ปิด
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

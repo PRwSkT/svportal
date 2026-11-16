@@ -70,14 +70,14 @@ export function StaffIdCard({
     return () => clearInterval(interval);
   }, []);
 
-  // Generate QR code for verification
+  // Generate QR code for verification in Somkid Navy
   useEffect(() => {
     const verificationUrl = getStaffVerificationUrl(personnel.id || 'preview');
     QRCode.toDataURL(verificationUrl, {
-      width: 320,
+      width: 360,
       margin: 1,
       color: {
-        dark: '#0c2340',
+        dark: '#183e66',
         light: '#ffffff',
       },
       errorCorrectionLevel: 'M',
@@ -296,11 +296,11 @@ export function StaffIdCard({
           </div>
 
           {/* ======================================================== */}
-          {/* BACK SIDE (หลังบัตร)                                    */}
+          {/* BACK SIDE (หลังบัตร - ดีไซน์สไตล์สถาบันทรงคุณค่า เรียบหรู)    */}
           {/* ======================================================== */}
           <div
             ref={backRef as any}
-            className="absolute inset-0 w-full h-full rounded-[28px] sm:rounded-[32px] overflow-hidden bg-gradient-to-br from-[#0e2747] via-[#091b30] to-[#040e1a] text-white shadow-2xl border border-slate-700/80 p-6 flex flex-col justify-between"
+            className="absolute inset-0 w-full h-full rounded-[28px] sm:rounded-[32px] overflow-hidden bg-gradient-to-b from-white via-[#fcfbf9] to-[#f8f6f0] text-slate-800 shadow-2xl border border-slate-200/90 p-5 sm:p-6 flex flex-col justify-between"
             style={{
               backfaceVisibility: 'hidden',
               WebkitBackfaceVisibility: 'hidden',
@@ -311,86 +311,99 @@ export function StaffIdCard({
               transition: 'opacity 0.25s ease-out',
             }}
           >
-            {/* Header: School Info */}
-            <div className="flex items-start justify-between border-b border-white/10 pb-4">
-              <div>
-                <p className="text-[10px] tracking-widest text-sky-300 font-semibold uppercase">
-                  Somkidvittaya School
-                </p>
-                <h3 className="text-sm font-bold text-white tracking-wide">
-                  โรงเรียนสมคิดวิทยา
-                </h3>
-                <p className="text-[9px] text-slate-300 mt-0.5">
-                  สังกัด สช. • รหัสสถานศึกษา {SCHOOL_INFO.schoolCode}
-                </p>
+            {/* Inner Luxury Gold Hairline Frame */}
+            <div className="absolute inset-3 rounded-[20px] sm:rounded-[24px] border border-[#b89058]/35 pointer-events-none z-0" />
+
+            {/* Header: School Identity */}
+            <div className="relative z-10 flex items-center justify-between border-b border-[#b89058]/25 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg p-0.5 flex items-center justify-center shrink-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img 
+                    src="/SV-Portal.png" 
+                    alt="Logo" 
+                    className="w-full h-full object-contain" 
+                  />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-[#183e66] tracking-wide leading-tight">
+                    โรงเรียนสมคิดวิทยา
+                  </h3>
+                  <p className="text-[9px] tracking-widest text-[#b89058] font-bold uppercase">
+                    Somkidvittaya School
+                  </p>
+                </div>
               </div>
 
-              {/* School Logo */}
-              <div className="w-9 h-9 rounded-xl bg-white/10 backdrop-blur-md p-1 border border-white/15 flex items-center justify-center shrink-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img 
-                  src="/SV-Portal.png" 
-                  alt="Logo" 
-                  className="w-full h-full object-contain filter brightness-110" 
-                />
+              <div className="text-right">
+                <span className="inline-block px-2 py-0.5 rounded-full text-[8px] font-bold tracking-wider uppercase bg-[#183e66]/5 text-[#183e66] border border-[#183e66]/15">
+                  FACULTY CARD
+                </span>
               </div>
             </div>
 
             {/* Middle: QR Code & Staff Identity */}
-            <div className="flex flex-col items-center justify-center my-auto py-2">
+            <div className="relative z-10 flex flex-col items-center justify-center my-auto py-1">
               {/* QR Code Container */}
-              <div className="p-3 bg-white rounded-2xl shadow-xl border-2 border-sky-400/30 flex flex-col items-center">
+              <div className="p-2.5 bg-white rounded-2xl shadow-sm border border-[#b89058]/40 flex flex-col items-center">
                 {qrCodeDataUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={qrCodeDataUrl}
                     alt="Staff Verification QR"
-                    className="w-32 h-32 sm:w-36 sm:h-36 object-contain"
+                    className="w-28 h-28 sm:w-32 sm:h-32 object-contain"
                   />
                 ) : (
-                  <div className="w-32 h-32 flex items-center justify-center bg-slate-100 rounded-xl">
+                  <div className="w-28 h-28 sm:w-32 sm:h-32 flex items-center justify-center bg-slate-100 rounded-xl">
                     <QrIcon className="w-8 h-8 text-slate-400 animate-pulse" />
                   </div>
                 )}
-                <span className="text-[9px] font-semibold text-[#091b30] tracking-wider uppercase mt-1">
-                  Scan to Verify Identity
+                <span className="text-[8px] font-bold text-[#183e66]/80 tracking-widest uppercase mt-1">
+                  Scan to Verify &amp; Connect
                 </span>
               </div>
 
-              {/* Thai Details */}
-              <div className="mt-3 text-center">
-                <p className="text-xs font-bold text-white tracking-wide">
+              {/* Cardholder Details */}
+              <div className="mt-2 text-center space-y-0.5">
+                <p className="text-xs sm:text-sm font-bold text-[#183e66] tracking-wide">
                   {nameInfo.fullNameTh || personnel.name_th || nameInfo.fullNameEn}
                 </p>
-                <p className="text-[11px] text-sky-200 mt-0.5">
+                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+                  {nameInfo.fullNameEn}
+                </p>
+                <p className="text-[10px] font-bold text-[#b89058] tracking-wide">
                   {personnel.position_th || positionEn}
                 </p>
-                {personnel.email && (
-                  <p className="text-[9px] text-slate-400 font-mono mt-0.5">
-                    {personnel.email}
-                  </p>
-                )}
               </div>
             </div>
 
-            {/* Footer: Legal Notice & Security Verification */}
-            <div className="space-y-2 border-t border-white/10 pt-3">
-              <div className="flex items-center justify-between text-[9px] text-slate-400">
-                <span>ปีการศึกษา {DEFAULT_ACADEMIC_YEAR || '2568'}</span>
-                <span className="font-mono text-emerald-400 flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3" /> OFFICIAL DIGITAL ID
-                </span>
+            {/* Credential Dates Block (Academic Year, Valid From, Expires) */}
+            <div className="relative z-10 w-full grid grid-cols-3 gap-1 py-1.5 px-2 rounded-xl bg-white/80 border border-[#b89058]/30 text-center shadow-2xs">
+              <div>
+                <span className="block text-[7.5px] font-bold text-slate-400 uppercase tracking-wider">ปีการศึกษา</span>
+                <span className="text-[10.5px] font-bold text-[#183e66]">{personnel.academic_year || '2567'}</span>
               </div>
+              <div className="border-x border-[#b89058]/20">
+                <span className="block text-[7.5px] font-bold text-slate-400 uppercase tracking-wider">ออกบัตร (ISSUED)</span>
+                <span className="text-[9.5px] font-semibold text-slate-700">{personnel.card_issue_date || '16 พ.ค. 2567'}</span>
+              </div>
+              <div>
+                <span className="block text-[7.5px] font-bold text-slate-400 uppercase tracking-wider">หมดอายุ (EXPIRES)</span>
+                <span className="text-[9.5px] font-bold text-rose-700">{personnel.card_expire_date || '15 พ.ค. 2569'}</span>
+              </div>
+            </div>
 
-              <p className="text-[8px] text-slate-400/80 leading-relaxed text-center">
-                บัตรประจำตัวนี้เป็นกรรมสิทธิ์ของโรงเรียนสมคิดวิทยา อ.เมืองระยอง จ.ระยอง
-                <br />
-                โทรศัพท์ 038-611251 • www.somkidvittaya.ac.th
+            {/* Footer: Legal Notice & Tap to flip hint */}
+            <div className="relative z-10 space-y-1 border-t border-[#b89058]/25 pt-2 text-center">
+              <p className="text-[8px] text-slate-500 leading-snug">
+                โรงเรียนสมคิดวิทยา อ.เมืองระยอง จ.ระยอง • โทร. 038-611251
+              </p>
+              <p className="text-[8.5px] font-bold text-[#183e66]">
+                www.somkidvittaya.ac.th
               </p>
 
-              {/* Tap to flip hint */}
-              <div className="pt-1 flex items-center justify-center gap-1 text-[9px] text-sky-300/80">
-                <RotateCw className="w-2.5 h-2.5" />
+              <div className="pt-0.5 flex items-center justify-center gap-1 text-[8px] text-slate-400">
+                <RotateCw className="w-2 h-2" />
                 <span>แตะที่บัตรเพื่อพลิกกลับด้านหน้า</span>
               </div>
             </div>

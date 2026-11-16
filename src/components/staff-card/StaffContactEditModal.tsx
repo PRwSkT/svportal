@@ -43,6 +43,11 @@ export function StaffContactEditModal({
     linkedin_url: '',
     office_room: '',
     card_bio: '',
+    education_history: '',
+    experience_history: '',
+    academic_year: '2567',
+    card_issue_date: '16 พ.ค. 2567',
+    card_expire_date: '15 พ.ค. 2569',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -60,6 +65,11 @@ export function StaffContactEditModal({
         linkedin_url: personnel.linkedin_url || '',
         office_room: personnel.office_room || '',
         card_bio: personnel.card_bio || '',
+        education_history: personnel.education_history || '',
+        experience_history: personnel.experience_history || '',
+        academic_year: personnel.academic_year || '2567',
+        card_issue_date: personnel.card_issue_date || '16 พ.ค. 2567',
+        card_expire_date: personnel.card_expire_date || '15 พ.ค. 2569',
       });
     }
   }, [personnel, isOpen]);
@@ -286,6 +296,82 @@ export function StaffContactEditModal({
                 onChange={(e) => setFormData({ ...formData, card_bio: e.target.value })}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
               />
+            </div>
+
+            {/* Education & Experience */}
+            <div className="space-y-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80">
+              <h4 className="text-xs font-bold text-[#183e66] dark:text-sky-300 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>ประวัติการศึกษาและประสบการณ์ทำงาน</span>
+              </h4>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  ประวัติการศึกษา (Education Background)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="เช่น ปริญญาตรี ครุศาสตรบัณฑิต (เกียรตินิยม) จุฬาลงกรณ์มหาวิทยาลัย"
+                  value={formData.education_history}
+                  onChange={(e) => setFormData({ ...formData, education_history: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  ประวัติการทำงาน / ผลงาน (Experience)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="เช่น ครูผู้สอนวิชาภาษาอังกฤษ โรงเรียนสมคิดวิทยา (2563 - ปัจจุบัน)"
+                  value={formData.experience_history}
+                  onChange={(e) => setFormData({ ...formData, experience_history: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                />
+              </div>
+            </div>
+
+            {/* Card Validity & Academic Year */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-2xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40">
+              <div>
+                <label className="block text-xs font-bold text-amber-900 dark:text-amber-200 mb-1">
+                  ปีการศึกษา
+                </label>
+                <input
+                  type="text"
+                  placeholder="เช่น 2567"
+                  value={formData.academic_year}
+                  onChange={(e) => setFormData({ ...formData, academic_year: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-amber-200 dark:border-amber-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/20 font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-amber-900 dark:text-amber-200 mb-1">
+                  วันออกบัตร (Valid From)
+                </label>
+                <input
+                  type="text"
+                  placeholder="เช่น 16 พ.ค. 2567"
+                  value={formData.card_issue_date}
+                  onChange={(e) => setFormData({ ...formData, card_issue_date: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-amber-200 dark:border-amber-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-amber-900 dark:text-amber-200 mb-1">
+                  วันหมดอายุ (Expires)
+                </label>
+                <input
+                  type="text"
+                  placeholder="เช่น 15 พ.ค. 2569"
+                  value={formData.card_expire_date}
+                  onChange={(e) => setFormData({ ...formData, card_expire_date: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-amber-200 dark:border-amber-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                />
+              </div>
             </div>
 
             {/* Buttons */}
