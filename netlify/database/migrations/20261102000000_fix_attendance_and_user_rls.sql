@@ -17,23 +17,30 @@ CREATE POLICY "Authenticated users can view app_users"
   TO authenticated
   USING (true);
 
--- 2. Fix attendance_records policies
-DROP POLICY IF EXISTS "Service role can manage all attendance" ON public.attendance_records;
-DROP POLICY IF EXISTS "Admins can view all attendance" ON public.attendance_records;
-DROP POLICY IF EXISTS "Attendance managers can view all attendance" ON public.attendance_records;
+-- 2. Fix attendance_records policies (only if table exists)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'attendance_records') THEN
+    EXECUTE 'DROP POLICY IF EXISTS "Service role can manage all attendance" ON public.attendance_records';
+    EXECUTE 'DROP POLICY IF EXISTS "Admins can view all attendance" ON public.attendance_records';
+    EXECUTE 'DROP POLICY IF EXISTS "Attendance managers can view all attendance" ON public.attendance_records';
 
-CREATE POLICY "Attendance managers can view all attendance"
-  ON public.attendance_records
-  FOR SELECT
-  TO authenticated
-  USING (
-    auth.uid() = user_id
-    OR EXISTS (
-      SELECT 1 FROM public.app_users
-      WHERE app_users.id = auth.uid()
-      AND (
-        app_users.role IN ('admin', 'executive')
-        OR app_users.assigned_features ? 'admin_attendance'
-      )
-    )
-  );
+    EXECUTE $pol$
+      CREATE POLICY "Attendance managers can view all attendance"
+        ON public.attendance_records
+        FOR SELECT
+        TO authenticated
+        USING (
+          auth.uid() = user_id
+          OR EXISTS (
+            SELECT 1 FROM public.app_users
+            WHERE app_users.id = auth.uid()
+            AND (
+              app_users.role IN ('admin', 'executive')
+              OR app_users.assigned_features ? 'admin_attendance'
+            )
+          )
+        )
+    $pol$;
+  END IF;
+END $$;
