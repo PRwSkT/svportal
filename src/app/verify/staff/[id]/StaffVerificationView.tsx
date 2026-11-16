@@ -177,24 +177,20 @@ export default function StaffVerificationView({ personnel, requestedId }: StaffV
         <div className="w-full max-w-lg space-y-6">
           
           {/* Identity Header */}
-          <div className="border-b border-[#091b30]/15 pb-5">
-            <p className="text-[11px] font-bold tracking-[0.14em] uppercase text-[#8b1d32] mb-1.5">
+          <div className="border-b border-[#091b30]/15 pb-4">
+            <p className="text-[11px] font-bold tracking-[0.14em] uppercase text-[#8b1d32] mb-1">
               {eyebrowLabel}
             </p>
             
             <h1 className="text-2xl sm:text-3xl font-bold text-[#091b30] tracking-tight leading-snug">
-              {personnel.name_th}
+              {personnel.name_th || nameInfo.fullNameEn}
             </h1>
-            
-            <p className="text-sm sm:text-base font-semibold text-[#12395f] tracking-wide uppercase mt-1">
-              {nameInfo.fullNameEn}
-            </p>
 
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2 text-xs">
-              <span className="font-bold text-[#1c2229]">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5 text-xs">
+              <span className="font-bold text-[#12395f]">
                 {personnel.position_th || personnel.position_en}
               </span>
-              {personnel.position_en && (
+              {personnel.position_en && personnel.position_th && (
                 <>
                   <span className="text-[#091b30]/30">•</span>
                   <span className="text-[#5c6872] font-medium">
@@ -372,21 +368,13 @@ export default function StaffVerificationView({ personnel, requestedId }: StaffV
             </div>
           )}
 
-          {/* Metadata Footer Line */}
-          <div className="pt-3 text-[11px] text-[#5c6872] flex items-center justify-between border-t border-[#091b30]/15">
-            <span>ปีการศึกษา {personnel.academic_year || '2569'}</span>
-            <span>โรงเรียนสมคิดวิทยา อ.เมืองระยอง จ.ระยอง</span>
-          </div>
         </div>
       </main>
 
       {/* Official Deep Navy Footer matching www.somkidvittaya.ac.th */}
-      <footer className="bg-[#091b30] text-white/75 py-6 px-4 text-center text-xs">
-        <p className="font-bold text-white">
-          {SCHOOL_INFO.nameTh} ({SCHOOL_INFO.nameEn})
-        </p>
-        <p className="text-[11px] mt-1">
-          {SCHOOL_INFO.addressTh} • โทรศัพท์ {SCHOOL_INFO.phone} • www.somkidvittaya.ac.th
+      <footer className="bg-[#091b30] text-white/75 py-5 px-4 text-center text-[11px]">
+        <p className="font-semibold text-white">
+          {SCHOOL_INFO.addressTh} • โทร. {SCHOOL_INFO.phone} • www.somkidvittaya.ac.th
         </p>
       </footer>
     </div>
