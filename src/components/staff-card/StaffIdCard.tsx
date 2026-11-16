@@ -136,14 +136,9 @@ export function StaffIdCard({
               style={{ backgroundImage: "url('/staff-card/card-bg.png')" }}
             />
 
-            {/* Layer 2: Person Portrait Photo with Bottom Gradient Fade */}
+            {/* Layer 2: Person Portrait Photo (Opaque, Solid Cutout) */}
             <div 
               className="absolute inset-0 w-full h-full flex items-center justify-center pointer-events-none"
-              style={{
-                // Mask the bottom of the photo so it smoothly dissolves into the card without letting the building show through clothes
-                maskImage: 'linear-gradient(to top, transparent 0%, transparent 4%, rgba(0,0,0,0.85) 16%, black 28%, black 100%)',
-                WebkitMaskImage: 'linear-gradient(to top, transparent 0%, transparent 4%, rgba(0,0,0,0.85) 16%, black 28%, black 100%)',
-              }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -153,6 +148,15 @@ export function StaffIdCard({
                 loading="eager"
               />
             </div>
+
+            {/* Layer 2.5: Soft White Bottom Gradient Overlay (Covers bottom of photo & building sketch behind text) */}
+            <div 
+              className="absolute inset-x-0 bottom-0 pointer-events-none z-[5]"
+              style={{
+                height: `${Math.round(height * 0.40)}px`,
+                background: 'linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0.98) 25%, rgba(255,255,255,0.7) 55%, rgba(255,255,255,0) 100%)',
+              }}
+            />
 
             {/* Layer 3: Dynamic Live Security Seal & Pulse Indicator */}
             <div className="absolute top-4 right-4 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-md shadow-xs border border-emerald-200/80">

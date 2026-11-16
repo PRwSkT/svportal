@@ -25,7 +25,7 @@ import {
   FileText
 } from 'lucide-react';
 import { FacebookIcon, InstagramIcon, LinkedInIcon } from '@/components/staff-card/SocialIcons';
-import html2canvas from 'html2canvas';
+import { exportCardToPng } from '@/lib/staff-card/export-image';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { StaffIdCard } from '@/components/staff-card/StaffIdCard';
@@ -89,27 +89,9 @@ export default function StaffIdCardSelfServicePage() {
     const toastId = toast.loading(`กำลังสร้างรูปภาพบัตร (${side === 'front' ? 'ด้านหน้า' : 'ด้านหลัง'})...`);
 
     try {
-      const canvas = await html2canvas(targetRef, {
-        scale: 3,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: null,
-        onclone: (_, element) => {
-          element.style.transform = 'none';
-          element.style.opacity = '1';
-          element.style.visibility = 'visible';
-        },
-      });
-
-      const dataUrl = canvas.toDataURL('image/png');
-      const a = document.createElement('a');
-      a.href = dataUrl;
       const cleanName = (nameInfo.fullNameEn || 'staff').toLowerCase().replace(/\s+/g, '_');
-      a.download = `somkid_card_${cleanName}_${side}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-
+      const filename = `somkid_card_${cleanName}_${side}.png`;
+      await exportCardToPng(targetRef, filename);
       toast.success(`ดาวน์โหลดรูปบัตร (${side === 'front' ? 'ด้านหน้า' : 'ด้านหลัง'}) สำเร็จ!`, { id: toastId });
     } catch (err: any) {
       toast.error('เกิดข้อผิดพลาดในการดาวน์โหลด', { id: toastId, description: err.message });
