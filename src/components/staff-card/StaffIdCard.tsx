@@ -207,16 +207,16 @@ export function StaffIdCard({
               </span>
             </div>
 
-            {/* Layer 4: Foreground Typography (Left-aligned First Name, Last Name, Position) */}
+            {/* Layer 4: Foreground Typography (Right-aligned First Name, Last Name, Position) */}
             <div 
-              className="absolute inset-x-0 bottom-0 z-10 pointer-events-none text-left"
+              className="absolute inset-x-0 bottom-0 z-10 pointer-events-none text-right"
               style={{
                 paddingLeft: `${Math.round(width * 0.0726)}px`,
                 paddingRight: `${Math.round(width * 0.0726)}px`,
-                paddingBottom: `${Math.round(height * 0.065)}px`,
+                paddingBottom: `${Math.round(height * 0.072)}px`,
               }}
             >
-              <div className="flex flex-col items-start">
+              <div className="flex flex-col items-end">
                 {/* First Name (Large Bold Navy) */}
                 <h1 
                   className="font-bold tracking-tight text-[#183e66] leading-[0.92] uppercase drop-shadow-xs"
@@ -228,7 +228,7 @@ export function StaffIdCard({
                   {nameInfo.firstName}
                 </h1>
 
-                {/* Last Name (Medium Navy, Left Aligned) */}
+                {/* Last Name (Medium Navy, Right Aligned) */}
                 {nameInfo.lastName && (
                   <h2 
                     className="font-medium text-[#183e66] leading-tight uppercase drop-shadow-xs mt-0.5"
@@ -241,8 +241,8 @@ export function StaffIdCard({
                   </h2>
                 )}
 
-                {/* Position with matching underline, Left Aligned */}
-                <div className="flex flex-col items-start mt-1.5">
+                {/* Position with matching underline, Right Aligned */}
+                <div className="flex flex-col items-end mt-1.5">
                   <span 
                     className="text-[#183e66] font-bold tracking-wider uppercase opacity-95"
                     style={{
@@ -254,6 +254,20 @@ export function StaffIdCard({
                   <div className="w-full h-[1.5px] bg-[#183e66] opacity-80 mt-0.5 rounded-full" />
                 </div>
               </div>
+            </div>
+
+            {/* Layer 4.5: Crisp S1RI THAM Logo (Above white gradient so it never fades/sinks) */}
+            <div 
+              className="absolute inset-x-0 flex justify-center pointer-events-none z-20"
+              style={{ bottom: `${Math.round(height * 0.018)}px` }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img 
+                src="/staff-card/siritham-logo.png" 
+                alt="S1RI THAM" 
+                style={{ height: `${Math.round(height * 0.03)}px` }}
+                className="w-auto object-contain"
+              />
             </div>
 
             {/* Hologram Light Sheen (Simulates Physical Card Lamination Reflection) */}
@@ -282,10 +296,10 @@ export function StaffIdCard({
               transition: 'opacity 0.25s ease-out',
             }}
           >
-            {/* Subtle Architectural Sketch Watermark matching the front */}
+            {/* Subtle Architectural Sketch Watermark (building only, no overlapping logos) */}
             <div 
               className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none opacity-[0.08]"
-              style={{ backgroundImage: "url('/staff-card/card-bg.png')" }}
+              style={{ backgroundImage: "url('/staff-card/building-bg.png')" }}
             />
 
             {/* Top: Official School Crest & Wordmark (same as front) */}
@@ -315,8 +329,8 @@ export function StaffIdCard({
                 )}
               </div>
 
-              {/* Left-aligned Staff Details (matching front card alignment) */}
-              <div className="w-full mt-4 text-left px-1">
+              {/* Right-aligned Staff Details */}
+              <div className="w-full mt-4 text-right px-1">
                 <p 
                   className="text-sm font-bold text-[#183e66] leading-snug"
                   style={{ fontFamily: '"Sukhumvit Set", sans-serif' }}
