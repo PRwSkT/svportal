@@ -33,6 +33,8 @@ export function StaffContactEditModal({
   onUpdated,
 }: StaffContactEditModalProps) {
   const [formData, setFormData] = useState({
+    name_en: '',
+    image_url: '',
     phone: '',
     line_id: '',
     facebook_url: '',
@@ -48,6 +50,8 @@ export function StaffContactEditModal({
   useEffect(() => {
     if (personnel) {
       setFormData({
+        name_en: personnel.name_en || '',
+        image_url: personnel.image_url || '',
         phone: personnel.phone || '',
         line_id: personnel.line_id || '',
         facebook_url: personnel.facebook_url || '',
@@ -123,6 +127,39 @@ export function StaffContactEditModal({
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* English Name & Profile Photo URL */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-sky-600" />
+                  <span>ชื่อภาษาอังกฤษบนหน้าบัตร</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="เช่น CHATTRAPORN CHIMPOO หรือ ADMIN"
+                  value={formData.name_en}
+                  onChange={(e) => setFormData({ ...formData, name_en: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 uppercase"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">จะถูกจัดวางเป็นชื่อตัวใหญ่และนามสกุลบนหน้าบัตร</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>ลิงก์รูปถ่ายประจำตัว (Portrait URL)</span>
+                </label>
+                <input
+                  type="url"
+                  placeholder="เช่น https://.../photo.png (รูปพื้นหลังโปร่งใสหรือภาพถ่ายตรง)"
+                  value={formData.image_url}
+                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">หากไม่ใส่ จะแสดงตราสัญลักษณ์ประจำตัวแทน</p>
+              </div>
+            </div>
+
             {/* Phone & Office Room */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>

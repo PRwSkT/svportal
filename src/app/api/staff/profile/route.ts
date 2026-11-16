@@ -68,10 +68,53 @@ export async function PUT(request: Request) {
     }
 
     if (!targetId) {
-      return NextResponse.json(
-        { error: 'ไม่พบข้อมูลบุคลากรที่ต้องการอัปเดต' },
-        { status: 404 }
-      );
+      // Auto-create personnel record for logged-in user if missing
+      const { data: appUserData } = await supabase
+        .from('app_users')
+        .select('full_name, role')
+        .eq('id', authUser.id)
+        .single();
+
+      const defaultNameEn = body.name_en?.trim()?.toUpperCase() || 
+        (appUserData?.full_name && /^[A-Za-z\s]+$/.test(appUserData.full_name) 
+          ? appUserData.full_name.trim().toUpperCase() 
+          : (authUser.email?.split('@')[0]?.toUpperCase() || 'STAFF'));
+
+      const newPersonnel = {
+        user_id: authUser.id,
+        name_th: appUserData?.full_name || authUser.email?.split('@')[0] || 'บุคลากร',
+        name_en: defaultNameEn,
+        position_th: appUserData?.role === 'admin' ? 'ผู้ดูแลระบบ (Admin)' : 'บุคลากรทางการศึกษา',
+        position_en: appUserData?.role === 'admin' ? 'Administrator' : 'Academic Staff',
+        category: appUserData?.role || 'staff',
+        email: authUser.email,
+        phone: phone !== undefined ? phone?.trim() : null,
+        line_id: line_id !== undefined ? line_id?.trim() : null,
+        facebook_url: facebook_url !== undefined ? facebook_url?.trim() : null,
+        instagram_url: instagram_url !== undefined ? instagram_url?.trim() : null,
+        tiktok_url: tiktok_url !== undefined ? tiktok_url?.trim() : null,
+        linkedin_url: linkedin_url !== undefined ? linkedin_url?.trim() : null,
+        office_room: office_room !== undefined ? office_room?.trim() : null,
+        card_bio: card_bio !== undefined ? card_bio?.trim() : null,
+        image_url: body.image_url !== undefined ? (body.image_url?.trim() || null) : null,
+        is_active: true,
+      };
+
+      const { data: created, error: createErr } = await supabase
+        .from('personnel')
+        .insert(newPersonnel)
+        .select()
+        .single();
+
+      if (createErr) throw createErr;
+
+      // Link back to app_users
+      await supabase
+        .from('app_users')
+        .update({ personnel_id: created.id })
+        .eq('id', authUser.id);
+
+      return NextResponse.json({ personnel: created, success: true });
     }
 
     const updatePayload: Record<string, any> = {
@@ -83,6 +126,8 @@ export async function PUT(request: Request) {
       linkedin_url: linkedin_url !== undefined ? linkedin_url?.trim() : undefined,
       office_room: office_room !== undefined ? office_room?.trim() : undefined,
       card_bio: card_bio !== undefined ? card_bio?.trim() : undefined,
+      name_en: body.name_en !== undefined ? body.name_en?.trim()?.toUpperCase() : undefined,
+      image_url: body.image_url !== undefined ? (body.image_url?.trim() || null) : undefined,
       updated_at: new Date().toISOString(),
     };
 

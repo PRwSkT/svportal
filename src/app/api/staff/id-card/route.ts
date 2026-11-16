@@ -95,14 +95,18 @@ export async function GET(request: Request) {
     }
 
     // 5. If no record exists, generate a virtual personnel object from auth user
+    const defaultNameEn = (appUserData?.full_name && /^[A-Za-z\s]+$/.test(appUserData.full_name)) 
+      ? appUserData.full_name.trim().toUpperCase() 
+      : (authUser.email?.split('@')[0]?.toUpperCase() || 'STAFF');
+
     const virtualPersonnel = {
       id: authUser.id,
       name_th: appUserData?.full_name || authUser.email?.split('@')[0] || 'บุคลากร',
-      name_en: authUser.email?.split('@')[0]?.toUpperCase() || 'STAFF',
+      name_en: defaultNameEn,
       position_th: appUserData?.role === 'admin' ? 'ผู้ดูแลระบบ (Admin)' : 'บุคลากรทางการศึกษา',
       position_en: appUserData?.role === 'admin' ? 'Administrator' : 'Academic Staff',
       category: appUserData?.role || 'staff',
-      image_url: '/staff-card/sample-teacher.png',
+      image_url: null, // Do not default to sample teacher; show placeholder if no photo
       email: authUser.email,
       is_active: true,
     };

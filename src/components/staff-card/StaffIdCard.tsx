@@ -92,8 +92,12 @@ export function StaffIdCard({
     onFlipChange?.(next);
   };
 
-  // Profile image fallback
-  const photoUrl = personnel.image_url || '/staff-card/sample-teacher.png';
+  // Profile image fallback: ONLY Kru Chattraporn defaults to sample teacher image
+  const isSampleKruChattraporn = !personnel.image_url && (
+    Boolean(personnel.name_th?.includes('ฉัตรพร')) || 
+    Boolean(personnel.name_en?.toUpperCase().includes('CHATTRAPORN'))
+  );
+  const photoUrl = personnel.image_url || (isSampleKruChattraporn ? '/staff-card/sample-teacher.png' : null);
 
   return (
     <div className={`flex flex-col items-center select-none ${className}`}>
@@ -136,25 +140,58 @@ export function StaffIdCard({
               style={{ backgroundImage: "url('/staff-card/card-bg.png')" }}
             />
 
-            {/* Layer 2: Person Portrait Photo (Opaque, Solid Cutout) */}
-            <div 
-              className="absolute inset-0 w-full h-full flex items-center justify-center pointer-events-none"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={photoUrl}
-                alt={nameInfo.fullNameEn || 'Staff Portrait'}
-                className="w-full h-[90%] object-contain object-bottom transition-transform duration-300 group-hover:scale-[1.02]"
-                loading="eager"
-              />
-            </div>
+            {/* Layer 2: Person Portrait Photo or Silhouette Placeholder */}
+            {photoUrl ? (
+              <div 
+                className="absolute pointer-events-none overflow-hidden"
+                style={{
+                  width: '110.24%',
+                  left: '-1.17%',
+                  bottom: 0,
+                  height: '92.83%',
+                  zIndex: 2,
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={photoUrl}
+                  alt={nameInfo.fullNameEn || 'Staff Portrait'}
+                  className="w-full h-full object-cover object-top transition-transform duration-300 group-hover:scale-[1.01]"
+                  loading="eager"
+                />
+              </div>
+            ) : (
+              <div 
+                className="absolute inset-x-0 pointer-events-none flex flex-col items-center justify-center z-[2]"
+                style={{
+                  top: '22%',
+                  bottom: '32%',
+                }}
+              >
+                <div className="flex flex-col items-center justify-center p-5 rounded-2xl bg-white/70 backdrop-blur-xs border border-dashed border-[#183e66]/30 shadow-xs max-w-[70%] text-center">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-tr from-[#183e66] to-[#255f9a] text-white flex items-center justify-center shadow-md mb-2.5">
+                    {nameInfo.firstName ? (
+                      <span className="text-xl sm:text-2xl font-bold tracking-wider font-mono">
+                        {nameInfo.firstName.slice(0, 2)}
+                      </span>
+                    ) : (
+                      <User className="w-8 h-8 text-white/90" />
+                    )}
+                  </div>
+                  <p className="text-[11px] font-bold text-[#183e66]">ยังไม่มีรูปถ่ายประจำตัว</p>
+                  <p className="text-[9px] text-slate-500 mt-0.5 leading-snug">
+                    สามารถใส่รูปและข้อมูลติดต่อได้ที่ปุ่ม &quot;แก้ไขข้อมูลติดต่อ / โซเชียล&quot;
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Layer 2.5: Soft White Bottom Gradient Overlay (Covers bottom of photo & building sketch behind text) */}
             <div 
-              className="absolute inset-x-0 bottom-0 pointer-events-none z-[5]"
+              className="absolute inset-x-0 bottom-0 pointer-events-none z-[3]"
               style={{
-                height: `${Math.round(height * 0.40)}px`,
-                background: 'linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0.98) 25%, rgba(255,255,255,0.7) 55%, rgba(255,255,255,0) 100%)',
+                height: `${Math.round(height * 0.30)}px`,
+                background: 'linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0.96) 25%, rgba(255,255,255,0.65) 60%, rgba(255,255,255,0) 100%)',
               }}
             />
 
@@ -171,47 +208,81 @@ export function StaffIdCard({
             </div>
 
             {/* Layer 4: Foreground Typography (First Name, Last Name, Position) */}
-            <div className="absolute inset-x-0 bottom-0 z-10 px-6 sm:px-7 pb-10 sm:pb-12 pointer-events-none">
-              <div className="flex flex-col">
-                {/* First Name (Large Bold Navy) */}
-                <h1 
-                  className="font-bold tracking-tight text-[#183e66] leading-[0.92] uppercase drop-shadow-xs"
-                  style={{
-                    fontSize: `${Math.round(width * 0.11)}px`,
-                    fontFamily: '"Sukhumvit Set", sans-serif',
-                  }}
-                >
-                  {nameInfo.firstName}
-                </h1>
-
-                {/* Last Name (Medium Navy, Right Indented) */}
-                <div className="flex justify-end pr-2 -mt-1 sm:-mt-1.5">
-                  <h2 
-                    className="font-medium text-[#183e66] leading-none uppercase drop-shadow-xs"
+            <div 
+              className="absolute inset-x-0 bottom-0 z-10 pointer-events-none"
+              style={{
+                paddingLeft: `${Math.round(width * 0.0726)}px`,
+                paddingRight: `${Math.round(width * 0.0726)}px`,
+                paddingBottom: `${Math.round(height * 0.065)}px`,
+              }}
+            >
+              {nameInfo.lastName ? (
+                <div className="flex flex-col">
+                  {/* First Name (Large Bold Navy) */}
+                  <h1 
+                    className="font-bold tracking-tight text-[#183e66] leading-[0.9] uppercase drop-shadow-xs"
                     style={{
-                      fontSize: `${Math.round(width * 0.065)}px`,
+                      fontSize: `${Math.round(width * 0.126)}px`,
                       fontFamily: '"Sukhumvit Set", sans-serif',
                     }}
                   >
-                    {nameInfo.lastName}
-                  </h2>
-                </div>
+                    {nameInfo.firstName}
+                  </h1>
 
-                {/* Position with matching underline */}
-                <div className="flex justify-end items-center gap-2 mt-1 pr-2">
-                  <div className="flex flex-col items-end">
+                  {/* Last Name (Medium Navy, Right Indented) */}
+                  <div className="flex justify-end -mt-1 sm:-mt-1.5">
+                    <h2 
+                      className="font-medium text-[#183e66] leading-none uppercase drop-shadow-xs"
+                      style={{
+                        fontSize: `${Math.round(width * 0.071)}px`,
+                        fontFamily: '"Sukhumvit Set", sans-serif',
+                      }}
+                    >
+                      {nameInfo.lastName}
+                    </h2>
+                  </div>
+
+                  {/* Position with matching underline */}
+                  <div className="flex justify-end items-center mt-1">
+                    <div className="flex flex-col items-end">
+                      <span 
+                        className="text-[#183e66] font-bold tracking-wider uppercase opacity-95"
+                        style={{
+                          fontSize: `${Math.max(9, Math.round(width * 0.024))}px`,
+                        }}
+                      >
+                        {positionEn}
+                      </span>
+                      <div className="w-full h-[1.5px] bg-[#183e66] opacity-80 mt-0.5 rounded-full" />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col">
+                  {/* Single Name (e.g. Workspace Admin) */}
+                  <h1 
+                    className="font-bold tracking-tight text-[#183e66] leading-[0.9] uppercase drop-shadow-xs"
+                    style={{
+                      fontSize: `${Math.round(width * 0.126)}px`,
+                      fontFamily: '"Sukhumvit Set", sans-serif',
+                    }}
+                  >
+                    {nameInfo.firstName}
+                  </h1>
+
+                  <div className="flex items-center justify-between mt-1 pt-1 border-t border-[#183e66]/20">
                     <span 
-                      className="text-[#183e66] font-semibold tracking-wider uppercase opacity-90"
+                      className="text-[#183e66] font-bold tracking-wider uppercase opacity-95"
                       style={{
                         fontSize: `${Math.max(9, Math.round(width * 0.024))}px`,
                       }}
                     >
                       {positionEn}
                     </span>
-                    <div className="w-full h-[1.5px] bg-[#183e66] opacity-70 mt-0.5 rounded-full" />
+                    <div className="w-12 h-[1.5px] bg-[#183e66] opacity-80 rounded-full" />
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Hologram Light Sheen (Simulates Physical Card Lamination Reflection) */}
