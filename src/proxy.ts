@@ -1,12 +1,18 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { isSystemAdmin } from '@/lib/constants/auth';
-import { isNetlifyDbActive } from '@/lib/db/netlify-bridge';
-import { createPgPostgrestClient } from '@/lib/db/pg-postgrest-adapter';
 import { verifyStaffSessionToken, STAFF_SESSION_COOKIE } from '@/lib/auth/staff-session';
 
+function isNetlifyDbActive(): boolean {
+  if (process.env.DB_PROVIDER === 'netlify') return true;
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL && (process.env.DATABASE_URL || process.env.NETLIFY_DB_URL)) {
+    return true;
+  }
+  return false;
+}
+
 export async function proxy(request: NextRequest) {
-  const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
+  const nonce = btoa(crypto.randomUUID());
   const cspHeader = `
     default-src 'self';
     script-src 'self' 'unsafe-eval' 'unsafe-inline' https: blob: data:;
@@ -87,7 +93,8 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/llc-display') ||
     request.nextUrl.pathname.startsWith('/tv') ||
     request.nextUrl.pathname.startsWith('/portal') ||
-    request.nextUrl.pathname.startsWith('/download')
+    request.nextUrl.pathname.startsWith('/download') ||
+    request.nextUrl.pathname.startsWith('/verify')
   ) {
     if (
       request.nextUrl.pathname.startsWith('/llc-display') ||
@@ -126,7 +133,7 @@ export async function proxy(request: NextRequest) {
   // 1. Check dual-mode sv_staff_session cookie first
   const staffCookie = request.cookies.get(STAFF_SESSION_COOKIE)?.value;
   if (staffCookie) {
-    const staffSession = verifyStaffSessionToken(staffCookie);
+    const staffSession = await verifyStaffSessionToken(staffCookie);
     if (staffSession) {
       user = {
         id: staffSession.id,
@@ -220,17 +227,33 @@ export async function proxy(request: NextRequest) {
 
     // Retrieve user record from app_users
     let appUserData: any = null;
-    if (isNetlifyDbActive() || !supabaseClient) {
-      const pgClient = createPgPostgrestClient();
-      const { data } = await pgClient.rpc('get_app_user_by_id', {
-        target_user_id: user.id,
-      });
-      appUserData = data;
-    } else {
+    if (supabaseClient) {
       const { data } = await supabaseClient.rpc('get_app_user_by_id', {
         target_user_id: user.id,
       });
       appUserData = data;
+    } else {
+      try {
+        const origin = request.nextUrl.origin;
+        const bridgeRes = await fetch(`${origin}/api/db/bridge`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            cookie: request.headers.get('cookie') || '',
+          },
+          body: JSON.stringify({
+            type: 'rpc',
+            fn: 'get_app_user_by_id',
+            args: { target_user_id: user.id },
+          }),
+        });
+        if (bridgeRes.ok) {
+          const resJson = await bridgeRes.json();
+          appUserData = resJson.data;
+        }
+      } catch (err) {
+        console.error('Edge bridge user lookup error:', err);
+      }
     }
 
     const userRole = appUserData?.role;

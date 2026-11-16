@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isSystemAdmin } from '@/lib/constants/auth';
 import {
-  authenticateStaffWithPg,
   attachStaffSessionCookie,
   clearStaffSessionCookie,
 } from '@/lib/auth/staff-session';
+import { authenticateStaffWithPg } from '@/lib/auth/staff-auth-pg';
 import { createServerClient } from '@supabase/ssr';
 
 export const dynamic = 'force-dynamic';
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    attachStaffSessionCookie(res, authenticatedUser);
+    await attachStaffSessionCookie(res, authenticatedUser);
     return res;
   } catch (error: any) {
     console.error('Staff login error:', error);

@@ -4,10 +4,10 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { getPgPool } from './netlify-bridge';
 import {
-  authenticateStaffWithPg,
   getStaffSessionFromCookies,
   clearStaffSessionCookie,
 } from '@/lib/auth/staff-session';
+import { authenticateStaffWithPg } from '@/lib/auth/staff-auth-pg';
 
 export interface PostgrestError {
   code: string;

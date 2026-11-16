@@ -1,6 +1,4 @@
-import crypto from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { getPgPool } from '@/lib/db/netlify-bridge';
 
 export const STAFF_SESSION_COOKIE = 'sv_staff_session';
 
@@ -20,37 +18,88 @@ function getSessionSecret(): string {
   );
 }
 
+function toBase64Url(uint8Array: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < uint8Array.byteLength; i++) {
+    binary += String.fromCharCode(uint8Array[i]);
+  }
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+function fromBase64Url(base64Url: string): Uint8Array {
+  let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+  while (base64.length % 4 !== 0) {
+    base64 += '=';
+  }
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
 /**
- * Signs a payload into an HMAC-SHA256 authenticated session token.
+ * Signs a payload into an HMAC-SHA256 authenticated session token using standard Web Crypto API.
  */
-export function signStaffSessionToken(payload: StaffSessionPayload): string {
+export async function signStaffSessionToken(payload: StaffSessionPayload): Promise<string> {
+  const enc = new TextEncoder();
   const secret = getSessionSecret();
-  const data = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  const signature = crypto.createHmac('sha256', secret).update(data).digest('base64url');
+  const data = toBase64Url(enc.encode(JSON.stringify(payload)));
+
+  const key = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+
+  const sigBuffer = await crypto.subtle.sign('HMAC', key, enc.encode(data));
+  const signature = toBase64Url(new Uint8Array(sigBuffer));
   return `${data}.${signature}`;
 }
 
 /**
- * Verifies and parses an HMAC-SHA256 staff session token.
+ * Verifies and parses an HMAC-SHA256 staff session token using standard Web Crypto API.
+ * Safe for Edge Runtime, Node.js, and Deno.
  */
-export function verifyStaffSessionToken(token: string): StaffSessionPayload | null {
+export async function verifyStaffSessionToken(token: string): Promise<StaffSessionPayload | null> {
   if (!token || typeof token !== 'string') return null;
 
   const parts = token.split('.');
   if (parts.length !== 2) return null;
 
   const [data, signature] = parts;
-  const secret = getSessionSecret();
-  const expectedSig = crypto.createHmac('sha256', secret).update(data).digest('base64url');
-
-  const sigBuf = Buffer.from(signature);
-  const expBuf = Buffer.from(expectedSig);
-  if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
-    return null;
-  }
+  if (!data || !signature) return null;
 
   try {
-    const payload = JSON.parse(Buffer.from(data, 'base64url').toString('utf-8')) as StaffSessionPayload;
+    const enc = new TextEncoder();
+    const secret = getSessionSecret();
+
+    const key = await crypto.subtle.importKey(
+      'raw',
+      enc.encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
+
+    const sigBytes = fromBase64Url(signature);
+    const isValid = await crypto.subtle.verify(
+      'HMAC',
+      key,
+      sigBytes,
+      enc.encode(data)
+    );
+
+    if (!isValid) return null;
+
+    const dec = new TextDecoder();
+    const payload = JSON.parse(dec.decode(fromBase64Url(data))) as StaffSessionPayload;
     if (typeof payload.exp !== 'number' || payload.exp < Math.floor(Date.now() / 1000)) {
       return null;
     }
@@ -87,16 +136,16 @@ export async function getStaffSessionFromCookies(
   }
 
   if (!token) return null;
-  return verifyStaffSessionToken(token);
+  return await verifyStaffSessionToken(token);
 }
 
 /**
  * Attaches the sv_staff_session HttpOnly cookie to a NextResponse or standard Response.
  */
-export function attachStaffSessionCookie(
+export async function attachStaffSessionCookie(
   res: NextResponse | Response,
   user: { id: string; email: string; full_name?: string }
-): void {
+): Promise<void> {
   const exp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60; // 7 days
   const payload: StaffSessionPayload = {
     id: user.id,
@@ -104,7 +153,7 @@ export function attachStaffSessionCookie(
     full_name: user.full_name || user.email.split('@')[0],
     exp,
   };
-  const token = signStaffSessionToken(payload);
+  const token = await signStaffSessionToken(payload);
 
   const cookieOptions = {
     httpOnly: true,
@@ -143,76 +192,4 @@ export function clearStaffSessionCookie(res: NextResponse | Response): void {
       `${STAFF_SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`
     );
   }
-}
-
-/**
- * Queries auth.users verifying password hash via pgcrypto crypt().
- */
-export async function authenticateStaffWithPg(
-  email: string,
-  password: string
-): Promise<{ id: string; email: string; full_name: string } | null> {
-  const pool = getPgPool();
-  if (!pool) {
-    throw new Error('Database pool not available for staff authentication');
-  }
-
-  const cleanEmail = email.trim().toLowerCase();
-
-  let rows: any[] = [];
-  try {
-    const res = await pool.query(
-      `SELECT id, email, raw_user_meta_data
-       FROM auth.users
-       WHERE lower(email) = lower($1)
-         AND encrypted_password = crypt($2, encrypted_password)
-       LIMIT 1`,
-      [cleanEmail, password]
-    );
-    rows = res.rows;
-  } catch {
-    // If crypt is in extensions or public schema
-    try {
-      const res = await pool.query(
-        `SELECT id, email, raw_user_meta_data
-         FROM auth.users
-         WHERE lower(email) = lower($1)
-           AND (
-             encrypted_password = extensions.crypt($2, encrypted_password)
-             OR encrypted_password = public.crypt($2, encrypted_password)
-           )
-         LIMIT 1`,
-        [cleanEmail, password]
-      );
-      rows = res.rows;
-    } catch (innerErr) {
-      console.error('Error during authenticateStaffWithPg query:', innerErr);
-      return null;
-    }
-  }
-
-  if (!rows || rows.length === 0) {
-    return null;
-  }
-
-  const user = rows[0];
-  let fullName = user.raw_user_meta_data?.full_name || user.email.split('@')[0];
-
-  try {
-    const appRes = await pool.query(
-      `SELECT full_name FROM public.app_users WHERE id = $1 LIMIT 1`,
-      [user.id]
-    );
-    if (appRes.rows.length > 0 && appRes.rows[0].full_name) {
-      fullName = appRes.rows[0].full_name;
-    }
-  } catch {
-    // ignore
-  }
-
-  return {
-    id: user.id,
-    email: user.email,
-    full_name: fullName,
-  };
 }
