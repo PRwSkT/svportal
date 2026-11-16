@@ -1,4 +1,4 @@
-import { AcademicExamQuestion, AcademicExamSet, ChoiceOption, ExamQuestionOrderMapping } from '@/types/academic';
+import type { AcademicExamQuestion, AcademicExamSet, ChoiceOption, ExamQuestionOrderMapping } from '@/types/academic';
 
 /**
  * Shuffles an array with Fisher-Yates algorithm
@@ -277,7 +277,7 @@ export function rebuildAnswerKeyFromMapping(
   (set.question_order_mapping || []).forEach(m => {
     const originalCorrect = correctByOriginal.get(Number(m.original_question_number));
     if (!originalCorrect) return;
-    const slots: ChoiceOption[] = ['A', 'B', 'C', 'D'];
+    const slots: ChoiceOption[] = ['A', 'B', 'C', 'D', 'E'];
     const slot = slots.find(s => m.choice_map?.[s] === originalCorrect) || originalCorrect;
     key[String(m.new_question_number)] = slot;
   });
@@ -372,3 +372,151 @@ export function evaluateOMRBubbles(
     confidence: Math.min(1.0, top1.density)
   };
 }
+
+/**
+ * Optical Bubble Density Evaluator for Teacher Subjective Score (0 to 5)
+ * Analyzes optical densities of score bubbles 0, 1, 2, 3, 4, 5 filled by teachers.
+ */
+export function evaluateTeacherSubjectiveBubbles(
+  densities: Record<number, number>,
+  options: {
+    markThreshold?: number;     // Min density to consider a bubble marked (0.0 to 1.0)
+    ambiguityDiff?: number;     // Min difference between top 2 marks to be confident
+  } = {}
+): {
+  score: number | null;
+  confidence: number;
+  isAmbiguous: boolean;
+} {
+  const markThreshold = options.markThreshold ?? 0.35;
+  const ambiguityDiff = options.ambiguityDiff ?? 0.15;
+
+  const scores = [0, 1, 2, 3, 4, 5];
+  const sorted = scores
+    .map(s => ({ score: s, density: densities[s] ?? 0 }))
+    .sort((a, b) => b.density - a.density);
+
+  const top1 = sorted[0];
+  const top2 = sorted[1];
+
+  // If even top1 is below threshold, teacher left it blank
+  if (!top1 || top1.density < markThreshold) {
+    return {
+      score: null,
+      confidence: 1.0,
+      isAmbiguous: false
+    };
+  }
+
+  // If top2 is also above threshold and close to top1 -> ambiguous mark
+  if (top2 && top2.density >= markThreshold && (top1.density - top2.density) < ambiguityDiff) {
+    return {
+      score: top1.score,
+      confidence: Math.max(0.1, (top1.density - top2.density) / top1.density),
+      isAmbiguous: true
+    };
+  }
+
+  return {
+    score: top1.score,
+    confidence: Math.min(1.0, top1.density),
+    isAmbiguous: false
+  };
+}
+
+/**
+ * Normalizes question_meta ensuring complete persistence of:
+ * - subjective_mode
+ * - rubric_criteria
+ * - sample_answer
+ * - answer_format
+ * - diagnostic_tags
+ * - step_by_step_solution
+ * - scoring_limits
+ */
+export function normalizeQuestionMeta(q: any): Record<string, any> {
+  const meta: Record<string, any> = { ...(q.question_meta || {}) };
+
+  // 1. Diagnostic Tags (Solve-First Pedagogy)
+  if (q.diagnostic_tags && !meta.diagnostic_tags) {
+    meta.diagnostic_tags = q.diagnostic_tags;
+  }
+
+  // 2. Step-by-Step Solution / Solve-First Derivation
+  if (q.step_by_step_solution && !meta.step_by_step_solution) {
+    meta.step_by_step_solution = q.step_by_step_solution;
+  }
+
+  // 3. Subjective Question Configurations
+  const isSubjective = q.question_type === 'subjective' || meta.subjective_mode !== undefined;
+  if (isSubjective) {
+    if (!meta.subjective_mode) {
+      meta.subjective_mode = q.subjective_mode || 
+        (q.choice_b === 'blank_box' ? 'drawing_and_explain' :
+         q.choice_b === 'grid_box' ? 'step_by_step_math' :
+         q.choice_b === 'lines_8' ? 'essay_extended' :
+         q.choice_b === 'lines_3' ? 'short_fill' : 'step_by_step_math');
+    }
+
+    if (!meta.sample_answer && (q.sample_answer || (q.choice_a && q.choice_a !== 'ตัวเลือก ก' && q.choice_a !== 'แนวคำตอบ / คีย์เวิร์ด'))) {
+      meta.sample_answer = q.sample_answer || q.choice_a;
+    }
+
+    if (!meta.answer_format && (q.answer_format || q.choice_b)) {
+      meta.answer_format = q.answer_format || q.choice_b;
+    }
+
+    if (!meta.rubric_criteria && (q.rubric_criteria || (q.choice_c && q.choice_c !== '-'))) {
+      meta.rubric_criteria = q.rubric_criteria || q.choice_c;
+    }
+
+    if (!meta.scoring_limits) {
+      const maxPts = Number(q.points ?? (meta.subjective_mode === 'essay_extended' ? 10 : 5));
+      meta.scoring_limits = q.scoring_limits || { min: 0, max: maxPts };
+    }
+  }
+
+  // 4. Choices array if present
+  if (q.choices && Array.isArray(q.choices) && !meta.choices) {
+    meta.choices = q.choices;
+  }
+
+  return meta;
+}
+
+/**
+ * Normalizes question record for database insertion, ensuring bidirectional consistency
+ * between choice_a..c and question_meta
+ */
+export function buildQuestionRow(q: any, examId: string, idx: number) {
+  const meta = normalizeQuestionMeta(q);
+  const isSubj = q.question_type === 'subjective';
+
+  const choiceA = q.choice_a || meta.sample_answer || (isSubj ? 'แนวคำตอบ / คีย์เวิร์ด' : 'ตัวเลือก ก');
+  const choiceB = q.choice_b || meta.answer_format || (isSubj ? 'lines_5' : 'ตัวเลือก ข');
+  const choiceC = q.choice_c || meta.rubric_criteria || (isSubj ? '-' : 'ตัวเลือก ค');
+  const choiceD = q.choice_d || (isSubj ? '-' : 'ตัวเลือก ง');
+  const choiceE = q.choice_e || null;
+
+  return {
+    exam_id: examId,
+    question_number: q.question_number || (idx + 1),
+    question_type: q.question_type || 'mcq',
+    question_text: q.question_text || `ข้อที่ ${idx + 1}`,
+    math_latex: q.math_latex || null,
+    question_image_url: q.question_image_url || null,
+    diagram_svg: q.diagram_svg || null,
+    choice_a: choiceA,
+    choice_b: choiceB,
+    choice_c: choiceC,
+    choice_d: choiceD,
+    choice_e: choiceE,
+    correct_choice: q.correct_choice || 'A',
+    indicator_code: q.indicator_code || null,
+    points: q.points ?? (isSubj ? 5.0 : 1.0),
+    pin_choice_position: q.pin_choice_position ?? false,
+    pinned_choice_index: q.pinned_choice_index || (q.pin_choice_position ? 'D' : null),
+    question_meta: meta
+  };
+}
+

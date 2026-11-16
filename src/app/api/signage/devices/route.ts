@@ -16,7 +16,8 @@ export async function GET() {
       let isOnline = false;
       if (d.last_heartbeat) {
         const last = new Date(d.last_heartbeat).getTime();
-        isOnline = (now - last) <= (2 * 60 * 1000);
+        // Allow up to 6 minutes to accommodate both daytime (60s) and off-hours (5m) heartbeat intervals
+        isOnline = (now - last) <= (6 * 60 * 1000);
       }
       return {
         ...d,

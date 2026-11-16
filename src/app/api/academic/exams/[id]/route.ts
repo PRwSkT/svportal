@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase/admin';
-import { generateExamSets } from '@/lib/academic/exam-engine';
+import { 
+  generateExamSets, 
+  rebuildAnswerKeyFromMapping, 
+  recalculateAllSubmissions,
+  normalizeQuestionMeta,
+  buildQuestionRow
+} from '@/lib/academic/exam-engine';
 import { requireAuth } from '@/lib/auth';
 
 export async function GET(
@@ -113,10 +119,15 @@ export async function GET(
       }
     }
 
+    const enrichedQuestions = (questions || []).map((q: any) => ({
+      ...q,
+      question_meta: normalizeQuestionMeta(q)
+    }));
+
     return NextResponse.json({
       success: true,
       exam,
-      questions: questions || [],
+      questions: enrichedQuestions,
       sets: sets || [],
       submissions: submissions || [],
       enrolled_students: enrolledStudents
@@ -179,30 +190,42 @@ export async function PUT(
 
     if (examError) throw examError;
 
-    // If questions were provided, replace and regenerate sets
+    // If questions were provided, process update with Safe Edit Lock
     if (questions && Array.isArray(questions)) {
-      // Delete old questions
-      await supabase.from('academic_exam_questions').delete().eq('exam_id', id);
+      // 1. Check existing submissions to prevent destructive key mismatch on printed exams
+      const { count: submissionCount } = await supabase
+        .from('academic_exam_submissions')
+        .select('id', { count: 'exact', head: true })
+        .eq('exam_id', id);
 
-      const qRows = questions.map((q: any, idx: number) => ({
-        exam_id: id,
-        question_number: q.question_number || (idx + 1),
-        question_type: q.question_type || 'mcq',
-        question_text: q.question_text || `ข้อที่ ${idx + 1}`,
-        math_latex: q.math_latex || null,
-        question_image_url: q.question_image_url || null,
-        diagram_svg: q.diagram_svg || null,
-        choice_a: q.choice_a || (q.question_type === 'subjective' ? 'แนวคำตอบ / คีย์เวิร์ด' : 'ตัวเลือก ก'),
-        choice_b: q.choice_b || (q.question_type === 'subjective' ? 'lines_5' : 'ตัวเลือก ข'),
-        choice_c: q.choice_c || (q.question_type === 'subjective' ? '-' : 'ตัวเลือก ค'),
-        choice_d: q.choice_d || (q.question_type === 'subjective' ? '-' : 'ตัวเลือก ง'),
-        choice_e: q.choice_e || null,
-        correct_choice: q.correct_choice || 'A',
-        indicator_code: q.indicator_code || null,
-        points: q.points ?? (q.question_type === 'subjective' ? 5.0 : 1.0),
-        pin_choice_position: q.pin_choice_position ?? false,
-        pinned_choice_index: q.pinned_choice_index || (q.pin_choice_position ? 'D' : null)
-      }));
+      const hasSubmissions = (submissionCount || 0) > 0;
+      const isFinalized = updatedExam.status === 'ready' || updatedExam.status === 'conducted' || updatedExam.status === 'archived';
+
+      // 2. Fetch existing sets
+      const { data: existingSets } = await supabase
+        .from('academic_exam_sets')
+        .select('*')
+        .eq('exam_id', id)
+        .order('set_name', { ascending: true });
+
+      const hasExistingSets = Boolean(existingSets && existingSets.length > 0);
+
+      // Safe Edit Lock Guard: If exam already has submissions, prevent changing total question count
+      if (hasSubmissions && existingSets && existingSets.length > 0) {
+        const expectedCount = existingSets[0].question_order_mapping?.length || 0;
+        if (expectedCount > 0 && questions.length !== expectedCount) {
+          return NextResponse.json({
+            success: false,
+            error: `Safe Edit Lock: ไม่สามารถเพิ่มหรือลดจำนวนข้อสอบได้ (${questions.length} vs เดิม ${expectedCount} ข้อ) เนื่องจากมีนักเรียนส่งกระดาษคำตอบแล้ว (${submissionCount} คน) อนุญาตเฉพาะการแก้ไขข้อความโจทย์ ตัวเลือก เฉลย เกณฑ์รูบริก หรือคะแนนเพื่อรักษาผลการสอบเดิม`
+          }, { status: 400 });
+        }
+      }
+
+      // 3. Build normalized question rows with JSONB question_meta support & fallback
+      const qRows = questions.map((q: any, idx: number) => buildQuestionRow(q, id, idx));
+
+      // Delete old questions and insert updated records
+      await supabase.from('academic_exam_questions').delete().eq('exam_id', id);
 
       const { data: qData, error: qError } = await supabase
         .from('academic_exam_questions')
@@ -211,23 +234,70 @@ export async function PUT(
 
       if (qError) throw qError;
 
-      // Regenerate sets
-      await supabase.from('academic_exam_sets').delete().eq('exam_id', id);
+      const questionsList = qData || qRows;
 
-      const sets = generateExamSets(qData || [], {
-        setNames: ['A', 'B', 'C'],
-        shuffleQuestions: true,
-        shuffleChoices: true
-      });
+      // 4. Safe Edit Lock: If exam has submissions, is finalized, or sets already exist,
+      // DO NOT delete sets and randomize from scratch. Rebuild answer keys deterministically!
+      if (hasSubmissions || isFinalized || hasExistingSets) {
+        if (existingSets && existingSets.length > 0) {
+          for (const set of existingSets) {
+            const updatedAnswerKey = rebuildAnswerKeyFromMapping(set, questionsList);
+            await supabase
+              .from('academic_exam_sets')
+              .update({ answer_key: updatedAnswerKey })
+              .eq('id', set.id);
+          }
 
-      const setRows = sets.map(s => ({
-        exam_id: id,
-        set_name: s.set_name,
-        question_order_mapping: s.question_order_mapping,
-        answer_key: s.answer_key
-      }));
+          // Retroactive rescoring for existing student submissions
+          if (hasSubmissions) {
+            const { data: submissions } = await supabase
+              .from('academic_exam_submissions')
+              .select('id, student_id, set_name, student_answers')
+              .eq('exam_id', id);
 
-      await supabase.from('academic_exam_sets').insert(setRows);
+            if (submissions && submissions.length > 0) {
+              const updatedSetsWithKeys = existingSets.map(s => ({
+                ...s,
+                answer_key: rebuildAnswerKeyFromMapping(s, questionsList)
+              }));
+              const rescored = recalculateAllSubmissions(
+                submissions,
+                updatedSetsWithKeys,
+                updatedExam.max_score || 20,
+                questionsList
+              );
+              for (const item of rescored) {
+                await supabase
+                  .from('academic_exam_submissions')
+                  .update({
+                    raw_score: item.raw_score,
+                    total_score: item.total_score,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', item.id);
+              }
+            }
+          }
+        }
+      } else {
+        // Initial set generation for draft exams without sets
+        await supabase.from('academic_exam_sets').delete().eq('exam_id', id);
+
+        const sets = generateExamSets(questionsList, {
+          setNames: ['A', 'B', 'C'],
+          shuffleQuestions: true,
+          shuffleChoices: true
+        });
+
+        const setRows = sets.map(s => ({
+          exam_id: id,
+          set_name: s.set_name,
+          question_order_mapping: s.question_order_mapping,
+          answer_key: s.answer_key
+        }));
+
+        await supabase.from('academic_exam_sets').insert(setRows);
+      }
     }
 
     return NextResponse.json({ success: true, exam: updatedExam });

@@ -7,6 +7,7 @@
 import { getAdminClient } from '@/lib/supabase/admin';
 import { formatThaiDate } from '@/lib/opec/regis-validator';
 import ExcelJS from 'exceljs';
+import { DEFAULT_SCHOOL_IDENTITY } from '@/lib/documents/types';
 
 export interface PP3GraduateRecord {
   sequenceNumber: number;
@@ -22,7 +23,7 @@ export interface PP3GraduateRecord {
   graduationDateTh: string;
   pp1Number: string;
   pp2Number: string;
-  status: 'ผ่านเกณฑ์จบการศึกษา' | 'ไม่ผ่านเกณฑ์';
+  status: 'ผ่านเกณฑ์จบการศึกษา' | 'ไม่ผ่านเกณฑ์' | 'รอแก้งาน (ติด 0/มผ)' | 'รอผลการเรียน (ติด ร/มส)' | 'ยังไม่บันทึกคะแนน (รอผลการเรียน)';
   notes: string;
 }
 
@@ -122,8 +123,12 @@ export async function generatePP3ReportData(params?: {
     const prefix = isFemale ? 'เด็กหญิง' : 'เด็กชาย';
     const sGrades = gradesByStudent.get(s.id) || [];
 
-    // Calculate GPAX with realistic fallback if student just enrolled
-    let gpax = 3.85;
+    // Calculate GPAX strictly from real database records (no fake/seeded generation)
+    let gpax = 0;
+    let status: PP3GraduateRecord['status'] = 'ผ่านเกณฑ์จบการศึกษา';
+    let hasFailing = false;
+    let hasIncomplete = false;
+
     if (sGrades.length > 0) {
       let ptSum = 0;
       let count = 0;
@@ -131,7 +136,15 @@ export async function generatePP3ReportData(params?: {
         const isReported = g.gradebook?.course?.is_reported_to_opec;
         if (isReported === false) continue; // Skip non-OPEC courses
 
-        const val = parseFloat(g.final_grade);
+        const gradeStr = String(g.final_grade || '').trim();
+        if (!gradeStr || gradeStr === 'ร' || gradeStr === 'มส') {
+          hasIncomplete = true;
+        }
+        if (gradeStr === '0' || gradeStr === 'มผ') {
+          hasFailing = true;
+        }
+
+        const val = parseFloat(gradeStr);
         const weight = Number(g.gradebook?.course?.credits) || 1.0;
         if (!isNaN(val)) {
           ptSum += val * weight;
@@ -141,15 +154,21 @@ export async function generatePP3ReportData(params?: {
       if (count > 0) {
         gpax = Math.floor((ptSum / count) * 100 + 0.5) / 100;
       }
+      if (hasIncomplete) {
+        status = 'รอผลการเรียน (ติด ร/มส)';
+      } else if (hasFailing) {
+        status = 'รอแก้งาน (ติด 0/มผ)';
+      } else {
+        status = 'ผ่านเกณฑ์จบการศึกษา';
+      }
     } else {
-      // Deterministic slight variation around 3.50 - 3.95 based on student ID for mock/preview
-      const seed = parseInt(s.id.slice(-2)) || 50;
-      gpax = Math.floor((3.40 + (seed % 60) * 0.01) * 100) / 100;
+      gpax = 0;
+      status = 'ยังไม่บันทึกคะแนน (รอผลการเรียน)';
     }
 
     totalGpaxSum += gpax;
     if (gpax > highestGpax) highestGpax = gpax;
-    if (gpax < lowestGpax) lowestGpax = gpax;
+    if (gpax < lowestGpax && gpax > 0) lowestGpax = gpax;
 
     const birthDateTh = s.birth_date ? formatThaiDate(s.birth_date) : '15 มกราคม 2558';
     const paddedId = String(idx + 1).padStart(3, '0');
@@ -165,20 +184,21 @@ export async function generatePP3ReportData(params?: {
       gender: isFemale ? 'หญิง' : 'ชาย',
       birthDateTh,
       gpax,
-      graduationDateTh: '31 มีนาคม 2568',
+      graduationDateTh: status === 'ผ่านเกณฑ์จบการศึกษา' ? '31 มีนาคม 2568' : '-',
       pp1Number: `1121100013/2568/${paddedId}`,
       pp2Number: `ปพ.2/2568/${paddedId}`,
-      status: 'ผ่านเกณฑ์จบการศึกษา',
+      status,
       notes: ''
     });
   });
 
-  const totalGraduates = records.length;
-  const averageGpax = totalGraduates > 0 ? Math.floor((totalGpaxSum / totalGraduates) * 100 + 0.5) / 100 : 0;
+  const totalGraduates = records.filter(r => r.status === 'ผ่านเกณฑ์จบการศึกษา').length;
+  const gradedRecords = records.filter(r => r.gpax > 0);
+  const averageGpax = gradedRecords.length > 0 ? Math.floor((totalGpaxSum / gradedRecords.length) * 100 + 0.5) / 100 : 0;
 
   return {
     schoolId: '1121100013',
-    schoolName: 'โรงเรียนสมคิดวิทยา',
+    schoolName: DEFAULT_SCHOOL_IDENTITY.nameTh,
     district: 'เมืองลำปาง',
     province: 'ลำปาง',
     academicYear,
@@ -188,8 +208,8 @@ export async function generatePP3ReportData(params?: {
     femaleCount,
     averageGpax,
     highestGpax: highestGpax || 4.0,
-    lowestGpax: lowestGpax === 4.0 && totalGraduates === 0 ? 0 : lowestGpax,
-    directorName: 'นายพิศาล เครือคงคา',
+    lowestGpax: lowestGpax === 4.0 && gradedRecords.length === 0 ? 0 : lowestGpax,
+    directorName: DEFAULT_SCHOOL_IDENTITY.directorName,
     registrarName: 'นางสาววิภาดา รัตนพรหม',
     records
   };

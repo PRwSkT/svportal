@@ -43,7 +43,10 @@ import type {
   SystemDomainEvent,
   TransportMode,
 } from '@/types/family-pipeline';
-import { generatePickupTotp } from '@/lib/pipeline/bidirectional-store';
+import {
+  generatePickupTotp,
+  getPickupTimeBucket,
+} from '@/lib/pipeline/bidirectional-store';
 
 export const FULL_GUARDIAN_PERMS: GuardianPermissionFlags = {
   is_legal_guardian: true,
@@ -58,6 +61,22 @@ export const FULL_GUARDIAN_PERMS: GuardianPermissionFlags = {
   can_give_consent: true,
   receives_emergency_alert: true,
 };
+
+/**
+ * Masks 13-digit Thai National Citizen ID for PDPA compliance.
+ * Example: '1100201928331' -> '1-1002-XXXXX-33-1'
+ */
+export function maskCitizenId(id: string | null | undefined): string {
+  if (!id) return '';
+  const digits = id.replace(/\D/g, '');
+  if (digits.length === 13) {
+    return `${digits[0]}-${digits.slice(1, 5)}-XXXXX-${digits.slice(10, 12)}-${digits[12]}`;
+  }
+  if (id.length > 6) {
+    return `${id.slice(0, 3)}****${id.slice(-2)}`;
+  }
+  return id;
+}
 
 function formatCheckInTime(raw: string | null | undefined): string | null {
   if (!raw) return null;
@@ -77,11 +96,13 @@ function formatCheckInTime(raw: string | null | undefined): string | null {
 }
 
 /**
- * Fetches the entire real pipeline state from Supabase database tables.
+ * Fetches the real pipeline state from Supabase database tables.
+ * Strictly scopes data to authenticated guardian's linked children if caller is a parent.
  */
 export async function fetchRealPipelineState(
   targetStudentId?: string,
-  guardianId?: string
+  guardianId?: string,
+  isStaff: boolean = false
 ): Promise<BidirectionalPipelineState> {
   const supabase = getAdminClient();
   const todayStr = getBangkokDate();
@@ -107,6 +128,10 @@ export async function fetchRealPipelineState(
     { data: messagesRaw },
     { data: consentsRaw },
     { data: invitationsRaw },
+    { data: feeItemsRaw },
+    { data: feeTypesRaw },
+    { data: tuitionPaymentsRaw },
+    { data: subsidiesRaw },
   ] = await Promise.all([
     supabase.from('students').select('*').order('grade').order('name'),
     supabase.from('academic_classes').select('*'),
@@ -127,6 +152,10 @@ export async function fetchRealPipelineState(
     supabase.from('parent_teacher_messages').select('*').order('created_at', { ascending: true }),
     supabase.schema('family').from('consents').select('*'),
     supabase.schema('family').from('guardian_invitations').select('*'),
+    supabase.from('fee_items').select('*'),
+    supabase.from('fee_types').select('*'),
+    supabase.from('tuition_payments').select('*').order('created_at', { ascending: false }),
+    supabase.from('subsidy_free15y_disbursements').select('*'),
   ]);
 
   if (sErr) {
@@ -156,7 +185,7 @@ export async function fetchRealPipelineState(
 
   const walletMap = Object.fromEntries(wallets.map((w) => [w.student_id, w]));
 
-  // Build real ParentChildProfiles
+  // Build real ParentChildProfiles with masked citizen ID in learner_id
   const realChildren: ParentChildProfile[] = students.map((s) => {
     const isEarly = s.grade?.startsWith('อ.');
     const teacher = classTeacherMap[s.grade] || {
@@ -168,7 +197,7 @@ export async function fetchRealPipelineState(
     return {
       id: s.id,
       public_uid: s.public_uid || s.id,
-      learner_id: s.citizen_id || s.id,
+      learner_id: maskCitizenId(s.citizen_id || s.id),
       prefix: s.prefix || (s.gender === 'ชาย' ? 'ด.ช.' : 'ด.ญ.'),
       first_name: s.first_name || '',
       last_name: s.last_name || '',
@@ -196,15 +225,17 @@ export async function fetchRealPipelineState(
 
   // Pick or construct the target real GuardianProfile
   const targetGuardianRaw = guardianId
-    ? (guardians.find((g) => g.id === guardianId) || guardians[0])
-    : (targetStudentId
-        ? (guardians.find((g) => links.some((l) => l.guardian_id === g.id && l.student_id === targetStudentId)) || guardians[0])
-        : guardians[0]);
+    ? guardians.find((g) => g.id === guardianId)
+    : targetStudentId
+    ? guardians.find((g) => links.some((l) => l.guardian_id === g.id && l.student_id === targetStudentId))
+    : isStaff
+    ? guardians[0]
+    : null;
 
   const realGuardian: GuardianProfile = targetGuardianRaw
     ? {
         id: targetGuardianRaw.id,
-        citizen_id: targetGuardianRaw.citizen_id,
+        citizen_id: maskCitizenId(targetGuardianRaw.citizen_id),
         prefix: targetGuardianRaw.prefix || 'คุณ',
         first_name: targetGuardianRaw.first_name,
         last_name: targetGuardianRaw.last_name,
@@ -221,8 +252,8 @@ export async function fetchRealPipelineState(
         updated_at: targetGuardianRaw.updated_at,
       }
     : {
-        id: 'g-somkid-real',
-        citizen_id: '1210400061267',
+        id: guardianId || 'g-guest',
+        citizen_id: '1-1002-XXXXX-XX-X',
         prefix: 'คุณ',
         first_name: 'ผู้ปกครอง',
         last_name: 'สมคิดวิทยา',
@@ -240,13 +271,37 @@ export async function fetchRealPipelineState(
       };
 
   // Find linked students for this guardian
-  const guardianLinks = links.filter((l) => l.guardian_id === realGuardian.id);
+  const guardianLinks = guardianId
+    ? links.filter((l) => l.guardian_id === realGuardian.id)
+    : [];
   const linkedStudentIds = new Set(guardianLinks.map((l) => l.student_id));
 
-  // If guardianId is provided and guardian has linked students, filter children to only their students!
-  const myChildren = (guardianId && linkedStudentIds.size > 0)
-    ? realChildren.filter((c) => linkedStudentIds.has(c.id))
-    : realChildren;
+  // Determine allowed children strictly based on caller identity
+  let myChildren: ParentChildProfile[];
+  if (guardianId) {
+    myChildren = realChildren.filter((c) => linkedStudentIds.has(c.id));
+  } else if (targetStudentId) {
+    myChildren = realChildren.filter((c) => c.id === targetStudentId);
+  } else if (isStaff) {
+    myChildren = realChildren;
+  } else {
+    myChildren = [];
+  }
+
+  // Define allowedStudentIds filter set:
+  // If caller is a guardian, only linked children.
+  // If caller is staff and requested targetStudentId, that student.
+  // If caller is staff without filter, all students (allowedStudentIds is null).
+  const allowedStudentIds: Set<string> | null = guardianId
+    ? linkedStudentIds
+    : targetStudentId
+    ? new Set([targetStudentId])
+    : isStaff
+    ? null
+    : new Set();
+
+  const childIdSet = new Set(myChildren.map((c) => c.id));
+  const studentMap = Object.fromEntries(realChildren.map((c) => [c.id, c]));
 
   // Map real guardian student links
   const realLinks: GuardianStudentLink[] = links.map((l) => ({
@@ -274,8 +329,13 @@ export async function fetchRealPipelineState(
     updated_at: l.updated_at,
   }));
 
-  // Map attendance logs
-  const studentMap = Object.fromEntries(realChildren.map((c) => [c.id, c]));
+  const scopedLinks = guardianId
+    ? realLinks.filter((l) => l.guardian_id === realGuardian.id)
+    : targetStudentId
+    ? realLinks.filter((l) => l.student_id === targetStudentId)
+    : realLinks;
+
+  // Map attendance logs - standardized to MORNING_HOMEROOM
   const realAttendance: StudentAttendanceLog[] = (attendanceRaw || []).map((a) => {
     const child = studentMap[a.student_id];
     return {
@@ -285,7 +345,7 @@ export async function fetchRealPipelineState(
       nickname: child?.nickname || '',
       grade_level: child?.grade || '',
       attendance_date: a.attendance_date,
-      period: a.period || 'HOMEROOM_MORNING',
+      period: a.period || 'MORNING_HOMEROOM',
       status: a.status as AttendanceStatus,
       check_in_time: formatCheckInTime(a.check_in_time),
       check_out_time: a.check_out_time,
@@ -296,6 +356,9 @@ export async function fetchRealPipelineState(
       updated_at: a.updated_at,
     };
   });
+  const scopedAttendance = allowedStudentIds
+    ? realAttendance.filter((a) => allowedStudentIds.has(a.student_id))
+    : realAttendance;
 
   // Map leave requests
   const realLeaves: StudentLeaveRequest[] = (leavesRaw || []).map((lv) => {
@@ -320,6 +383,9 @@ export async function fetchRealPipelineState(
       updated_at: lv.updated_at,
     };
   });
+  const scopedLeaves = allowedStudentIds
+    ? realLeaves.filter((lv) => allowedStudentIds.has(lv.student_id))
+    : realLeaves;
 
   // Map pickup plans
   const realPickup: PickupDailyPlan[] = (pickupRaw || []).map((p) => {
@@ -349,6 +415,9 @@ export async function fetchRealPipelineState(
       updated_at: p.updated_at,
     };
   });
+  const scopedPickup = allowedStudentIds
+    ? realPickup.filter((p) => allowedStudentIds.has(p.student_id))
+    : realPickup;
 
   // Map early years care
   const realCare: EarlyYearsDailyCare[] = (careRaw || []).map((c) => {
@@ -356,9 +425,9 @@ export async function fetchRealPipelineState(
     return {
       id: c.id,
       student_id: c.student_id,
+      class_id: c.class_id || child?.grade || 'อ.1/1',
       student_name: child?.full_name || c.student_id,
       nickname: child?.nickname || '',
-      class_id: c.class_id,
       care_date: c.care_date,
       morning_mood: c.morning_mood as EarlyYearsMood,
       breakfast_status: c.breakfast_status as MealConsumptionStatus,
@@ -366,15 +435,14 @@ export async function fetchRealPipelineState(
       milk_morning: c.milk_morning as MilkConsumptionStatus,
       milk_afternoon: c.milk_afternoon as MilkConsumptionStatus,
       nap_start: c.nap_start || '12:30',
-      nap_end: c.nap_end || '14:15',
+      nap_end: c.nap_end || '14:30',
       nap_quality: c.nap_quality as NapQualityStatus,
-      toilet_count: c.toilet_count ?? 2,
-      diaper_count: c.diaper_count ?? 0,
-      toilet_note: c.toilet_note,
-      temperature_c: Number(c.temperature_c) || 36.5,
-      learning_activity: c.learning_activity || 'กิจกรรมเสริมประสบการณ์และการเรียนรู้ตามวัย',
-      home_suggestion: c.home_suggestion || 'ชวนน้องพูดคุยทบทวนกิจกรรมประจำวัน',
-      teacher_note: c.teacher_note || 'น้องมีสมาธิและร่วมกิจกรรมอย่างมีความสุข',
+      toilet_count: c.toilet_count,
+      diaper_count: c.diaper_count,
+      temperature_c: Number(c.temperature_c),
+      learning_activity: c.learning_activity,
+      home_suggestion: c.home_suggestion,
+      teacher_note: c.teacher_note,
       photo_urls: c.photo_urls || [],
       is_published: c.is_published ?? true,
       published_at: c.published_at,
@@ -382,6 +450,9 @@ export async function fetchRealPipelineState(
       updated_at: c.updated_at,
     };
   });
+  const scopedCare = allowedStudentIds
+    ? realCare.filter((c) => allowedStudentIds.has(c.student_id))
+    : realCare;
 
   // Map dropoff notes
   const realDropoffs: EarlyYearsDropoffNote[] = (dropoffRaw || []).map((d) => {
@@ -390,21 +461,25 @@ export async function fetchRealPipelineState(
       id: d.id,
       student_id: d.student_id,
       student_name: child?.full_name || d.student_id,
-      grade_level: child?.grade || 'อ.1/1',
+      grade_level: child?.grade || d.grade_level || 'อ.1/1',
+      nickname: child?.nickname || '',
       note_date: d.note_date,
       guardian_name: d.guardian_name,
-      sleep_hours: Number(d.sleep_hours) || 9,
+      sleep_hours: d.sleep_hours ? Number(d.sleep_hours) : 9,
       ate_breakfast: d.ate_breakfast ?? true,
-      morning_mood: (d.morning_mood as EarlyYearsMood) || 'CHEERFUL',
+      morning_mood: d.morning_mood as EarlyYearsMood,
       medication_today: d.medication_today ?? false,
       pickup_person_today: d.pickup_person_today || 'คุณแม่',
-      special_note: d.special_note,
+      special_note: d.special_note || '',
       acknowledged_by_teacher: d.acknowledged_by_teacher,
       acknowledged_at: d.acknowledged_at,
       created_at: d.created_at,
       updated_at: d.updated_at,
     };
   });
+  const scopedDropoffs = allowedStudentIds
+    ? realDropoffs.filter((d) => allowedStudentIds.has(d.student_id))
+    : realDropoffs;
 
   // Map medication requests
   const realMeds: MedicationRequest[] = (medsRaw || []).map((m) => {
@@ -431,73 +506,105 @@ export async function fetchRealPipelineState(
       updated_at: m.updated_at,
     };
   });
+  const scopedMeds = allowedStudentIds
+    ? realMeds.filter((m) => allowedStudentIds.has(m.student_id))
+    : realMeds;
 
   // Map incidents
-  const realIncidents: StudentIncident[] = (incidentsRaw || []).map((i) => {
-    const child = studentMap[i.student_id];
+  const realIncidents: StudentIncident[] = (incidentsRaw || []).map((inc) => {
+    const child = studentMap[inc.student_id];
     return {
-      id: i.id,
-      student_id: i.student_id,
-      student_name: child?.full_name || i.student_id,
-      nickname: child?.nickname || '',
+      id: inc.id,
+      student_id: inc.student_id,
+      student_name: child?.full_name || inc.student_id,
       grade_level: child?.grade || '',
-      incident_date: i.incident_date,
-      incident_time: i.incident_time,
-      location: i.location,
-      severity: i.severity,
-      description: i.description,
-      first_aid_given: i.first_aid_given,
-      hospital_referred: i.hospital_referred,
-      reported_by: i.reported_by,
-      parent_acknowledged: i.parent_acknowledged,
-      parent_acknowledged_at: i.parent_acknowledged_at,
-      acknowledged_by_name: i.acknowledged_by_name,
-      created_at: i.created_at,
-      updated_at: i.updated_at,
+      incident_date: inc.incident_date,
+      incident_time: inc.incident_time,
+      location: inc.location,
+      severity: inc.severity,
+      description: inc.description,
+      first_aid_given: inc.first_aid_given,
+      hospital_referred: inc.hospital_referred ?? false,
+      reported_by: inc.reported_by,
+      parent_acknowledged: inc.parent_acknowledged ?? false,
+      parent_acknowledged_at: inc.parent_acknowledged_at,
+      acknowledged_by_name: inc.acknowledged_by_name,
+      created_at: inc.created_at,
+      updated_at: inc.updated_at,
     };
   });
+  const scopedIncidents = allowedStudentIds
+    ? realIncidents.filter((i) => allowedStudentIds.has(i.student_id))
+    : realIncidents;
 
   // Map assignments
-  const realAssignments: AcademicAssignmentItem[] = (assignmentsRaw || []).map((asg) => {
-    const sub = (submissionsRaw || []).find((s) => s.assignment_id === asg.id);
+  const submissions = submissionsRaw || [];
+  const submissionMap = new Map<string, { status: string; score: number | null; feedback: string | null }>();
+  submissions.forEach((sub) => {
+    submissionMap.set(`${sub.assignment_id}:${sub.student_id}`, {
+      status: sub.status,
+      score: sub.score ? Number(sub.score) : null,
+      feedback: sub.teacher_feedback,
+    });
+  });
+
+  const realAssignments: AcademicAssignmentItem[] = (assignmentsRaw || []).map((a) => {
+    const firstSub = myChildren.length > 0
+      ? submissionMap.get(`${a.id}:${myChildren[0].id}`)
+      : undefined;
+
     return {
-      id: asg.id,
-      student_id: sub?.student_id || asg.class_id,
-      class_id: asg.class_id,
-      grade_level: asg.grade_level,
-      subject_name: asg.subject_name,
-      title_th: asg.title_th,
-      title_en: asg.title_en,
-      description: asg.description,
-      due_date: asg.due_date,
-      max_score: Number(asg.max_score) || 10,
-      assigned_by: asg.assigned_by,
-      submission_status: (sub?.status as any) || 'PENDING',
-      score: sub?.score ? Number(sub.score) : undefined,
-      teacher_feedback: sub?.teacher_feedback || undefined,
-      created_at: asg.created_at,
-      updated_at: asg.updated_at,
+      id: a.id,
+      class_id: a.class_id,
+      grade_level: a.grade_level,
+      subject_name: a.subject_name,
+      title_th: a.title_th,
+      title_en: a.title_en || a.title_th,
+      description: a.description || '',
+      due_date: a.due_date,
+      max_score: Number(a.max_score || 10),
+      assigned_by: a.assigned_by,
+      student_id: myChildren[0]?.id || '',
+      submission_status: (firstSub?.status as any) || 'PENDING',
+      score: firstSub?.score,
+      teacher_feedback: firstSub?.feedback,
+      created_at: a.created_at,
+      updated_at: a.updated_at || a.created_at || todayStr,
     };
   });
 
-  // Map threads and messages
-  const realThreads: ParentTeacherThread[] = (threadsRaw || []).map((th) => ({
-    id: th.id,
-    student_id: th.student_id,
-    student_name: th.student_name,
-    grade_level: th.grade_level,
-    guardian_name: th.guardian_name,
-    teacher_name: th.teacher_name,
-    channel_type: th.channel_type,
-    last_message_text: th.last_message_text || '',
-    last_message_at: th.last_message_at,
-    unread_staff_count: th.unread_staff_count ?? 0,
-    unread_parent_count: th.unread_parent_count ?? 0,
-    office_hours_note: 'เวลาทำการตอบกลับ 07:30 - 17:00 น. เพื่อคุ้มครองสมดุลเวลาทำงานของครู',
-    created_at: th.created_at,
-    updated_at: th.updated_at,
-  }));
+  const allowedGrades = new Set(myChildren.map((c) => c.grade));
+  const allowedClasses = new Set(myChildren.map((c) => c.classroom));
+  const scopedAssignments = allowedStudentIds
+    ? realAssignments.filter((a) => allowedGrades.has(a.grade_level) || allowedClasses.has(a.class_id))
+    : realAssignments;
 
+  // Map threads & messages
+  const realThreads: ParentTeacherThread[] = (threadsRaw || []).map((t) => {
+    const child = studentMap[t.student_id];
+    return {
+      id: t.id,
+      student_id: t.student_id,
+      student_name: child?.full_name || t.student_name,
+      grade_level: child?.grade || t.grade_level,
+      guardian_name: t.guardian_name,
+      teacher_name: t.teacher_name,
+      channel_type: t.channel_type,
+      subject: t.subject,
+      last_message_text: t.last_message_text,
+      last_message_at: t.last_message_at,
+      unread_staff_count: t.unread_staff_count || 0,
+      unread_parent_count: t.unread_parent_count || 0,
+      office_hours_note: t.office_hours_note || 'เวลาทำการสื่อสาร 07:30 - 17:00 น. วันจันทร์-ศุกร์',
+      created_at: t.created_at,
+      updated_at: t.updated_at,
+    };
+  });
+  const scopedThreads = allowedStudentIds
+    ? realThreads.filter((t) => allowedStudentIds.has(t.student_id))
+    : realThreads;
+
+  const allowedThreadIds = new Set(scopedThreads.map((t) => t.id));
   const realMessages: ParentTeacherMessage[] = (messagesRaw || []).map((m) => ({
     id: m.id,
     thread_id: m.thread_id,
@@ -509,6 +616,9 @@ export async function fetchRealPipelineState(
     acknowledged_at: m.acknowledged_at,
     created_at: m.created_at,
   }));
+  const scopedMessages = allowedStudentIds
+    ? realMessages.filter((m) => allowedThreadIds.has(m.thread_id))
+    : realMessages;
 
   // Consents & Invitations
   const realConsents: ConsentRecord[] = (consentsRaw || []).map((c) => ({
@@ -525,6 +635,9 @@ export async function fetchRealPipelineState(
     signed_at: c.signed_at,
     revoked_at: c.revoked_at,
   }));
+  const scopedConsents = allowedStudentIds
+    ? realConsents.filter((c) => allowedStudentIds.has(c.student_id))
+    : realConsents;
 
   const realInvitations: GuardianInvitation[] = (invitationsRaw || []).map((inv) => {
     const child = studentMap[inv.student_id];
@@ -543,82 +656,146 @@ export async function fetchRealPipelineState(
       created_at: inv.created_at,
     };
   });
+  const scopedInvitations = allowedStudentIds
+    ? realInvitations.filter(
+        (inv) => allowedStudentIds.has(inv.student_id) || (guardianId && inv.guardian_id === realGuardian.id)
+      )
+    : realInvitations;
 
-  // Real invoices & subsidies (linked to students)
-  const feeInvoices: ParentFeeInvoiceItem[] = realChildren.map((c) => ({
-    id: `INV-2569-${c.id}`,
-    student_id: c.id,
-    title_th: `ค่าธรรมเนียมการศึกษา ภาคเรียนที่ 1/2569 (${c.grade})`,
-    title_en: `Tuition & Educational Services Term 1/2569 (${c.grade})`,
-    term_label: '1/2569',
-    amount: c.stage === 'EARLY_YEARS' ? 14500 : 12500,
-    due_date: '2026-06-15',
-    status: 'paid',
-    receipt_number: `REC-2569-${c.id}`,
-    paid_at: '2026-05-28T10:15:00.000Z',
-    payment_method: 'Thai QR PromptPay (Biller ID)',
-  }));
+  // Fee Invoices from DB fee_items / fee_types or fallback
+  const feeTypeMap = Object.fromEntries((feeTypesRaw || []).map((ft) => [ft.id, ft]));
+  const paymentByStudentMap = new Map<string, any>();
+  (tuitionPaymentsRaw || []).forEach((tp) => {
+    if (!paymentByStudentMap.has(tp.student_id)) {
+      paymentByStudentMap.set(tp.student_id, tp);
+    }
+  });
 
-  const subsidies: Free15YSubsidyItem[] = realChildren.map((c) => ({
-    id: `SUB-15Y-${c.id}`,
-    student_id: c.id,
-    academic_year: '2569',
-    semester: '1/2569',
-    category_th: 'เงินอุดหนุนค่าเครื่องแบบนักเรียนและอุปกรณ์การเรียน (สช.)',
-    category_en: 'MoE/OPEC Student Uniform & Learning Material Subsidy',
-    amount: c.stage === 'EARLY_YEARS' ? 625 : 850,
-    parent_signed: true,
-    signed_by_name: realGuardian.full_name,
-    signed_at: '2026-06-01T09:30:00.000Z',
-    receipt_code: `OPEC-69-${c.id}`,
-  }));
+  let feeInvoices: ParentFeeInvoiceItem[] = [];
+  if (feeItemsRaw && feeItemsRaw.length > 0) {
+    feeInvoices = feeItemsRaw.map((fi) => {
+      const ft = feeTypeMap[fi.fee_type_id];
+      const child = studentMap[fi.student_id];
+      const p = paymentByStudentMap.get(fi.student_id);
+      return {
+        id: fi.id,
+        student_id: fi.student_id,
+        title_th: ft?.name || `ค่าธรรมเนียมการศึกษา (${child?.grade || 'ประจำชั้น'})`,
+        title_en: ft?.name || `Tuition & Services (${child?.grade || ''})`,
+        term_label: `${ft?.semester || '1'}/${ft?.academic_year || '2569'}`,
+        amount: Number(fi.amount),
+        due_date: ft?.due_date || '2026-06-15',
+        status: fi.status === 'paid' ? 'paid' : 'unpaid',
+        receipt_number: p?.receipt_number || (fi.status === 'paid' ? `REC-2569-${fi.student_id}` : null),
+        paid_at: p?.created_at || (fi.status === 'paid' ? fi.updated_at : null),
+        payment_method: p?.payment_method ? `Thai QR PromptPay (${p.payment_method})` : null,
+      };
+    });
+  } else {
+    feeInvoices = realChildren.map((c) => ({
+      id: `INV-2569-${c.id}`,
+      student_id: c.id,
+      title_th: `ค่าธรรมเนียมการศึกษา ภาคเรียนที่ 1/2569 (${c.grade})`,
+      title_en: `Tuition & Educational Services Term 1/2569 (${c.grade})`,
+      term_label: '1/2569',
+      amount: c.stage === 'EARLY_YEARS' ? 14500 : 12500,
+      due_date: '2026-06-15',
+      status: 'paid',
+      receipt_number: `REC-2569-${c.id}`,
+      paid_at: '2026-05-28T10:15:00.000Z',
+      payment_method: 'Thai QR PromptPay (Biller ID)',
+    }));
+  }
+  const scopedInvoices = allowedStudentIds
+    ? feeInvoices.filter((inv) => allowedStudentIds.has(inv.student_id))
+    : feeInvoices;
+
+  // Free 15Y Subsidies from DB or fallback
+  let subsidies: Free15YSubsidyItem[] = [];
+  if (subsidiesRaw && subsidiesRaw.length > 0) {
+    subsidies = subsidiesRaw.map((s) => ({
+      id: s.id,
+      student_id: s.student_id,
+      academic_year: s.academic_year || '2569',
+      semester: `${s.term || '1'}/${s.academic_year || '2569'}`,
+      category_th: 'เงินอุดหนุนค่าเครื่องแบบนักเรียนและอุปกรณ์การเรียน (สช.)',
+      category_en: 'MoE/OPEC Student Uniform & Learning Material Subsidy',
+      amount: Number(s.total_amount || 850),
+      parent_signed: Boolean(s.signature_data),
+      signed_by_name: s.recipient_name || realGuardian.full_name,
+      signed_at: s.disbursed_at || s.created_at,
+      receipt_code: s.form_or1_1_number || `OPEC-69-${s.student_id}`,
+    }));
+  } else {
+    subsidies = realChildren.map((c) => ({
+      id: `SUB-15Y-${c.id}`,
+      student_id: c.id,
+      academic_year: '2569',
+      semester: '1/2569',
+      category_th: 'เงินอุดหนุนค่าเครื่องแบบนักเรียนและอุปกรณ์การเรียน (สช.)',
+      category_en: 'MoE/OPEC Student Uniform & Learning Material Subsidy',
+      amount: c.stage === 'EARLY_YEARS' ? 625 : 850,
+      parent_signed: true,
+      signed_by_name: realGuardian.full_name,
+      signed_at: '2026-06-01T09:30:00.000Z',
+      receipt_code: `OPEC-69-${c.id}`,
+    }));
+  }
+  const scopedSubsidies = allowedStudentIds
+    ? subsidies.filter((sub) => allowedStudentIds.has(sub.student_id))
+    : subsidies;
+
+  const earlyMilestones: DevelopmentalMilestoneItem[] = [
+    {
+      id: 'ms-real-1',
+      student_id: myChildren.find((c) => c.stage === 'EARLY_YEARS')?.id || '10247',
+      domain: 'PHYSICAL',
+      domain_th: 'ด้านร่างกาย',
+      domain_en: 'Physical Domain',
+      indicator_th: 'การทรงตัวและการใช้กล้ามเนื้อมัดเล็ก-มัดใหญ่ในการปฏิบัติกิจกรรม',
+      indicator_en: 'Gross and fine motor skills coordination',
+      rating: 3,
+      teacher_comment: 'กล้ามเนื้อมือแข็งแรง หยิบจับอุปกรณ์และทรงตัวได้มั่นคงตามวัย',
+      evaluated_at: todayStr,
+    },
+    {
+      id: 'ms-real-2',
+      student_id: myChildren.find((c) => c.stage === 'EARLY_YEARS')?.id || '10247',
+      domain: 'EMOTIONAL_SOCIAL',
+      domain_th: 'ด้านอารมณ์ จิตใจ และสังคม',
+      domain_en: 'Emotional & Social Domain',
+      indicator_th: 'การปฏิบัติตามข้อตกลงร่วมกันและการแบ่งปันของเล่นกับเพื่อน',
+      indicator_en: 'Social interaction and sharing with peers',
+      rating: 3,
+      teacher_comment: 'มีน้ำใจ ปรับตัวเข้ากับกลุ่มเพื่อนได้ดีและแสดงออกอย่างเหมาะสม',
+      evaluated_at: todayStr,
+    },
+  ];
+  const scopedMilestones = allowedStudentIds
+    ? earlyMilestones.filter((m) => allowedStudentIds.has(m.student_id))
+    : earlyMilestones;
 
   return {
     version: 2,
     guardian: realGuardian,
     children: myChildren,
-    links: realLinks,
-    invitations: realInvitations,
-    consents: realConsents,
-    attendance_logs: realAttendance,
-    leave_requests: realLeaves,
-    pickup_plans: realPickup,
-    early_years_care: realCare,
-    dropoff_notes: realDropoffs,
-    medication_requests: realMeds,
-    incidents: realIncidents,
-    assignments: realAssignments,
-    threads: realThreads,
-    messages: realMessages,
+    links: scopedLinks,
+    invitations: scopedInvitations,
+    consents: scopedConsents,
+    attendance_logs: scopedAttendance,
+    leave_requests: scopedLeaves,
+    pickup_plans: scopedPickup,
+    early_years_care: scopedCare,
+    dropoff_notes: scopedDropoffs,
+    medication_requests: scopedMeds,
+    incidents: scopedIncidents,
+    assignments: scopedAssignments,
+    threads: scopedThreads,
+    messages: scopedMessages,
     domain_events: [],
-    fee_invoices: feeInvoices,
-    free15y_subsidies: subsidies,
-    early_years_milestones: [
-      {
-        id: 'ms-real-1',
-        student_id: realChildren.find((c) => c.stage === 'EARLY_YEARS')?.id || '10247',
-        domain: 'PHYSICAL',
-        domain_th: 'ด้านร่างกาย',
-        domain_en: 'Physical Domain',
-        indicator_th: 'การทรงตัวและการใช้กล้ามเนื้อมัดเล็ก-มัดใหญ่ในการปฏิบัติกิจกรรม',
-        indicator_en: 'Gross and fine motor skills coordination',
-        rating: 3,
-        teacher_comment: 'กล้ามเนื้อมือแข็งแรง หยิบจับอุปกรณ์และทรงตัวได้มั่นคงตามวัย',
-        evaluated_at: todayStr,
-      },
-      {
-        id: 'ms-real-2',
-        student_id: realChildren.find((c) => c.stage === 'EARLY_YEARS')?.id || '10247',
-        domain: 'EMOTIONAL_SOCIAL',
-        domain_th: 'ด้านอารมณ์ จิตใจ และสังคม',
-        domain_en: 'Emotional & Social Domain',
-        indicator_th: 'การปฏิบัติตามข้อตกลงร่วมกันและการแบ่งปันของเล่นกับเพื่อน',
-        indicator_en: 'Social interaction and sharing with peers',
-        rating: 3,
-        teacher_comment: 'มีน้ำใจ ปรับตัวเข้ากับกลุ่มเพื่อนได้ดีและแสดงออกอย่างเหมาะสม',
-        evaluated_at: todayStr,
-      },
-    ],
+    fee_invoices: scopedInvoices,
+    free15y_subsidies: scopedSubsidies,
+    early_years_milestones: scopedMilestones,
     primary_grades: {},
   };
 }
@@ -642,7 +819,7 @@ export async function dbRecordAttendance(payload: {
   const record = {
     student_id: payload.student_id,
     attendance_date: todayStr,
-    period: payload.period || 'HOMEROOM_MORNING',
+    period: payload.period || 'MORNING_HOMEROOM',
     status: payload.status,
     check_in_time: payload.status === 'PRESENT' || payload.status === 'LATE' ? nowIso : null,
     source: payload.source || 'TEACHER_APP',
@@ -702,11 +879,19 @@ export async function dbSubmitLeaveRequest(payload: {
 }
 
 export async function dbReviewLeaveRequest(payload: {
-  leave_id: string;
-  decision: 'APPROVED' | 'REJECTED';
+  leave_id?: string;
+  request_id?: string;
+  decision?: 'APPROVED' | 'REJECTED';
+  status?: 'APPROVED' | 'REJECTED';
   reviewed_by: string;
   review_note?: string;
 }) {
+  const targetId = payload.leave_id || payload.request_id;
+  const targetDecision = payload.decision || payload.status;
+  if (!targetId || !targetDecision) {
+    throw new Error('leave_id/request_id and decision/status are required');
+  }
+
   const supabase = getAdminClient();
   const nowIso = new Date().toISOString();
 
@@ -714,13 +899,13 @@ export async function dbReviewLeaveRequest(payload: {
     .schema('family')
     .from('student_leave_requests')
     .update({
-      status: payload.decision,
+      status: targetDecision,
       reviewed_by: payload.reviewed_by,
       reviewed_at: nowIso,
       review_note: payload.review_note || null,
       updated_at: nowIso,
     })
-    .eq('id', payload.leave_id)
+    .eq('id', targetId)
     .select()
     .single();
 
@@ -730,7 +915,7 @@ export async function dbReviewLeaveRequest(payload: {
   }
 
   // If approved, update attendance status
-  if (payload.decision === 'APPROVED' && updatedLeave) {
+  if (targetDecision === 'APPROVED' && updatedLeave) {
     const attStatus: AttendanceStatus =
       updatedLeave.leave_type === 'SICK_LEAVE'
         ? 'SICK_LEAVE'
@@ -742,7 +927,7 @@ export async function dbReviewLeaveRequest(payload: {
       {
         student_id: updatedLeave.student_id,
         attendance_date: updatedLeave.start_date,
-        period: 'HOMEROOM_MORNING',
+        period: 'MORNING_HOMEROOM',
         status: attStatus,
         source: 'TEACHER_APP',
         recorded_by: payload.reviewed_by,
@@ -847,7 +1032,21 @@ export async function dbSubmitDropoffNote(payload: {
   return data;
 }
 
-export async function dbAcknowledgeDropoffNote(noteId: string, teacherName: string) {
+export async function dbAcknowledgeDropoffNote(
+  noteIdOrPayload: string | { note_id?: string; id?: string; teacher_name?: string },
+  teacherName?: string
+) {
+  const noteId = typeof noteIdOrPayload === 'string'
+    ? noteIdOrPayload
+    : (noteIdOrPayload.note_id || noteIdOrPayload.id || '');
+  const teacher = (typeof noteIdOrPayload === 'object' && noteIdOrPayload.teacher_name)
+    ? noteIdOrPayload.teacher_name
+    : (teacherName || 'ครูประจำชั้น');
+
+  if (!noteId) {
+    throw new Error('note_id is required to acknowledge dropoff note');
+  }
+
   const supabase = getAdminClient();
   const nowIso = new Date().toISOString();
 
@@ -855,7 +1054,7 @@ export async function dbAcknowledgeDropoffNote(noteId: string, teacherName: stri
     .schema('family')
     .from('early_years_dropoff_notes')
     .update({
-      acknowledged_by_teacher: teacherName,
+      acknowledged_by_teacher: teacher,
       acknowledged_at: nowIso,
       updated_at: nowIso,
     })
@@ -968,10 +1167,16 @@ export async function dbSubmitMedication(payload: {
 }
 
 export async function dbAdministerMedication(payload: {
-  medication_id: string;
+  medication_id?: string;
+  request_id?: string;
   nurse_name: string;
   nurse_note?: string;
 }) {
+  const targetId = payload.medication_id || payload.request_id;
+  if (!targetId) {
+    throw new Error('medication_id or request_id is required');
+  }
+
   const supabase = getAdminClient();
   const nowIso = new Date().toISOString();
 
@@ -985,7 +1190,7 @@ export async function dbAdministerMedication(payload: {
       nurse_note: payload.nurse_note || null,
       updated_at: nowIso,
     })
-    .eq('id', payload.medication_id)
+    .eq('id', targetId)
     .select()
     .single();
 
@@ -1107,7 +1312,14 @@ export async function dbSendMessage(payload: {
   return data;
 }
 
+/**
+ * Top up student wallet balance with bounds checking and immutable ledger insertion.
+ */
 export async function dbTopupWallet(studentId: string, amount: number) {
+  if (typeof amount !== 'number' || isNaN(amount) || amount <= 0 || amount > 50000) {
+    throw new Error('จำนวนเงินเติมกระเป๋าต้องอยู่ระหว่าง 1 ถึง 50,000 บาท');
+  }
+
   const supabase = getAdminClient();
   const nowIso = new Date().toISOString();
 
@@ -1116,17 +1328,70 @@ export async function dbTopupWallet(studentId: string, amount: number) {
     .from('wallet_accounts')
     .select('balance')
     .eq('student_id', studentId)
+    .maybeSingle();
+
+  const balanceBefore = Number(currentWallet?.balance || 0);
+  const balanceAfter = balanceBefore + amount;
+
+  // 2. Upsert wallet balance
+  const { data: updatedWallet, error: wErr } = await supabase
+    .from('wallet_accounts')
+    .upsert(
+      {
+        student_id: studentId,
+        balance: balanceAfter,
+        is_active: true,
+        updated_at: nowIso,
+      },
+      { onConflict: 'student_id' }
+    )
+    .select()
     .single();
 
-  const newBalance = Number(currentWallet?.balance || 0) + Number(amount);
+  if (wErr) {
+    console.error('Error topping up wallet account:', wErr);
+    throw new Error(wErr.message);
+  }
 
-  // 2. Upsert wallet
+  // 3. Insert immutable ledger entry into wallet_transactions
+  const { error: tErr } = await supabase
+    .from('wallet_transactions')
+    .insert({
+      student_id: studentId,
+      type: 'topup',
+      amount: amount,
+      balance_before: balanceBefore,
+      balance_after: balanceAfter,
+      channel: 'svportal',
+      svportal_ref: 'PROMPTPAY-TOPUP',
+      cashier_note: 'เติมเงินผ่าน Parents Portal PromptPay',
+      created_at: nowIso,
+    });
+
+  if (tErr) {
+    console.error('Error recording wallet transaction ledger:', tErr);
+  }
+
+  return updatedWallet;
+}
+
+/**
+ * Updates student daily spending limit in wallet_accounts.
+ */
+export async function dbSaveDailyLimit(studentId: string, dailyLimit: number) {
+  if (typeof dailyLimit !== 'number' || isNaN(dailyLimit) || dailyLimit < 0 || dailyLimit > 5000) {
+    throw new Error('วงเงินใช้จ่ายต่อวันต้องอยู่ระหว่าง 0 ถึง 5,000 บาท');
+  }
+
+  const supabase = getAdminClient();
+  const nowIso = new Date().toISOString();
+
   const { data, error } = await supabase
     .from('wallet_accounts')
     .upsert(
       {
         student_id: studentId,
-        balance: newBalance,
+        daily_limit: dailyLimit,
         is_active: true,
         updated_at: nowIso,
       },
@@ -1136,8 +1401,396 @@ export async function dbTopupWallet(studentId: string, amount: number) {
     .single();
 
   if (error) {
-    console.error('Error topping up wallet:', error);
+    console.error('Error saving daily limit:', error);
     throw new Error(error.message);
   }
   return data;
+}
+
+/**
+ * Acknowledges receipt of a parent-teacher message.
+ */
+export async function dbAcknowledgeMessage(messageId: string) {
+  const supabase = getAdminClient();
+  const nowIso = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from('parent_teacher_messages')
+    .update({
+      acknowledged_at: nowIso,
+    })
+    .eq('id', messageId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error acknowledging message:', error);
+    throw new Error(error.message);
+  }
+  return data;
+}
+
+/**
+ * Acknowledges infirmary incident report by parent.
+ */
+export async function dbAcknowledgeIncident(incidentId: string, guardianName?: string) {
+  const supabase = getAdminClient();
+  const nowIso = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from('student_incidents')
+    .update({
+      parent_acknowledged: true,
+      parent_acknowledged_at: nowIso,
+      acknowledged_by_name: guardianName || 'ผู้ปกครอง',
+      updated_at: nowIso,
+    })
+    .eq('id', incidentId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error acknowledging student incident:', error);
+    throw new Error(error.message);
+  }
+  return data;
+}
+
+/**
+ * Signs 15-Year Free Education Subsidy disbursement (อร.1/1) in Postgres.
+ */
+export async function dbSignFree15Y(
+  subsidyId: string,
+  guardianName: string,
+  signatureData?: string,
+  studentId?: string
+) {
+  const supabase = getAdminClient();
+  const nowIso = new Date().toISOString();
+
+  // Try updating if row exists with id
+  const { data, error } = await supabase
+    .from('subsidy_free15y_disbursements')
+    .update({
+      recipient_name: guardianName,
+      signature_data: signatureData || 'DIGITAL_SIGNATURE_PARENT_PORTAL',
+      disbursed_at: nowIso,
+      updated_at: nowIso,
+    })
+    .eq('id', subsidyId)
+    .select()
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error signing free 15y subsidy:', error);
+    throw new Error(error.message);
+  }
+
+  if (data) return data;
+
+  // Fallback: upsert by student_id, academic_year '2569', term '1'
+  const targetStudentId = studentId || subsidyId.replace('SUB-15Y-', '');
+  const { data: upserted, error: upErr } = await supabase
+    .from('subsidy_free15y_disbursements')
+    .upsert(
+      {
+        student_id: targetStudentId,
+        academic_year: '2569',
+        term: '1',
+        disbursement_type: 'ALL',
+        recipient_name: guardianName,
+        signature_data: signatureData || 'DIGITAL_SIGNATURE_PARENT_PORTAL',
+        disbursed_at: nowIso,
+        updated_at: nowIso,
+      },
+      { onConflict: 'student_id,academic_year,term,disbursement_type' }
+    )
+    .select()
+    .single();
+
+  if (upErr) {
+    console.error('Error upserting free 15y subsidy:', upErr);
+    throw new Error(upErr.message);
+  }
+  return upserted;
+}
+
+/**
+ * Pays tuition fee invoice: marks fee_items / installment tranche paid and creates tuition_payments record.
+ */
+export async function dbPayFeeInvoice(
+  invoiceId: string,
+  studentId: string,
+  amount?: number,
+  paymentMethod?: string
+) {
+  const supabase = getAdminClient();
+  const nowIso = new Date().toISOString();
+  const receiptNo = `REC-2569-${String(Math.floor(10000 + Math.random() * 89999))}`;
+
+  // 1. If invoiceId is a UUID in fee_items, update fee_items
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(invoiceId);
+  if (isUuid) {
+    await supabase
+      .from('fee_items')
+      .update({ status: 'paid', updated_at: nowIso })
+      .eq('id', invoiceId);
+  }
+
+  // 2. Insert into tuition_payments
+  const { data: paymentRecord, error: pErr } = await supabase
+    .from('tuition_payments')
+    .insert({
+      student_id: studentId,
+      fee_item_ids: isUuid ? [invoiceId] : [],
+      total_amount: amount || 0,
+      payment_method: paymentMethod?.toLowerCase().includes('qr') ? 'qr' : 'transfer',
+      receipt_number: receiptNo,
+      cashier_note: 'ชำระผ่าน Parents Portal PromptPay',
+      created_at: nowIso,
+    })
+    .select()
+    .single();
+
+  if (pErr) {
+    console.error('Error inserting tuition payment:', pErr);
+  }
+
+  // 3. If invoiceId matches an installment schedule in invoice_installment_schedules, mark it PAID
+  if (isUuid) {
+    await supabase
+      .from('invoice_installment_schedules')
+      .update({
+        status: 'PAID',
+        paid_at: nowIso,
+        receipt_number: receiptNo,
+        updated_at: nowIso,
+      })
+      .eq('id', invoiceId);
+  }
+
+  return {
+    id: invoiceId,
+    student_id: studentId,
+    status: 'paid',
+    receipt_number: receiptNo,
+    paid_at: nowIso,
+    payment_method: 'Thai QR PromptPay',
+    amount: amount || 0,
+    paymentRecord,
+  };
+}
+
+/**
+ * Updates guardian link permissions matrix in Postgres (family.guardian_student_links).
+ */
+export async function dbUpdateGuardianPerms(
+  linkId: string,
+  patch: Partial<GuardianStudentLink>,
+  staffName?: string
+) {
+  const supabase = getAdminClient();
+  const nowIso = new Date().toISOString();
+
+  const updateFields: Record<string, unknown> = {
+    updated_at: nowIso,
+  };
+  if (patch.is_legal_guardian !== undefined) updateFields.is_legal_guardian = patch.is_legal_guardian;
+  if (patch.can_view_daily !== undefined) updateFields.can_view_daily = patch.can_view_daily;
+  if (patch.can_view_academic !== undefined) updateFields.can_view_academic = patch.can_view_academic;
+  if (patch.can_view_health !== undefined) updateFields.can_view_health = patch.can_view_health;
+  if (patch.can_view_finance !== undefined) updateFields.can_view_finance = patch.can_view_finance;
+  if (patch.can_pay !== undefined) updateFields.can_pay = patch.can_pay;
+  if (patch.can_message_teacher !== undefined) updateFields.can_message_teacher = patch.can_message_teacher;
+  if (patch.can_pickup !== undefined) updateFields.can_pickup = patch.can_pickup;
+  if (patch.can_manage_pickup !== undefined) updateFields.can_manage_pickup = patch.can_manage_pickup;
+  if (patch.can_give_consent !== undefined) updateFields.can_give_consent = patch.can_give_consent;
+  if (patch.receives_emergency_alert !== undefined) updateFields.receives_emergency_alert = patch.receives_emergency_alert;
+  if (patch.has_legal_restriction !== undefined) updateFields.has_legal_restriction = patch.has_legal_restriction;
+  if (patch.restriction_note !== undefined) updateFields.restriction_note = patch.restriction_note;
+
+  const { data, error } = await supabase
+    .schema('family')
+    .from('guardian_student_links')
+    .update(updateFields)
+    .eq('id', linkId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating guardian perms:', error);
+    throw new Error(error.message);
+  }
+  return data;
+}
+
+/**
+ * Creates guardian invitation code in Postgres (family.guardian_invitations).
+ */
+export async function dbCreateGuardianInvite(payload: {
+  student_id: string;
+  guardian_id?: string;
+  invite_code?: string;
+  expires_at?: string;
+  created_by?: string;
+}) {
+  const supabase = getAdminClient();
+  const now = new Date();
+  const expiresAt = payload.expires_at || new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const code = payload.invite_code || `SV-FAM-${payload.student_id}-${Math.floor(100 + Math.random() * 900)}`;
+
+  let targetGuardianId = payload.guardian_id;
+  if (!targetGuardianId) {
+    const { data: g } = await supabase
+      .schema('family')
+      .from('guardians')
+      .select('id')
+      .limit(1)
+      .maybeSingle();
+    targetGuardianId = g?.id;
+  }
+
+  if (!targetGuardianId) {
+    throw new Error('Guardian ID is required to generate an invitation');
+  }
+
+  const { data, error } = await supabase
+    .schema('family')
+    .from('guardian_invitations')
+    .insert({
+      student_id: payload.student_id,
+      guardian_id: targetGuardianId,
+      invite_code: code,
+      expires_at: expiresAt,
+      created_by: payload.created_by || null,
+      created_at: now.toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating guardian invite:', error);
+    throw new Error(error.message);
+  }
+  return data;
+}
+
+/**
+ * Upserts academic assignment in public.academic_assignments.
+ */
+export async function dbUpsertAssignment(payload: {
+  id?: string;
+  class_id?: string;
+  grade_level: string;
+  subject_name: string;
+  title_th: string;
+  title_en?: string;
+  description?: string;
+  due_date: string;
+  max_score?: number;
+  assigned_by: string;
+}) {
+  const supabase = getAdminClient();
+  const nowIso = new Date().toISOString();
+
+  const record: Record<string, unknown> = {
+    grade_level: payload.grade_level,
+    class_id: payload.class_id || payload.grade_level,
+    subject_name: payload.subject_name,
+    title_th: payload.title_th,
+    title_en: payload.title_en || null,
+    description: payload.description || null,
+    due_date: payload.due_date,
+    max_score: payload.max_score ?? 10,
+    assigned_by: payload.assigned_by,
+    updated_at: nowIso,
+  };
+
+  if (payload.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.id)) {
+    record.id = payload.id;
+  }
+
+  const { data, error } = await supabase
+    .from('academic_assignments')
+    .upsert(record)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error upserting assignment:', error);
+    throw new Error(error.message);
+  }
+  return data;
+}
+
+/**
+ * Server-side TOTP verification against 30s rotating HMAC buckets or temporary delegate OTP.
+ * On success, updates family.pickup_daily_plans to RELEASED.
+ */
+export async function dbVerifyPickupTotp(
+  studentId: string,
+  inputCode: string,
+  verifiedBy?: string,
+  timestampMs: number = Date.now()
+): Promise<{
+  valid: boolean;
+  matchedMode: 'TOTP_CURRENT' | 'TOTP_PREVIOUS' | 'DELEGATE_OTP' | 'NONE';
+  updatedPlan?: any;
+}> {
+  const clean = inputCode.replace(/\D/g, '');
+  if (!clean || !studentId) return { valid: false, matchedMode: 'NONE' };
+
+  const currentBucket = getPickupTimeBucket(timestampMs);
+  let matchedMode: 'TOTP_CURRENT' | 'TOTP_PREVIOUS' | 'DELEGATE_OTP' | 'NONE' = 'NONE';
+
+  if (clean === generatePickupTotp(studentId, currentBucket)) {
+    matchedMode = 'TOTP_CURRENT';
+  } else if (clean === generatePickupTotp(studentId, currentBucket - 1)) {
+    matchedMode = 'TOTP_PREVIOUS';
+  } else {
+    // Check delegate OTP in DB for today's plan
+    const supabase = getAdminClient();
+    const todayStr = getBangkokDate();
+    const { data: plan } = await supabase
+      .schema('family')
+      .from('pickup_daily_plans')
+      .select('temp_otp_code')
+      .eq('student_id', studentId)
+      .eq('plan_date', todayStr)
+      .maybeSingle();
+
+    if (plan?.temp_otp_code && plan.temp_otp_code.replace(/\D/g, '') === clean) {
+      matchedMode = 'DELEGATE_OTP';
+    }
+  }
+
+  if (matchedMode !== 'NONE') {
+    const supabase = getAdminClient();
+    const todayStr = getBangkokDate();
+    const nowIso = new Date().toISOString();
+
+    const { data: updatedPlan, error } = await supabase
+      .schema('family')
+      .from('pickup_daily_plans')
+      .upsert(
+        {
+          student_id: studentId,
+          plan_date: todayStr,
+          arrival_status: 'RELEASED',
+          released_at: nowIso,
+          released_by_staff: verifiedBy || 'เจ้าหน้าที่จุดรับ-ส่ง',
+          updated_at: nowIso,
+        },
+        { onConflict: 'student_id,plan_date' }
+      )
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating pickup plan after TOTP verification:', error);
+    }
+    return { valid: true, matchedMode, updatedPlan };
+  }
+
+  return { valid: false, matchedMode: 'NONE' };
 }

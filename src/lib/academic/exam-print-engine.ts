@@ -1,43 +1,14 @@
 import QRCode from 'qrcode';
-import katex from 'katex';
-import { AcademicExamQuestion } from '@/types/academic';
-import { parseImageUrlMeta, isImageChoice, parseChoiceContent } from '@/lib/academic/exam-image-utils';
+import type { AcademicExamQuestion } from '../../types/academic';
+import { parseImageUrlMeta, isImageChoice, parseChoiceContent } from './exam-image-utils';
+import { renderSafeKaTeX, sanitizeSvg } from './security-sanitizer';
 
 /**
- * Safely converts LaTeX expressions ($...$ and $$...$$) into KaTeX HTML for sharp vector printing
+ * Safely converts LaTeX expressions ($...$ and $$...$$) into KaTeX HTML for sharp vector printing,
+ * escaping any surrounding HTML to prevent XSS injection.
  */
 export function renderMathInHtml(text: string): string {
-  if (!text) return '';
-  try {
-    if (text.includes('$')) {
-      // Replace display equations $$...$$
-      let res = text.replace(/\$\$([^$]+)\$\$/g, (_, eq) => {
-        try {
-          return katex.renderToString(eq, { displayMode: true, throwOnError: false, strict: 'ignore' });
-        } catch {
-          return eq;
-        }
-      });
-      // Replace inline equations $...$
-      res = res.replace(/\$([^$]+)\$/g, (_, eq) => {
-        try {
-          return katex.renderToString(eq, { displayMode: false, throwOnError: false, strict: 'ignore' });
-        } catch {
-          return eq;
-        }
-      });
-      return res;
-    }
-
-    // Fallback: if text has raw LaTeX commands without $ delimiters
-    if (/\\(frac|sqrt|times|div|pm|cdot|le|ge|neq|approx|pi|theta|alpha|beta|Delta|Omega|sum|int|infty)/.test(text)) {
-      return katex.renderToString(text, { displayMode: false, throwOnError: false, strict: 'ignore' });
-    }
-
-    return text;
-  } catch {
-    return text;
-  }
+  return renderSafeKaTeX(text);
 }
 
 export interface ExamPaperMeta {
@@ -93,6 +64,9 @@ export interface BatchAnswerSheetsOptions {
   academicYear?: string;
   term?: string;
   hasSubjective?: boolean;
+  subjectiveQuestionsCount?: number;
+  subjectiveQuestions?: AcademicExamQuestion[];
+  questions?: AcademicExamQuestion[];
 }
 
 /**
@@ -332,7 +306,16 @@ export function generateExamPaperHtml(
     const getChoiceText = (letter: string) => {
       const origKey = (choiceMap && choiceMap[letter]) ? choiceMap[letter] : letter;
       const mappedLetter = origKey.toLowerCase();
-      return (q as any)[`choice_${mappedLetter}`] || (q as any)[`choice_${letter.toLowerCase()}`] || '';
+      const directChoice = (q as any)[`choice_${mappedLetter}`] || (q as any)[`choice_${letter.toLowerCase()}`];
+      if (directChoice) return directChoice;
+      if (q.question_meta?.choices && Array.isArray(q.question_meta.choices)) {
+        const letterIndex = { a: 0, b: 1, c: 2, d: 3, e: 4 }[mappedLetter];
+        if (letterIndex !== undefined && q.question_meta.choices[letterIndex]) {
+          const item = q.question_meta.choices[letterIndex];
+          return typeof item === 'string' ? item : item.text || '';
+        }
+      }
+      return '';
     };
 
     const choiceA = getChoiceText('A') || 'ตัวเลือก ก';
@@ -351,44 +334,215 @@ export function generateExamPaperHtml(
     const isFirstQuestion = idx === 0;
 
     const renderSubjectiveAnswerSpace = () => {
-      const spaceFormat = (q as any).choice_b || 'lines_5';
+      const subjectiveMode = (q.question_meta?.subjective_mode) || (q as any).choice_b || 'lines_5';
       const points = q.points || 5;
 
-      let lineCount = 5;
-      if (spaceFormat === 'lines_3') lineCount = 3;
-      else if (spaceFormat === 'lines_8') lineCount = 8;
-      else if (spaceFormat === 'lines_10') lineCount = 10;
+      let innerHtml = '';
 
-      const isBox = spaceFormat === 'blank_box' || spaceFormat === 'grid_box';
-
-      return `
-        <div class="subjective-response-container" style="margin-top: 10px; margin-bottom: 6px;">
-          ${isBox ? `
-            <div class="subjective-workings-box subjective-box ${spaceFormat === 'grid_box' ? 'grid-box' : 'blank-box'}" style="height: ${spaceFormat === 'grid_box' ? '160px' : '130px'}; border: 1.5px dashed #94a3b8; border-radius: 6px; padding: 10px; background-color: ${spaceFormat === 'grid_box' ? '#f8fafc' : '#ffffff'}; position: relative; overflow: hidden;">
-              ${spaceFormat === 'grid_box' ? `
-                <svg width="100%" height="100%" style="position: absolute; inset: 0; pointer-events: none;" xmlns="http://www.w3.org/2000/svg">
-                  <defs>
-                    <pattern id="print-grid-${qNum}" width="18" height="18" patternUnits="userSpaceOnUse">
-                      <path d="M 18 0 L 0 0 0 18" fill="none" stroke="#cbd5e1" stroke-width="0.7" />
-                    </pattern>
-                  </defs>
-                  <rect width="100%" height="100%" fill="url(#print-grid-${qNum})" />
-                </svg>
-              ` : ''}
-              <span style="position: relative; z-index: 1; font-size: 11px; color: #64748b; font-weight: 600; background: rgba(255,255,255,0.85); padding: 1px 4px; border-radius: 3px;">พื้นที่สำหรับแสดงวิธีทำ / เขียนคำตอบ / วาดภาพ:</span>
+      if (subjectiveMode === 'short_fill') {
+        innerHtml = `
+          <div class="subjective-short-fill" style="margin: 8px 0; display: flex; align-items: center; gap: 10px; font-size: 13px;">
+            <span style="font-weight: 700; color: #1e293b; white-space: nowrap;">ตอบ:</span>
+            <div style="flex: 1; border-bottom: 1.5px dotted #64748b; height: 26px;"></div>
+            <div style="border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 8px; font-size: 11px; color: #64748b; background: #f8fafc; white-space: nowrap;">
+              [ หน่วย: .................... ]
             </div>
-          ` : `
-            <div class="subjective-dotted-lines" style="display: flex; flex-direction: column; gap: 10px; padding: 4px 0;">
-              ${Array.from({ length: lineCount }).map((_, lineIdx) => `
-                <div class="subjective-line" style="border-bottom: 1px dashed #94a3b8; height: 28px; display: flex; align-items: flex-end;">
-                  ${lineIdx === 0 ? '<span style="font-size: 12px; color: #475569; font-weight: 700; padding-right: 8px; padding-bottom: 2px;">ตอบ:</span>' : ''}
+          </div>
+        `;
+      } else if (subjectiveMode === 'step_by_step_math') {
+        innerHtml = `
+          <div class="subjective-math-steps" style="margin: 8px 0; border: 1.5px solid #94a3b8; border-radius: 6px; overflow: hidden; background: #ffffff;">
+            <div style="background: #f1f5f9; padding: 4px 10px; font-size: 11px; font-weight: 700; color: #334155; border-bottom: 1px solid #cbd5e1; display: flex; justify-content: space-between;">
+              <span>วิธีทำ (แสดงลำดับขั้นตอนการคำนวณและสูตรที่ใช้):</span>
+              <span style="font-weight: normal; color: #64748b; font-size: 10px;">(สามารถทดเลขในพื้นที่นี้ได้)</span>
+            </div>
+            <div style="min-height: 120px; padding: 6px 10px; background-image: repeating-linear-gradient(transparent, transparent 27px, #e2e8f0 27px, #e2e8f0 28px);">
+            </div>
+            <div style="padding: 5px 10px; background: #f8fafc; border-top: 1.5px double #94a3b8; display: flex; align-items: center; gap: 8px; font-size: 12px;">
+              <strong style="color: #0f172a; white-space: nowrap;">คำตอบสุดท้าย:</strong>
+              <div style="flex: 1; border-bottom: 1.5px solid #0f172a; height: 20px;"></div>
+              <div style="border: 1px dashed #94a3b8; padding: 1px 6px; font-size: 10px; border-radius: 3px; color: #475569; white-space: nowrap;">หน่วย: ................</div>
+            </div>
+          </div>
+        `;
+      } else if (subjectiveMode === 'sub_questions') {
+        innerHtml = `
+          <div class="subjective-sub-questions" style="margin: 8px 0; display: flex; flex-direction: column; gap: 8px;">
+            ${[1, 2, 3].map(subIdx => `
+              <div style="display: flex; align-items: flex-end; gap: 8px; font-size: 12px;">
+                <span style="font-weight: 700; color: #334155; white-space: nowrap;">${qNum}.${subIdx}) ตอบ:</span>
+                <div style="flex: 1; border-bottom: 1px dashed #94a3b8; height: 22px;"></div>
+                <span style="font-size: 9.5px; color: #64748b; white-space: nowrap;">[ ...... / ${Math.round((points / 3) * 10) / 10} คะแนน ]</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } else if (subjectiveMode === 'comparison_table') {
+        innerHtml = `
+          <div class="subjective-comparison-table" style="margin: 8px 0; border: 1.5px solid #94a3b8; border-radius: 6px; overflow: hidden;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 11.5px; text-align: left;">
+              <thead>
+                <tr style="background: #f1f5f9; border-bottom: 1.5px solid #94a3b8;">
+                  <th style="padding: 5px 8px; border-right: 1px solid #cbd5e1; width: 32%; font-weight: 700; color: #1e293b;">เกณฑ์ / ประเด็นเปรียบเทียบ</th>
+                  <th style="padding: 5px 8px; border-right: 1px solid #cbd5e1; width: 34%; font-weight: 700; color: #1e293b;">กรณีที่ 1 / สิ่งแรก</th>
+                  <th style="padding: 5px 8px; width: 34%; font-weight: 700; color: #1e293b;">กรณีที่ 2 / สิ่งที่สอง</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${[1, 2, 3].map(rowIdx => `
+                  <tr style="border-bottom: 1px dashed #cbd5e1; height: 34px;">
+                    <td style="padding: 4px 8px; border-right: 1px solid #cbd5e1; color: #64748b;">${rowIdx}. ....................................</td>
+                    <td style="padding: 4px 8px; border-right: 1px solid #cbd5e1;"></td>
+                    <td style="padding: 4px 8px;"></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      } else if (subjectiveMode === 'diagram_labeling') {
+        innerHtml = `
+          <div class="subjective-diagram-labeling" style="margin: 8px 0; padding: 8px 10px; background: #f8fafc; border: 1.5px dashed #94a3b8; border-radius: 6px;">
+            <div style="font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 6px;">
+              ระบุชื่อส่วนประกอบหรือหน้าที่ตามหมายเลขที่ชี้ในแผนภาพ:
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; font-size: 12px;">
+              <div style="display: flex; align-items: flex-end; gap: 6px;">
+                <span style="font-weight: 700; color: #1e293b; white-space: nowrap;">หมายเลข (1):</span>
+                <div style="flex: 1; border-bottom: 1px dashed #64748b; height: 20px;"></div>
+              </div>
+              <div style="display: flex; align-items: flex-end; gap: 6px;">
+                <span style="font-weight: 700; color: #1e293b; white-space: nowrap;">หมายเลข (2):</span>
+                <div style="flex: 1; border-bottom: 1px dashed #64748b; height: 20px;"></div>
+              </div>
+              <div style="display: flex; align-items: flex-end; gap: 6px;">
+                <span style="font-weight: 700; color: #1e293b; white-space: nowrap;">หมายเลข (3):</span>
+                <div style="flex: 1; border-bottom: 1px dashed #64748b; height: 20px;"></div>
+              </div>
+              <div style="display: flex; align-items: flex-end; gap: 6px;">
+                <span style="font-weight: 700; color: #1e293b; white-space: nowrap;">หมายเลข (4):</span>
+                <div style="flex: 1; border-bottom: 1px dashed #64748b; height: 20px;"></div>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (subjectiveMode === 'sequencing_flow') {
+        innerHtml = `
+          <div class="subjective-sequencing-flow" style="margin: 8px 0;">
+            <div style="font-size: 10.5px; font-weight: 700; color: #475569; margin-bottom: 6px;">
+              เรียงลำดับขั้นตอนโดยเติมข้อความหรือหมายเลขลงในกล่องผังลำดับ:
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+              ${[1, 2, 3, 4].map((step, sIdx) => `
+                <div style="flex: 1; border: 1.5px solid #64748b; border-radius: 6px; padding: 4px 6px; background: #ffffff; min-height: 44px; display: flex; flex-direction: column;">
+                  <span style="font-size: 9.5px; font-weight: 700; color: #64748b;">ขั้นตอนที่ ${step}:</span>
+                  <div style="flex: 1; border-bottom: 1px dashed #cbd5e1; margin-top: 10px;"></div>
+                </div>
+                ${sIdx < 3 ? '<span style="font-size: 14px; color: #64748b; font-weight: 700;">➔</span>' : ''}
+              `).join('')}
+            </div>
+          </div>
+        `;
+      } else if (subjectiveMode === 'drawing_and_explain') {
+        innerHtml = `
+          <div class="subjective-drawing-explain" style="margin: 8px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div style="border: 1.5px dashed #94a3b8; border-radius: 6px; padding: 6px; min-height: 125px; background: #f8fafc; position: relative; overflow: hidden;">
+              <svg width="100%" height="100%" style="position: absolute; inset: 0; pointer-events: none;" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <pattern id="print-dot-grid-${qNum}" width="16" height="16" patternUnits="userSpaceOnUse">
+                    <circle cx="2" cy="2" r="0.75" fill="#94a3b8" />
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#print-dot-grid-${qNum})" />
+              </svg>
+              <span style="position: relative; z-index: 1; font-size: 10.5px; font-weight: 700; color: #475569; background: rgba(255,255,255,0.85); padding: 1px 4px; border-radius: 3px;">
+                [ กรอบวาดภาพประกอบ / แผนภาพ ]
+              </span>
+            </div>
+            <div style="display: flex; flex-direction: column; justify-content: space-between; gap: 6px;">
+              <span style="font-size: 10.5px; font-weight: 700; color: #475569;">คำอธิบายภาพประกอบ:</span>
+              ${[1, 2, 3, 4].map(() => `
+                <div style="border-bottom: 1px dashed #94a3b8; height: 22px;"></div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      } else if (subjectiveMode === 'language_writing') {
+        innerHtml = `
+          <div class="subjective-language-writing" style="margin: 8px 0; display: flex; flex-direction: column; gap: 10px;">
+            ${[1, 2, 3].map(() => `
+              <div style="border: 1px solid #cbd5e1; border-radius: 4px; overflow: hidden; background: #fafafa;">
+                <div style="height: 10px; border-bottom: 1px solid #cbd5e1; background: #ffffff;"></div>
+                <div style="height: 12px; border-bottom: 1px dashed #94a3b8; background: #f8fafc;"></div>
+                <div style="height: 12px; border-bottom: 1.5px solid #475569; background: #ffffff;"></div>
+                <div style="height: 8px; background: #f8fafc;"></div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } else if (subjectiveMode === 'essay_extended') {
+        innerHtml = `
+          <div class="subjective-essay" style="margin: 8px 0;">
+            <div style="font-size: 10px; color: #64748b; margin-bottom: 4px; font-style: italic;">
+              (เขียนบรรยายความเรียง ความยาวประมาณ 5-8 บรรทัด ตัวบรรจงเรียบร้อย)
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              ${Array.from({ length: 8 }).map((_, lineIdx) => `
+                <div style="border-bottom: 1px dashed #94a3b8; height: 24px; display: flex; align-items: flex-end;">
+                  ${lineIdx === 0 ? '<span style="font-size: 11px; color: #475569; font-weight: 700; padding-right: 8px; padding-bottom: 2px;">ตอบ:</span>' : ''}
                 </div>
               `).join('')}
             </div>
-          `}
+          </div>
+        `;
+      } else if (subjectiveMode === 'blank_box' || subjectiveMode === 'grid_box') {
+        innerHtml = `
+          <div class="subjective-workings-box subjective-box ${subjectiveMode === 'grid_box' ? 'grid-box' : 'blank-box'}" style="height: ${subjectiveMode === 'grid_box' ? '160px' : '130px'}; border: 1.5px dashed #94a3b8; border-radius: 6px; padding: 10px; background-color: ${subjectiveMode === 'grid_box' ? '#f8fafc' : '#ffffff'}; position: relative; overflow: hidden;">
+            ${subjectiveMode === 'grid_box' ? `
+              <svg width="100%" height="100%" style="position: absolute; inset: 0; pointer-events: none;" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <pattern id="print-grid-${qNum}" width="18" height="18" patternUnits="userSpaceOnUse">
+                    <path d="M 18 0 L 0 0 0 18" fill="none" stroke="#cbd5e1" stroke-width="0.7" />
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#print-grid-${qNum})" />
+              </svg>
+            ` : ''}
+            <span style="position: relative; z-index: 1; font-size: 11px; color: #64748b; font-weight: 600; background: rgba(255,255,255,0.85); padding: 1px 4px; border-radius: 3px;">พื้นที่สำหรับแสดงวิธีทำ / เขียนคำตอบ / วาดภาพ:</span>
+          </div>
+        `;
+      } else {
+        // Default standard lined response (lines_3, lines_5, lines_8, lines_10)
+        let lineCount = 5;
+        if (subjectiveMode === 'lines_3') lineCount = 3;
+        else if (subjectiveMode === 'lines_8') lineCount = 8;
+        else if (subjectiveMode === 'lines_10') lineCount = 10;
 
-          <div style="margin-top: 8px; display: flex; justify-content: flex-end;">
-            <div style="display: inline-flex; align-items: center; gap: 8px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 10px; font-size: 10px; color: #475569; background: #f8fafc;">
+        innerHtml = `
+          <div class="subjective-dotted-lines" style="display: flex; flex-direction: column; gap: 8px; padding: 4px 0;">
+            ${Array.from({ length: lineCount }).map((_, lineIdx) => `
+              <div class="subjective-line" style="border-bottom: 1px dashed #94a3b8; height: 26px; display: flex; align-items: flex-end;">
+                ${lineIdx === 0 ? '<span style="font-size: 12px; color: #475569; font-weight: 700; padding-right: 8px; padding-bottom: 2px;">ตอบ:</span>' : ''}
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      const hasRubricCriteria = q.choice_c && q.choice_c.trim() !== '-' && q.choice_c.trim().length > 0;
+
+      return `
+        <div class="subjective-response-container" style="margin-top: 8px; margin-bottom: 6px;">
+          ${innerHtml}
+
+          ${hasRubricCriteria ? `
+            <div class="subjective-rubric-criterion" style="margin-top: 6px; padding: 3px 8px; background: #fffbeb; border: 1px solid #fef3c7; border-radius: 4px; font-size: 10px; color: #92400e;">
+              <strong>เกณฑ์การให้คะแนน:</strong> ${renderMathInHtml(q.choice_c)}
+            </div>
+          ` : ''}
+
+          <div style="margin-top: 6px; display: flex; justify-content: flex-end;">
+            <div style="display: inline-flex; align-items: center; gap: 8px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 8px; font-size: 9.5px; color: #475569; background: #f8fafc;">
               <span>คะแนนเต็ม: <strong>${points} คะแนน</strong></span>
               <span>|</span>
               <span>คะแนนที่ได้: [ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ]</span>
@@ -442,7 +596,7 @@ export function generateExamPaperHtml(
               if (q.diagram_svg) {
                 return `
                   <div class="question-diagram-box" style="margin: 8px 0; text-align: center; max-width: 100%;">
-                    ${q.diagram_svg}
+                    ${sanitizeSvg(q.diagram_svg)}
                   </div>
                 `;
               }
@@ -955,15 +1109,57 @@ export async function generateBatchAnswerSheetsHtml(
     schoolName = 'โรงเรียนสมคิดวิทยา',
     academicYear = '2568',
     term = '1',
-    hasSubjective: hasSubjectiveOpt
+    hasSubjective: hasSubjectiveOpt,
+    subjectiveQuestionsCount,
+    subjectiveQuestions,
+    questions
   } = options;
+
+  // Resolve subjective questions from options or exam
+  const resolvedSubjQuestions: AcademicExamQuestion[] = 
+    subjectiveQuestions || 
+    (questions ? questions.filter(q => q.question_type === 'subjective') : []) ||
+    ((exam as any).questions ? (exam as any).questions.filter((q: any) => q.question_type === 'subjective') : []);
 
   const hasSubjective = Boolean(
     hasSubjectiveOpt || 
+    resolvedSubjQuestions.length > 0 ||
+    (subjectiveQuestionsCount && subjectiveQuestionsCount > 0) ||
     (exam as any).has_subjective || 
     (exam as any).hasSubjective || 
     (exam.title && exam.title.includes('อัตนัย'))
   );
+
+  // Build dynamic list of subjective questions for Teacher Scoring Bubble Zone
+  const subjectiveItems: Array<{ itemNumber: number; questionNumber: number; label: string; maxScore: number }> = [];
+  if (resolvedSubjQuestions.length > 0) {
+    resolvedSubjQuestions.forEach((q, idx) => {
+      subjectiveItems.push({
+        itemNumber: idx + 1,
+        questionNumber: q.question_number || (idx + 1),
+        label: `อ.${idx + 1} (ข้อ ${q.question_number || idx + 1})`,
+        maxScore: Math.min(Math.max(Math.round(q.points || 5), 1), 5)
+      });
+    });
+  } else if (subjectiveQuestionsCount && subjectiveQuestionsCount > 0) {
+    for (let i = 1; i <= subjectiveQuestionsCount; i++) {
+      subjectiveItems.push({
+        itemNumber: i,
+        questionNumber: i,
+        label: `อ.${i}`,
+        maxScore: 5
+      });
+    }
+  } else if (hasSubjective) {
+    for (let i = 1; i <= 4; i++) {
+      subjectiveItems.push({
+        itemNumber: i,
+        questionNumber: i,
+        label: `อ.${i}`,
+        maxScore: 5
+      });
+    }
+  }
 
   const totalQuestions = Math.min(Math.max(exam.total_questions || 20, 10), 60);
 
@@ -1190,10 +1386,30 @@ export async function generateBatchAnswerSheetsHtml(
             ${columnsHtml.join('')}
           </div>
 
-          ${hasSubjective ? `
+          ${hasSubjective && subjectiveItems.length > 0 ? `
+            <!-- Teacher Subjective Score Bubble Zone (Optical Marker for Auto-Scoring) -->
+            <div class="teacher-subjective-box" data-teacher-zone="true" style="margin-top: 4px; margin-bottom: 3px; border: 1.5px solid #0f172a; border-radius: 4px; padding: 3px 6px; background: #f8fafc;">
+              <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #cbd5e1; padding-bottom: 2px; margin-bottom: 3px;">
+                <span style="font-size: 8.5px; font-weight: 800; color: #0f172a;">ส่วนสำหรับครูผู้ตรวจให้คะแนนข้อสอบอัตนัย (Teacher Scoring Zone - ห้ามนักเรียนระบาย):</span>
+                <span style="font-size: 8px; color: #64748b;">(ใช้ดินสอ 2B ระบายคะแนนข้อละ 0-5)</span>
+              </div>
+              <div class="teacher-subjective-grid" style="display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center;">
+                ${subjectiveItems.map(item => `
+                  <div class="teacher-subjective-item" data-teacher-item="${item.itemNumber}" data-qnum="${item.questionNumber}" style="display: flex; align-items: center; gap: 2px; font-size: 8.5px;">
+                    <span class="teacher-item-label" style="font-weight: 700; color: #0f172a;">${item.label}:</span>
+                    <div class="teacher-bubble-group" style="display: flex; gap: 2px;">
+                      ${[0, 1, 2, 3, 4, 5].map(sc => `
+                        <span class="bubble-circle teacher-bubble" data-subj-item="${item.itemNumber}" data-qnum="${item.questionNumber}" data-score="${sc}" style="width: 13px; height: 13px; min-width: 13px; border: 1px solid #0f172a; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 7.5px; font-weight: bold; background: #ffffff; color: #0f172a;">${sc}</span>
+                      `).join('')}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
             <!-- Notice: Exam includes Subjective Questions answered on exam paper -->
-            <div class="subjective-notice-strip" style="margin-top: 5px; margin-bottom: 3px; padding: 3px 8px; background: #fffbeb; border: 1px dashed #d97706; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; font-size: 9.5px; color: #92400e;">
-              <span>[ข้อควรทราบ] การสอบนี้ <strong>มีข้อสอบอัตนัย (เขียนตอบ/แสดงวิธีทำ)</strong></span>
+            <div class="subjective-notice-strip" style="margin-top: 3px; margin-bottom: 3px; padding: 2px 8px; background: #fffbeb; border: 1px dashed #d97706; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; font-size: 9px; color: #92400e;">
+              <span>[ข้อควรทราบ] การสอบนี้ <strong>มีข้อสอบอัตนัย (เขียนตอบ/แสดงวิธีทำ) จำนวน ${subjectiveItems.length} ข้อ</strong></span>
               <span style="font-weight: 600;">ให้นักเรียนเขียนตอบลงในกระดาษข้อสอบโดยตรง</span>
             </div>
           ` : ''}

@@ -1,10 +1,12 @@
 /**
  * ปพ.2 (Certificate of Graduation) Engine
  * หลักฐานแสดงวุฒิการศึกษาตามหลักสูตรแกนกลางการศึกษาขั้นพื้นฐาน (ระดับประถมศึกษา)
+ * โรงเรียนสมคิดวิทยา (1121100013)
  */
 
 import { getAdminClient } from '@/lib/supabase/admin';
 import { formatThaiDate } from '@/lib/opec/regis-validator';
+import { DEFAULT_SCHOOL_IDENTITY } from '@/lib/documents/types';
 
 export interface PP2CertificateData {
   certificateNumber: string; // เช่น 1121100013/2568/001
@@ -53,10 +55,10 @@ export async function getPP2DataByStudentId(studentId: string, customClient?: an
     birthDateTh,
     graduationDateTh: '31 มีนาคม พ.ศ. 2568',
     curriculumName: 'หลักสูตรแกนกลางการศึกษาขั้นพื้นฐาน พุทธศักราช 2551 (ฉบับปรับปรุง 2560)',
-    schoolName: 'โรงเรียนสมคิดวิทยา',
+    schoolName: DEFAULT_SCHOOL_IDENTITY.nameTh,
     district: 'อำเภอเมืองลำปาง',
     province: 'จังหวัดลำปาง',
-    directorName: 'นายพิศาล เครือคงคา',
+    directorName: DEFAULT_SCHOOL_IDENTITY.directorName,
     chairmanName: 'นายสมคิด วิทยานุสรณ์'
   };
 }

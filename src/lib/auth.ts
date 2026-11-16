@@ -1,6 +1,7 @@
 import { createClient } from './supabase/server';
 import { isSystemAdmin } from './constants/auth';
 import { AppUser } from '@/types';
+import { getStaffSessionFromCookies } from './auth/staff-session';
 
 export const MOCK_PREVIEW_USER = {
   id: '47d50deb-be67-4a2b-8518-0d62a229f942',
@@ -16,10 +17,26 @@ export async function getServerUser() {
       return user;
     }
   } catch {
-    // Ignore cookie read error and check preview mode fallback
+    // Ignore cookie read error and check staff session fallback
   }
 
-  if (process.env.SV_PREVIEW_MODE === 'true') {
+  try {
+    const session = await getStaffSessionFromCookies();
+    if (session) {
+      return {
+        id: session.id,
+        email: session.email,
+        user_metadata: { full_name: session.full_name },
+        app_metadata: {},
+        aud: 'authenticated',
+        created_at: '',
+      } as any;
+    }
+  } catch {
+    // ignore
+  }
+
+  if (process.env.NODE_ENV === 'development' && process.env.SV_PREVIEW_MODE === 'true') {
     return MOCK_PREVIEW_USER as any;
   }
 
@@ -27,7 +44,7 @@ export async function getServerUser() {
 }
 
 /**
- * Returns the authenticated user strictly from Supabase session cookies.
+ * Returns the authenticated user strictly from session cookies.
  * NEVER falls back to MOCK_PREVIEW_USER.
  * Essential for public forms, guest submissions, and any flow where visitors must not inherit mock admin identity.
  */
@@ -41,6 +58,23 @@ export async function getRealAuthUser() {
   } catch {
     // Ignore cookie read error
   }
+
+  try {
+    const session = await getStaffSessionFromCookies();
+    if (session) {
+      return {
+        id: session.id,
+        email: session.email,
+        user_metadata: { full_name: session.full_name },
+        app_metadata: {},
+        aud: 'authenticated',
+        created_at: '',
+      } as any;
+    }
+  } catch {
+    // ignore
+  }
+
   return null;
 }
 
@@ -53,7 +87,7 @@ export async function getUserRole(): Promise<'admin' | 'cashier' | string | null
     // Ignore RPC error and check preview mode fallback
   }
 
-  if (process.env.SV_PREVIEW_MODE === 'true') {
+  if (process.env.NODE_ENV === 'development' && process.env.SV_PREVIEW_MODE === 'true') {
     return 'admin';
   }
 

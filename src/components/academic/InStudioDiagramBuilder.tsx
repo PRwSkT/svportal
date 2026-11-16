@@ -50,7 +50,11 @@ import {
   Droplet,
   Eye,
   EyeOff,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Pen,
+  Highlighter,
+  Eraser,
+  Sparkles
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -204,6 +208,25 @@ function simplifyPointsRDP(points: { x: number; y: number }[], epsilon: number):
     return [...rec1.slice(0, rec1.length - 1), ...rec2];
   }
   return [points[0], points[end]];
+}
+
+/**
+ * Goodnotes-style Bézier curve interpolation for smooth freehand strokes
+ */
+export function pointsToSmoothPathD(pts: { x: number; y: number }[]): string {
+  if (!pts || pts.length === 0) return '';
+  if (pts.length === 1) return `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)} L ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+  if (pts.length === 2) return `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)} L ${pts[1].x.toFixed(1)} ${pts[1].y.toFixed(1)}`;
+
+  let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const xc = (pts[i].x + pts[i + 1].x) / 2;
+    const yc = (pts[i].y + pts[i + 1].y) / 2;
+    d += ` Q ${pts[i].x.toFixed(1)} ${pts[i].y.toFixed(1)}, ${xc.toFixed(1)} ${yc.toFixed(1)}`;
+  }
+  const last = pts[pts.length - 1];
+  d += ` L ${last.x.toFixed(1)} ${last.y.toFixed(1)}`;
+  return d;
 }
 
 // Render Endpoint Cap SVG Markup at (x, y) pointing along outward angleRad
@@ -418,6 +441,16 @@ function renderCustomLineAndIntersectionMarkup(el: CanvasElement): string {
   }
 
   if (el.type === 'polygon_custom') {
+    if (el.extraProps?.pathD) {
+      const isHighlighter = Boolean(el.extraProps?.isHighlighter);
+      const strokeOp = el.strokeOpacity !== undefined ? `stroke-opacity="${el.strokeOpacity}"` : (isHighlighter ? 'stroke-opacity="0.38"' : '');
+      const blendStyle = isHighlighter ? 'style="mix-blend-mode: multiply;"' : '';
+      const textTag = el.text
+        ? `<text x="${cx}" y="${cy}" font-size="${el.fontSize || 13}" font-weight="bold" fill="#0f172a" text-anchor="middle" dominant-baseline="central" font-family="Sarabun, sans-serif">${escapeXml(el.text)}</text>`
+        : '';
+      return `<path d="${el.extraProps.pathD}" fill="${el.fill || 'none'}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" stroke-linecap="round" stroke-linejoin="round" ${strokeOp} ${dash} ${blendStyle}/>${textTag}`;
+    }
+
     const rawPts: { x: number; y: number }[] = el.extraProps?.points || [
       { x: 0.5, y: 0 },
       { x: 1, y: 0.85 },
@@ -652,15 +685,31 @@ export function InStudioDiagramBuilderModal({
   const [autoCrop, setAutoCrop] = useState<boolean>(true);
   const [zoom, setZoom] = useState<number>(1);
 
-  // Interactive Mouse Drawing Mode State
-  type ToolMode = 'select' | 'draw_line' | 'draw_smart' | 'draw_polygon';
+  // Interactive Mouse Drawing Mode State (Goodnotes Pen, Highlighter, Eraser & Shapes)
+  type ToolMode = 'select' | 'draw_line' | 'draw_smart' | 'draw_polygon' | 'freehand' | 'highlighter' | 'eraser';
   const [toolMode, setToolMode] = useState<ToolMode>('select');
+  const [penColor, setPenColor] = useState<string>('#0f172a');
+  const [penWidth, setPenWidth] = useState<number>(2.5);
+  const [highlighterColor, setHighlighterColor] = useState<string>('#facc15');
+  const [highlighterWidth, setHighlighterWidth] = useState<number>(18);
+  const drawAndHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isStylusPenActiveRef = useRef<boolean>(false);
   const [drawPresetCapStart, setDrawPresetCapStart] = useState<string>('none');
   const [drawPresetCapEnd, setDrawPresetCapEnd] = useState<string>('none');
   const [drawPresetLineShape, setDrawPresetLineShape] = useState<string>('straight');
   const [isDrawingStroke, setIsDrawingStroke] = useState<boolean>(false);
   const [drawPoints, setDrawPoints] = useState<{ x: number; y: number }[]>([]);
+  const drawPointsRef = useRef<{ x: number; y: number }[]>([]);
   const [polygonCursorPos, setPolygonCursorPos] = useState<{ x: number; y: number } | null>(null);
+
+  // Auto-fit canvas zoom on mobile & tablet viewports
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 820) {
+      const avail = Math.max(300, window.innerWidth - 36);
+      const computedZoom = Math.min(1, Math.max(0.4, Number((avail / CANVAS_WIDTH).toFixed(2))));
+      setZoom(computedZoom);
+    }
+  }, []);
 
   // History for Undo/Redo
   const [history, setHistory] = useState<CanvasElement[][]>([]);
@@ -708,10 +757,11 @@ export function InStudioDiagramBuilderModal({
       if (match && match[1]) {
         try {
           const parsed = JSON.parse(match[1]);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setElements(parsed);
-            elementsRef.current = parsed;
-            setHistory([parsed]);
+          const rawList = Array.isArray(parsed) ? parsed : (parsed && Array.isArray(parsed.elements) ? parsed.elements : null);
+          if (rawList && rawList.length > 0) {
+            setElements(rawList);
+            elementsRef.current = rawList;
+            setHistory([rawList]);
             setHistoryIndex(0);
             setSelectedId(null);
             return;
@@ -797,6 +847,72 @@ export function InStudioDiagramBuilderModal({
 
     // Preset defaults for specific shapes
     switch (type) {
+      case 'geom_triangle_angles' as any:
+        addElement('triangle', {
+          x: 220,
+          y: 120,
+          width: 180,
+          height: 140,
+          stroke: '#1e293b',
+          strokeWidth: 2,
+          fill: '#f8fafc',
+          text: 'θ = 60°'
+        });
+        addElement('angle_arc', {
+          x: 220,
+          y: 200,
+          width: 60,
+          height: 60,
+          extraProps: { angle: 60, radius: 28, showDegree: true }
+        });
+        toast.success('แทรกรูปสามเหลี่ยมพร้อมสัญลักษณ์มุม θ เรียบร้อย');
+        return;
+      case 'geom_circle_theorem' as any:
+        addElement('circle', {
+          x: 220,
+          y: 120,
+          width: 160,
+          height: 160,
+          stroke: '#0f172a',
+          strokeWidth: 2,
+          fill: '#f8fafc',
+          text: 'O'
+        });
+        addElement('line', {
+          x: 300,
+          y: 200,
+          width: 80,
+          height: 80,
+          stroke: '#2563eb',
+          strokeWidth: 2,
+          extraProps: { x1: 300, y1: 200, x2: 380, y2: 200, endCap: 'none' },
+          text: 'r'
+        });
+        toast.success('แทรกทฤษฎีวงกลม (จุดศูนย์กลาง O และรัศมี r) เรียบร้อย');
+        return;
+      case 'geom_bearing_angle' as any:
+        addElement('arrow', {
+          x: 260,
+          y: 80,
+          width: 40,
+          height: 160,
+          stroke: '#0f172a',
+          strokeWidth: 2,
+          extraProps: { x1: 280, y1: 240, x2: 280, y2: 80, endCap: 'arrow' },
+          text: 'N (เหนือ)'
+        });
+        addElement('arrow', {
+          x: 280,
+          y: 160,
+          width: 120,
+          height: 120,
+          stroke: '#e11d48',
+          strokeWidth: 2,
+          extraProps: { x1: 280, y1: 240, x2: 380, y2: 140, endCap: 'arrow' },
+          text: '045°'
+        });
+        toast.success('แทรกแผนภาพมุมทิศแบริ่ง (Bearing Angle) เรียบร้อย');
+        return;
       case 'circle':
         base.width = 110;
         base.height = 110;
@@ -1681,7 +1797,7 @@ export function InStudioDiagramBuilderModal({
     setActiveGuides({ verticals: [], horizontals: [] });
   }, [drawPoints, drawPresetCapStart, drawPresetCapEnd]);
 
-  // Interactive Canvas Mouse Down for Drawing Modes (draw_line, draw_smart, draw_polygon)
+  // Interactive Canvas Mouse Down for Drawing Modes (draw_line, draw_smart, draw_polygon, freehand, highlighter, eraser)
   const handleCanvasMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
     if (toolMode === 'select') {
       setSelectedId(null);
@@ -1689,6 +1805,28 @@ export function InStudioDiagramBuilderModal({
     }
     e.stopPropagation();
     const rawPos = getCanvasCoords(e.clientX, e.clientY);
+
+    if (toolMode === 'eraser') {
+      const hitEl = elements.slice().reverse().find(el => {
+        return rawPos.x >= el.x - 12 && rawPos.x <= el.x + el.width + 12 &&
+               rawPos.y >= el.y - 12 && rawPos.y <= el.y + el.height + 12;
+      });
+      if (hitEl) {
+        const next = elements.filter(el => el.id !== hitEl.id);
+        saveToHistory(next);
+        setSelectedId(null);
+        toast.success('ลบเส้นหรือวัตถุเรียบร้อย');
+      }
+      return;
+    }
+
+    if (toolMode === 'freehand' || toolMode === 'highlighter') {
+      setIsDrawingStroke(true);
+      const initialPts = [{ x: Math.round(rawPos.x), y: Math.round(rawPos.y) }];
+      setDrawPoints(initialPts);
+      drawPointsRef.current = initialPts;
+      return;
+    }
 
     if (toolMode === 'draw_polygon') {
       const anchor = drawPoints.length > 0 ? drawPoints[drawPoints.length - 1] : null;
@@ -1698,7 +1836,9 @@ export function InStudioDiagramBuilderModal({
         finishPolygonDrawing(true);
         return;
       }
-      setDrawPoints(prev => [...prev, { x: snapped.x, y: snapped.y }]);
+      const updatedPts = [...drawPoints, { x: snapped.x, y: snapped.y }];
+      setDrawPoints(updatedPts);
+      drawPointsRef.current = updatedPts;
       setActiveGuides({ verticals: snapped.verticals, horizontals: snapped.horizontals });
       return;
     }
@@ -1706,13 +1846,109 @@ export function InStudioDiagramBuilderModal({
     // draw_line or draw_smart
     const snapped = snapPointWithGuides(rawPos, null, null, e.shiftKey);
     setIsDrawingStroke(true);
-    setDrawPoints([{ x: snapped.x, y: snapped.y }]);
+    const initialPts = [{ x: snapped.x, y: snapped.y }];
+    setDrawPoints(initialPts);
+    drawPointsRef.current = initialPts;
     setActiveGuides({ verticals: snapped.verticals, horizontals: snapped.horizontals });
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
     if (toolMode === 'select') return;
     const rawPos = getCanvasCoords(e.clientX, e.clientY);
+
+    if (toolMode === 'eraser') {
+      if (e.buttons === 1) {
+        const hitEl = elements.slice().reverse().find(el => {
+          return rawPos.x >= el.x - 10 && rawPos.x <= el.x + el.width + 10 &&
+                 rawPos.y >= el.y - 10 && rawPos.y <= el.y + el.height + 10;
+        });
+        if (hitEl) {
+          const next = elements.filter(el => el.id !== hitEl.id);
+          saveToHistory(next);
+          setSelectedId(null);
+        }
+      }
+      return;
+    }
+
+    if (toolMode === 'freehand' || toolMode === 'highlighter') {
+      if (!isDrawingStroke) return;
+      const pts = drawPointsRef.current;
+      const lastPt = pts[pts.length - 1];
+      if (!lastPt || Math.hypot(rawPos.x - lastPt.x, rawPos.y - lastPt.y) >= 2.5) {
+        const nextPt = { x: Math.round(rawPos.x), y: Math.round(rawPos.y) };
+        const updated = [...pts, nextPt];
+        drawPointsRef.current = updated;
+        setDrawPoints(updated);
+      }
+
+      // Draw & Hold timer for freehand: holding still for 400ms triggers geometric shape snap
+      if (toolMode === 'freehand') {
+        if (drawAndHoldTimerRef.current) clearTimeout(drawAndHoldTimerRef.current);
+        drawAndHoldTimerRef.current = setTimeout(() => {
+          const currentPts = drawPointsRef.current;
+          if (currentPts.length >= 8) {
+            const first = currentPts[0];
+            const last = currentPts[currentPts.length - 1];
+            const totalLen = currentPts.reduce((acc, p, idx) => idx > 0 ? acc + Math.hypot(p.x - currentPts[idx - 1].x, p.y - currentPts[idx - 1].y) : 0, 0);
+            const endDist = Math.hypot(last.x - first.x, last.y - first.y);
+            const isClosed = endDist <= Math.max(38, totalLen * 0.22);
+
+            const xs = currentPts.map(p => p.x);
+            const ys = currentPts.map(p => p.y);
+            const minX = Math.min(...xs);
+            const maxX = Math.max(...xs);
+            const minY = Math.min(...ys);
+            const maxY = Math.max(...ys);
+            const w = Math.max(20, maxX - minX);
+            const h = Math.max(20, maxY - minY);
+
+            if (isClosed) {
+              const aspect = w / (h || 1);
+              if (aspect >= 0.75 && aspect <= 1.3) {
+                const d = Math.round((w + h) / 2);
+                addElement('circle', {
+                  x: minX,
+                  y: minY,
+                  width: d,
+                  height: d,
+                  stroke: penColor,
+                  strokeWidth: penWidth,
+                  fill: '#ffffff'
+                });
+                toast.success('💡 Draw & Hold: แปลงเป็นวงกลมเรขาคณิตอัตโนมัติ');
+              } else {
+                addElement('rect', {
+                  x: minX,
+                  y: minY,
+                  width: w,
+                  height: h,
+                  stroke: penColor,
+                  strokeWidth: penWidth,
+                  fill: '#ffffff'
+                });
+                toast.success('💡 Draw & Hold: แปลงเป็นสี่เหลี่ยมเรขาคณิตอัตโนมัติ');
+              }
+            } else {
+              addElement('line', {
+                x: minX,
+                y: minY,
+                width: w,
+                height: h,
+                stroke: penColor,
+                strokeWidth: penWidth,
+                extraProps: { x1: first.x, y1: first.y, x2: last.x, y2: last.y }
+              });
+              toast.success('💡 Draw & Hold: แปลงเป็นเส้นตรงอัตโนมัติ');
+            }
+            setIsDrawingStroke(false);
+            setDrawPoints([]);
+            drawPointsRef.current = [];
+          }
+        }, 400);
+      }
+      return;
+    }
 
     if (toolMode === 'draw_polygon') {
       if (drawPoints.length === 0) return;
@@ -1739,12 +1975,59 @@ export function InStudioDiagramBuilderModal({
   };
 
   const handleCanvasMouseUp = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (toolMode === 'select' || toolMode === 'draw_polygon') return;
+    if (drawAndHoldTimerRef.current) clearTimeout(drawAndHoldTimerRef.current);
+
+    if (toolMode === 'select' || toolMode === 'draw_polygon' || toolMode === 'eraser') return;
     if (!isDrawingStroke) return;
     setIsDrawingStroke(false);
     setActiveGuides({ verticals: [], horizontals: [] });
 
     if (drawPoints.length < 2) {
+      setDrawPoints([]);
+      return;
+    }
+
+    if (toolMode === 'freehand') {
+      const xs = drawPoints.map(p => p.x);
+      const ys = drawPoints.map(p => p.y);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      const pathD = pointsToSmoothPathD(drawPoints);
+      addElement('polygon_custom', {
+        x: minX,
+        y: minY,
+        width: Math.max(10, maxX - minX),
+        height: Math.max(10, maxY - minY),
+        stroke: penColor,
+        strokeWidth: penWidth,
+        fill: 'none',
+        extraProps: { pathD, isFreehand: true }
+      });
+      setDrawPoints([]);
+      return;
+    }
+
+    if (toolMode === 'highlighter') {
+      const xs = drawPoints.map(p => p.x);
+      const ys = drawPoints.map(p => p.y);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      const pathD = pointsToSmoothPathD(drawPoints);
+      addElement('polygon_custom', {
+        x: minX,
+        y: minY,
+        width: Math.max(10, maxX - minX),
+        height: Math.max(10, maxY - minY),
+        stroke: highlighterColor,
+        strokeWidth: highlighterWidth,
+        strokeOpacity: 0.38,
+        fill: 'none',
+        extraProps: { pathD, isHighlighter: true }
+      });
       setDrawPoints([]);
       return;
     }
@@ -1938,6 +2221,186 @@ export function InStudioDiagramBuilderModal({
     });
     toast.success('แปลงเส้นวาดเป็นเส้นตรงต่อเนื่องเรียบร้อย');
     setDrawPoints([]);
+    drawPointsRef.current = [];
+  };
+
+  // Touch Handlers for Mobile & Tablet (Apple Pencil, Stylus & Touch)
+  const handleCanvasTouchStart = (e: React.TouchEvent<SVGSVGElement>) => {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const rawPos = getCanvasCoords(t.clientX, t.clientY);
+
+    if (toolMode === 'select') {
+      setSelectedId(null);
+      return;
+    }
+
+    if (toolMode === 'eraser') {
+      const hitEl = elements.slice().reverse().find(el => {
+        return rawPos.x >= el.x - 14 && rawPos.x <= el.x + el.width + 14 &&
+               rawPos.y >= el.y - 14 && rawPos.y <= el.y + el.height + 14;
+      });
+      if (hitEl) {
+        const next = elements.filter(el => el.id !== hitEl.id);
+        saveToHistory(next);
+        setSelectedId(null);
+        toast.success('ลบเส้นหรือวัตถุเรียบร้อย');
+      }
+      return;
+    }
+
+    if (toolMode === 'freehand' || toolMode === 'highlighter') {
+      setIsDrawingStroke(true);
+      const initialPts = [{ x: Math.round(rawPos.x), y: Math.round(rawPos.y) }];
+      setDrawPoints(initialPts);
+      drawPointsRef.current = initialPts;
+      return;
+    }
+
+    if (toolMode === 'draw_polygon') {
+      const anchor = drawPoints.length > 0 ? drawPoints[drawPoints.length - 1] : null;
+      const snapped = snapPointWithGuides(rawPos, null, anchor, false);
+      if (drawPoints.length >= 3 && Math.hypot(snapped.x - drawPoints[0].x, snapped.y - drawPoints[0].y) <= 18) {
+        finishPolygonDrawing(true);
+        return;
+      }
+      const updatedPts = [...drawPoints, { x: snapped.x, y: snapped.y }];
+      setDrawPoints(updatedPts);
+      drawPointsRef.current = updatedPts;
+      setActiveGuides({ verticals: snapped.verticals, horizontals: snapped.horizontals });
+      return;
+    }
+
+    const snapped = snapPointWithGuides(rawPos, null, null, false);
+    setIsDrawingStroke(true);
+    const initial = [{ x: snapped.x, y: snapped.y }];
+    setDrawPoints(initial);
+    drawPointsRef.current = initial;
+    setActiveGuides({ verticals: snapped.verticals, horizontals: snapped.horizontals });
+  };
+
+  const handleCanvasTouchMove = (e: React.TouchEvent<SVGSVGElement>) => {
+    if (toolMode === 'select' || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const rawPos = getCanvasCoords(t.clientX, t.clientY);
+
+    if (toolMode === 'eraser') {
+      const hitEl = elements.slice().reverse().find(el => {
+        return rawPos.x >= el.x - 12 && rawPos.x <= el.x + el.width + 12 &&
+               rawPos.y >= el.y - 12 && rawPos.y <= el.y + el.height + 12;
+      });
+      if (hitEl) {
+        const next = elements.filter(el => el.id !== hitEl.id);
+        saveToHistory(next);
+        setSelectedId(null);
+      }
+      return;
+    }
+
+    if (toolMode === 'freehand' || toolMode === 'highlighter') {
+      if (!isDrawingStroke) return;
+      const pts = drawPointsRef.current;
+      const lastPt = pts[pts.length - 1];
+      if (!lastPt || Math.hypot(rawPos.x - lastPt.x, rawPos.y - lastPt.y) >= 2.5) {
+        const nextPt = { x: Math.round(rawPos.x), y: Math.round(rawPos.y) };
+        const updated = [...pts, nextPt];
+        drawPointsRef.current = updated;
+        setDrawPoints(updated);
+      }
+
+      if (toolMode === 'freehand') {
+        if (drawAndHoldTimerRef.current) clearTimeout(drawAndHoldTimerRef.current);
+        drawAndHoldTimerRef.current = setTimeout(() => {
+          const currentPts = drawPointsRef.current;
+          if (currentPts.length >= 8) {
+            const first = currentPts[0];
+            const last = currentPts[currentPts.length - 1];
+            const totalLen = currentPts.reduce((acc, p, idx) => idx > 0 ? acc + Math.hypot(p.x - currentPts[idx - 1].x, p.y - currentPts[idx - 1].y) : 0, 0);
+            const endDist = Math.hypot(last.x - first.x, last.y - first.y);
+            const isClosed = endDist <= Math.max(38, totalLen * 0.22);
+
+            const xs = currentPts.map(p => p.x);
+            const ys = currentPts.map(p => p.y);
+            const minX = Math.min(...xs);
+            const maxX = Math.max(...xs);
+            const minY = Math.min(...ys);
+            const maxY = Math.max(...ys);
+            const w = Math.max(20, maxX - minX);
+            const h = Math.max(20, maxY - minY);
+
+            if (isClosed) {
+              const aspect = w / (h || 1);
+              if (aspect >= 0.75 && aspect <= 1.3) {
+                const d = Math.round((w + h) / 2);
+                addElement('circle', {
+                  x: minX,
+                  y: minY,
+                  width: d,
+                  height: d,
+                  stroke: penColor,
+                  strokeWidth: penWidth,
+                  fill: '#ffffff'
+                });
+                toast.success('💡 Draw & Hold: แปลงเป็นวงกลมเรขาคณิตอัตโนมัติ');
+              } else {
+                addElement('rect', {
+                  x: minX,
+                  y: minY,
+                  width: w,
+                  height: h,
+                  stroke: penColor,
+                  strokeWidth: penWidth,
+                  fill: '#ffffff'
+                });
+                toast.success('💡 Draw & Hold: แปลงเป็นสี่เหลี่ยมเรขาคณิตอัตโนมัติ');
+              }
+            } else {
+              addElement('line', {
+                x: minX,
+                y: minY,
+                width: w,
+                height: h,
+                stroke: penColor,
+                strokeWidth: penWidth,
+                extraProps: { x1: first.x, y1: first.y, x2: last.x, y2: last.y }
+              });
+              toast.success('💡 Draw & Hold: แปลงเป็นเส้นตรงอัตโนมัติ');
+            }
+            setIsDrawingStroke(false);
+            setDrawPoints([]);
+            drawPointsRef.current = [];
+          }
+        }, 400);
+      }
+      return;
+    }
+
+    if (toolMode === 'draw_polygon') {
+      if (drawPoints.length === 0) return;
+      const anchor = drawPoints[drawPoints.length - 1];
+      const snapped = snapPointWithGuides(rawPos, null, anchor, false);
+      setPolygonCursorPos({ x: snapped.x, y: snapped.y });
+      setActiveGuides({ verticals: snapped.verticals, horizontals: snapped.horizontals });
+      return;
+    }
+
+    if (!isDrawingStroke || drawPoints.length === 0) return;
+
+    if (toolMode === 'draw_line') {
+      const startPt = drawPoints[0];
+      const snapped = snapPointWithGuides(rawPos, null, startPt, false);
+      setDrawPoints([startPt, { x: snapped.x, y: snapped.y }]);
+      setActiveGuides({ verticals: snapped.verticals, horizontals: snapped.horizontals });
+    } else if (toolMode === 'draw_smart') {
+      const lastPt = drawPoints[drawPoints.length - 1];
+      if (Math.hypot(rawPos.x - lastPt.x, rawPos.y - lastPt.y) >= 4) {
+        setDrawPoints(prev => [...prev, { x: Math.round(rawPos.x), y: Math.round(rawPos.y) }]);
+      }
+    }
+  };
+
+  const handleCanvasTouchEnd = () => {
+    handleCanvasMouseUp({} as any);
   };
 
   // Quick Rotate shortcuts (-90, +90, -15, +15)
@@ -4311,13 +4774,13 @@ ${cellsStr}`;
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-sm tracking-wide">สตูดิโอออกแบบแผนภาพข้อสอบ (Canva Studio Pro)</h3>
+                <h3 className="font-bold text-sm tracking-wide">สตูดิโอออกแบบแผนภาพและวาดโจทย์อิสระ (Goodnotes Ink & Diagram Studio Pro)</h3>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30">
                   Vector Engine v2.1
                 </span>
               </div>
               <p className="text-[11px] text-stone-400">
-                ลากวาง ปรับแต่งรูปทรงเรขาคณิต 2D/3D วงจรไฟฟ้า เครื่องแก้ววิทย์ และเส้นจำนวน
+                วาดอิสระด้วยปากกา Draw & Hold, ไฮไลต์โปร่งแสง, ยางลบ Stroke, รูปทรงเรขาคณิต 2D/3D และเครื่องแก้ววิทย์
               </p>
             </div>
           </div>
@@ -4668,6 +5131,9 @@ ${cellsStr}`;
                       { type: 'parallel_transversal', label: 'เส้นขนาน & มุมเส้นตัด', icon: <SlidersHorizontal className="w-3.5 h-3.5 text-violet-600" /> },
                       { type: 'intersecting_lines', label: 'เส้นตัดกัน & มุมตรงข้าม', icon: <Compass className="w-3.5 h-3.5 text-rose-600" /> },
                       { type: 'dimension_line', label: 'เส้นบอกขนาด', icon: <Minus className="w-3.5 h-3.5 text-emerald-600" /> },
+                      { type: 'geom_triangle_angles', label: 'สามเหลี่ยมพร้อมมุม (θ)', icon: <Triangle className="w-3.5 h-3.5 text-blue-600" /> },
+                      { type: 'geom_circle_theorem', label: 'ทฤษฎีวงกลม (O & r)', icon: <Circle className="w-3.5 h-3.5 text-indigo-600" /> },
+                      { type: 'geom_bearing_angle', label: 'มุมทิศแบริ่ง (045° N)', icon: <Compass className="w-3.5 h-3.5 text-rose-600" /> },
                       { type: 'angle_arc', label: 'มุม & ส่วนโค้ง', icon: <Compass className="w-3.5 h-3.5 text-purple-600" /> },
                       { type: 'protractor', label: 'ไม้โปรแทรกเตอร์', icon: <Compass className="w-3.5 h-3.5 text-sky-600" /> },
                       { type: 'axes_xy', label: 'แกนพิกัดฉาก X-Y', icon: <Grid3X3 className="w-3.5 h-3.5 text-cyan-600" /> },
@@ -4862,6 +5328,64 @@ ${cellsStr}`;
                   <Move className="w-3.5 h-3.5" />
                   <span>เลือก/ย้าย</span>
                 </button>
+
+                {/* Goodnotes Freehand Pen with Draw & Hold */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setToolMode('freehand');
+                    setDrawPoints([]);
+                    setSelectedId(null);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors ${
+                    toolMode === 'freehand'
+                      ? 'bg-rose-600 text-white shadow-2xs'
+                      : 'text-stone-700 hover:bg-stone-100'
+                  }`}
+                  title="ปากกาวาดลายเส้นอิสระสไตล์ Goodnotes (วาดแล้วค้างไว้ 0.4 วินาทีเพื่อแปลงเป็นรูปทรงเรขาคณิตอัตโนมัติ)"
+                >
+                  <Pen className="w-3.5 h-3.5" />
+                  <span>ปากกา (Draw & Hold)</span>
+                </button>
+
+                {/* Highlighter */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setToolMode('highlighter');
+                    setDrawPoints([]);
+                    setSelectedId(null);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors ${
+                    toolMode === 'highlighter'
+                      ? 'bg-amber-500 text-white shadow-2xs'
+                      : 'text-stone-700 hover:bg-stone-100'
+                  }`}
+                  title="ปากกาเน้นข้อความโปร่งแสง สำหรับเน้นจุดสำคัญหรือระบายทับแผนภาพ"
+                >
+                  <Highlighter className="w-3.5 h-3.5" />
+                  <span>ไฮไลต์</span>
+                </button>
+
+                {/* Stroke Eraser */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setToolMode('eraser');
+                    setDrawPoints([]);
+                    setSelectedId(null);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors ${
+                    toolMode === 'eraser'
+                      ? 'bg-red-600 text-white shadow-2xs'
+                      : 'text-stone-700 hover:bg-stone-100'
+                  }`}
+                  title="คลิกหรือลากผ่านเส้น/วัตถุเพื่อลบออกทันที"
+                >
+                  <Eraser className="w-3.5 h-3.5" />
+                  <span>ยางลบ</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -4954,8 +5478,8 @@ ${cellsStr}`;
                 <div className="w-px h-3.5 bg-stone-200 mx-0.5" />
                 <button
                   type="button"
-                  onClick={() => setZoom(prev => Math.max(0.5, prev - 0.25))}
-                  className="p-1 hover:bg-stone-100 rounded text-stone-600"
+                  onClick={() => setZoom(prev => Math.max(0.4, prev - 0.2))}
+                  className="p-1 hover:bg-stone-100 rounded text-stone-600 cursor-pointer"
                   title="ย่อมุมมอง"
                 >
                   <ZoomOut className="w-3.5 h-3.5" />
@@ -4963,96 +5487,249 @@ ${cellsStr}`;
                 <span className="text-[10px] font-bold text-stone-700 w-9 text-center">{Math.round(zoom * 100)}%</span>
                 <button
                   type="button"
-                  onClick={() => setZoom(prev => Math.min(1.5, prev + 0.25))}
-                  className="p-1 hover:bg-stone-100 rounded text-stone-600"
+                  onClick={() => setZoom(prev => Math.min(1.5, prev + 0.2))}
+                  className="p-1 hover:bg-stone-100 rounded text-stone-600 cursor-pointer"
                   title="ขยายมุมมอง"
                 >
                   <ZoomIn className="w-3.5 h-3.5" />
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      const avail = Math.max(300, window.innerWidth - 48);
+                      const fitZoom = Math.min(1, Math.max(0.4, Number((avail / CANVAS_WIDTH).toFixed(2))));
+                      setZoom(fitZoom);
+                    } else {
+                      setZoom(1);
+                    }
+                  }}
+                  className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-stone-100 hover:bg-stone-200 text-stone-700 cursor-pointer"
+                  title="ปรับขนาดพอดีหน้าจอ (Responsive Fit)"
+                >
+                  พอดีจอ
+                </button>
               </div>
 
-              {/* Sub-bar when Drawing Mode is Active: Preset Endpoint Caps & Line Shape */}
+              {/* Sub-bar when Drawing Mode is Active */}
               {toolMode !== 'select' && (
                 <div className="w-full pt-1.5 mt-1 border-t border-stone-200 flex flex-wrap items-center justify-between gap-2 text-[11px]">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="flex items-center gap-1">
-                      <span className="text-stone-500 font-semibold">ทรงเส้น:</span>
-                      <select
-                        value={drawPresetLineShape}
-                        onChange={(e) => setDrawPresetLineShape(e.target.value as any)}
-                        className="px-1.5 py-0.5 border border-stone-300 rounded bg-white font-semibold text-stone-800"
-                      >
-                        <option value="straight">เส้นตรง (Straight)</option>
-                        <option value="curved">เส้นโค้ง (Curved)</option>
-                        <option value="elbow">เส้นหักฉาก (Elbow)</option>
-                        <option value="zigzag">เส้นซิกแซก/สปริง (Zigzag)</option>
-                        <option value="double">เส้นคู่ขนาน (Double)</option>
-                      </select>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="text-stone-500 font-semibold">หัวเส้นเริ่มต้น:</span>
-                      <select
-                        value={drawPresetCapStart}
-                        onChange={(e) => setDrawPresetCapStart(e.target.value)}
-                        className="px-1.5 py-0.5 border border-stone-300 rounded bg-white font-semibold text-stone-800"
-                      >
-                        <option value="none">ไม่มี (None)</option>
-                        <option value="arrow">หัวลูกศรทึบ</option>
-                        <option value="open_arrow">หัวลูกศรโปร่ง</option>
-                        <option value="dot">จุดทึบ</option>
-                        <option value="hollow_dot">จุดโปร่ง</option>
-                        <option value="bar">ขีดกั้นตั้งฉาก</option>
-                        <option value="diamond">หัวข้าวหลามตัด</option>
-                      </select>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="text-stone-500 font-semibold">ปลายเส้นสิ้นสุด:</span>
-                      <select
-                        value={drawPresetCapEnd}
-                        onChange={(e) => setDrawPresetCapEnd(e.target.value)}
-                        className="px-1.5 py-0.5 border border-stone-300 rounded bg-white font-semibold text-stone-800"
-                      >
-                        <option value="none">ไม่มี (None)</option>
-                        <option value="arrow">หัวลูกศรทึบ</option>
-                        <option value="open_arrow">หัวลูกศรโปร่ง</option>
-                        <option value="dot">จุดทึบ</option>
-                        <option value="hollow_dot">จุดโปร่ง</option>
-                        <option value="bar">ขีดกั้นตั้งฉาก</option>
-                        <option value="diamond">หัวข้าวหลามตัด</option>
-                      </select>
-                    </div>
-                  </div>
+                  {toolMode === 'freehand' ? (
+                    <div className="flex items-center justify-between w-full flex-wrap gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Pen Color Swatches */}
+                        <div className="flex items-center gap-1">
+                          <span className="text-stone-500 font-semibold text-[10px]">สีหมึก:</span>
+                          {[
+                            { color: '#0f172a', label: 'ดำ' },
+                            { color: '#2563eb', label: 'น้ำเงิน' },
+                            { color: '#dc2626', label: 'แดง' },
+                            { color: '#16a34a', label: 'เขียว' },
+                            { color: '#9333ea', label: 'ม่วง' },
+                            { color: '#ea580c', label: 'ส้ม' },
+                            { color: '#64748b', label: 'เทา' }
+                          ].map(c => (
+                            <button
+                              key={c.color}
+                              type="button"
+                              onClick={() => setPenColor(c.color)}
+                              style={{ backgroundColor: c.color }}
+                              className={`w-5 h-5 rounded-full border transition-all cursor-pointer ${
+                                penColor === c.color ? 'scale-125 ring-2 ring-rose-500 border-white' : 'border-stone-300 hover:scale-110'
+                              }`}
+                              title={c.label}
+                            />
+                          ))}
+                        </div>
 
-                  {toolMode === 'draw_polygon' ? (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] text-emerald-700 font-semibold">
-                        คลิกวางจุด ({drawPoints.length} จุด)
+                        <div className="w-px h-3.5 bg-stone-200" />
+
+                        {/* Pen Width */}
+                        <div className="flex items-center gap-1">
+                          <span className="text-stone-500 font-semibold text-[10px]">ขนาดเส้น:</span>
+                          {[
+                            { w: 1.5, label: '1.5px (บาง)' },
+                            { w: 2.5, label: '2.5px (กลาง)' },
+                            { w: 4, label: '4px (หนา)' },
+                            { w: 6, label: '6px (หนาพิเศษ)' }
+                          ].map(pw => (
+                            <button
+                              key={pw.w}
+                              type="button"
+                              onClick={() => setPenWidth(pw.w)}
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer ${
+                                penWidth === pw.w ? 'bg-rose-600 text-white shadow-2xs' : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                              }`}
+                            >
+                              {pw.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Draw & Hold Indicator Badge */}
+                      <div className="flex items-center gap-1.5 px-2 py-0.5 bg-rose-50 border border-rose-200 rounded-md text-[10px] text-rose-800 font-medium">
+                        <Sparkles className="w-3 h-3 text-rose-600" />
+                        <span>Draw & Hold: วาดลายเส้นค้างไว้ 0.4s แปลงเป็นรูปทรงตรงเป๊ะ</span>
+                      </div>
+                    </div>
+                  ) : toolMode === 'highlighter' ? (
+                    <div className="flex items-center justify-between w-full flex-wrap gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Highlighter Color Swatches */}
+                        <div className="flex items-center gap-1">
+                          <span className="text-stone-500 font-semibold text-[10px]">สีไฮไลต์:</span>
+                          {[
+                            { color: '#facc15', label: 'เหลืองนีออน' },
+                            { color: '#4ade80', label: 'เขียวนีออน' },
+                            { color: '#38bdf8', label: 'ฟ้าพาสเทล' },
+                            { color: '#f472b6', label: 'ชมพู' },
+                            { color: '#fb923c', label: 'ส้ม' }
+                          ].map(c => (
+                            <button
+                              key={c.color}
+                              type="button"
+                              onClick={() => setHighlighterColor(c.color)}
+                              style={{ backgroundColor: c.color }}
+                              className={`w-5 h-5 rounded-full border transition-all cursor-pointer ${
+                                highlighterColor === c.color ? 'scale-125 ring-2 ring-amber-500 border-white' : 'border-stone-300 hover:scale-110'
+                              }`}
+                              title={c.label}
+                            />
+                          ))}
+                        </div>
+
+                        <div className="w-px h-3.5 bg-stone-200" />
+
+                        {/* Highlighter Width */}
+                        <div className="flex items-center gap-1">
+                          <span className="text-stone-500 font-semibold text-[10px]">หัวไฮไลต์:</span>
+                          {[
+                            { w: 12, label: '12px' },
+                            { w: 18, label: '18px (มาตรฐาน)' },
+                            { w: 26, label: '26px' },
+                            { w: 36, label: '36px (กว้าง)' }
+                          ].map(hw => (
+                            <button
+                              key={hw.w}
+                              type="button"
+                              onClick={() => setHighlighterWidth(hw.w)}
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer ${
+                                highlighterWidth === hw.w ? 'bg-amber-500 text-white shadow-2xs' : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                              }`}
+                            >
+                              {hw.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 px-2 py-0.5 bg-amber-50 border border-amber-200 rounded-md text-[10px] text-amber-900 font-medium">
+                        <span>✨ โหมดโปร่งแสง (mix-blend-mode: multiply ไม่บดบังตัวอักษร)</span>
+                      </div>
+                    </div>
+                  ) : toolMode === 'eraser' ? (
+                    <div className="flex items-center justify-between w-full flex-wrap gap-2">
+                      <span className="text-red-700 font-semibold text-[11px] flex items-center gap-1">
+                        <Eraser className="w-3.5 h-3.5" />
+                        คลิกหรือลากผ่านเส้นวาดอิสระ/รูปทรง เพื่อลบออกทันที (Stroke Eraser)
                       </span>
-                      {drawPoints.length >= 2 && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => finishPolygonDrawing(true)}
-                            className="px-2 py-0.5 bg-emerald-600 text-white rounded font-bold text-[10px] hover:bg-emerald-700"
-                          >
-                            ปิดรูปหลายเหลี่ยม
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => finishPolygonDrawing(false)}
-                            className="px-2 py-0.5 bg-blue-600 text-white rounded font-bold text-[10px] hover:bg-blue-700"
-                          >
-                            จบเส้นเปิด
-                          </button>
-                        </>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nonFreehand = elements.filter(el => !el.extraProps?.isFreehand && !el.extraProps?.isHighlighter);
+                          saveToHistory(nonFreehand);
+                          setSelectedId(null);
+                          toast.success('ล้างเส้นวาดอิสระทั้งหมดเรียบร้อย');
+                        }}
+                        className="px-2.5 py-0.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-300 rounded font-semibold text-[10px] transition-colors cursor-pointer"
+                      >
+                        ล้างเส้นวาด Goodnotes ทั้งหมด
+                      </button>
                     </div>
                   ) : (
-                    <span className="text-[10px] text-blue-700 font-semibold">
-                      {toolMode === 'draw_line'
-                        ? 'คลิกค้างบนผืนผ้าใบแล้วลากเพื่อวาดเส้นตรง (กด Shift ล็อกมุมทีละ 15°)'
-                        : 'วาดเส้นด้วยเมาส์ ระบบจะดัดเป็นเส้นตรง/สามเหลี่ยม/สี่เหลี่ยม/วงกลมให้อัตโนมัติ'}
-                    </span>
+                    <>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-1">
+                          <span className="text-stone-500 font-semibold">ทรงเส้น:</span>
+                          <select
+                            value={drawPresetLineShape}
+                            onChange={(e) => setDrawPresetLineShape(e.target.value as any)}
+                            className="px-1.5 py-0.5 border border-stone-300 rounded bg-white font-semibold text-stone-800"
+                          >
+                            <option value="straight">เส้นตรง (Straight)</option>
+                            <option value="curved">เส้นโค้ง (Curved)</option>
+                            <option value="elbow">เส้นหักฉาก (Elbow)</option>
+                            <option value="zigzag">เส้นซิกแซก/สปริง (Zigzag)</option>
+                            <option value="double">เส้นคู่ขนาน (Double)</option>
+                          </select>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-stone-500 font-semibold">หัวเส้นเริ่มต้น:</span>
+                          <select
+                            value={drawPresetCapStart}
+                            onChange={(e) => setDrawPresetCapStart(e.target.value)}
+                            className="px-1.5 py-0.5 border border-stone-300 rounded bg-white font-semibold text-stone-800"
+                          >
+                            <option value="none">ไม่มี (None)</option>
+                            <option value="arrow">หัวลูกศรทึบ</option>
+                            <option value="open_arrow">หัวลูกศรโปร่ง</option>
+                            <option value="dot">จุดทึบ</option>
+                            <option value="hollow_dot">จุดโปร่ง</option>
+                            <option value="bar">ขีดกั้นตั้งฉาก</option>
+                            <option value="diamond">หัวข้าวหลามตัด</option>
+                          </select>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-stone-500 font-semibold">ปลายเส้นสิ้นสุด:</span>
+                          <select
+                            value={drawPresetCapEnd}
+                            onChange={(e) => setDrawPresetCapEnd(e.target.value)}
+                            className="px-1.5 py-0.5 border border-stone-300 rounded bg-white font-semibold text-stone-800"
+                          >
+                            <option value="none">ไม่มี (None)</option>
+                            <option value="arrow">หัวลูกศรทึบ</option>
+                            <option value="open_arrow">หัวลูกศรโปร่ง</option>
+                            <option value="dot">จุดทึบ</option>
+                            <option value="hollow_dot">จุดโปร่ง</option>
+                            <option value="bar">ขีดกั้นตั้งฉาก</option>
+                            <option value="diamond">หัวข้าวหลามตัด</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {toolMode === 'draw_polygon' ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-emerald-700 font-semibold">
+                            คลิกวางจุด ({drawPoints.length} จุด)
+                          </span>
+                          {drawPoints.length >= 2 && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => finishPolygonDrawing(true)}
+                                className="px-2 py-0.5 bg-emerald-600 text-white rounded font-bold text-[10px] hover:bg-emerald-700 cursor-pointer"
+                              >
+                                ปิดรูปหลายเหลี่ยม
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => finishPolygonDrawing(false)}
+                                className="px-2 py-0.5 bg-blue-600 text-white rounded font-bold text-[10px] hover:bg-blue-700 cursor-pointer"
+                              >
+                                จบเส้นเปิด
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-blue-700 font-semibold">
+                          {toolMode === 'draw_line'
+                            ? 'คลิกค้างบนผืนผ้าใบแล้วลากเพื่อวาดเส้นตรง (กด Shift ล็อกมุมทีละ 15°)'
+                            : 'วาดเส้นด้วยเมาส์ ระบบจะดัดเป็นเส้นตรง/สามเหลี่ยม/สี่เหลี่ยม/วงกลมให้อัตโนมัติ'}
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -5060,22 +5737,28 @@ ${cellsStr}`;
 
             {/* Interactive Canvas Container */}
             <div 
-              className="bg-white rounded-xl shadow-lg border border-stone-300 relative overflow-hidden transition-transform duration-75"
+              className="bg-white rounded-xl shadow-lg border border-stone-300 relative overflow-hidden transition-transform duration-75 touch-none"
               style={{ 
                 width: CANVAS_WIDTH, 
                 height: CANVAS_HEIGHT,
                 transform: `scale(${zoom})`,
-                transformOrigin: 'center center'
+                transformOrigin: 'center center',
+                touchAction: 'none'
               }}
             >
               {/* Main Interactive SVG */}
               <svg
                 ref={svgRef}
                 viewBox={`0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}`}
-                className={`w-full h-full ${toolMode !== 'select' ? 'cursor-crosshair' : 'cursor-default'}`}
+                className={`w-full h-full select-none ${toolMode !== 'select' ? 'cursor-crosshair' : 'cursor-default'}`}
+                style={{ touchAction: 'none' }}
                 onMouseDown={handleCanvasMouseDown}
                 onMouseMove={handleCanvasMouseMove}
                 onMouseUp={handleCanvasMouseUp}
+                onTouchStart={handleCanvasTouchStart}
+                onTouchMove={handleCanvasTouchMove}
+                onTouchEnd={handleCanvasTouchEnd}
+                onTouchCancel={handleCanvasTouchEnd}
               >
                 {/* Crisp Major & Minor Grid Lines */}
                 {showGrid && (
@@ -5402,6 +6085,32 @@ ${cellsStr}`;
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeDasharray="4,3"
+                      />
+                    )}
+
+                    {/* Freehand Pen Live Preview */}
+                    {toolMode === 'freehand' && drawPoints.length >= 2 && (
+                      <path
+                        d={pointsToSmoothPathD(drawPoints)}
+                        fill="none"
+                        stroke={penColor}
+                        strokeWidth={penWidth}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    )}
+
+                    {/* Highlighter Live Preview */}
+                    {toolMode === 'highlighter' && drawPoints.length >= 2 && (
+                      <path
+                        d={pointsToSmoothPathD(drawPoints)}
+                        fill="none"
+                        stroke={highlighterColor}
+                        strokeWidth={highlighterWidth}
+                        strokeOpacity={0.45}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{ mixBlendMode: 'multiply' }}
                       />
                     )}
 

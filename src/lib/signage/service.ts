@@ -2,30 +2,66 @@ import { getAdminClient } from '@/lib/supabase/admin';
 import crypto from 'crypto';
 
 export async function resolvePlaylistForDevice(deviceId: string) {
+  const cleanId = (deviceId || '').trim();
+  const isValidDeviceId =
+    cleanId.length >= 3 &&
+    cleanId.length <= 64 &&
+    /^[a-zA-Z0-9_-]+$/.test(cleanId) &&
+    !['favicon.ico', 'robots.txt', 'sw.js', 'null', 'undefined'].includes(cleanId.toLowerCase());
+
+  if (!isValidDeviceId) {
+    return {
+      device_id: cleanId,
+      device_name: 'Invalid Device',
+      group_id: null,
+      orientation: 'PORTRAIT_90',
+      is_muted: false,
+      volume: 20,
+      ticker_text: '',
+      version: 'invalid',
+      generated_at: new Date().toISOString(),
+      total_items: 0,
+      items: [],
+    };
+  }
+
   const supabase = getAdminClient();
 
   // 1. Fetch device
   let { data: device } = await supabase
     .from('signage_devices')
     .select('*')
-    .eq('id', deviceId)
+    .eq('id', cleanId)
     .maybeSingle();
 
   if (!device) {
-    // Auto-register device
-    const { data: newDev } = await supabase
-      .from('signage_devices')
-      .insert({
-        id: deviceId,
-        name: `TV เครื่องใหม่ (${deviceId})`,
-        status: 'ONLINE',
-        last_heartbeat: new Date().toISOString(),
-        orientation: 'PORTRAIT_90',
-        volume: 20,
-      })
-      .select()
-      .single();
-    device = newDev;
+    // Only auto-register if deviceId looks like a valid TV/display identifier
+    const isAutoRegisterable =
+      cleanId.startsWith('tv') ||
+      cleanId.startsWith('dev') ||
+      cleanId.startsWith('llc') ||
+      cleanId.startsWith('disp') ||
+      cleanId.length >= 6;
+
+    if (isAutoRegisterable) {
+      try {
+        const { data: newDev } = await supabase
+          .from('signage_devices')
+          .insert({
+            id: cleanId,
+            name: `TV เครื่องใหม่ (${cleanId})`,
+            status: 'ONLINE',
+            last_heartbeat: new Date().toISOString(),
+            orientation: 'PORTRAIT_90',
+            volume: 20,
+          })
+          .select()
+          .single();
+        device = newDev;
+      } catch (err) {
+        console.warn('[Signage] Auto-register device failed:', err);
+      }
+    }
   }
 
   const deviceGroupId = device?.group_id;

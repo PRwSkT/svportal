@@ -67,6 +67,7 @@ export default function HomeLaunchpad() {
       tools: [
         { id: "dashboard", name: dict.nav.dashboard, href: "/dashboard", icon: <LineChart className="w-6 h-6" />, color: "bg-emerald-500 text-white" },
         { id: "pos_fees", name: dict.nav.posFees, href: "/pos/fees", icon: <CreditCard className="w-6 h-6" />, color: "bg-emerald-500/20 text-emerald-600" },
+        { id: "admin_fees", name: language === 'th' ? "ผ่อนชำระ 5 เดือน & ค่าปรับ" : "5M Installments & Waivers", href: "/admin/fees", icon: <CreditCard className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
         { id: "admin_reports", name: dict.nav.adminReports, href: "/admin/reports", icon: <FileText className="w-6 h-6" />, color: "bg-emerald-500/20 text-emerald-600" },
         { id: "subsidy_free15y", name: language === 'th' ? "เรียนฟรี 15 ปี (อร.11)" : "15Y Free Subsidy", href: "/admin/subsidy/free15y", icon: <HandCoins className="w-6 h-6" />, color: "bg-teal-500/20 text-teal-600" }
       ]
@@ -91,7 +92,7 @@ export default function HomeLaunchpad() {
         { id: "student_attendance", name: language === 'th' ? "เช็กชื่อ & ใบลา 360°" : "Attendance & Leave", href: "/admin/students/attendance", icon: <UserCheck className="w-6 h-6" />, color: "bg-indigo-500/20 text-indigo-600" },
         { id: "pickup_dismissal", name: language === 'th' ? "จุดรับ-ส่งเด็ก (QR)" : "Smart Pickup", href: "/admin/safety/pickup", icon: <QrCode className="w-6 h-6" />, color: "bg-[#7B1C3E] text-white" },
         { id: "pastoral_care", name: language === 'th' ? "ดูแลนักเรียน (SDQ)" : "Pastoral Care", href: "/pastoral", icon: <HeartHandshake className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
-        { id: "student_nutrition", name: language === 'th' ? "โภชนาการ & นม" : "Nutrition & Milk", href: "/admin/students/nutrition", icon: <Apple className="w-6 h-6" />, color: "bg-emerald-500/20 text-emerald-600" },
+        { id: "student_nutrition", name: language === 'th' ? "โรงครัวภายใน & โภชนาการ" : "Kitchen & Nutrition", href: "/admin/students/nutrition", icon: <Apple className="w-6 h-6" />, color: "bg-emerald-500/20 text-emerald-600" },
         { id: "van_safety", name: language === 'th' ? "รถตู้รับ-ส่ง" : "Van Safety", href: "/admin/safety/van", icon: <Bus className="w-6 h-6" />, color: "bg-amber-500/20 text-amber-600" },
         { id: "school_infirmary", name: language === 'th' ? "ห้องพยาบาล" : "Infirmary", href: "/admin/health/infirmary", icon: <Stethoscope className="w-6 h-6" />, color: "bg-red-500/20 text-red-600" }
       ]

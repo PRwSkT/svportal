@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { requireAuth } from '@/lib/auth';
 import { auditVanSafety, VanDailyLogItem } from '@/lib/safety/van';
+import { getBangkokDate } from '@/lib/utils';
 
 export async function GET(request: Request) {
   try {
@@ -11,7 +12,7 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const date = searchParams.get('date') || new Date().toISOString().split('T')[0];
+    const date = searchParams.get('date') || getBangkokDate();
     const tripType = (searchParams.get('tripType') || 'morning') as 'morning' | 'evening';
     const routeId = searchParams.get('routeId');
 
@@ -126,7 +127,7 @@ export async function POST(request: Request) {
 
     // Action: Update Student Passenger Status
     if (action === 'update_status') {
-      const { route_id, student_id, status, log_date = new Date().toISOString().split('T')[0], trip_type = 'morning', notes = '' } = body;
+      const { route_id, student_id, status, log_date = getBangkokDate(), trip_type = 'morning', notes = '' } = body;
       
       if (!route_id || !student_id || !status) {
         return NextResponse.json({ error: 'Missing route_id, student_id, or status' }, { status: 400 });
@@ -165,6 +166,29 @@ export async function POST(request: Request) {
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      // If morning trip and student disembarks at school, sync to student_attendance_logs as PRESENT
+      if (status === 'DISEMBARKED' && trip_type === 'morning') {
+        try {
+          await supabase
+            .from('student_attendance_logs')
+            .upsert({
+              student_id,
+              attendance_date: log_date,
+              period: 'MORNING_HOMEROOM',
+              status: 'PRESENT',
+              source: 'VAN_SYNC',
+              check_in_time: disembarked_at || now,
+              recorded_by: auth.appUser?.full_name || auth.user?.email || 'VAN_DRIVER',
+              notes: `ลงจากรถตู้สาย ${route_id} เรียบร้อย`,
+              updated_at: now
+            }, {
+              onConflict: 'student_id,attendance_date,period'
+            });
+        } catch (attErr) {
+          console.warn('Van disembark sync to attendance failed:', attErr);
+        }
       }
 
       return NextResponse.json({ success: true, log: data });

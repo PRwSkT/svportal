@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase/admin';
+import {
+  getAuthenticatedGuardianId,
+  attachParentSessionCookies,
+  clearParentSessionCookies,
+} from '@/lib/parents/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +42,27 @@ const FEATURED_DEMO_GUARDIAN_IDS = [
   '15960b99-581b-4da2-a45a-c4846de50691', // คุณลานนา เฮียบ (ป.4/1 & ป.6/1)
   '59db5804-fe69-4792-a2ff-7e45741fd86c', // คุณธีระยุทธ บุปผาศรี (อ.1/1 & อ.3/1)
 ];
+
+function isParentDemoAllowed(): boolean {
+  return (
+    process.env.NODE_ENV === 'development' ||
+    process.env.SV_ALLOW_PARENT_DEMO === 'true'
+  );
+}
+
+function maskCitizenId(cid: string | null): string | null {
+  if (!cid) return null;
+  const clean = cid.replace(/[^0-9]/g, '');
+  if (clean.length < 6) return '***';
+  return `${clean.slice(0, 1)}-${clean.slice(1, 4)}x-xxxxx-${clean.slice(-2, -1)}x-${clean.slice(-1)}`;
+}
+
+function maskPhoneNumber(phone: string | null): string | null {
+  if (!phone) return null;
+  const clean = phone.replace(/[^0-9]/g, '');
+  if (clean.length < 7) return '***';
+  return `${clean.slice(0, 3)}-xxx-${clean.slice(-4)}`;
+}
 
 async function getGuardianWithChildren(guardianId: string): Promise<GuardianAccountSummary | null> {
   const supabase = getAdminClient();
@@ -99,14 +125,22 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
 
-    // 1. Return demo guardians or search directory
+    // 1. Return demo guardians (disabled in production unless SV_ALLOW_PARENT_DEMO=true)
     if (action === 'demo_list') {
+      if (!isParentDemoAllowed()) {
+        return NextResponse.json({
+          ok: true,
+          demoGuardians: [],
+          demoAvailable: false,
+          message: 'ระบบบัญชีทดสอบถูกปิดการใช้งานในสภาพแวดล้อม Production',
+        });
+      }
+
       const q = searchParams.get('q')?.trim() || '';
       const supabase = getAdminClient();
 
       if (q) {
         const cleanQ = q.replace(/[^0-9a-zA-Z\u0E00-\u0E7F]/g, '');
-        // Search in guardians by name or citizen_id or phone
         const { data: matchedGuardians } = await supabase
           .schema('family')
           .from('guardians')
@@ -118,25 +152,33 @@ export async function GET(request: NextRequest) {
         for (const g of matchedGuardians || []) {
           const detail = await getGuardianWithChildren(g.id);
           if (detail && detail.children.length > 0) {
-            results.push(detail);
+            results.push({
+              ...detail,
+              citizen_id: maskCitizenId(detail.citizen_id),
+              phone_number: maskPhoneNumber(detail.phone_number),
+            });
           }
         }
-        return NextResponse.json({ ok: true, demoGuardians: results });
+        return NextResponse.json({ ok: true, demoGuardians: results, demoAvailable: true });
       }
 
-      // Default featured demo list
+      // Default featured demo list with masked PII
       const results: GuardianAccountSummary[] = [];
       for (const gid of FEATURED_DEMO_GUARDIAN_IDS) {
         const detail = await getGuardianWithChildren(gid);
-        if (detail) results.push(detail);
+        if (detail) {
+          results.push({
+            ...detail,
+            citizen_id: maskCitizenId(detail.citizen_id),
+            phone_number: maskPhoneNumber(detail.phone_number),
+          });
+        }
       }
-      return NextResponse.json({ ok: true, demoGuardians: results });
+      return NextResponse.json({ ok: true, demoGuardians: results, demoAvailable: true });
     }
 
-    // 2. Check current session
-    const guardianId =
-      request.cookies.get('sv_parent_session_guardian_id')?.value ||
-      request.headers.get('x-guardian-id');
+    // 2. Check current session (strictly using HMAC verified session helper; never raw header)
+    const guardianId = getAuthenticatedGuardianId(request);
 
     if (!guardianId) {
       return NextResponse.json({
@@ -155,8 +197,7 @@ export async function GET(request: NextRequest) {
         guardian: null,
         children: [],
       });
-      res.cookies.delete('sv_parent_session_guardian_id');
-      res.cookies.delete('sv_parent_session');
+      clearParentSessionCookies(res);
       return res;
     }
 
@@ -185,13 +226,19 @@ export async function POST(request: NextRequest) {
         authenticated: false,
         message: 'ออกจากระบบเรียบร้อยแล้ว (Signed out successfully)',
       });
-      res.cookies.delete('sv_parent_session_guardian_id');
-      res.cookies.delete('sv_parent_session');
+      clearParentSessionCookies(res);
       return res;
     }
 
-    // 2. Demo Quick Login
+    // 2. Demo Quick Login (guard with isParentDemoAllowed)
     if (action === 'demo_login') {
+      if (!isParentDemoAllowed()) {
+        return NextResponse.json(
+          { ok: false, error: 'ระบบบัญชีทดสอบถูกปิดการใช้งานในสภาพแวดล้อม Production' },
+          { status: 403 }
+        );
+      }
+
       const guardianId = body.guardianId;
       if (!guardianId) {
         return NextResponse.json({ ok: false, error: 'กรุณาระบุรหัสผู้ปกครอง (Missing guardianId)' }, { status: 400 });
@@ -210,22 +257,9 @@ export async function POST(request: NextRequest) {
         token: guardianInfo.id,
       });
 
-      // Set cookie for 30 days
-      res.cookies.set('sv_parent_session_guardian_id', guardianInfo.id, {
-        path: '/',
-        maxAge: 30 * 24 * 60 * 60,
-        sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
-      });
-      res.cookies.set('sv_parent_session', JSON.stringify({
-        guardianId: guardianInfo.id,
+      attachParentSessionCookies(res, guardianInfo.id, {
         name: guardianInfo.full_name,
-        citizenId: guardianInfo.citizen_id,
-      }), {
-        path: '/',
-        maxAge: 30 * 24 * 60 * 60,
-        sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
+        citizenId: maskCitizenId(guardianInfo.citizen_id),
       });
 
       return res;
@@ -352,22 +386,9 @@ export async function POST(request: NextRequest) {
       token: guardianInfo.id,
     });
 
-    // Set cookie for 30 days
-    res.cookies.set('sv_parent_session_guardian_id', guardianInfo.id, {
-      path: '/',
-      maxAge: 30 * 24 * 60 * 60,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-    });
-    res.cookies.set('sv_parent_session', JSON.stringify({
-      guardianId: guardianInfo.id,
+    attachParentSessionCookies(res, guardianInfo.id, {
       name: guardianInfo.full_name,
-      citizenId: guardianInfo.citizen_id,
-    }), {
-      path: '/',
-      maxAge: 30 * 24 * 60 * 60,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      citizenId: maskCitizenId(guardianInfo.citizen_id),
     });
 
     return res;

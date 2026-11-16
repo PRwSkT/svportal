@@ -1642,7 +1642,7 @@
     // ------------------------------------------
     // 5. Audio & TTS Playback Engine
     // ------------------------------------------
-    const GCP_TTS_FALLBACK_KEY = "AIzaSyBh3hXo1hP2FLeHVWwRNtt7ymD1kyEqTOo";
+    const GCP_TTS_FALLBACK_KEY = (typeof window !== 'undefined' && (window.GCP_TTS_KEY || localStorage.getItem('sv_gcp_tts_key'))) || "";
     let ttsCache = {};
 
     // Clear legacy TTS cache to purge any robotic Chirp3 voices
@@ -1727,25 +1727,27 @@
       }
 
       // 2. Direct Google Cloud TTS Fallback (Standard Official Thai Female Voice)
-      try {
-        const directVoice = (lang === 'th-TH' || lang.startsWith('th')) ? 'th-TH-Neural2-C' : 'en-GB-Neural2-F';
-        const directRes = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${GCP_TTS_FALLBACK_KEY}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            input: { text: cleanText },
-            voice: { languageCode: lang, name: directVoice },
-            audioConfig: { audioEncoding: 'MP3', speakingRate: 0.95 }
-          })
-        });
-        const directData = await directRes.json();
-        if (directData && directData.audioContent) {
-          const audioUri = 'data:audio/mp3;base64,' + directData.audioContent;
-          ttsCache[cacheKey] = audioUri;
-          return audioUri;
+      if (GCP_TTS_FALLBACK_KEY) {
+        try {
+          const directVoice = (lang === 'th-TH' || lang.startsWith('th')) ? 'th-TH-Neural2-C' : 'en-GB-Neural2-F';
+          const directRes = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${GCP_TTS_FALLBACK_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              input: { text: cleanText },
+              voice: { languageCode: lang, name: directVoice },
+              audioConfig: { audioEncoding: 'MP3', speakingRate: 0.95 }
+            })
+          });
+          const directData = await directRes.json();
+          if (directData && directData.audioContent) {
+            const audioUri = 'data:audio/mp3;base64,' + directData.audioContent;
+            ttsCache[cacheKey] = audioUri;
+            return audioUri;
+          }
+        } catch (eDirect) {
+          console.warn('Direct Google Cloud TTS failed, using Web Speech API fallback:', eDirect);
         }
-      } catch (eDirect) {
-        console.warn('Direct Google Cloud TTS failed, using Web Speech API fallback:', eDirect);
       }
 
       // 3. Web Speech API Fallback (Guaranteed Female Voice)

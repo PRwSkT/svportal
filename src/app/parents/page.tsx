@@ -81,7 +81,15 @@ import {
   GraduationCap,
   MessageSquare,
   LogOut,
+  Loader2,
+  CalendarClock,
 } from 'lucide-react';
+import {
+  formatPromptPayPayload,
+  generatePromptPayQrDataUrl,
+  buildTuitionQrRefs,
+  sanitizePromptPayRef,
+} from '@/lib/finance/emvco-promptpay';
 import { ParentLoginView } from '@/components/parents/ParentLoginView';
 import {
   getParentClientSession,
@@ -316,6 +324,17 @@ export default function ParentsPortalPage() {
   // PromptPay Invoice Modal state
   const [activeInvoiceModal, setActiveInvoiceModal] =
     useState<ParentFeeInvoiceItem | null>(null);
+  const [promptPayQrUrl, setPromptPayQrUrl] = useState<string | null>(null);
+  const [promptPayPayloadStr, setPromptPayPayloadStr] = useState<string>('');
+  const [isGeneratingQr, setIsGeneratingQr] = useState<boolean>(false);
+
+  // 5-Month Installment State
+  const [installmentData, setInstallmentData] = useState<any>(null);
+  const [availablePlans, setAvailablePlans] = useState<any[]>([]);
+  const [isLoadingInstallments, setIsLoadingInstallments] = useState(false);
+  const [signingAgreementPlan, setSigningAgreementPlan] = useState<any | null>(null);
+  const [guardianSignName, setGuardianSignName] = useState('');
+  const [isSubmittingAgreement, setIsSubmittingAgreement] = useState(false);
 
   // Drop-off Note Form state (Early Years)
   const [dropoffSleepHours, setDropoffSleepHours] = useState<number>(10);
@@ -531,6 +550,120 @@ export default function ParentsPortalPage() {
       return true;
     });
   }, [pipeline.children, studentGradeFilter, studentSearchQuery]);
+
+  // Real EMVCo PromptPay QR generator for Invoice Modal
+  useEffect(() => {
+    if (!activeInvoiceModal || activeInvoiceModal.status === 'paid') {
+      setPromptPayQrUrl(null);
+      setPromptPayPayloadStr('');
+      return;
+    }
+    setIsGeneratingQr(true);
+    const studentId = activeInvoiceModal.student_id || selectedChild.id;
+    const refs = buildTuitionQrRefs(studentId, activeInvoiceModal.id);
+    const payload = formatPromptPayPayload({
+      targetId: '0994000164821', // Somkidvittaya Tax ID / Biller ID
+      amount: activeInvoiceModal.amount,
+      ref1: refs.ref1,
+      ref2: refs.ref2,
+      merchantName: 'SOMKIDVITTAYA',
+    });
+    setPromptPayPayloadStr(payload);
+    generatePromptPayQrDataUrl(payload, 280)
+      .then((url) => {
+        setPromptPayQrUrl(url);
+        setIsGeneratingQr(false);
+      })
+      .catch((err) => {
+        console.error('Error generating PromptPay QR URL:', err);
+        setIsGeneratingQr(false);
+      });
+  }, [activeInvoiceModal, selectedChild.id]);
+
+  // Load 5-Month Installment status & available plans
+  const loadInstallments = useCallback(async (studentId: string) => {
+    setIsLoadingInstallments(true);
+    try {
+      const [resStudent, resPlans] = await Promise.all([
+        fetch(`/api/fees/installments?action=student&student_id=${studentId}`),
+        fetch(`/api/fees/installments?action=plans`),
+      ]);
+      const dataStudent = await resStudent.json();
+      const dataPlans = await resPlans.json();
+
+      if (dataStudent?.success) {
+        setInstallmentData(dataStudent);
+      }
+      if (dataPlans?.success && Array.isArray(dataPlans.plans)) {
+        setAvailablePlans(dataPlans.plans);
+      }
+    } catch (err) {
+      console.warn('Installment fetch warning:', err);
+    } finally {
+      setIsLoadingInstallments(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedChild?.id) {
+      loadInstallments(selectedChild.id);
+    }
+  }, [selectedChild?.id, loadInstallments]);
+
+  const handleSignAgreement = async (planId: string) => {
+    if (!guardianSignName.trim()) {
+      toast.error(isThai ? 'กรุณาระบุชื่อ-นามสกุลผู้ปกครองผู้ลงนาม' : 'Please provide guardian signature name');
+      return;
+    }
+    setIsSubmittingAgreement(true);
+    try {
+      const res = await fetch('/api/fees/installments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create_agreement',
+          student_id: selectedChild.id,
+          plan_id: planId,
+          academic_year: '2569',
+          requested_by_guardian_name: guardianSignName.trim(),
+          digital_signature: `ONLINE_SIGN_${Date.now()}`,
+          notes: 'สมัครผ่าน Parents Portal PWA',
+        }),
+      });
+      const data = await res.json();
+      if (data?.success) {
+        toast.success(
+          isThai
+            ? 'สมัครแผนผ่อนชำระ 5 งวดสำเร็จ! เจ้าหน้าที่การเงินจะดำเนินการตรวจสอบ'
+            : '5-Month Installment agreement requested successfully!'
+        );
+        setSigningAgreementPlan(null);
+        setGuardianSignName('');
+        await loadInstallments(selectedChild.id);
+      } else {
+        toast.error(data?.error || 'เกิดข้อผิดพลาดในการสมัครแผนผ่อนชำระ');
+      }
+    } catch (err) {
+      console.error('Error signing agreement:', err);
+      toast.error('ไม่สามารถเชื่อมต่อระบบการเงินได้');
+    } finally {
+      setIsSubmittingAgreement(false);
+    }
+  };
+
+  const handlePayTranchePromptPay = (tranche: any) => {
+    setActiveInvoiceModal({
+      id: tranche.id,
+      student_id: selectedChild.id,
+      title_th: `ค่าธรรมเนียมการศึกษา งวดที่ ${tranche.installment_no}/5 (ปีการศึกษา 2569)`,
+      title_en: `Tuition Installment Tranche #${tranche.installment_no}/5 (AY 2569)`,
+      term_label: `งวดที่ ${tranche.installment_no}`,
+      amount: Number(tranche.amount || 0) + Number(tranche.late_fee_amount || 0),
+      due_date: tranche.due_date,
+      status: 'unpaid',
+      payment_method: 'Thai QR PromptPay',
+    });
+  };
 
   // Sync forms when switching child
   useEffect(() => {
@@ -775,7 +908,7 @@ export default function ParentsPortalPage() {
     );
   };
 
-  const handleAcknowledgeTeacherMessage = (messageId: string) => {
+  const handleAcknowledgeTeacherMessage = async (messageId: string) => {
     const current = getPipelineState();
     const msgIdx = current.messages.findIndex((m) => m.id === messageId);
     if (msgIdx === -1) return;
@@ -795,6 +928,20 @@ export default function ParentsPortalPage() {
     }
     savePipelineState(current);
     refreshPipeline();
+
+    try {
+      await fetch('/api/pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'ACK_MESSAGE',
+          payload: { message_id: messageId },
+        }),
+      });
+    } catch (err) {
+      console.warn('Sync ack message warning:', err);
+    }
+
     toast.success(
       isThai
         ? 'ยืนยันการรับทราบข้อความครูประจำชั้นเรียบร้อยแล้ว'
@@ -905,16 +1052,45 @@ export default function ParentsPortalPage() {
     );
   };
 
-  const handleConfirmPromptPayInvoice = (invoice: ParentFeeInvoiceItem) => {
-    const paid = payFeeInvoiceFromParent(invoice.id);
-    if (paid) {
-      setActiveInvoiceModal(paid);
-      refreshPipeline();
-      toast.success(
-        isThai
-          ? `ชำระเงินสำเร็จ! ออกใบเสร็จรับเงินดิจิทัลเลขที่ ${paid.receipt_number}`
-          : `Payment completed! Official e-Receipt ${paid.receipt_number} issued.`
-      );
+  const handleConfirmPromptPayInvoice = async (invoice: ParentFeeInvoiceItem) => {
+    try {
+      const res = await fetch('/api/pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'PAY_INVOICE',
+          payload: {
+            invoice_id: invoice.id,
+            student_id: invoice.student_id || selectedChild.id,
+            amount: invoice.amount,
+            payment_method: 'Thai QR PromptPay (Parents Portal)',
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data?.success) {
+        const paid = payFeeInvoiceFromParent(invoice.id);
+        if (paid) {
+          setActiveInvoiceModal({
+            ...paid,
+            receipt_number: data.data?.receipt_number || paid.receipt_number,
+          });
+        }
+        refreshPipeline();
+        if (selectedChild?.id) {
+          loadInstallments(selectedChild.id);
+        }
+        toast.success(
+          isThai
+            ? `ชำระเงินสำเร็จ! ออกใบเสร็จรับเงินดิจิทัลเลขที่ ${data.data?.receipt_number || (paid ? paid.receipt_number : invoice.id)}`
+            : `Payment completed! Official e-Receipt issued.`
+        );
+      } else {
+        toast.error(data?.error || 'ชำระเงินไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+      }
+    } catch (err) {
+      console.error('Payment error:', err);
+      toast.error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบการเงิน');
     }
   };
 
@@ -930,21 +1106,45 @@ export default function ParentsPortalPage() {
     }
   };
 
-  const handleSaveDailyLimit = () => {
-    const current = getPipelineState();
-    const idx = current.children.findIndex((c) => c.id === selectedChild.id);
-    if (idx >= 0) {
-      current.children[idx] = {
-        ...current.children[idx],
-        wallet_daily_limit: Number(customDailyLimit) || 100,
-      };
-      savePipelineState(current);
-      refreshPipeline();
+  const handleSaveDailyLimit = async () => {
+    const limitNum = Number(customDailyLimit) || 100;
+    try {
+      const current = getPipelineState();
+      const idx = current.children.findIndex((c) => c.id === selectedChild.id);
+      if (idx >= 0) {
+        current.children[idx] = {
+          ...current.children[idx],
+          wallet_daily_limit: limitNum,
+        };
+        savePipelineState(current);
+        refreshPipeline();
+      }
+
+      const res = await fetch('/api/pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'SAVE_DAILY_LIMIT',
+          payload: {
+            student_id: selectedChild.id,
+            daily_limit: limitNum,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!data?.success) {
+        toast.error(data?.error || 'ไม่สามารถบันทึกวงเงินในระบบได้');
+        return;
+      }
+
       toast.success(
         isThai
-          ? `ตั้งวงเงินใช้จ่ายสหกรณ์ต่อวันของ ${selectedChild.nickname} เป็น ${customDailyLimit} บาท/วัน`
-          : `Updated daily spending limit to ${customDailyLimit} THB/day`
+          ? `ตั้งวงเงินใช้จ่ายสหกรณ์ต่อวันของ ${selectedChild.nickname} เป็น ${limitNum} บาท/วัน`
+          : `Updated daily spending limit to ${limitNum} THB/day`
       );
+    } catch (err) {
+      console.error('Error saving daily limit:', err);
+      toast.error('เกิดข้อผิดพลาดในการบันทึกวงเงิน');
     }
   };
 
@@ -989,57 +1189,83 @@ export default function ParentsPortalPage() {
     );
   };
 
-  const handleDownloadIcsCalendar = () => {
-    const icsContent = [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'PRODID:-//Somkidvittaya School//Parents Portal PWA//TH',
-      'CALSCALE:GREGORIAN',
-      'METHOD:PUBLISH',
-      'BEGIN:VEVENT',
-      'UID:sv-event-2026-ptc@somkidvittaya.ac.th',
-      'DTSTART:20261031T020000Z',
-      'DTEND:20261031T050000Z',
-      `SUMMARY:${selectedChild.nickname} - วันประชุมผู้ปกครองและรับสมุดรายงานพัฒนาการ/ปพ.6`,
-      'DESCRIPTION:ประชุมผู้ปกครองประจำภาคเรียน โรงเรียนสมคิดวิทยา',
-      'LOCATION:หอประชุมสมคิดวิทยา',
-      'END:VEVENT',
-      'BEGIN:VEVENT',
-      'UID:sv-event-2026-health@somkidvittaya.ac.th',
-      'DTSTART:20261104T013000Z',
-      'DTEND:20261104T043000Z',
-      `SUMMARY:${selectedChild.nickname} - ตรวจสุขภาพประจำปีและเคลือบฟลูออไรด์`,
-      'DESCRIPTION:ทีมแพทย์และทันตภิบาลโรงพยาบาลแหลมฉบังตรวจสุขภาพนักเรียน',
-      'LOCATION:ห้องพยาบาลโรงเรียนสมคิดวิทยา',
-      'END:VEVENT',
-      'BEGIN:VEVENT',
-      'UID:sv-event-2026-loykrathong@somkidvittaya.ac.th',
-      'DTSTART:20261112T013000Z',
-      'DTEND:20261112T070000Z',
-      'SUMMARY:กิจกรรมสืบสานประเพณีลอยกระทงรักษ์โลก โรงเรียนสมคิดวิทยา',
-      'DESCRIPTION:ประดิษฐ์กระทงวัสดุธรรมชาติร่วมกับเพื่อนและครูประจำชั้น',
-      'LOCATION:ลานกิจกรรมโรงเรียนสมคิดวิทยา',
-      'END:VEVENT',
-      'END:VCALENDAR',
-    ].join('\r\n');
+  const handleDownloadIcsCalendar = async () => {
+    try {
+      const res = await fetch('/api/calendar?published_only=true');
+      const data = await res.json();
+      const events: any[] = Array.isArray(data?.events) ? data.events : (Array.isArray(data) ? data : []);
 
-    const blob = new Blob([icsContent], {
-      type: 'text/calendar;charset=utf-8',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `somkidvittaya-family-calendar-${selectedChild.id}.ics`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+      const formatIcsDate = (dateStr: string) => {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return '20261101T080000Z';
+        return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+      };
 
-    toast.success(
-      isThai
-        ? 'ดาวน์โหลดไฟล์ปฏิทินโรงเรียน (.ics) สำหรับซิงค์เข้ามือถือเรียบร้อยแล้ว!'
-        : 'Downloaded school calendar (.ics) file for mobile sync!'
-    );
+      const lines = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Somkidvittaya School//Parents Portal PWA//TH',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+      ];
+
+      if (events.length > 0) {
+        events.forEach((ev: any, idx: number) => {
+          lines.push(
+            'BEGIN:VEVENT',
+            `UID:sv-event-${ev.id || idx}@somkidvittaya.ac.th`,
+            `DTSTART:${formatIcsDate(ev.start_date || ev.start_time || new Date().toISOString())}`,
+            `DTEND:${formatIcsDate(ev.end_date || ev.end_time || ev.start_date || new Date().toISOString())}`,
+            `SUMMARY:${selectedChild.nickname} - ${ev.title || ev.summary || 'กิจกรรมโรงเรียนสมคิดวิทยา'}`,
+            `DESCRIPTION:${ev.description || 'กิจกรรมโรงเรียนสมคิดวิทยา'}`,
+            `LOCATION:${ev.location || 'โรงเรียนสมคิดวิทยา'}`,
+            'END:VEVENT'
+          );
+        });
+      } else {
+        lines.push(
+          'BEGIN:VEVENT',
+          'UID:sv-event-2026-ptc@somkidvittaya.ac.th',
+          'DTSTART:20261031T020000Z',
+          'DTEND:20261031T050000Z',
+          `SUMMARY:${selectedChild.nickname} - วันประชุมผู้ปกครองและรับสมุดรายงานพัฒนาการ/ปพ.6`,
+          'DESCRIPTION:ประชุมผู้ปกครองประจำภาคเรียน โรงเรียนสมคิดวิทยา',
+          'LOCATION:หอประชุมสมคิดวิทยา',
+          'END:VEVENT',
+          'BEGIN:VEVENT',
+          'UID:sv-event-2026-health@somkidvittaya.ac.th',
+          'DTSTART:20261104T013000Z',
+          'DTEND:20261104T043000Z',
+          `SUMMARY:${selectedChild.nickname} - ตรวจสุขภาพประจำปีและเคลือบฟลูออไรด์`,
+          'DESCRIPTION:ทีมแพทย์และทันตภิบาลโรงพยาบาลแหลมฉบังตรวจสุขภาพนักเรียน',
+          'LOCATION:ห้องพยาบาลโรงเรียนสมคิดวิทยา',
+          'END:VEVENT'
+        );
+      }
+
+      lines.push('END:VCALENDAR');
+
+      const blob = new Blob([lines.join('\r\n')], {
+        type: 'text/calendar;charset=utf-8',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `somkidvittaya-family-calendar-${selectedChild.id}.ics`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success(
+        isThai
+          ? 'ดาวน์โหลดไฟล์ปฏิทินโรงเรียน (.ics) สำหรับซิงค์เข้ามือถือเรียบร้อยแล้ว!'
+          : 'Downloaded school calendar (.ics) file for mobile sync!'
+      );
+    } catch (err) {
+      console.error('Failed to download calendar:', err);
+      toast.error('ไม่สามารถดาวน์โหลดไฟล์ปฏิทินได้');
+    }
   };
 
   const handleResetDemo = () => {
@@ -1253,19 +1479,21 @@ export default function ParentsPortalPage() {
               {isThai ? 'บุตรหลานของคุณ' : 'Your Children'}
             </span>
             <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setStudentSearchModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold transition-all bg-[#7B1C3E]/10 hover:bg-[#7B1C3E]/20 text-[#7B1C3E] border border-[#7B1C3E]/20 cursor-pointer"
-                title={isThai ? 'ค้นหาและเลือกนักเรียนทั้ง 151 คน' : 'Select from 151 students'}
-              >
-                <Users className="w-3.5 h-3.5 text-[#7B1C3E]" />
-                <span>
-                  {isThai
-                    ? `เลือกนักเรียน (${pipeline.children.length} คน)`
-                    : `Students (${pipeline.children.length})`}
-                </span>
-              </button>
+              {pipeline.children.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setStudentSearchModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold transition-all bg-[#7B1C3E]/10 hover:bg-[#7B1C3E]/20 text-[#7B1C3E] border border-[#7B1C3E]/20 cursor-pointer"
+                  title={isThai ? 'เลือกบุตรหลานของคุณ' : 'Select your child'}
+                >
+                  <Users className="w-3.5 h-3.5 text-[#7B1C3E]" />
+                  <span>
+                    {isThai
+                      ? `สลับบุตรหลาน (${pipeline.children.length} คน)`
+                      : `Children (${pipeline.children.length})`}
+                  </span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setShowFamilySummary((prev) => !prev)}
@@ -3539,18 +3767,6 @@ export default function ParentsPortalPage() {
                         ? 'ออกรหัส OTP มอบอำนาจรับแทน 6 หลักใหม่'
                         : 'Generate New 6-Digit Delegate OTP'}
                     </button>
-
-                    <Link
-                      href="/admin/safety/pickup"
-                      className="w-full py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5"
-                    >
-                      <span>
-                        {isThai
-                          ? 'ไปที่หน้าจุดรับ-ส่งเด็ก (/admin/safety/pickup) เพื่อทดสอบกรอกรหัส'
-                          : 'Test OTP at Staff Pickup Kiosk'}
-                      </span>
-                      <ArrowUpRight className="w-3.5 h-3.5" />
-                    </Link>
                   </div>
                 </div>
               </div>
@@ -3650,6 +3866,170 @@ export default function ParentsPortalPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* 5-Month Installments & Tranche Timeline (ปีการศึกษา 2569) */}
+                <div className="pt-3 border-t border-slate-200/90 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CalendarClock className="w-4 h-4 text-[#7B1C3E]" />
+                      <h4 className="font-extrabold text-xs uppercase tracking-wider text-slate-700">
+                        {isThai
+                          ? 'แผนผ่อนชำระค่าธรรมเนียม 5 งวด (5-Month Installments)'
+                          : '5-Month Tuition Installment Plan'}
+                      </h4>
+                    </div>
+                    {installmentData?.agreement && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800">
+                        {isThai ? 'สัญญาใช้งานอยู่' : 'Active Agreement'}
+                      </span>
+                    )}
+                  </div>
+
+                  {isLoadingInstallments ? (
+                    <div className="py-6 flex items-center justify-center gap-2 text-xs text-slate-500">
+                      <Loader2 className="w-4 h-4 animate-spin text-[#7B1C3E]" />
+                      <span>{isThai ? 'กำลังโหลดข้อมูลผ่อนชำระ...' : 'Loading installment schedule...'}</span>
+                    </div>
+                  ) : installmentData?.agreement ? (
+                    <div className="space-y-2.5">
+                      <div className="rounded-xl bg-slate-50 border border-slate-200 p-2.5 text-xs text-slate-600 flex items-center justify-between">
+                        <span>
+                          <strong>{isThai ? 'แผน:' : 'Plan:'}</strong> {installmentData.agreement.plan_name_th || 'ผ่อนชำระ 5 งวด ภาคเรียนที่ 1/2569'}
+                        </span>
+                        <span className="text-[11px] text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                          {isThai ? 'ระยะปลอดค่าปรับ 15 วัน' : '15-Day Grace Period'}
+                        </span>
+                      </div>
+
+                      {/* Tranche Timeline */}
+                      <div className="space-y-2">
+                        {installmentData.schedules?.map((tranche: any) => {
+                          const isPaid = tranche.status === 'PAID';
+                          const isOverdue = tranche.status === 'OVERDUE' || (Number(tranche.late_fee_amount || 0) > 0);
+                          const totalTrancheDue = Number(tranche.amount || 0) + Number(tranche.late_fee_amount || 0);
+
+                          return (
+                            <div
+                              key={tranche.id}
+                              className={`p-3 rounded-2xl border transition-all ${
+                                isPaid
+                                  ? 'bg-emerald-50/50 border-emerald-200'
+                                  : isOverdue
+                                  ? 'bg-rose-50/50 border-rose-300'
+                                  : 'bg-white border-slate-200'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 text-xs font-black flex items-center justify-center">
+                                    {tranche.installment_no}
+                                  </span>
+                                  <div>
+                                    <p className="font-extrabold text-xs text-slate-900">
+                                      {isThai ? `งวดที่ ${tranche.installment_no}/5` : `Tranche #${tranche.installment_no}/5`}
+                                    </p>
+                                    <p className="text-[10px] text-slate-500">
+                                      {isThai ? 'กำหนดชำระ:' : 'Due:'} {tranche.due_date}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="text-right">
+                                  <p className="font-black text-xs sm:text-sm text-slate-900">
+                                    {formatCurrency(totalTrancheDue)}
+                                  </p>
+                                  {Number(tranche.late_fee_amount || 0) > 0 && (
+                                    <p className="text-[10px] text-rose-600 font-bold">
+                                      {isThai ? `(+ค่าปรับ ${tranche.late_fee_amount}฿)` : `(+Late Fee ${tranche.late_fee_amount}฿)`}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between">
+                                <span
+                                  className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                                    isPaid
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : isOverdue
+                                      ? 'bg-rose-100 text-rose-800'
+                                      : 'bg-amber-100 text-amber-800'
+                                  }`}
+                                >
+                                  {isPaid
+                                    ? (isThai ? `ชำระแล้ว (${tranche.receipt_number || 'REC'})` : `Paid (${tranche.receipt_number || 'REC'})`)
+                                    : isOverdue
+                                    ? (isThai ? 'เกินกำหนดชำระ' : 'Overdue')
+                                    : (isThai ? 'รอชำระ' : 'Pending')}
+                                </span>
+
+                                {!isPaid && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handlePayTranchePromptPay(tranche)}
+                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#1B3A6B] hover:bg-[#142c52] text-white text-xs font-bold shadow-xs cursor-pointer"
+                                  >
+                                    <QrCode className="w-3.5 h-3.5" />
+                                    <span>{isThai ? 'ชำระงวดนี้ด้วย PromptPay' : 'Pay Tranche QR'}</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    /* Offer 5-Month Installment Plan */
+                    <div className="rounded-2xl bg-amber-50/70 border border-amber-200/90 p-3.5 space-y-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-extrabold text-xs text-amber-950">
+                            {isThai
+                              ? 'สมัครแผนผ่อนชำระ 5 งวด (แบ่งเบาภาระค่าเทอม ไม่มีดอกเบี้ย)'
+                              : 'Enroll in 5-Month Tuition Installment (0% Interest)'}
+                          </p>
+                          <p className="text-[11px] text-amber-800 mt-0.5">
+                            {isThai
+                              ? 'แบ่งชำระเป็น 5 งวดเท่ากัน (มิ.ย. - ต.ค.) พร้อมระยะปลอดค่าปรับ 15 วันหลังครบกำหนด'
+                              : '5 equal monthly tranches (June - Oct) with 15-day grace period.'}
+                          </p>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-amber-200/80 text-amber-900 shrink-0">
+                          0% ดอกเบี้ย
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-5 gap-1 text-center text-[10px]">
+                        {['งวด 1 (มิ.ย.)', 'งวด 2 (ก.ค.)', 'งวด 3 (ส.ค.)', 'งวด 4 (ก.ย.)', 'งวด 5 (ต.ค.)'].map((t, idx) => (
+                          <div key={idx} className="bg-white/80 border border-amber-200 rounded-lg p-1.5">
+                            <span className="font-bold text-slate-700 block">{t}</span>
+                            <span className="text-amber-900 font-extrabold text-[11px] block mt-0.5">
+                              {selectedChild.stage === 'EARLY_YEARS' ? '2,900฿' : '2,500฿'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const plan = availablePlans.find((p) => p.tranches_count === 5) || availablePlans[0] || {
+                            id: 'plan-default-5m',
+                            name_th: 'แผนผ่อนชำระมาตรฐาน 5 งวด (มิ.ย. - ต.ค. 2569)',
+                            tranches_count: 5,
+                          };
+                          setSigningAgreementPlan(plan);
+                          setGuardianSignName(pipeline.guardian?.full_name || '');
+                        }}
+                        className="w-full py-2.5 rounded-xl bg-amber-700 hover:bg-amber-800 text-white font-extrabold text-xs shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <FileSignature className="w-3.5 h-3.5" />
+                        <span>{isThai ? 'ทำสัญญาผ่อนชำระ 5 งวดออนไลน์' : 'Apply for 5-Month Installment Online'}</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -4186,7 +4566,7 @@ export default function ParentsPortalPage() {
                     ? isThai
                       ? 'ใบเสร็จรับเงินดิจิทัลโรงเรียนสมคิดวิทยา'
                       : 'Official Digital Receipt'
-                    : 'Thai QR PromptPay Billing'}
+                    : 'Thai QR PromptPay Bill Payment'}
                 </span>
                 <h3 className="text-base font-extrabold text-slate-900 mt-1">
                   {isThai
@@ -4205,13 +4585,28 @@ export default function ParentsPortalPage() {
 
             {activeInvoiceModal.status === 'unpaid' ? (
               <div className="space-y-4">
-                <div className="w-48 h-48 mx-auto">
-                  <DeterministicQrSvg
-                    value={`PROMPTPAY-SOMKID-${activeInvoiceModal.id}-${activeInvoiceModal.amount}`}
-                    accentColor="#1B3A6B"
-                  />
+                <div className="w-56 h-56 mx-auto flex items-center justify-center">
+                  {isGeneratingQr ? (
+                    <div className="flex flex-col items-center gap-2 text-slate-500">
+                      <Loader2 className="w-8 h-8 animate-spin text-[#1B3A6B]" />
+                      <span className="text-xs font-bold">สร้าง Thai QR PromptPay...</span>
+                    </div>
+                  ) : promptPayQrUrl ? (
+                    <div className="flex flex-col items-center">
+                      <img
+                        src={promptPayQrUrl}
+                        alt="EMVCo Tag 30 PromptPay QR"
+                        className="w-52 h-52 rounded-2xl border-4 border-[#1B3A6B] shadow-md p-1 bg-white"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-48 h-48 rounded-2xl bg-slate-100 flex items-center justify-center text-xs text-slate-500">
+                      ไม่สามารถโหลด QR Code ได้
+                    </div>
+                  )}
                 </div>
-                <div className="rounded-2xl bg-slate-50 p-3.5 border border-slate-200 text-center">
+
+                <div className="rounded-2xl bg-slate-50 p-3.5 border border-slate-200 text-center space-y-1">
                   <p className="text-xs text-slate-500">
                     {isThai
                       ? 'ยอดชำระค่าธรรมเนียมการศึกษา'
@@ -4220,22 +4615,35 @@ export default function ParentsPortalPage() {
                   <p className="text-2xl font-black text-[#7B1C3E]">
                     {formatCurrency(activeInvoiceModal.amount)}
                   </p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
+                  <p className="text-[11px] text-slate-600 font-bold">
                     {isThai
-                      ? 'บัญชี: โรงเรียนสมคิดวิทยา (PromptPay Biller ID)'
-                      : 'Biller: Somkidvittaya School'}
+                      ? 'บัญชี: โรงเรียนสมคิดวิทยา (PromptPay Biller ID: 0994000164821)'
+                      : 'Biller: Somkidvittaya School (0994000164821)'}
                   </p>
+                  <div className="pt-1 flex items-center justify-center gap-1.5 text-[10px] text-slate-500 font-mono">
+                    <span>Ref 1: {sanitizePromptPayRef(activeInvoiceModal.student_id || selectedChild.id)}</span>
+                    <span>•</span>
+                    <span>Ref 2: {sanitizePromptPayRef(activeInvoiceModal.id).slice(0, 10)}</span>
+                  </div>
+                  <div className="pt-1 inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    <span>BOT EMVCo Tag 30 Bill Payment (CRC-16 Verified)</span>
+                  </div>
                 </div>
+
                 <button
                   type="button"
                   onClick={() =>
                     handleConfirmPromptPayInvoice(activeInvoiceModal)
                   }
-                  className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm shadow-md cursor-pointer"
+                  className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm shadow-md cursor-pointer flex items-center justify-center gap-2"
                 >
-                  {isThai
-                    ? 'ยืนยันการชำระเงินผ่าน QR PromptPay ทันที'
-                    : 'Simulate Instant PromptPay Payment'}
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>
+                    {isThai
+                      ? 'จำลองการชำระเงินสำเร็จ (ยืนยันสลิป/บันทึกบัญชี)'
+                      : 'Simulate Instant PromptPay Payment'}
+                  </span>
                 </button>
               </div>
             ) : (
@@ -4274,8 +4682,90 @@ export default function ParentsPortalPage() {
         </div>
       )}
 
+      {/* MODAL: SIGN 5-MONTH INSTALLMENT AGREEMENT */}
+      {signingAgreementPlan && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"
+        >
+          <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-amber-100 text-amber-900">
+                  {isThai ? 'สัญญาผ่อนชำระค่าธรรมเนียมการศึกษา' : 'Installment Agreement'}
+                </span>
+                <h3 className="text-base font-extrabold text-slate-900 mt-1">
+                  {isThai ? 'ข้อตกลงและเงื่อนไขการผ่อนชำระ 5 งวด' : '5-Month Installment Terms'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSigningAgreementPlan(null)}
+                className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3.5 space-y-2 text-xs text-slate-700">
+              <p>
+                <strong>{isThai ? 'นักเรียน:' : 'Student:'}</strong> {selectedChild.full_name} ({selectedChild.grade})
+              </p>
+              <p>
+                <strong>{isThai ? 'แผนที่เลือก:' : 'Selected Plan:'}</strong> {signingAgreementPlan.name_th}
+              </p>
+              <p>
+                <strong>{isThai ? 'จำนวนงวด:' : 'Tranches:'}</strong> 5 งวด (ชำระทุกวันที่ 15 ของเดือน มิ.ย. - ต.ค.)
+              </p>
+              <p className="text-[11px] text-slate-500">
+                {isThai
+                  ? 'ข้อกำหนด: ระยะปลอดค่าปรับ 15 วัน หากพ้นกำหนดจะมีค่าปรับ 100 บาทต่องวด ผู้ปกครองสามารถยื่นคำร้องขอยกเว้นค่าปรับได้ในกรณีจำเป็น'
+                  : 'Notice: 15-day grace period applies. Overdue tranches incur 100 THB late fee unless waiver is approved.'}
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">
+                {isThai ? 'ชื่อ-นามสกุลผู้ปกครองผู้ลงนามสัญญา:' : 'Signing Guardian Full Name:'}
+              </label>
+              <input
+                type="text"
+                value={guardianSignName}
+                onChange={(e) => setGuardianSignName(e.target.value)}
+                placeholder="ระบุชื่อ-นามสกุล"
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#7B1C3E]/20"
+              />
+            </div>
+
+            <div className="pt-2 flex items-center gap-2">
+              <button
+                type="button"
+                disabled={isSubmittingAgreement}
+                onClick={() => handleSignAgreement(signingAgreementPlan.id)}
+                className="flex-1 py-2.5 rounded-xl bg-[#7B1C3E] hover:bg-[#5e152f] text-white font-extrabold text-xs shadow-md cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                {isSubmittingAgreement ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <FileSignature className="w-4 h-4" />
+                )}
+                <span>{isThai ? 'ยืนยันทำสัญญาผ่อนชำระ' : 'Confirm Agreement'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSigningAgreementPlan(null)}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+              >
+                {isThai ? 'ยกเลิก' : 'Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ==================================================================
-          MODAL 3: SELECT ANY STUDENT (151 STUDENTS ACROSS 13 CLASSROOMS)
+          MODAL 3: SELECT REGISTERED CHILD
           ================================================================== */}
       {studentSearchModalOpen && (
         <div
@@ -4287,14 +4777,14 @@ export default function ParentsPortalPage() {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-[#7B1C3E]/10 text-[#7B1C3E]">
-                  {isThai ? 'ทะเบียนนักเรียนสมคิดวิทยา' : 'Student Registry'}
+                  {isThai ? 'บุตรหลานในความดูแลของคุณ' : 'Your Registered Children'}
                 </span>
                 <h3 className="text-base font-extrabold text-slate-900 mt-1 flex items-center gap-2">
                   <Users className="w-4 h-4 text-[#7B1C3E]" />
                   <span>
                     {isThai
-                      ? `เลือกนักเรียนในระบบ (${pipeline.children.length} คน)`
-                      : `Select Student (${pipeline.children.length} Students)`}
+                      ? `เลือกบุตรหลาน (${pipeline.children.length} คน)`
+                      : `Select Child (${pipeline.children.length})`}
                   </span>
                 </h3>
               </div>

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase/admin';
+import { requireAuth } from '@/lib/auth';
 import crypto from 'crypto';
 
 export async function GET() {
@@ -50,6 +51,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireAuth('admin', 'admin_signage');
+    if (auth.error) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+    }
+
     const body = await request.json();
     const { name, target_type, target_ids, priority, media_ids } = body;
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase/admin';
+import { resolvePlaylistForDevice } from '@/lib/signage/service';
 
 export async function POST(
   request: Request,
@@ -8,7 +9,7 @@ export async function POST(
   try {
     const { deviceId } = await params;
     const body = await request.json().catch(() => ({}));
-    const { current_media_id, free_storage_mb, app_version, ip_address, current_fps, dropped_frames } = body;
+    const { current_media_id, free_storage_mb, app_version, ip_address, current_fps, dropped_frames, include_playlist } = body;
 
     const clientIp = ip_address || 
       request.headers.get('x-nf-client-connection-ip') ||
@@ -57,6 +58,16 @@ export async function POST(
           dropped_frames: dropped_frames !== undefined ? dropped_frames : undefined,
         })
         .eq('id', deviceId);
+    }
+
+    if (include_playlist) {
+      const playlist = await resolvePlaylistForDevice(deviceId);
+      return NextResponse.json({
+        success: true,
+        message: 'Heartbeat acknowledged',
+        timestamp: now,
+        data: playlist,
+      });
     }
 
     return NextResponse.json({ success: true, message: 'Heartbeat acknowledged', timestamp: now });

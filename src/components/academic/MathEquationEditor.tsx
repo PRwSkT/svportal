@@ -2,17 +2,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import katex from 'katex';
-import { 
-  Calculator, 
-  X, 
-  Check, 
-  HelpCircle, 
-  Copy, 
-  Sparkles,
-  ArrowRight,
-  Divide,
-  Percent
-} from 'lucide-react';
+import { renderSafeKaTeX, escapeHtml } from '@/lib/academic/security-sanitizer';
+import { Calculator, X, Check, Sparkles, Loader2 } from 'lucide-react';
 
 interface MathEquationEditorProps {
   isOpen: boolean;
@@ -28,29 +19,9 @@ export function KaTeXInline({ content, className = '' }: { content: string; clas
   const rendered = useMemo(() => {
     if (!content) return '';
     try {
-      // If content has $ or $$, parse and replace
-      if (content.includes('$')) {
-        return content.replace(/\$\$([^$]+)\$\$/g, (_, eq) => {
-          try {
-            return katex.renderToString(eq, { displayMode: true, throwOnError: false });
-          } catch {
-            return eq;
-          }
-        }).replace(/\$([^$]+)\$/g, (_, eq) => {
-          try {
-            return katex.renderToString(eq, { displayMode: false, throwOnError: false });
-          } catch {
-            return eq;
-          }
-        });
-      }
-      // If starts with LaTeX commands like \frac, \sqrt
-      if (/^\s*\\(frac|sqrt|times|div|pm|approx|leq|geq|angle|pi|alpha|beta|sum|int)/.test(content)) {
-        return katex.renderToString(content, { displayMode: false, throwOnError: false });
-      }
-      return content;
-    } catch (e) {
-      return content;
+      return renderSafeKaTeX(content);
+    } catch {
+      return escapeHtml(content);
     }
   }, [content]);
 
@@ -72,30 +43,71 @@ export function MathEquationEditorModal({
 }: MathEquationEditorProps) {
   const [latexInput, setLatexInput] = useState(initialValue);
   const [activeCategory, setActiveCategory] = useState<'basic' | 'fractions' | 'geometry' | 'science'>('basic');
-  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [spokenMathInput, setSpokenMathInput] = useState('');
+  const [isConvertingMath, setIsConvertingMath] = useState(false);
+  const [spokenExplanation, setSpokenExplanation] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLatexInput(initialValue);
+      // Pre-fill spoken input if initialValue has plain text or non-latex
+      if (initialValue && !initialValue.startsWith('\\') && !initialValue.startsWith('$')) {
+        setSpokenMathInput(initialValue);
+      } else {
+        setSpokenMathInput('');
+      }
+      setSpokenExplanation(null);
     }
   }, [isOpen, initialValue]);
 
-  const previewHtml = useMemo(() => {
-    if (!latexInput.trim()) return '';
+  const handleConvertSpokenMath = async (textToConvert?: string) => {
+    const raw = (textToConvert || spokenMathInput || '').trim();
+    if (!raw) return;
+
+    setIsConvertingMath(true);
+    setSpokenExplanation(null);
+    try {
+      const res = await fetch('/api/academic/exams/ai-draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'fix_latex',
+          text: raw
+        })
+      });
+      const data = await res.json();
+      if (data.success && (data.raw_latex || data.katex)) {
+        const cleanLatex = data.raw_latex || data.katex.replace(/^\$|\$$/g, '');
+        setLatexInput(cleanLatex);
+        setSpokenExplanation(data.explanation || 'แปลงเป็นสูตร KaTeX สำเร็จแล้ว');
+      } else if (data.error) {
+        setSpokenExplanation(`แจ้งเตือน: ${data.error}`);
+      }
+    } catch (err: any) {
+      console.warn('AI fix_latex request failed:', err?.message);
+    } finally {
+      setIsConvertingMath(false);
+    }
+  };
+
+  const { previewHtml, previewError } = useMemo(() => {
+    if (!latexInput.trim()) return { previewHtml: '', previewError: null };
     try {
       const clean = latexInput.replace(/^\$\$|\$\$$/g, '').replace(/^\$|\$$/g, '');
       const html = katex.renderToString(clean, {
         displayMode: true,
-        throwOnError: true
+        throwOnError: true,
+        strict: 'ignore'
       });
-      setPreviewError(null);
-      return html;
-    } catch (err: any) {
-      setPreviewError(err?.message || 'รูปแบบสูตรไม่ถูกต้อง');
+      return { previewHtml: html, previewError: null };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'รูปแบบสูตรไม่ถูกต้อง';
       try {
-        return katex.renderToString(latexInput, { displayMode: true, throwOnError: false });
+        const fallback = renderSafeKaTeX(latexInput.includes('$') ? latexInput : `$$${latexInput}$$`);
+        return { previewHtml: fallback, previewError: msg };
       } catch {
-        return '';
+        return { previewHtml: '', previewError: msg };
       }
     }
   }, [latexInput]);
@@ -289,6 +301,79 @@ export function MathEquationEditorModal({
 
         {/* Main Body */}
         <div className="p-6 space-y-4 overflow-y-auto flex-1">
+          {/* Nong Fah AI Spoken Math to KaTeX Bar */}
+          <div className="p-3.5 bg-gradient-to-r from-purple-50 via-indigo-50/40 to-amber-50/50 rounded-xl border border-purple-200/80 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-purple-900">
+                <Sparkles className="w-4 h-4 text-purple-600 shrink-0" />
+                <span>ให้น้องฟ้าแปลงภาษาพูด/ข้อความเป็น LaTeX (Spoken Math to KaTeX)</span>
+              </div>
+              <span className="text-[10px] font-semibold text-purple-700 bg-purple-100/80 border border-purple-200/60 px-2 py-0.5 rounded-full">
+                Nong Fah 2.0 AI KaTeX
+              </span>
+            </div>
+
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={spokenMathInput}
+                onChange={(e) => setSpokenMathInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleConvertSpokenMath();
+                  }
+                }}
+                placeholder='พิมพ์หรือวางภาษาพูด เช่น "สแควรูทเอกซ์บวกหนึ่งส่วนสอง", "เศษ 3 ส่วน 4 บวก รูท x"'
+                className="flex-1 px-3 py-2 text-xs border border-purple-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400 placeholder:text-stone-400"
+              />
+              <button
+                type="button"
+                onClick={() => handleConvertSpokenMath()}
+                disabled={isConvertingMath || !spokenMathInput.trim()}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs shrink-0"
+              >
+                {isConvertingMath ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5" />
+                )}
+                <span>แปลงเป็น LaTeX</span>
+              </button>
+            </div>
+
+            {/* Quick Presets */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              <span className="text-[10px] text-stone-500 font-medium">ตัวอย่างภาษาพูด:</span>
+              {[
+                'สแควรูทเอกซ์บวกหนึ่งส่วนสอง',
+                'เศษ 3 ส่วน 4 บวก รูท x',
+                'x กำลัง 2 ลบ 4 เท่ากับ 0',
+                '2x บวก 5 มากกว่าหรือเท่ากับ 15',
+                'รากที่สองของ y คูณ พาย'
+              ].map((sample) => (
+                <button
+                  key={sample}
+                  type="button"
+                  onClick={() => {
+                    setSpokenMathInput(sample);
+                    handleConvertSpokenMath(sample);
+                  }}
+                  className="text-[10px] px-2 py-0.5 bg-white hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-md transition-colors"
+                >
+                  {sample}
+                </button>
+              ))}
+            </div>
+
+            {spokenExplanation && (
+              <div className="p-2 bg-white/90 border border-purple-200 rounded-lg text-[11px] text-purple-800 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <span>{spokenExplanation}</span>
+              </div>
+            )}
+          </div>
+
           {/* Input Area */}
           <div>
             <label className="block text-xs font-semibold text-stone-700 uppercase tracking-wider mb-1.5">

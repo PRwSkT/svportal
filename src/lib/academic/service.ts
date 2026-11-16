@@ -160,12 +160,31 @@ export async function saveBatchStudentGrades(
 ): Promise<{ success: boolean; updatedCount: number }> {
   const supabase = createClient();
 
+  // Fetch course annual_hours dynamically from course definition
+  let defaultCourseHours = 40;
+  try {
+    const { data: gb } = await supabase
+      .from('academic_gradebooks')
+      .select('course:academic_courses(annual_hours)')
+      .eq('id', gradebookId)
+      .single();
+    const courseAnnualHours = (gb as any)?.course?.annual_hours;
+    if (courseAnnualHours) {
+      defaultCourseHours = Number(courseAnnualHours);
+    }
+  } catch {
+    // Keep fallback
+  }
+
   const updates = gradeRecords.map(r => {
+    const totalCourseHours = Number(r.total_course_hours) || defaultCourseHours;
+    const attendedHours = r.attended_hours != null ? Number(r.attended_hours) : totalCourseHours;
+
     const result = evaluateStudentCourseResult({
       formativeScore: Number(r.formative_score) || 0,
       examScore: Number(r.exam_score) || 0,
-      attendedHours: Number(r.attended_hours) || 40,
-      totalCourseHours: Number(r.total_course_hours) || 40,
+      attendedHours,
+      totalCourseHours,
       isAbsentFromExam: r.is_absent,
       isIncompleteWork: r.is_incomplete,
       isRemedial: r.is_remedial,
@@ -179,8 +198,8 @@ export async function saveBatchStudentGrades(
       exam_score: Number(r.exam_score) || 0,
       total_score: result.totalScore,
       final_grade: result.finalGrade,
-      attendance_hours: Number(r.attended_hours) || 40,
-      total_course_hours: Number(r.total_course_hours) || 40,
+      attendance_hours: attendedHours,
+      total_course_hours: totalCourseHours,
       attendance_percent: result.attendancePercent,
       is_remedial: r.is_remedial || false,
       remedial_score: r.remedial_score || null,
@@ -290,10 +309,56 @@ export async function reviewGradebook(params: {
   gradebookId: string;
   reviewerId: string;
   action: 'approve_head' | 'reject_head' | 'approve_director' | 'reject_director';
+  reviewerRole?: string;
   notes?: string;
 }): Promise<boolean> {
   const supabase = createClient();
-  const { gradebookId, reviewerId, action, notes } = params;
+  const { gradebookId, reviewerId, action, reviewerRole, notes } = params;
+
+  // 1. Verify reviewer authority (enforce server/session role validation)
+  let verifiedRole = reviewerRole;
+  if (!verifiedRole && reviewerId) {
+    // Check personnel table
+    const { data: staff } = await supabase
+      .from('personnel')
+      .select('category, position_th')
+      .or(`id.eq.${reviewerId},user_id.eq.${reviewerId}`)
+      .maybeSingle();
+
+    if (staff) {
+      const pos = staff.position_th || '';
+      if (pos.includes('ผู้อำนวยการ') || pos.includes('ผู้รับใบอนุญาต') || staff.category === 'executive') {
+        verifiedRole = 'director';
+      } else if (pos.includes('หัวหน้า') || pos.includes('วิชาการ')) {
+        verifiedRole = 'head';
+      } else {
+        verifiedRole = 'teacher';
+      }
+    } else {
+      // Fallback check app_users
+      const { data: appUser } = await supabase
+        .from('app_users')
+        .select('role')
+        .eq('id', reviewerId)
+        .maybeSingle();
+      if (appUser) {
+        verifiedRole = appUser.role; // 'admin' | 'cashier'
+      }
+    }
+  }
+
+  const isDirectorAuthorized = verifiedRole === 'director' || verifiedRole === 'executive' || verifiedRole === 'admin';
+  const isHeadAuthorized = isDirectorAuthorized || verifiedRole === 'head' || verifiedRole === 'academic_head' || verifiedRole === 'academic staff';
+
+  if (action === 'approve_director' || action === 'reject_director') {
+    if (!isDirectorAuthorized) {
+      throw new Error('ไม่มีสิทธิ์ดำเนินการ: การอนุมัติขั้นสุดท้ายหรือส่งกลับต้องกระทำโดยผู้อำนวยการหรือผู้บริหารสถานศึกษาเท่านั้น');
+    }
+  } else if (action === 'approve_head' || action === 'reject_head') {
+    if (!isHeadAuthorized) {
+      throw new Error('ไม่มีสิทธิ์ดำเนินการ: การตรวจทานชั้นต้นต้องกระทำโดยหัวหน้าฝ่ายวิชาการหรือผู้อำนวยการเท่านั้น');
+    }
+  }
 
   let updates: Partial<AcademicGradebook> = {
     updated_at: new Date().toISOString()

@@ -62,20 +62,40 @@ export default function AcademicAssignmentsPage() {
   const [formScore, setFormScore] = useState<string>('');
   const [formFeedback, setFormFeedback] = useState<string>('');
 
+  const fetchRemoteAssignments = useCallback(async () => {
+    try {
+      const res = await fetch('/api/pipeline');
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.state?.assignments && data.state.assignments.length > 0) {
+          setPipeline(prev => ({
+            ...prev,
+            assignments: data.state.assignments
+          }));
+        }
+      }
+    } catch (e) {
+      console.warn('Assignments pipeline fetch note:', e);
+    }
+  }, []);
+
   const syncPipeline = useCallback(() => {
     setPipeline({ ...getPipelineState() });
   }, []);
 
   useEffect(() => {
     syncPipeline();
+    fetchRemoteAssignments();
+    const interval = setInterval(fetchRemoteAssignments, 15000);
     const handleUpdate = () => syncPipeline();
     window.addEventListener(PIPELINE_EVENT_NAME, handleUpdate);
     window.addEventListener('storage', handleUpdate);
     return () => {
+      clearInterval(interval);
       window.removeEventListener(PIPELINE_EVENT_NAME, handleUpdate);
       window.removeEventListener('storage', handleUpdate);
     };
-  }, [syncPipeline]);
+  }, [syncPipeline, fetchRemoteAssignments]);
 
   const assignments = pipeline.assignments || [];
 
@@ -131,7 +151,7 @@ export default function AcademicAssignmentsPage() {
     setIsModalOpen(true);
   };
 
-  const handleSaveAssignment = (e: React.FormEvent) => {
+  const handleSaveAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formTitleTh.trim()) {
       toast.error(isThai ? 'กรุณาระบุชื่องาน' : 'Please provide assignment title');
@@ -154,6 +174,19 @@ export default function AcademicAssignmentsPage() {
       score: formScore.trim() ? Number(formScore) : null,
       teacher_feedback: formFeedback.trim() || null,
     });
+
+    try {
+      await fetch('/api/pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'UPSERT_ASSIGNMENT',
+          assignment: saved
+        })
+      });
+    } catch (e) {
+      console.warn('Assignment Postgres sync error:', e);
+    }
 
     toast.success(
       isThai

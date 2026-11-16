@@ -24,9 +24,10 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { VanDailyLogItem, VanSafetyAuditResult } from '@/lib/safety/van';
+import { getBangkokDate } from '@/lib/utils';
 
 export default function SchoolVanSafetyPage() {
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState<string>(() => getBangkokDate());
   const [tripType, setTripType] = useState<'morning' | 'evening'>('morning');
   const [routes, setRoutes] = useState<any[]>([]);
   const [selectedRouteId, setSelectedRouteId] = useState<string>('');
@@ -58,6 +59,8 @@ export default function SchoolVanSafetyPage() {
 
   useEffect(() => {
     fetchRoutes();
+    const interval = setInterval(fetchRoutes, 15000);
+    return () => clearInterval(interval);
   }, [selectedDate, tripType]);
 
   // Audio Siren Functions using Web Audio API

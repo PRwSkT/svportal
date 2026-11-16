@@ -35,8 +35,15 @@ import { toast } from 'sonner';
 import { calculateEightLevelGrade, evaluateAttendanceEligibility } from '@/lib/academic/calculation';
 import { DEFAULT_ACADEMIC_YEAR } from '@/lib/constants/school';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
 
 function SmartGradebookContent() {
+  const { user, appUser, role } = useAuth();
+  const userRole = (role as string) || '';
+  const isAdminOrDirector = userRole === 'admin' || userRole === 'executive' || userRole === 'director';
+  const isHeadOrAdmin = isAdminOrDirector || userRole === 'academic staff' || userRole === 'head';
+  const [isReviewing, setIsReviewing] = useState(false);
+
   const [classes, setClasses] = useState<any[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('');
@@ -47,6 +54,12 @@ function SmartGradebookContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+
+  // Dynamic weights & annual hours from course definition and gradebook
+  const selectedCourse = courses.find((c: any) => c.id === selectedCourseId) || gradebook?.course;
+  const courseHours = Number(selectedCourse?.annual_hours || gradebook?.course?.annual_hours || 40);
+  const formativeMax = Number(gradebook?.formative_weight ?? (selectedCourse?.course_type === 'activity' ? 80 : 70));
+  const examMax = Number(gradebook?.summative_weight ?? (100 - formativeMax));
 
   // Pre-flight Audit Modal State
   const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
@@ -182,19 +195,20 @@ function SmartGradebookContent() {
   // 3. Score Change Handler with Local Calculation & Debounced Auto-save
   const handleScoreChange = (index: number, field: 'formative_score' | 'exam_score' | 'attendance_hours', value: number) => {
     const updated = [...grades];
-    const maxVal = field === 'formative_score' ? 70 : field === 'exam_score' ? 30 : 40;
+    const maxVal = field === 'formative_score' ? formativeMax : field === 'exam_score' ? examMax : courseHours;
     const item = { ...updated[index], [field]: Math.min(maxVal, Math.max(0, value)) };
 
     const formative = Number(item.formative_score) || 0;
     const exam = Number(item.exam_score) || 0;
     const total = Math.min(100, Math.round((formative + exam) * 100) / 100);
-    const attended = Number(item.attendance_hours) || 40;
-    const totalHours = Number(item.total_course_hours) || 40;
+    const attended = item.attendance_hours != null ? Number(item.attendance_hours) : courseHours;
+    const totalHours = Number(item.total_course_hours) || courseHours;
 
     const { isEligible, attendancePercent } = evaluateAttendanceEligibility(attended, totalHours);
 
     item.total_score = total;
     item.attendance_percent = attendancePercent;
+    item.total_course_hours = totalHours;
 
     if (item.is_incomplete) {
       item.final_grade = 'ร';
@@ -227,11 +241,12 @@ function SmartGradebookContent() {
       const formative = Number(item.formative_score) || 0;
       const exam = Number(item.exam_score) || 0;
       const total = Math.min(100, Math.round((formative + exam) * 100) / 100);
-      const attended = Number(item.attendance_hours) || 40;
-      const totalHours = Number(item.total_course_hours) || 40;
+      const attended = item.attendance_hours != null ? Number(item.attendance_hours) : courseHours;
+      const totalHours = Number(item.total_course_hours) || courseHours;
       const { isEligible, attendancePercent } = evaluateAttendanceEligibility(attended, totalHours);
       item.total_score = total;
       item.attendance_percent = attendancePercent;
+      item.total_course_hours = totalHours;
       item.final_grade = isEligible ? calculateEightLevelGrade(total) : 'มส';
     } else if (status === 'INCOMPLETE_R') {
       item.is_incomplete = true;
@@ -321,19 +336,20 @@ function SmartGradebookContent() {
       const val = parseFloat(cells[0]);
 
       if (!isNaN(val)) {
-        const maxAllowed = field === 'formative_score' ? 70 : field === 'exam_score' ? 30 : 40;
+        const maxAllowed = field === 'formative_score' ? formativeMax : field === 'exam_score' ? examMax : courseHours;
         const clampedVal = Math.min(maxAllowed, Math.max(0, val));
         
         const item = { ...updated[targetIdx], [field]: clampedVal };
         const formative = Number(item.formative_score) || 0;
         const exam = Number(item.exam_score) || 0;
         const total = Math.min(100, Math.round((formative + exam) * 100) / 100);
-        const attended = Number(item.attendance_hours) || 40;
-        const totalHours = Number(item.total_course_hours) || 40;
+        const attended = item.attendance_hours != null ? Number(item.attendance_hours) : courseHours;
+        const totalHours = Number(item.total_course_hours) || courseHours;
         const { isEligible, attendancePercent } = evaluateAttendanceEligibility(attended, totalHours);
 
         item.total_score = total;
         item.attendance_percent = attendancePercent;
+        item.total_course_hours = totalHours;
 
         if (item.is_incomplete) {
           item.final_grade = 'ร';
@@ -361,11 +377,11 @@ function SmartGradebookContent() {
   };
 
   // Batch Set Attendance for all students in one click
-  const handleBatchSetAttendance = (hours = 40) => {
+  const handleBatchSetAttendance = (hours = courseHours) => {
     if (isLocked || grades.length === 0) return;
     const updated = grades.map(row => {
       const attended = hours;
-      const totalHours = Number(row.total_course_hours) || 40;
+      const totalHours = Number(row.total_course_hours) || courseHours;
       const { isEligible, attendancePercent } = evaluateAttendanceEligibility(attended, totalHours);
       const total = Number(row.total_score) || 0;
       let finalGrade = row.final_grade;
@@ -381,6 +397,7 @@ function SmartGradebookContent() {
       return {
         ...row,
         attendance_hours: hours,
+        total_course_hours: totalHours,
         attendance_percent: attendancePercent,
         final_grade: finalGrade
       };
@@ -396,7 +413,7 @@ function SmartGradebookContent() {
   // Batch Curve Score (+/- X points across all students)
   const handleBatchCurveScore = () => {
     if (isLocked || grades.length === 0 || batchCurveDelta === 0) return;
-    const maxAllowed = batchCurveField === 'formative_score' ? 70 : 30;
+    const maxAllowed = batchCurveField === 'formative_score' ? formativeMax : examMax;
     const updated = grades.map(row => {
       const current = Number(row[batchCurveField]) || 0;
       const newVal = Math.min(maxAllowed, Math.max(0, Math.round((current + batchCurveDelta) * 10) / 10));
@@ -404,11 +421,12 @@ function SmartGradebookContent() {
       const formative = Number(item.formative_score) || 0;
       const exam = Number(item.exam_score) || 0;
       const total = Math.min(100, Math.round((formative + exam) * 100) / 100);
-      const attended = Number(item.attendance_hours) || 40;
-      const totalHours = Number(item.total_course_hours) || 40;
+      const attended = item.attendance_hours != null ? Number(item.attendance_hours) : courseHours;
+      const totalHours = Number(item.total_course_hours) || courseHours;
       const { isEligible, attendancePercent } = evaluateAttendanceEligibility(attended, totalHours);
       item.total_score = total;
       item.attendance_percent = attendancePercent;
+      item.total_course_hours = totalHours;
       if (item.is_incomplete) {
         item.final_grade = 'ร';
       } else if (item.is_absent) {
@@ -435,7 +453,7 @@ function SmartGradebookContent() {
       toast.warning('ไม่พบข้อมูลที่จะส่งออก');
       return;
     }
-    const headers = ['เลขที่', 'รหัสนักเรียน', 'ชื่อ-สกุล', 'คะแนนเก็บ (70)', 'คะแนนสอบ (30)', 'คะแนนรวม (100)', 'เกรด', 'เวลาเรียน (ชม.)', 'เวลาเรียน %', 'สถานะ'];
+    const headers = ['เลขที่', 'รหัสนักเรียน', 'ชื่อ-สกุล', `คะแนนเก็บ (${formativeMax})`, `คะแนนสอบ (${examMax})`, 'คะแนนรวม (100)', 'เกรด', `เวลาเรียน (${courseHours} ชม.)`, 'เวลาเรียน %', 'สถานะ'];
     const rows = grades.map((g, idx) => [
       g.roll_number || idx + 1,
       g.student_id,
@@ -444,7 +462,7 @@ function SmartGradebookContent() {
       g.exam_score ?? 0,
       g.total_score ?? 0,
       g.final_grade ?? '-',
-      g.attendance_hours ?? 40,
+      g.attendance_hours ?? courseHours,
       `${g.attendance_percent}%`,
       g.is_incomplete ? 'ร' : g.is_absent ? 'ขส' : g.final_grade === 'มส' ? 'มส' : 'ปกติ'
     ]);
@@ -518,6 +536,29 @@ function SmartGradebookContent() {
     }
   };
 
+  const handleReviewAction = async (action: 'approve_head' | 'reject_head' | 'approve_director' | 'reject_director') => {
+    if (!gradebook?.id) return;
+    setIsReviewing(true);
+    try {
+      const res = await fetch(`/api/academic/gradebooks/${gradebook.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          reviewer_id: user?.id
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast.success(data.message || 'บันทึกผลการตรวจทานเรียบร้อยแล้ว');
+      loadGradebookData(selectedClassId, selectedCourseId);
+    } catch (err: any) {
+      toast.error(err.message || 'ดำเนินการไม่สำเร็จ');
+    } finally {
+      setIsReviewing(false);
+    }
+  };
+
   const isLocked = gradebook?.approval_status === 'OFFICIALLY_LOCKED' || gradebook?.approval_status === 'SUBMITTED_TO_HEAD' || gradebook?.approval_status === 'APPROVED_BY_HEAD';
 
   return (
@@ -588,6 +629,54 @@ function SmartGradebookContent() {
                 <Send className="w-3.5 h-3.5" />
                 ส่งตรวจทานผลการเรียน
               </button>
+            )}
+
+            {/* Department Head Review Action Bar (enforcing verified role) */}
+            {gradebook?.approval_status === 'SUBMITTED_TO_HEAD' && isHeadOrAdmin && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleReviewAction('reject_head')}
+                  disabled={isReviewing}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-xl text-xs font-bold transition-all border border-rose-200"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  ส่งกลับแก้ไข
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleReviewAction('approve_head')}
+                  disabled={isReviewing}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  อนุมัติชั้นต้น (หัวหน้าแผนก)
+                </button>
+              </div>
+            )}
+
+            {/* Director Review Action Bar (enforcing verified role) */}
+            {gradebook?.approval_status === 'APPROVED_BY_HEAD' && isAdminOrDirector && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleReviewAction('reject_director')}
+                  disabled={isReviewing}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-xl text-xs font-bold transition-all border border-rose-200"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  ส่งกลับ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleReviewAction('approve_director')}
+                  disabled={isReviewing}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-700/20 transition-all"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  ลงนามอนุมัติ (Final Lock)
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -688,8 +777,8 @@ function SmartGradebookContent() {
             <div className="flex items-end">
               <div className="text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-700/60 w-full">
                 <span>สัดส่วนคะแนน: </span>
-                <strong className="text-[#7B1C3E]">เก็บ 70% : ปลายปี 30%</strong>
-                <span className="block mt-0.5">เกณฑ์เวลาเรียน: <strong>80% (ขาดได้ไม่เกิน 8 ชม.)</strong></span>
+                <strong className="text-[#7B1C3E]">เก็บ {formativeMax}% : ปลายปี {examMax}%</strong>
+                <span className="block mt-0.5">เวลาเรียนรายปี: <strong>{courseHours} ชม. (เกณฑ์ 80%: {Math.round(courseHours * 0.8)} ชม.)</strong></span>
               </div>
             </div>
           </div>
@@ -709,13 +798,13 @@ function SmartGradebookContent() {
 
               <button
                 type="button"
-                onClick={() => handleBatchSetAttendance(40)}
+                onClick={() => handleBatchSetAttendance(courseHours)}
                 disabled={isLocked || grades.length === 0}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-bold transition-all border border-emerald-500/20 disabled:opacity-50"
-                title="ตั้งเวลาเรียนของทุกคนในห้องนี้เป็น 40 ชม. (100%)"
+                title={`ตั้งเวลาเรียนของทุกคนในห้องนี้เป็น ${courseHours} ชม. (100%)`}
               >
                 <CheckCheck className="w-3.5 h-3.5" />
-                <span>ตั้งเวลาเรียน 40 ชม. ทั้งห้อง</span>
+                <span>ตั้งเวลาเรียน {courseHours} ชม. ทั้งห้อง</span>
               </button>
 
               <button
@@ -779,16 +868,16 @@ function SmartGradebookContent() {
                     <th className="py-3.5 px-3 w-24">รหัส</th>
                     <th className="py-3.5 px-4 min-w-[180px]">ชื่อ-สกุล นักเรียน</th>
                     <th className="py-3.5 px-3 text-center w-28 bg-[#7B1C3E]/5 dark:bg-[#7B1C3E]/10">
-                      คะแนนเก็บ (70)
+                      คะแนนเก็บ ({formativeMax})
                     </th>
                     <th className="py-3.5 px-3 text-center w-28 bg-purple-50/50 dark:bg-purple-950/20">
-                      สอบปลายปี (30)
+                      สอบปลายปี ({examMax})
                     </th>
                     <th className="py-3.5 px-3 text-center w-24 font-extrabold text-[#7B1C3E]">
                       รวม (100)
                     </th>
                     <th className="py-3.5 px-3 text-center w-20 font-extrabold">เกรด</th>
-                    <th className="py-3.5 px-3 text-center w-28">เวลาเรียน (ชม.)</th>
+                    <th className="py-3.5 px-3 text-center w-28">เวลาเรียน ({courseHours} ชม.)</th>
                     <th className="py-3.5 px-3 text-center w-24">เวลาเรียน %</th>
                     <th className="py-3.5 px-3 text-center w-36">สถานะพิเศษ</th>
                   </tr>
@@ -822,7 +911,7 @@ function SmartGradebookContent() {
                             type="number"
                             disabled={isLocked}
                             min="0"
-                            max="70"
+                            max={formativeMax}
                             step="0.5"
                             value={row.formative_score ?? ''}
                             onChange={(e) => handleScoreChange(idx, 'formative_score', parseFloat(e.target.value) || 0)}
@@ -839,7 +928,7 @@ function SmartGradebookContent() {
                             type="number"
                             disabled={isLocked}
                             min="0"
-                            max="30"
+                            max={examMax}
                             step="0.5"
                             value={row.exam_score ?? ''}
                             onChange={(e) => handleScoreChange(idx, 'exam_score', parseFloat(e.target.value) || 0)}
@@ -878,8 +967,8 @@ function SmartGradebookContent() {
                             type="number"
                             disabled={isLocked}
                             min="0"
-                            max="40"
-                            value={row.attendance_hours ?? 40}
+                            max={courseHours}
+                            value={row.attendance_hours ?? courseHours}
                             onChange={(e) => handleScoreChange(idx, 'attendance_hours', parseFloat(e.target.value) || 0)}
                             onKeyDown={(e) => handleCellKeyDown(e, idx, 'attendance_hours')}
                             onPaste={(e) => handleCellPaste(e, idx, 'attendance_hours')}
@@ -962,8 +1051,8 @@ function SmartGradebookContent() {
                       onChange={(e) => setBatchCurveField(e.target.value as any)}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#7B1C3E]/30"
                     >
-                      <option value="formative_score">คะแนนเก็บระหว่างภาค (เต็ม 70 คะแนน)</option>
-                      <option value="exam_score">คะแนนสอบปลายภาค (เต็ม 30 คะแนน)</option>
+                      <option value="formative_score">คะแนนเก็บระหว่างภาค (เต็ม {formativeMax} คะแนน)</option>
+                      <option value="exam_score">คะแนนสอบปลายภาค (เต็ม {examMax} คะแนน)</option>
                     </select>
                   </div>
 

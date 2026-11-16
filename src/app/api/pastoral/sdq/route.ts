@@ -11,7 +11,10 @@ import { DEFAULT_ACADEMIC_YEAR, DEFAULT_TERM } from '@/lib/constants/school';
 
 export async function GET(request: Request) {
   try {
-    const auth = await requireAuth();
+    let auth = await requireAuth('teacher', 'pastoral_care');
+    if (auth.error) {
+      auth = await requireAuth(undefined, 'admin_students');
+    }
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -135,7 +138,10 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireAuth();
+    let auth = await requireAuth('teacher', 'pastoral_care');
+    if (auth.error) {
+      auth = await requireAuth(undefined, 'admin_students');
+    }
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }

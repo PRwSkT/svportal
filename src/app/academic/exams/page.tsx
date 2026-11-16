@@ -443,6 +443,13 @@ export default function AcademicExamsPage() {
       mockAnswers[k] = Math.random() > 0.15 ? setKey[k] : (setKey[k] === 'A' ? 'B' : 'A');
     });
 
+    // Ingest simulated Teacher Subjective Bubble marks (0-5) for subjective questions
+    const mockSubjScores: Record<string, number> = {};
+    (activeExam.questions || []).filter((q: any) => q.question_type === 'subjective').forEach((q: any) => {
+      const maxPts = Math.min(Math.max(Math.round(q.points || 5), 1), 5);
+      mockSubjScores[String(q.question_number)] = Math.min(Math.floor(Math.random() * 2) + Math.max(1, maxPts - 1), maxPts);
+    });
+
     setTimeout(async () => {
       try {
         const res = await fetch(`/api/academic/exams/${activeExam.exam.id}/submissions`, {
@@ -452,6 +459,7 @@ export default function AcademicExamsPage() {
             student_id: targetStudent.id,
             set_name: currentSet,
             student_answers: mockAnswers,
+            subjective_scores: mockSubjScores,
             status: 'GRADED'
           })
         });
@@ -1240,6 +1248,11 @@ export default function AcademicExamsPage() {
                           </td>
                           <td className="py-2 px-3 text-right font-bold text-sm text-[#7B1C3E]">
                             {sub.total_score}
+                            {sub.subjective_scores && Object.keys(sub.subjective_scores).length > 0 && (
+                              <span className="block text-[10px] font-normal text-amber-700 dark:text-amber-400">
+                                (อัตนัย {Object.values(sub.subjective_scores).reduce((a: number, b: any) => a + Number(b), 0)} แต้ม)
+                              </span>
+                            )}
                           </td>
                           <td className="py-2 px-3 text-center">
                             {isOverride ? (

@@ -36,19 +36,31 @@ export async function POST(
       }, { status: 400 });
     }
 
-    // Check target gradebook status (prevent modifying locked gradebooks)
-    const { data: targetGb } = await supabase
+    // Fetch target gradebook with course definition (weights and hours)
+    const { data: targetGb, error: gbErr } = await supabase
       .from('academic_gradebooks')
-      .select('approval_status')
+      .select('*, course:academic_courses(*)')
       .eq('id', gradebookId)
       .single();
 
-    if (targetGb?.approval_status === 'APPROVED_BY_HEAD' || targetGb?.approval_status === 'OFFICIALLY_LOCKED') {
+    if (gbErr || !targetGb) {
+      return NextResponse.json({ success: false, error: 'Target gradebook not found' }, { status: 404 });
+    }
+
+    if (targetGb.approval_status === 'APPROVED_BY_HEAD' || targetGb.approval_status === 'OFFICIALLY_LOCKED') {
       return NextResponse.json({
         success: false,
         error: 'ไม่สามารถซิงค์คะแนนได้ เนื่องจากเล่ม ปพ.5 นี้ได้รับการอนุมัติหรือล็อกผลการเรียนอย่างเป็นทางการแล้ว'
       }, { status: 400 });
     }
+
+    // Dynamic weights and annual hours
+    const courseHours = Number(targetGb.course?.annual_hours || 40);
+    const formativeMax = Number(targetGb.formative_weight ?? (targetGb.course?.course_type === 'activity' ? 80 : 70));
+    const examMax = Number(targetGb.summative_weight ?? (100 - formativeMax));
+    const examMaxScore = Number(exam.max_score) || 20;
+    const examType = String(exam.exam_type || 'final').toLowerCase();
+    const midtermTargetWeight = Number(body.target_weight) || Math.min(20, Math.round(formativeMax * 0.3));
 
     // 1. Fetch all submissions for this exam
     const { data: submissions, error: subError } = await supabase
@@ -80,18 +92,44 @@ export async function POST(
       const existing = gradeMap.get(sub.student_id);
       if (!existing) continue;
 
-      const formativeScore = Number(existing.formative_score) || 0;
-      const newExamScore = Number(sub.total_score);
+      const rawScore = Number(sub.total_score);
+      let newFormativeScore = Number(existing.formative_score) || 0;
+      let newExamScore = Number(existing.exam_score) || 0;
+
+      if (examType === 'final') {
+        // Proportional scale to course's summative exam max weight (e.g. 30 pts)
+        const scaled = (rawScore / examMaxScore) * examMax;
+        newExamScore = Math.min(examMax, Math.max(0, Math.round(scaled * 10) / 10));
+      } else if (examType === 'midterm') {
+        // Proportional scale to midterm portion of formative weight (e.g. 20 pts)
+        const scaled = (rawScore / examMaxScore) * midtermTargetWeight;
+        const clampedMidterm = Math.min(midtermTargetWeight, Math.max(0, Math.round(scaled * 10) / 10));
+        // If mode is add, add to existing non-exam formative points; else set/update
+        if (body.mode === 'add') {
+          newFormativeScore = Math.min(formativeMax, Math.round((newFormativeScore + clampedMidterm) * 10) / 10);
+        } else {
+          newFormativeScore = Math.min(formativeMax, clampedMidterm);
+        }
+      } else {
+        // Quiz / Unit test (e.g. 10 pts)
+        const quizTarget = Number(body.target_weight) || 10;
+        const scaled = (rawScore / examMaxScore) * quizTarget;
+        const clampedQuiz = Math.min(quizTarget, Math.max(0, Math.round(scaled * 10) / 10));
+        newFormativeScore = Math.min(formativeMax, Math.round((newFormativeScore + clampedQuiz) * 10) / 10);
+      }
 
       const isAbsent = Boolean(sub.total_score === null || existing.is_absent || existing.final_grade === 'ขส');
       const isIncomplete = Boolean(existing.is_incomplete || existing.final_grade === 'ร');
       const isNoExam = Boolean(existing.final_grade === 'มส');
 
+      const attendedHours = Number(existing.attendance_hours ?? courseHours);
+      const totalCourseHours = Number(existing.total_course_hours ?? courseHours);
+
       const calc = evaluateStudentCourseResult({
-        formativeScore,
+        formativeScore: newFormativeScore,
         examScore: newExamScore,
-        attendedHours: Number(existing.attendance_hours ?? 40),
-        totalCourseHours: Number(existing.total_course_hours ?? 40),
+        attendedHours,
+        totalCourseHours,
         isAbsentFromExam: isAbsent,
         isIncompleteWork: isIncomplete,
         isRemedial: existing.is_remedial || false,
@@ -103,9 +141,13 @@ export async function POST(
       await supabase
         .from('academic_student_grades')
         .update({
+          formative_score: newFormativeScore,
           exam_score: newExamScore,
           total_score: calc.totalScore,
           final_grade: calculatedGrade,
+          attendance_hours: attendedHours,
+          total_course_hours: totalCourseHours,
+          attendance_percent: calc.attendancePercent,
           updated_at: new Date().toISOString()
         })
         .eq('id', existing.id);
@@ -113,10 +155,17 @@ export async function POST(
       syncedCount++;
     }
 
+    const typeLabelTh = examType === 'final'
+      ? `สอบปลายภาค (สัดส่วน ${examMax} คะแนน)`
+      : examType === 'midterm'
+      ? `สอบกลางภาค (สัดส่วน ${midtermTargetWeight} คะแนน)`
+      : `แบบทดสอบ (${examType})`;
+
     return NextResponse.json({
       success: true,
       synced_count: syncedCount,
-      message: `ซิงค์คะแนนสอบเข้าเล่ม ปพ.5 เรียบร้อยแล้ว ${syncedCount} คน พร้อมตัดเกรดอัตโนมัติ`
+      target_weight: examType === 'final' ? examMax : midtermTargetWeight,
+      message: `ซิงค์และคำนวณสัดส่วนคะแนน${typeLabelTh} เข้าเล่ม ปพ.5 เรียบร้อยแล้ว ${syncedCount} คน พร้อมตัดเกรดอัตโนมัติ`
     });
   } catch (error: any) {
     console.error('Error syncing exam scores to gradebook:', error);

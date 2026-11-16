@@ -153,6 +153,8 @@ export function ExamPrintModal({
               { id: '10001', name: 'ตัวอย่างนักเรียน 1', grade: selectedGrade || 'ป.3/1', roll_number: 1 },
               { id: '10002', name: 'ตัวอย่างนักเรียน 2', grade: selectedGrade || 'ป.3/1', roll_number: 2 }
             ],
+            questions: questionsList,
+            hasSubjective: questionsList.some((q: any) => q.question_type === 'subjective'),
             setDistribution,
             spareSheetsCount,
             schoolName: 'โรงเรียนสมคิดวิทยา',

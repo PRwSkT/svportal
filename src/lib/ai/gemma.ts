@@ -19,41 +19,28 @@ export type TaskComplexity = 'low' | 'medium' | 'high';
 export function getModelsForComplexity(complexity: TaskComplexity): string[] {
   switch (complexity) {
     case 'high':
-      // คำถามและคำตอบที่ซับซ้อนสูง (เช่น สร้างฟอร์มใหม่จากศูนย์, ออกข้อสอบ, วิเคราะห์สถิติตอบกลับ, ประเมินข้อสอบอัตนัย)
-      // ใช้โมเดลเรือธง 3.6 Flash -> 3 Flash -> 3.5 Flash Lite -> 3.1 Flash Lite -> 2.5 Flash
       return [
-        'gemini-3.6-flash',
-        'gemini-3-flash-preview',
-        'gemini-3.5-flash-lite',
-        'gemini-3.1-flash-lite',
         'gemini-2.5-flash',
+        'gemini-2.5-pro',
+        'gemini-2.0-flash',
         'gemini-2.5-flash-lite',
-        'gemini-flash-lite-latest',
+        'gemini-1.5-flash',
       ];
     case 'medium':
-      // คำถามและคำตอบความซับซ้อนปานกลาง (เช่น ปรับปรุงแก้ไขฟอร์มเดิม, ตรวจสุขภาพฟอร์ม/PDPA, แปลภาษา, สร้างตัวเลือกช้อยส์)
-      // ใช้โมเดลความเร็วสูง 3.5 Flash Lite -> 3.1 Flash Lite -> 3.6 Flash -> 3 Flash -> 2.5 Flash
       return [
-        'gemini-3.5-flash-lite',
-        'gemini-3.1-flash-lite',
-        'gemini-3.6-flash',
-        'gemini-3-flash-preview',
         'gemini-2.5-flash',
+        'gemini-2.0-flash',
         'gemini-2.5-flash-lite',
-        'gemini-flash-lite-latest',
+        'gemini-2.5-pro',
+        'gemini-1.5-flash',
       ];
     case 'low':
     default:
-      // คำถามและคำตอบความซับซ้อนต่ำ (เช่น ทักทาย, ถามทั่วไป, สารทุกข์สุกดิบ, ขอปุ่มนำทางด่วน)
-      // ใช้โมเดลขนาดเบาและเร็วที่สุด 3.1 Flash Lite -> 3.5 Flash Lite -> 3.6 Flash -> 3 Flash -> 2.5 Flash
       return [
-        'gemini-3.1-flash-lite',
-        'gemini-3.5-flash-lite',
-        'gemini-3.6-flash',
-        'gemini-3-flash-preview',
-        'gemini-2.5-flash',
         'gemini-2.5-flash-lite',
-        'gemini-flash-lite-latest',
+        'gemini-2.5-flash',
+        'gemini-2.0-flash',
+        'gemini-1.5-flash',
       ];
   }
 }
@@ -218,8 +205,9 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
         requestBody.generationConfig.responseMimeType = 'application/json';
       }
 
-      // Fast response mode: disable thinking tokens on models that support thinkingBudget=0 to avoid high latency
-      if (model === 'gemini-3.1-flash-lite' || model === 'gemini-3-flash-preview') {
+      // Fast response mode: disable thinking tokens on models that support thinkingBudget=0 to avoid high latency for low/medium tasks.
+      // For high complexity tasks (e.g. exam authoring, mathematical reasoning, diagnostic analysis), preserve reasoning/thinking budget.
+      if (complexity !== 'high' && (model === 'gemini-3.1-flash-lite' || model === 'gemini-3-flash-preview')) {
         requestBody.generationConfig.thinkingConfig = { thinkingBudget: 0 };
       }
 
@@ -282,17 +270,209 @@ export async function callGemma(options: GemmaCallOptions): Promise<string> {
   throw new Error(lastError?.message || 'ไม่สามารถติดต่อระบบน้องฟ้า AI ได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง');
 }
 
+export interface GeminiToolCall {
+  name: string;
+  args: Record<string, unknown>;
+}
+
+export interface GeminiToolCallResult {
+  text?: string;
+  toolCalls?: GeminiToolCall[];
+  groundingMetadata?: unknown;
+}
+
+export interface GeminiWithToolsOptions {
+  systemInstruction?: string;
+  contents: Array<{
+    role: 'user' | 'model' | 'function';
+    parts: Array<
+      | { text: string }
+      | { functionCall: { name: string; args: Record<string, unknown> } }
+      | { functionResponse: { name: string; response: Record<string, unknown> } }
+    >;
+  }>;
+  tools?: Array<{
+    functionDeclarations?: Array<{
+      name: string;
+      description: string;
+      parameters?: Record<string, unknown>;
+    }>;
+    googleSearch?: Record<string, unknown>;
+  }>;
+  temperature?: number;
+  maxOutputTokens?: number;
+  complexity?: TaskComplexity;
+}
+
 /**
- * Robust JSON Parser with graceful truncation repair
+ * Multi-turn, tool-calling Gemini caller supporting functionDeclarations and googleSearch grounding
  */
-function safeParseJson<T>(rawText: string, fallbackErrorMessage: string): T {
+export async function callGeminiWithTools(options: GeminiWithToolsOptions): Promise<GeminiToolCallResult> {
+  const apiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
+  if (!apiKey) {
+    throw new Error('ยังไม่ได้กำหนด GEMINI_API_KEY หรือ GOOGLE_API_KEY');
+  }
+
+  const {
+    systemInstruction,
+    contents,
+    tools,
+    temperature = 0.2,
+    maxOutputTokens = 4096,
+    complexity = 'medium',
+  } = options;
+
+  const candidateModels = getModelsForComplexity(complexity);
+  let lastError: Error | null = null;
+
+  for (const model of candidateModels) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+      const requestBody: any = {
+        contents,
+        generationConfig: {
+          temperature,
+          maxOutputTokens,
+        },
+      };
+
+      if (systemInstruction) {
+        requestBody.systemInstruction = {
+          parts: [{ text: systemInstruction }],
+        };
+      }
+
+      if (tools && tools.length > 0) {
+        requestBody.tools = tools;
+      }
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Client': 'svportal-ai/2.0',
+        },
+        body: JSON.stringify(requestBody),
+        signal: AbortSignal.timeout(25000),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.warn(`[GeminiTools] Model ${model} returned error ${res.status}:`, errorText.slice(0, 120));
+        lastError = new Error(`AI Model (${model}) status ${res.status}`);
+        continue;
+      }
+
+      const data = await res.json();
+      const candidate = data?.candidates?.[0];
+      const parts = candidate?.content?.parts || [];
+
+      let textOutput = '';
+      const toolCalls: GeminiToolCall[] = [];
+
+      for (const part of parts) {
+        if (part.text) {
+          textOutput += part.text;
+        }
+        if (part.functionCall) {
+          toolCalls.push({
+            name: part.functionCall.name,
+            args: part.functionCall.args || {},
+          });
+        }
+      }
+
+      return {
+        text: textOutput.trim() || undefined,
+        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+        groundingMetadata: candidate?.groundingMetadata,
+      };
+    } catch (err: any) {
+      console.warn(`[GeminiTools] Model ${model} request failed:`, err?.message);
+      lastError = err;
+    }
+  }
+
+  throw new Error(lastError?.message || 'ไม่สามารถติดต่อ AI โมเดลได้ในขณะนี้');
+}
+
+/**
+ * Two-Pass Google Search Grounding:
+ * Pass 1: Gathers up-to-date facts from Google Search without formatting constraints.
+ * Pass 2: Synthesizes facts into structured output (JSON / UI), avoiding Gemini's limitation
+ * of combining googleSearch with responseMimeType: 'application/json'.
+ */
+export async function callGeminiWithTwoPassSearch(options: {
+  systemPrompt: string;
+  userPrompt: string;
+  temperature?: number;
+  maxTokens?: number;
+  responseMimeType?: string;
+  complexity?: TaskComplexity;
+}): Promise<string> {
+  const {
+    systemPrompt,
+    userPrompt,
+    temperature = 0.2,
+    maxTokens = 2048,
+    responseMimeType,
+    complexity = 'medium',
+  } = options;
+
+  let liveFacts = '';
+  try {
+    const searchRes = await callGeminiWithTools({
+      systemInstruction: 'You are a factual research assistant. Search Google for up-to-date information to answer the user query accurately.',
+      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+      tools: [{ googleSearch: {} }],
+      temperature: 0.1,
+      maxOutputTokens: 1024,
+      complexity: 'medium',
+    });
+    if (searchRes.text) {
+      liveFacts = searchRes.text;
+    }
+  } catch (searchErr) {
+    console.warn('[TwoPassSearch] Pass 1 search skipped or failed:', searchErr);
+  }
+
+  const enhancedUserPrompt = liveFacts
+    ? `${userPrompt}\n\n[ข้อมูลสืบค้นล่าสุดจาก Google Search (Live Web Facts)]:\n${liveFacts}`
+    : userPrompt;
+
+  return callGemma({
+    systemPrompt,
+    userPrompt: enhancedUserPrompt,
+    temperature,
+    maxTokens,
+    responseMimeType,
+    enableSearchGrounding: false,
+    complexity,
+  });
+}
+
+/**
+ * Robust JSON Parser with graceful truncation repair (supports both objects and arrays)
+ */
+export function safeParseJson<T>(rawText: string, fallbackErrorMessage: string): T {
   let cleaned = (rawText || '').trim();
   cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
 
+  // Detect whether root is array or object
+  const firstBracket = cleaned.indexOf('[');
   const firstBrace = cleaned.indexOf('{');
-  const lastBrace = cleaned.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+
+  if (firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace)) {
+    const lastBracket = cleaned.lastIndexOf(']');
+    if (lastBracket !== -1 && lastBracket > firstBracket) {
+      cleaned = cleaned.substring(firstBracket, lastBracket + 1);
+    }
+  } else if (firstBrace !== -1) {
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (lastBrace !== -1 && lastBrace > firstBrace) {
+      cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    }
   }
 
   try {

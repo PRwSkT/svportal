@@ -1,7 +1,14 @@
 import { createServerClient } from '@supabase/ssr';
+import { SupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+import { isNetlifyDbActive } from '@/lib/db/netlify-bridge';
+import { createPgPostgrestClient } from '@/lib/db/pg-postgrest-adapter';
 
-export async function createClient() {
+export async function createClient(): Promise<SupabaseClient<any, 'public', any>> {
+  if (isNetlifyDbActive()) {
+    return createPgPostgrestClient() as any;
+  }
+
   const cookieStore = await cookies();
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

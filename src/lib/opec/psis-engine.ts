@@ -2,17 +2,21 @@
  * OPEC PSIS Subsidy Suite Engine
  * Handles statutory subsidy calculations for Somkidvittaya School (1121100013)
  * Compliant with Private Education Commission (สช.) and Cabinet Resolutions (มติ ครม.).
+ *
+ * นโยบายอาหารกลางวัน: โรงเรียนสมคิดวิทยาจัดอาหารกลางวันเองด้วยโรงครัวภายใน และรวมอยู่ในค่าเทอม
+ * จึง "ไม่เบิกเงินอุดหนุนอาหารกลางวัน" (lunchPerDay = 0) ต้นทุนวัตถุดิบจริงควบคุมที่ /admin/students/nutrition
+ * (ผังบัญชี ม.32 รหัส 52200) ส่วนฟิลด์/ฟังก์ชันเดิมคงไว้เพื่อความเข้ากันได้ แต่ยอดเงินอุดหนุนอาหารกลางวันเป็น 0 เสมอ
  */
 
 import { Student } from '@/types';
-import { screenLunchSubsidy, evaluateWeightForHeight, calculateBMI } from '../pastoral/nutrition';
+import { screenNutritionWatch, evaluateWeightForHeight, calculateBMI } from '../pastoral/nutrition';
 import ExcelJS from 'exceljs';
 
 export interface SubsidyRates {
   // Before Primary (Kindergarten อ.1 - อ.3)
   kindergarten: {
     salaryAndOperationPerYear: number; // 8,485 THB/year
-    lunchPerDay: number; // 27 THB/day (for schools <= 100 students) or 24 THB/day
+    lunchPerDay: number; // 0: ไม่รับเงินอุดหนุนอาหารกลางวัน (โรงครัวภายใน รวมในค่าเทอม)
     uniformPerYear: number; // 325 THB/year
     stationeryPerYear: number; // 290 THB/year
     activitiesPerYear: number; // 430 THB/year
@@ -20,7 +24,7 @@ export interface SubsidyRates {
   // Primary (ป.1 - ป.6)
   primary: {
     salaryAndOperationPerYear: number; // 8,610 THB/year
-    lunchPerDay: number; // 27 THB/day (targeted)
+    lunchPerDay: number; // 0: ไม่รับเงินอุดหนุนอาหารกลางวัน (โรงครัวภายใน รวมในค่าเทอม)
     uniformPerYear: number; // 360 THB/year
     stationeryPerYear: number; // 440 THB/year
     activitiesPerYear: number; // 480 THB/year
@@ -30,14 +34,14 @@ export interface SubsidyRates {
 export const OFFICIAL_SUBSIDY_RATES: SubsidyRates = {
   kindergarten: {
     salaryAndOperationPerYear: 8485,
-    lunchPerDay: 27,
+    lunchPerDay: 0,
     uniformPerYear: 325,
     stationeryPerYear: 290,
     activitiesPerYear: 430,
   },
   primary: {
     salaryAndOperationPerYear: 8610,
-    lunchPerDay: 27,
+    lunchPerDay: 0,
     uniformPerYear: 360,
     stationeryPerYear: 440,
     activitiesPerYear: 480,
@@ -76,7 +80,7 @@ export interface LunchSubsidyStudentRow {
   nutritionStatus: string;
   householdAnnualIncome: number | null;
   qualifyingReason: string;
-  subsidyAmount: number; // 27 THB x 200 days = 5,400 THB
+  subsidyAmount: number; // 0 เสมอ: ไม่มีเงินอุดหนุนอาหารกลางวัน (ใช้รายการนี้เป็นบัญชีเฝ้าระวังโภชนาการของโรงครัว)
 }
 
 /**
@@ -103,7 +107,7 @@ export function calculateOn1Summary(
 ): On1ReportSummary {
   let kindergartenCount = 0;
   let primaryCount = 0;
-  let primaryLunchCount = 0;
+  const primaryLunchCount = 0;
 
   students.forEach(student => {
     // Only count active enrolled students
@@ -115,17 +119,14 @@ export function calculateOn1Summary(
       kindergartenCount++;
     } else if (level === 'primary') {
       primaryCount++;
-      const lunchCheck = screenLunchSubsidy(student);
-      if (lunchCheck.isEligible) {
-        primaryLunchCount++;
-      }
+      // ไม่มีการเบิกเงินอุดหนุนอาหารกลางวัน: primaryLunchCount คงเป็น 0
     }
   });
 
   const rates = OFFICIAL_SUBSIDY_RATES;
   const SCHOOL_DAYS_PER_YEAR = 200;
 
-  // Kindergarten Calculations (All kindergarteners receive lunch in Thailand standard policy)
+  // Kindergarten Calculations (ไม่รวมเงินอุดหนุนอาหารกลางวัน เพราะโรงเรียนจัดโรงครัวภายในรวมในค่าเทอม)
   const kindergartenGrant = kindergartenCount * rates.kindergarten.salaryAndOperationPerYear;
   const kindergartenLunchGrant = kindergartenCount * rates.kindergarten.lunchPerDay * SCHOOL_DAYS_PER_YEAR;
   const kindergartenFree15YrGrant = kindergartenCount * (rates.kindergarten.uniformPerYear + rates.kindergarten.stationeryPerYear + rates.kindergarten.activitiesPerYear);
@@ -158,28 +159,23 @@ export function calculateOn1Summary(
 }
 
 /**
- * Extracts and filters students qualified for lunch subsidy.
+ * บัญชีเฝ้าระวังโภชนาการสำหรับโรงครัวภายใน (เดิมคือบัญชีคัดกรองเงินอาหารกลางวัน)
+ * ชื่อฟังก์ชันคงเดิมเพื่อความเข้ากันได้ แต่ไม่มีการคำนวณเงินอุดหนุน (subsidyAmount = 0)
  */
 export function getLunchSubsidyList(students: any[]): LunchSubsidyStudentRow[] {
   const list: LunchSubsidyStudentRow[] = [];
-  const SCHOOL_DAYS = 200;
-  const DAILY_RATE = 27;
-  const ANNUAL_SUBSIDY = DAILY_RATE * SCHOOL_DAYS; // 5,400 THB
-
   students.forEach(s => {
     const status = s.status || 'กำลังศึกษาอยู่';
     if (status !== 'กำลังศึกษาอยู่' && status !== 'นักเรียนเข้าใหม่') return;
 
-    const level = getEducationLevel(s.grade);
     const height = s.height ? Number(s.height) : null;
     const weight = s.weight ? Number(s.weight) : null;
     const bmiObj = calculateBMI(weight, height);
     const wfh = evaluateWeightForHeight(s.gender, height, weight);
 
-    const screening = screenLunchSubsidy(s);
+    const screening = screenNutritionWatch(s, { height, weight });
 
-    // Kindergarten students are automatically eligible, primary students must meet criteria
-    if (level === 'kindergarten' || screening.isEligible) {
+    if (screening.needsAttention) {
       // Annual income
       let annualIncome: number | null = null;
       const parents = Array.isArray(s.student_parents)
@@ -208,10 +204,10 @@ export function getLunchSubsidyList(students: any[]): LunchSubsidyStudentRow[] {
         bmi: bmiObj.bmi,
         nutritionStatus: wfh.status,
         householdAnnualIncome: annualIncome,
-        qualifyingReason: level === 'kindergarten' 
-          ? 'นักเรียนระดับก่อนประถมศึกษา (ได้รับเงินอาหารกลางวันทุกคน)' 
+        qualifyingReason: screening.kitchenAdvice
+          ? `${screening.reason} → ${screening.kitchenAdvice}`
           : screening.reason,
-        subsidyAmount: ANNUAL_SUBSIDY,
+        subsidyAmount: 0,
       });
     }
   });
@@ -220,7 +216,7 @@ export function getLunchSubsidyList(students: any[]): LunchSubsidyStudentRow[] {
 }
 
 /**
- * Generates an Excel workbook for the Lunch Subsidy List (PSIS format).
+ * Generates an Excel workbook of the in-house kitchen nutrition watch list (formerly lunch subsidy screening).
  */
 export async function generateLunchSubsidyWorkbook(students: any[]): Promise<ExcelJS.Workbook> {
   const rows = getLunchSubsidyList(students);
@@ -228,7 +224,7 @@ export async function generateLunchSubsidyWorkbook(students: any[]): Promise<Exc
   workbook.creator = 'SVPortal - โรงเรียนสมคิดวิทยา (1121100013)';
   workbook.created = new Date();
 
-  const sheet = workbook.addWorksheet('บัญชีคัดกรองเงินอาหารกลางวัน', {
+  const sheet = workbook.addWorksheet('บัญชีเฝ้าระวังโภชนาการ (โรงครัวภายใน)', {
     views: [{ state: 'frozen', ySplit: 1 }]
   });
 
@@ -243,8 +239,8 @@ export async function generateLunchSubsidyWorkbook(students: any[]): Promise<Exc
     { header: 'BMI', key: 'bmi', width: 12 },
     { header: 'ภาวะโภชนาการ (กรมอนามัย)', key: 'nutritionStatus', width: 22 },
     { header: 'รายได้ครอบครัว (บ./ปี)', key: 'income', width: 18 },
-    { header: 'เกณฑ์ที่ได้รับสิทธิ์', key: 'reason', width: 40 },
-    { header: 'ยอดเงินอุดหนุน (บาท)', key: 'amount', width: 18 },
+    { header: 'เหตุที่เฝ้าระวัง / คำแนะนำโรงครัว', key: 'reason', width: 56 },
+    { header: 'เงินอุดหนุนอาหารกลางวัน (บาท)', key: 'amount', width: 22 },
   ];
 
   // Header style (Emerald / Green for nutrition)
@@ -313,11 +309,11 @@ export async function generateOn1Workbook(students: any[], academicYear: string 
   const rowsData = [
     { item: '1. ระดับก่อนประถมศึกษา (อนุบาล 1 - 3)', count: '', rate: '', total: '' },
     { item: '  1.1 เงินอุดหนุนรายหัว (สมทบเงินเดือนครูและค่าใช้จ่ายดำเนินงาน)', count: summary.kindergartenCount, rate: '8,485.00', total: summary.kindergartenGrant.toLocaleString() },
-    { item: '  1.2 เงินอุดหนุนอาหารกลางวัน (27 บ./วัน x 200 วัน)', count: summary.kindergartenCount, rate: '5,400.00', total: summary.kindergartenLunchGrant.toLocaleString() },
+    { item: '  1.2 เงินอุดหนุนอาหารกลางวัน (ไม่เบิก — โรงครัวภายในรวมในค่าเทอม)', count: 0, rate: '0.00', total: summary.kindergartenLunchGrant.toLocaleString() },
     { item: '  1.3 เงินอุดหนุนเรียนฟรี 15 ปี (เครื่องแบบ, อุปกรณ์, กิจกรรม)', count: summary.kindergartenCount, rate: '1,045.00', total: summary.kindergartenFree15YrGrant.toLocaleString() },
     { item: '2. ระดับประถมศึกษา (ประถม 1 - 6)', count: '', rate: '', total: '' },
     { item: '  2.1 เงินอุดหนุนรายหัว (สมทบเงินเดือนครูและค่าใช้จ่ายดำเนินงาน)', count: summary.primaryCount, rate: '8,610.00', total: summary.primaryGrant.toLocaleString() },
-    { item: '  2.2 เงินอุดหนุนอาหารกลางวัน (คัดกรองทุพโภชนาการ/ขาดแคลน)', count: summary.primaryLunchCount, rate: '5,400.00', total: summary.primaryLunchGrant.toLocaleString() },
+    { item: '  2.2 เงินอุดหนุนอาหารกลางวัน (ไม่เบิก — โรงครัวภายในรวมในค่าเทอม)', count: 0, rate: '0.00', total: summary.primaryLunchGrant.toLocaleString() },
     { item: '  2.3 เงินอุดหนุนเรียนฟรี 15 ปี (เครื่องแบบ, อุปกรณ์, กิจกรรม)', count: summary.primaryCount, rate: '1,280.00', total: summary.primaryFree15YrGrant.toLocaleString() },
     { item: 'ยอดรวมงบประมาณเงินอุดหนุนที่ขอรับจัดสรรทั้งสิ้น', count: summary.totalStudents, rate: '-', total: summary.totalGrant.toLocaleString() },
   ];

@@ -105,32 +105,77 @@ export default function SchoolInfirmaryPage() {
     fetchData();
   }, [selectedDays, selectedGrade]);
 
-  // Synchronize with bidirectional pipeline store
+  const fetchPipelineData = async () => {
+    try {
+      const res = await fetch('/api/pipeline');
+      const json = await res.json();
+      if (json.success && json.state) {
+        setPipeline(json.state);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch live pipeline state:', e);
+    }
+  };
+
+  // Synchronize with bidirectional pipeline store and poll backend
   useEffect(() => {
+    fetchPipelineData();
+    const interval = setInterval(fetchPipelineData, 15000);
+
     const handleUpdate = () => {
       setPipeline({ ...getPipelineState() });
+      fetchPipelineData();
     };
     window.addEventListener(PIPELINE_EVENT_NAME, handleUpdate);
     window.addEventListener('storage', handleUpdate);
     return () => {
+      clearInterval(interval);
       window.removeEventListener(PIPELINE_EVENT_NAME, handleUpdate);
       window.removeEventListener('storage', handleUpdate);
     };
   }, []);
 
-  const handleAdministerMedication = (med: MedicationRequest) => {
+  const handleAdministerMedication = async (med: MedicationRequest) => {
     const note = nurseNoteInput[med.id]?.trim() || 'ป้อนยาตามปริมาณและเวลาที่ผู้ปกครองระบุเรียบร้อย วัดไข้ปกติ';
-    const updated = recordMedicationAdministered({
+    const nurseName = 'ครูพยาบาลวิชาชีพ พรทิพย์ สุขสวัสดิ์';
+
+    // Optimistic local update
+    recordMedicationAdministered({
       medication_id: med.id,
-      administered_by: 'ครูพยาบาลวิชาชีพ พรทิพย์ สุขสวัสดิ์',
+      administered_by: nurseName,
       nurse_note: note,
     });
 
-    if (updated) {
+    try {
+      const res = await fetch('/api/pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'ADMINISTER_MEDICATION',
+          payload: {
+            medication_id: med.id,
+            nurse_name: nurseName,
+            nurse_note: note
+          }
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(
+          isThai
+            ? 'บันทึกการป้อนยาสำเร็จและส่งแจ้งเตือนไปยัง Parents Portal แล้ว'
+            : 'Medication administered & synced to Parents Portal'
+        );
+        fetchPipelineData();
+      } else {
+        toast.error(data.error || 'บันทึกฐานข้อมูลไม่สำเร็จ');
+      }
+    } catch (err: unknown) {
+      console.warn('Pipeline backend sync fallback to local:', err);
       toast.success(
         isThai
-          ? 'บันทึกการป้อนยาสำเร็จและส่งแจ้งเตือนไปยัง Parents Portal แล้ว'
-          : 'Medication administered & synced to Parents Portal'
+          ? 'บันทึกการป้อนยาลงเครื่องเรียบร้อย (ออฟไลน์โหมด)'
+          : 'Medication administered locally'
       );
     }
   };

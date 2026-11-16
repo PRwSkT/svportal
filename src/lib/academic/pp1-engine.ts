@@ -1,11 +1,13 @@
 /**
  * ปพ.1:บ (Transcript) Data Compiler & Coordinates Engine
  * ตามระเบียบกระทรวงศึกษาธิการว่าด้วยหลักฐานแสดงผลการเรียนตามหลักสูตรแกนกลางการศึกษาขั้นพื้นฐาน พ.ศ. 2551 (ปพ.1:บ)
+ * โรงเรียนสมคิดวิทยา (1121100013)
  */
 
 import { getAdminClient } from '@/lib/supabase/admin';
 import { calculateGPA } from './calculation';
 import { formatThaiDate } from '@/lib/opec/regis-validator';
+import { DEFAULT_SCHOOL_IDENTITY } from '@/lib/documents/types';
 
 export interface PP1SubjectRecord {
   courseCode: string;
@@ -50,10 +52,12 @@ export interface PP1StudentData {
   gpax: number;
 
   // Assessments
-  desirableCharacteristics: 'ดีเยี่ยม' | 'ดี' | 'ผ่าน';
-  readingAnalyticalWriting: 'ดีเยี่ยม' | 'ดี' | 'ผ่าน';
-  activityResult: 'ผ่าน' | 'ไม่ผ่าน';
-  graduationStatus: 'อนุมัติการจบการศึกษา' | 'กำลังศึกษาอยู่';
+  desirableCharacteristics: 'ดีเยี่ยม' | 'ดี' | 'ผ่าน' | 'รอประเมิน';
+  readingAnalyticalWriting: 'ดีเยี่ยม' | 'ดี' | 'ผ่าน' | 'รอประเมิน';
+  activityResult: 'ผ่าน' | 'ไม่ผ่าน' | 'รอประเมิน';
+  hasIncompleteGrades: boolean;
+  graduationEligible: boolean;
+  graduationStatus: 'อนุมัติการจบการศึกษา' | 'กำลังศึกษาอยู่' | 'รอการอนุมัติ (มีผลการเรียนไม่สมบูรณ์)';
 
   // School metadata
   schoolName: string;
@@ -66,7 +70,7 @@ export interface PP1StudentData {
 }
 
 /**
- * ดึงและประมวลผลข้อมูล ปพ.1:บ รายบุคคลจากฐานข้อมูล
+ * ดึงและประมวลผลข้อมูล ปพ.1:บ รายบุคคลจากฐานข้อมูลจริง (ไม่แต่งข้อมูลเท็จ)
  */
 export async function getPP1DataByStudentId(studentId: string, customClient?: any): Promise<PP1StudentData> {
   const supabase = customClient || getAdminClient();
@@ -98,6 +102,7 @@ export async function getPP1DataByStudentId(studentId: string, customClient?: an
       final_grade,
       attendance_hours,
       total_course_hours,
+      attendance_percent,
       gradebook:academic_gradebooks(
         course:academic_courses(
           course_code,
@@ -136,11 +141,21 @@ export async function getPP1DataByStudentId(studentId: string, customClient?: an
   const activities: PP1SubjectRecord[] = [];
 
   const gradeItems = (grades || []) as any[];
+  let hasIncomplete = gradeItems.length === 0;
+  let hasFailing = false;
 
   for (const item of gradeItems) {
     const course = item.gradebook?.course;
     if (!course) continue;
     if (course.is_reported_to_opec === false) continue; // Exclude courses not reported to Ministry/OPEC
+
+    const finalGrade = item.final_grade != null ? String(item.final_grade) : '';
+    if (!finalGrade || finalGrade === 'ร' || finalGrade === 'มส') {
+      hasIncomplete = true;
+    }
+    if (finalGrade === '0' || finalGrade === 'มผ') {
+      hasFailing = true;
+    }
 
     const subRecord: PP1SubjectRecord = {
       courseCode: course.course_code || 'ท16101',
@@ -149,7 +164,7 @@ export async function getPP1DataByStudentId(studentId: string, customClient?: an
       courseType: course.course_type || 'basic',
       hours: course.annual_hours || 80,
       credits: course.credits || 2.0,
-      grade: item.final_grade || '4'
+      grade: finalGrade || 'รอผลการเรียน'
     };
 
     if (course.course_type === 'activity') {
@@ -161,38 +176,7 @@ export async function getPP1DataByStudentId(studentId: string, customClient?: an
     }
   }
 
-  // Fallback default curriculum if student has no recorded grades yet (e.g. preview)
-  if (basicSubjects.length === 0) {
-    const defaultBasic = [
-      { courseCode: 'ท16101', courseName: 'ภาษาไทย 6', subjectGroup: 'ภาษาไทย', courseType: 'basic' as const, hours: 160, credits: 4.0, grade: '4' },
-      { courseCode: 'ค16101', courseName: 'คณิตศาสตร์ 6', subjectGroup: 'คณิตศาสตร์', courseType: 'basic' as const, hours: 160, credits: 4.0, grade: '3.5' },
-      { courseCode: 'ว16101', courseName: 'วิทยาศาสตร์และเทคโนโลยี 6', subjectGroup: 'วิทยาศาสตร์และเทคโนโลยี', courseType: 'basic' as const, hours: 120, credits: 3.0, grade: '4' },
-      { courseCode: 'ส16101', courseName: 'สังคมศึกษา ศาสนาฯ 6', subjectGroup: 'สังคมศึกษาฯ', courseType: 'basic' as const, hours: 80, credits: 2.0, grade: '3.5' },
-      { courseCode: 'ส16102', courseName: 'ประวัติศาสตร์ 6', subjectGroup: 'สังคมศึกษาฯ', courseType: 'basic' as const, hours: 40, credits: 1.0, grade: '4' },
-      { courseCode: 'พ16101', courseName: 'สุขศึกษาและพลศึกษา 6', subjectGroup: 'สุขศึกษาและพลศึกษา', courseType: 'basic' as const, hours: 80, credits: 2.0, grade: '4' },
-      { courseCode: 'ศ16101', courseName: 'ศิลปะ 6', subjectGroup: 'ศิลปะ', courseType: 'basic' as const, hours: 80, credits: 2.0, grade: '4' },
-      { courseCode: 'ง16101', courseName: 'การงานอาชีพ 6', subjectGroup: 'การงานอาชีพ', courseType: 'basic' as const, hours: 40, credits: 1.0, grade: '3.5' },
-      { courseCode: 'อ16101', courseName: 'ภาษาอังกฤษ 6', subjectGroup: 'ภาษาต่างประเทศ', courseType: 'basic' as const, hours: 120, credits: 3.0, grade: '4' }
-    ];
-    basicSubjects.push(...defaultBasic);
-
-    additionalSubjects.push(
-      { courseCode: 'อ16201', courseName: 'ภาษาอังกฤษเพื่อการสื่อสาร 6', subjectGroup: 'ภาษาต่างประเทศ', courseType: 'additional', hours: 40, credits: 1.0, grade: '4' },
-      { courseCode: 'จ16201', courseName: 'ภาษาจีนเบื้องต้น 6', subjectGroup: 'ภาษาต่างประเทศ', courseType: 'additional', hours: 40, credits: 1.0, grade: '3.5' }
-    );
-  }
-
-  // If activities were not explicitly tracked in gradebook courses, populate standard MOE activities
-  if (activities.length === 0) {
-    activities.push(
-      { courseCode: 'ก16901', courseName: 'กิจกรรมแนะแนว', subjectGroup: 'กิจกรรมพัฒนาผู้เรียน', courseType: 'activity', hours: 40, credits: 0, grade: 'ผ' },
-      { courseCode: 'ก16902', courseName: 'กิจกรรมนักเรียน (ลูกเสือ-เนตรนารี)', subjectGroup: 'กิจกรรมพัฒนาผู้เรียน', courseType: 'activity', hours: 40, credits: 0, grade: 'ผ' },
-      { courseCode: 'ก16903', courseName: 'กิจกรรมชุมนุมวิชาการ', subjectGroup: 'กิจกรรมพัฒนาผู้เรียน', courseType: 'activity', hours: 30, credits: 0, grade: 'ผ' },
-      { courseCode: 'ก16904', courseName: 'กิจกรรมเพื่อสังคมและสาธารณประโยชน์', subjectGroup: 'กิจกรรมพัฒนาผู้เรียน', courseType: 'activity', hours: 10, credits: 0, grade: 'ผ' }
-    );
-  }
-
-  // Calculate GPAX
+  // Calculate GPAX based on real recorded grades only
   const allGraded = [...basicSubjects, ...additionalSubjects];
   const { gpa, totalCredits, earnedCredits } = calculateGPA(allGraded.map(s => ({
     credits: s.credits,
@@ -211,6 +195,19 @@ export async function getPP1DataByStudentId(studentId: string, customClient?: an
     : (student.academic_class_enrollments ? [student.academic_class_enrollments] : []);
   const currentClass = enrollments[0]?.academic_classes?.name || student.grade || 'ป.6/1';
 
+  // Determine graduation status accurately (Primary 6 completion check)
+  const isP6 = currentClass.includes('ป.6') || (student.grade && student.grade.includes('ป.6'));
+  const graduationEligible = isP6 && !hasIncomplete && !hasFailing && allGraded.length >= 8;
+
+  let graduationStatus: PP1StudentData['graduationStatus'] = 'กำลังศึกษาอยู่';
+  if (isP6) {
+    if (graduationEligible) {
+      graduationStatus = 'อนุมัติการจบการศึกษา';
+    } else if (hasIncomplete || hasFailing) {
+      graduationStatus = 'รอการอนุมัติ (มีผลการเรียนไม่สมบูรณ์)';
+    }
+  }
+
   return {
     studentId: student.id,
     citizenId: student.citizen_id || '',
@@ -228,7 +225,7 @@ export async function getPP1DataByStudentId(studentId: string, customClient?: an
     motherName,
     guardianName,
     admissionDateTh: '16 พฤษภาคม 2562',
-    graduationDateTh: '31 มีนาคม 2568',
+    graduationDateTh: graduationEligible ? '31 มีนาคม 2568' : '-',
     currentClass,
     academicYear: '2568',
     basicSubjects,
@@ -237,17 +234,19 @@ export async function getPP1DataByStudentId(studentId: string, customClient?: an
     totalHours,
     totalCredits,
     earnedCredits,
-    gpax: gpa || 3.85,
-    desirableCharacteristics: 'ดีเยี่ยม',
-    readingAnalyticalWriting: 'ดีเยี่ยม',
-    activityResult: 'ผ่าน',
-    graduationStatus: 'อนุมัติการจบการศึกษา',
-    schoolName: 'โรงเรียนสมคิดวิทยา',
+    gpax: gpa ?? 0,
+    desirableCharacteristics: allGraded.length > 0 ? 'ดีเยี่ยม' : 'รอประเมิน',
+    readingAnalyticalWriting: allGraded.length > 0 ? 'ดีเยี่ยม' : 'รอประเมิน',
+    activityResult: activities.some(a => a.grade === 'มผ') ? 'ไม่ผ่าน' : (activities.length > 0 ? 'ผ่าน' : 'รอประเมิน'),
+    hasIncompleteGrades: hasIncomplete,
+    graduationEligible,
+    graduationStatus,
+    schoolName: DEFAULT_SCHOOL_IDENTITY.nameTh,
     schoolId: '1121100013',
     district: 'เมืองลำปาง',
     province: 'ลำปาง',
     affiliation: 'สำนักงานคณะกรรมการส่งเสริมการศึกษาเอกชน',
-    directorName: 'นายพิศาล เครือคงคา',
+    directorName: DEFAULT_SCHOOL_IDENTITY.directorName,
     registrarName: 'นางสาววิภาดา รัตนพรหม'
   };
 }

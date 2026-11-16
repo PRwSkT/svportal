@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase/admin';
-import { generateExamSets } from '@/lib/academic/exam-engine';
+import { generateExamSets, buildQuestionRow } from '@/lib/academic/exam-engine';
 import { requireAuth } from '@/lib/auth';
 import { DEFAULT_ACADEMIC_YEAR, DEFAULT_TERM } from '@/lib/constants/school';
 
@@ -111,25 +111,7 @@ export async function POST(req: NextRequest) {
     // 2. Insert Questions if provided
     let insertedQuestions: any[] = [];
     if (questions.length > 0) {
-      const qRows = questions.map((q: any, idx: number) => ({
-        exam_id: exam.id,
-        question_number: q.question_number || (idx + 1),
-        question_type: q.question_type || 'mcq',
-        question_text: q.question_text || `ข้อที่ ${idx + 1}`,
-        math_latex: q.math_latex || null,
-        question_image_url: q.question_image_url || null,
-        diagram_svg: q.diagram_svg || null,
-        choice_a: q.choice_a || (q.question_type === 'subjective' ? 'แนวคำตอบ / คีย์เวิร์ด' : 'ตัวเลือก ก'),
-        choice_b: q.choice_b || (q.question_type === 'subjective' ? 'lines_5' : 'ตัวเลือก ข'),
-        choice_c: q.choice_c || (q.question_type === 'subjective' ? '-' : 'ตัวเลือก ค'),
-        choice_d: q.choice_d || (q.question_type === 'subjective' ? '-' : 'ตัวเลือก ง'),
-        choice_e: q.choice_e || null,
-        correct_choice: q.correct_choice || 'A',
-        indicator_code: q.indicator_code || null,
-        points: q.points ?? (q.question_type === 'subjective' ? 5.0 : 1.0),
-        pin_choice_position: q.pin_choice_position ?? false,
-        pinned_choice_index: q.pinned_choice_index || (q.pin_choice_position ? 'D' : null)
-      }));
+      const qRows = questions.map((q: any, idx: number) => buildQuestionRow(q, exam.id, idx));
 
       const { data: qData, error: qError } = await supabase
         .from('academic_exam_questions')

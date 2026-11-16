@@ -31,6 +31,12 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   suggestions?: string[];
+  actionCard?: {
+    type: string;
+    title: string;
+    description: string;
+    data: Record<string, unknown>;
+  } | null;
   actionButton?: {
     label: string;
     url: string;
@@ -42,6 +48,20 @@ interface ChatMessage {
 export function GlobalNongFahBot() {
   const pathname = usePathname() || '/';
   const { user } = useAuth();
+  const [isParentAuthenticated, setIsParentAuthenticated] = useState(false);
+
+  useEffect(() => {
+    if (pathname.startsWith('/parents')) {
+      fetch('/api/parents/auth')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.ok && data.authenticated) {
+            setIsParentAuthenticated(true);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [pathname]);
 
   const [isOpen, setIsOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -120,35 +140,54 @@ export function GlobalNongFahBot() {
         ],
       };
     }
-    if (pathname.includes('/attendance')) {
+    if (pathname.startsWith('/parents')) {
+      return {
+        key: 'parents',
+        title: 'ผู้ปกครอง & บุตรหลาน',
+        icon: Users,
+        tag: 'Parents Portal',
+        pillText: 'น้องฟ้าช่วยตอบคำถามผู้ปกครองได้นะคะ',
+        greeting:
+          'สวัสดีค่ะผู้ปกครอง หนูฟ้ายินดีให้บริการค่ะ สามารถสอบถามสถานะค่าเทอม แผนผ่อนชำระ 5 งวด/เทอม รายการอาหารกลางวัน สถิติการมาเรียน กระเป๋าเงินดิจิทัล หรือขอคำแนะนำส่งเสริมการเรียนรู้ของบุตรหลานได้เลยนะคะ',
+        suggestions: [
+          'ตรวจสอบสถานะค่าเทอมและแผนผ่อนชำระ 5 งวด',
+          'วันนี้โรงเรียนมีเมนูอาหารกลางวันอะไรบ้าง',
+          'เช็คยอดเงินในกระเป๋าเงิน (Wallet) ของลูก',
+          'เวลาปล่อยตัวและรถรับส่งนักเรียน',
+        ],
+      };
+    }
+    if (pathname.includes('/attendance') || pathname.includes('/kitchen') || pathname.includes('/nutrition')) {
       return {
         key: 'attendance',
-        title: 'เวลาเรียน & โภชนาการ',
+        title: 'เวลาเรียน & โรงครัว',
         icon: Utensils,
-        tag: 'Attendance & Health',
+        tag: 'Attendance & Kitchen',
         pillText: 'น้องฟ้าช่วยตรวจโภชนาการและเวลาเรียนค่ะ',
         greeting:
-          'สวัสดีค่ะ หนูฟ้าช่วยดูแลระบบเช็กชื่อเวลาเรียนและสุขภาพนักเรียนค่ะ คุณครูสามารถสอบถามเกณฑ์คัดกรองเด็กทุพโภชนาการ (น้ำหนัก-ส่วนสูง BMI กรมอนามัย) หรือเกณฑ์ขอรับเงินอุดหนุนอาหารกลางวัน สช. (รายได้ครอบครัว < 40,000 บาท/ปี) ได้ทันทีค่ะ',
+          'สวัสดีค่ะ หนูฟ้าช่วยดูแลระบบเช็กชื่อเวลาเรียน โรงครัวภายใน และโภชนาการนักเรียนค่ะ (โรงเรียนสมคิดวิทยาปรุงอาหารกลางวันสดใหม่ในโรงครัวภายใน รวมอยู่ในค่าธรรมเนียมการศึกษา) สอบถามเมนูประจำวัน สารก่อภูมิแพ้ ถาดอาหารพิเศษ หรือเกณฑ์ประเมิน BMI ได้ทันทีค่ะ',
         suggestions: [
-          'เกณฑ์คัดกรองเด็กรับเงินอาหารกลางวัน สช.',
-          'วิธีคำนวณและประเมินภาวะโภชนาการ BMI',
-          'สรุปแนวโน้มการขาดเรียนของนักเรียน',
+          'เมนูอาหารกลางวันและถาดอาหารพิเศษวันนี้',
+          'ยอดสั่งผลิตอาหารโรงครัวประจำวัน',
+          'วิธีคำนวณและประเมินภาวะโภชนาการ BMI กรมอนามัย',
+          'สรุปสถิติการเช็กชื่อมาเรียนวันนี้',
         ],
       };
     }
     if (pathname.includes('/fees') || pathname.includes('/pos') || pathname.includes('/wallet')) {
       return {
         key: 'finance',
-        title: 'การเงิน & สวัสดิการ',
+        title: 'การเงิน & ค่าธรรมเนียม',
         icon: Wallet,
-        tag: 'Finance & Free 15Y',
-        pillText: 'น้องฟ้าช่วยงานการเงินและเรียนฟรีได้นะคะ',
+        tag: 'Finance & Installments',
+        pillText: 'น้องฟ้าช่วยงานการเงินและผ่อนชำระได้นะคะ',
         greeting:
-          'สวัสดีค่ะ หนูฟ้าพร้อมช่วยงานการเงินและโครงการเรียนฟรี 15 ปีค่ะ ไม่ว่าจะเป็นการจัดทำแบบ อร.1, อร.1/1 การจัดการใบเสร็จรับเงินค่าธรรมเนียม หรือการตรวจสอบเงินคงเหลือในกระเป๋าเงินนักเรียนค่ะ',
+          'สวัสดีค่ะ หนูฟ้าพร้อมช่วยงานการเงิน แผนผ่อนชำระ 5 งวด/เทอม นโยบายค่าปรับล่าช้าและวันผ่อนผัน 5 วัน การขอยกเว้นค่าปรับ และระบบแยกเล่มใบเสร็จ 01 REC- vs 02 SRV- ค่ะ',
         suggestions: [
-          'ระเบียบการเบิกจ่ายเงินเรียนฟรี 15 ปี 4 หมวด',
-          'เอกสารแบบ อร.1/1 และการลงลายมือชื่อผู้ปกครอง',
-          'ตรวจสอบยอดเงินคงเหลือกระเป๋านักเรียน',
+          'โครงสร้างแผนผ่อนชำระ 5 งวด/เทอม',
+          'นโยบายค่าปรับล่าช้าและวันผ่อนผัน 5 วัน',
+          'ขั้นตอนพิจารณาขอยกเว้นค่าปรับ (Maker-Checker)',
+          'ทำไมต้องแยกเล่มใบเสร็จ 01 REC- และ 02 SRV-',
         ],
       };
     }
@@ -207,7 +246,7 @@ export function GlobalNongFahBot() {
 
   // Hide global bot on routes that have dedicated AI widgets or where AI should not be present (exams/login)
   const isHiddenRoute = 
-    !user ||
+    (!user && !isParentAuthenticated) ||
     pathname === '/' ||
     pathname === '/login' ||
     pathname.startsWith('/forms') ||
@@ -277,13 +316,15 @@ export function GlobalNongFahBot() {
         throw new Error('ระบบเซิร์ฟเวอร์ตอบกลับล่าช้าหรือขัดข้องชั่วคราว กรุณากดส่งคำสั่งลองใหม่อีกครั้งนะคะ');
       }
 
-      if (json.success && json.data) {
+      if (json.success) {
+        const replyText = json.answer || json.data?.reply || 'น้องฟ้าตรวจสอบข้อมูลให้เรียบร้อยแล้วค่ะ';
         const aiMsg: ChatMessage = {
           id: `ai-${Date.now()}`,
           role: 'assistant',
-          content: json.data.reply,
-          suggestions: json.data.suggestions || pageContext.suggestions,
-          actionButton: json.data.actionButton || null,
+          content: replyText,
+          suggestions: json.suggestions || json.data?.suggestions || pageContext.suggestions,
+          actionCard: json.actionCard || null,
+          actionButton: json.actionButton || json.data?.actionButton || null,
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, aiMsg]);
@@ -361,10 +402,12 @@ export function GlobalNongFahBot() {
 
   return (
     <>
-      {/* 1. Floating Trigger Button (Always Bottom-Right) */}
+      {/* 1. Floating Trigger Button (Always Bottom-Right; raised above mobile tab bar on /parents) */}
       <aside
         aria-label="ผู้ช่วยอัจฉริยะน้องฟ้า AI ประจำโรงเรียนสมคิดวิทยา"
-        className="fixed bottom-5 right-4 sm:bottom-6 sm:right-6 z-50 flex items-center gap-3 cursor-pointer group select-none pointer-events-auto print:hidden"
+        className={`fixed ${
+          pathname.startsWith('/parents') ? 'bottom-20 right-4 sm:bottom-6 sm:right-6' : 'bottom-5 right-4 sm:bottom-6 sm:right-6'
+        } z-50 flex items-center gap-3 cursor-pointer group select-none pointer-events-auto print:hidden`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
@@ -431,7 +474,9 @@ export function GlobalNongFahBot() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 25, scale: 0.94 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="fixed bottom-20 right-3 sm:bottom-24 sm:right-6 z-50 w-[94vw] sm:w-[440px] h-[640px] max-h-[82vh] bg-white rounded-3xl shadow-2xl shadow-rose-950/25 border border-rose-100 flex flex-col overflow-hidden backdrop-blur-xl print:hidden"
+            className={`fixed ${
+              pathname.startsWith('/parents') ? 'bottom-36 right-3 sm:bottom-24 sm:right-6' : 'bottom-20 right-3 sm:bottom-24 sm:right-6'
+            } z-50 w-[94vw] sm:w-[440px] h-[640px] max-h-[82vh] bg-white rounded-3xl shadow-2xl shadow-rose-950/25 border border-rose-100 flex flex-col overflow-hidden backdrop-blur-xl print:hidden`}
           >
             {/* Header: School Branding & Character Profile */}
             <div className="bg-gradient-to-r from-[#6E0D22] via-[#7B1C3E] to-[#9E1B46] text-white p-3.5 px-4 flex items-center justify-between border-b border-rose-900/20 shadow-md">
@@ -551,6 +596,36 @@ export function GlobalNongFahBot() {
                       <div className="whitespace-pre-line font-normal pr-3">
                         {msg.content}
                       </div>
+
+                      {/* Rich Action Card */}
+                      {msg.actionCard && (
+                        <div className="mt-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200/90 text-slate-800">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            {msg.actionCard.type === 'PROMPTPAY_QR' ? (
+                              <Wallet className="w-4 h-4 text-emerald-600" />
+                            ) : msg.actionCard.type === 'KITCHEN_ORDER' ? (
+                              <Utensils className="w-4 h-4 text-amber-600" />
+                            ) : (
+                              <Sparkles className="w-4 h-4 text-[#7B1C3E]" />
+                            )}
+                            <span className="text-xs font-bold text-slate-900">{msg.actionCard.title}</span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 mb-2">{msg.actionCard.description}</p>
+                          {msg.actionCard.type === 'PROMPTPAY_QR' && (
+                            <div className="bg-white p-3 rounded-xl border border-emerald-200 text-center">
+                              <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">
+                                BOT EMVCo Tag 30 PromptPay
+                              </span>
+                              <div className="text-lg font-black text-slate-900">
+                                {Number((msg.actionCard.data as any)?.amount || 0).toLocaleString()} ฿
+                              </div>
+                              <div className="text-[10px] text-slate-500 mt-0.5">
+                                รหัสนักเรียน: {String((msg.actionCard.data as any)?.studentId || '-')} • อ้างอิง: {String((msg.actionCard.data as any)?.ref2 || '-')}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* 1-Click Interactive Action Button */}
                       {msg.actionButton && (

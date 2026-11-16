@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import os from 'os';
+import crypto from 'crypto';
 import { getAdminClient } from '@/lib/supabase/admin';
+import { requireAuth } from '@/lib/auth';
 import {
   getRoomDisplayState,
   getAllRoomBookings,
@@ -10,6 +11,7 @@ import {
   getAllRooms,
   getBangkokNow,
   timeToMinutes,
+  generateQrToken,
   RoomBookingItem,
 } from '@/lib/room-booking/service';
 
@@ -34,27 +36,9 @@ export async function GET(req: NextRequest) {
       allBookings = await getAllRoomBookings(roomCode);
     }
 
-    // Detect LAN IP when running locally so mobile QR scanning works even from localhost
-    let lanHost = '';
-    try {
-      const nets = os.networkInterfaces();
-      for (const name of Object.keys(nets)) {
-        for (const net of nets[name] || []) {
-          if (net.family === 'IPv4' && !net.internal) {
-            lanHost = net.address;
-            break;
-          }
-        }
-        if (lanHost) break;
-      }
-    } catch {
-      // ignore
-    }
-
     return NextResponse.json(
       {
         success: true,
-        lan_ip: lanHost || null,
         rooms,
         ...state,
         all_bookings: allBookings,
@@ -72,6 +56,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuth();
+    if (auth.error) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+    }
+
     const body = await req.json();
     const roomCode = (body.room_code || 'LLC').trim().toUpperCase();
     const date = (body.date || getBangkokNow().dateStr).trim();
@@ -205,6 +194,11 @@ export async function PUT(req: NextRequest) {
     const action = body.action;
     const roomCode = (body.room_code || 'LLC').trim().toUpperCase();
 
+    const auth = await requireAuth();
+    if (auth.error && action !== 'checkin') {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+    }
+
     // 1. Create or Update Room Config
     if (action === 'update_config' || action === 'create_room') {
       if (!roomCode) {
@@ -257,6 +251,13 @@ export async function PUT(req: NextRequest) {
 
     // 2. QR Check-in (Only for advance bookings in SVPortal)
     if (action === 'checkin') {
+      if (auth.error) {
+        const validTokenGeneral = generateQrToken(roomCode, nowInfo.dateStr, 'GENERAL');
+        const validTokenBooking = body.booking_id ? generateQrToken(roomCode, nowInfo.dateStr, body.booking_id) : null;
+        if (!body.token || (body.token !== validTokenGeneral && body.token !== validTokenBooking)) {
+          return NextResponse.json({ success: false, error: 'Unauthorized: Invalid check-in QR token' }, { status: 401 });
+        }
+      }
       const bookingId = body.booking_id;
       const userType: 'TEACHER' | 'STUDENT' = body.user_type === 'STUDENT' ? 'STUDENT' : 'TEACHER';
       const identifier = (body.identifier || '').trim();

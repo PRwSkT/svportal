@@ -60,6 +60,7 @@ export function ParentLoginView({ onLoginSuccess }: ParentLoginViewProps) {
   // Demo guardians state
   const [demoList, setDemoList] = useState<DemoGuardianItem[]>([]);
   const [demoLoading, setDemoLoading] = useState(false);
+  const [demoAvailable, setDemoAvailable] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Fetch demo guardians
@@ -71,8 +72,13 @@ export function ParentLoginView({ onLoginSuccess }: ParentLoginViewProps) {
         : '/api/parents/auth?action=demo_list';
       const res = await fetch(url);
       const data = await res.json();
-      if (data.ok && Array.isArray(data.demoGuardians)) {
-        setDemoList(data.demoGuardians);
+      if (data.ok) {
+        if (data.demoAvailable !== undefined) {
+          setDemoAvailable(Boolean(data.demoAvailable));
+        }
+        if (Array.isArray(data.demoGuardians)) {
+          setDemoList(data.demoGuardians);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch demo guardians:', err);
@@ -427,7 +433,15 @@ export function ParentLoginView({ onLoginSuccess }: ParentLoginViewProps) {
               </div>
             )}
 
-            {!demoLoading && demoList.length === 0 && (
+            {!demoLoading && !demoAvailable && (
+              <div className="py-6 text-center text-xs text-amber-800 bg-amber-50 rounded-2xl p-4 border border-amber-200">
+                {isThai
+                  ? 'ระบบบัญชีทดสอบถูกปิดการใช้งานในสภาพแวดล้อม Production กรุณาเข้าสู่ระบบด้วยเลขประจำตัวประชาชนหรือเบอร์โทรศัพท์'
+                  : 'Demo accounts are disabled in production. Please sign in with your registered credentials.'}
+              </div>
+            )}
+
+            {!demoLoading && demoAvailable && demoList.length === 0 && (
               <div className="py-6 text-center text-xs text-slate-500">
                 {isThai ? 'ไม่พบบัญชีผู้ปกครองที่ค้นหา' : 'No parents found'}
               </div>

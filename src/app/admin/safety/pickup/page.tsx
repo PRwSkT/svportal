@@ -31,7 +31,6 @@ import {
   PIPELINE_EVENT_NAME,
   updatePickupDailyPlan,
   verifyPickupTotp,
-  generatePickupTotp,
   getPickupBucketSecondsRemaining,
 } from '@/lib/pipeline/bidirectional-store';
 import {
@@ -52,39 +51,46 @@ export default function SmartPickupKioskPage() {
   const [secondsLeft, setSecondsLeft] = useState<number>(() =>
     getPickupBucketSecondsRemaining()
   );
-  const [liveTotpCode, setLiveTotpCode] = useState<string>(() => {
-    const s = getPipelineState();
-    const id = s.children[0]?.id || '10103';
-    return generatePickupTotp(id);
-  });
   const [verifiedStudentIds, setVerifiedStudentIds] = useState<string[]>([]);
   const [lastVerifiedMode, setLastVerifiedMode] = useState<string | null>(null);
 
-  const syncPipeline = useCallback(() => {
+  const syncPipeline = useCallback(async () => {
+    try {
+      const res = await fetch('/api/pipeline');
+      const json = await res.json();
+      if (json.success && json.state) {
+        setPipeline(json.state);
+        return;
+      }
+    } catch {
+      // Fallback
+    }
     setPipeline({ ...getPipelineState() });
   }, []);
 
   useEffect(() => {
     syncPipeline();
+    const interval = setInterval(syncPipeline, 10000);
+
     const handleUpdate = () => syncPipeline();
     window.addEventListener(PIPELINE_EVENT_NAME, handleUpdate);
     window.addEventListener('storage', handleUpdate);
     return () => {
+      clearInterval(interval);
       window.removeEventListener(PIPELINE_EVENT_NAME, handleUpdate);
       window.removeEventListener('storage', handleUpdate);
     };
   }, [syncPipeline]);
 
-  // 1-second timer for live 30-second rotating TOTP display
+  // 1-second timer for live 30-second rotating TOTP ticker
   useEffect(() => {
     const updateTicker = () => {
       setSecondsLeft(getPickupBucketSecondsRemaining());
-      setLiveTotpCode(generatePickupTotp(selectedStudentId));
     };
     updateTicker();
     const interval = setInterval(updateTicker, 1000);
     return () => clearInterval(interval);
-  }, [selectedStudentId]);
+  }, []);
 
   const plans = pipeline.pickup_plans;
   const selectedPlan =
@@ -98,7 +104,7 @@ export default function SmartPickupKioskPage() {
     (l) => l.student_id === selectedStudentId && l.has_legal_restriction === true
   );
 
-  const handleVerifyCode = (codeToTest?: string) => {
+  const handleVerifyCode = async (codeToTest?: string) => {
     const code = (codeToTest ?? totpInput).trim();
     if (!code) {
       toast.error(
@@ -116,27 +122,64 @@ export default function SmartPickupKioskPage() {
       return;
     }
 
-    const res = verifyPickupTotp(selectedStudentId, code);
-    if (res.valid) {
-      setVerifiedStudentIds((prev) =>
-        prev.includes(selectedStudentId) ? prev : [...prev, selectedStudentId]
-      );
-      setLastVerifiedMode(res.matchedMode);
-      toast.success(
-        isThai
-          ? `ยืนยันตัวตนสำเร็จ (${res.matchedMode})! พร้อมส่งมอบ ${selectedPlan?.student_name}`
-          : `Verified (${res.matchedMode})! Ready to release ${selectedPlan?.student_name}`
-      );
-    } else {
-      toast.error(
-        isThai
-          ? 'รหัส TOTP ไม่ถูกต้องหรือหมดอายุ กรุณาตรวจสอบรหัสปัจจุบันจากแอปผู้ปกครอง'
-          : 'Invalid or expired TOTP code'
-      );
+    try {
+      const res = await fetch('/api/pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'VERIFY_PICKUP_TOTP',
+          payload: {
+            student_id: selectedStudentId,
+            code,
+          },
+        }),
+      });
+      const json = await res.json();
+      const verifyResult = json.data || verifyPickupTotp(selectedStudentId, code);
+
+      if (verifyResult.valid) {
+        setVerifiedStudentIds((prev) =>
+          prev.includes(selectedStudentId) ? prev : [...prev, selectedStudentId]
+        );
+        setLastVerifiedMode(verifyResult.matchedMode);
+        toast.success(
+          isThai
+            ? `ยืนยันตัวตนสำเร็จ (${verifyResult.matchedMode})! พร้อมส่งมอบ ${selectedPlan?.student_name}`
+            : `Verified (${verifyResult.matchedMode})! Ready to release ${selectedPlan?.student_name}`
+        );
+        setTotpInput('');
+      } else {
+        toast.error(
+          isThai
+            ? 'รหัส TOTP ไม่ถูกต้องหรือหมดอายุ กรุณาตรวจสอบรหัสปัจจุบันจากแอปผู้ปกครอง'
+            : 'Invalid or expired TOTP code'
+        );
+      }
+    } catch {
+      // Local fallback
+      const localRes = verifyPickupTotp(selectedStudentId, code);
+      if (localRes.valid) {
+        setVerifiedStudentIds((prev) =>
+          prev.includes(selectedStudentId) ? prev : [...prev, selectedStudentId]
+        );
+        setLastVerifiedMode(localRes.matchedMode);
+        toast.success(
+          isThai
+            ? `ยืนยันตัวตนสำเร็จ (${localRes.matchedMode})! พร้อมส่งมอบ ${selectedPlan?.student_name}`
+            : `Verified (${localRes.matchedMode})! Ready to release ${selectedPlan?.student_name}`
+        );
+        setTotpInput('');
+      } else {
+        toast.error(
+          isThai
+            ? 'รหัส TOTP ไม่ถูกต้องหรือหมดอายุ'
+            : 'Invalid or expired TOTP code'
+        );
+      }
     }
   };
 
-  const handleConfirmSafeRelease = (studentId: string, studentName: string) => {
+  const handleConfirmSafeRelease = async (studentId: string, studentName: string) => {
     const linkRestricted = pipeline.links.find(
       (l) => l.student_id === studentId && l.has_legal_restriction === true
     );
@@ -149,13 +192,29 @@ export default function SmartPickupKioskPage() {
       return;
     }
 
-    updatePickupDailyPlan({
+    const payload = {
       student_id: studentId,
-      arrival_status: 'RELEASED',
+      arrival_status: 'RELEASED' as const,
       released_by_staff: 'ครูเวรจุดรับ-ส่ง อาคารหน้า',
-      actor_role: 'STAFF',
+      actor_role: 'STAFF' as const,
       actor_name: 'ครูเวรจุดรับ-ส่ง อาคารหน้า',
-    });
+    };
+
+    updatePickupDailyPlan(payload);
+
+    try {
+      await fetch('/api/pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'UPDATE_PICKUP_PLAN',
+          payload,
+        }),
+      });
+    } catch (e) {
+      console.warn('Sync release to backend error:', e);
+    }
+
     syncPipeline();
     toast.success(
       isThai
@@ -164,16 +223,32 @@ export default function SmartPickupKioskPage() {
     );
   };
 
-  const handleSetArrivalStatus = (
+  const handleSetArrivalStatus = async (
     studentId: string,
     status: PickupArrivalStatus
   ) => {
-    updatePickupDailyPlan({
+    const payload = {
       student_id: studentId,
       arrival_status: status,
-      actor_role: 'STAFF',
+      actor_role: 'STAFF' as const,
       actor_name: 'ครูเวรจุดรับ-ส่ง อาคารหน้า',
-    });
+    };
+
+    updatePickupDailyPlan(payload);
+
+    try {
+      await fetch('/api/pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'UPDATE_PICKUP_PLAN',
+          payload,
+        }),
+      });
+    } catch (e) {
+      console.warn('Sync arrival status to backend error:', e);
+    }
+
     syncPipeline();
     toast.success(
       isThai
@@ -322,7 +397,6 @@ export default function SmartPickupKioskPage() {
                         type="button"
                         onClick={() => {
                           setSelectedStudentId(p.student_id);
-                          setTotpInput(generatePickupTotp(p.student_id));
                         }}
                         className={`p-3.5 rounded-2xl border text-left transition-all flex items-center justify-between cursor-pointer ${
                           isSelected
@@ -367,48 +441,37 @@ export default function SmartPickupKioskPage() {
                 </div>
               </div>
 
-              {/* Helper Pill showing live expected TOTP from generatePickupTotp(studentId) */}
-              <div className="p-4 rounded-2xl bg-amber-50/90 dark:bg-amber-950/30 border border-[#D4AF37]/50 space-y-2">
+              {/* Gate Security Ticker & Dynamic Token Instructions */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold text-[#7B1C3E] dark:text-amber-300 flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4" />
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
                     {isThai
-                      ? `รหัส TOTP ปัจจุบันของ #${selectedStudentId} (สำหรับทดสอบ 1-Click):`
-                      : `Live Expected TOTP for #${selectedStudentId}:`}
+                      ? 'ความปลอดภัยรอบรหัส 30 วินาที:'
+                      : '30s Security Window:'}
                   </span>
-                  <span className="font-mono text-lg font-black tracking-widest text-[#7B1C3E] dark:text-amber-200 bg-white dark:bg-slate-900 px-3 py-1 rounded-xl border border-amber-300">
-                    {liveTotpCode}
+                  <span className="font-mono text-xs font-extrabold text-[#7B1C3E] dark:text-amber-300 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                    <span>{secondsLeft}s {isThai ? 'เหลือก่อนเปลี่ยนรอบ' : 'remaining'}</span>
                   </span>
                 </div>
-
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  {isThai
+                    ? 'ผู้ปกครองต้องแสดงรหัส Dynamic TOTP 6 หลักจาก Parents Portal หรือแจ้งรหัสผู้รับแทนชั่วคราว (Delegate OTP) ให้ครูเวรตรวจสอบผ่านระบบ'
+                    : 'Guardian must present dynamic 6-digit TOTP from Parents Portal or give registered Delegate OTP to staff.'}
+                </p>
                 {selectedPlan?.temp_otp_code && (
-                  <div className="flex items-center justify-between text-xs pt-1 border-t border-amber-200/60">
+                  <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-200 dark:border-slate-700">
                     <span className="font-bold text-indigo-700 dark:text-indigo-300">
                       {isThai
-                        ? 'รหัส OTP ผู้รับแทนชั่วคราว (Delegate OTP):'
-                        : 'Active Delegate Temp OTP:'}
+                        ? 'มีผู้รับแทนชั่วคราวที่ลงทะเบียนล่วงหน้า'
+                        : 'Pre-registered Delegate on file'}
                     </span>
-                    <span className="font-mono font-black text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-lg">
-                      {selectedPlan.temp_otp_code}
+                    <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded">
+                      {isThai ? 'รองรับรหัสรับแทน' : 'Delegate Code Enabled'}
                     </span>
                   </div>
                 )}
-
-                <div className="flex gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTotpInput(liveTotpCode);
-                      handleVerifyCode(liveTotpCode);
-                    }}
-                    className="w-full py-2 px-3 rounded-xl bg-[#7B1C3E] hover:bg-[#631430] text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    {isThai
-                      ? `กรอกอัตโนมัติ & ยืนยันรหัส TOTP (${liveTotpCode})`
-                      : `Auto-fill & Verify TOTP (${liveTotpCode})`}
-                  </button>
-                </div>
               </div>
 
               {/* Manual Input & Verify Button */}
@@ -655,12 +718,11 @@ export default function SmartPickupKioskPage() {
                             type="button"
                             onClick={() => {
                               setSelectedStudentId(plan.student_id);
-                              const code = generatePickupTotp(plan.student_id);
-                              setTotpInput(code);
+                              setTotpInput('');
                             }}
                             className="px-2.5 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 text-[11px] font-bold hover:bg-indigo-100 cursor-pointer"
                           >
-                            {isThai ? 'ตรวจรหัส TOTP' : 'Load in Verifier'}
+                            {isThai ? 'เลือกกรอกรหัส TOTP' : 'Select for Verification'}
                           </button>
                         </div>
 

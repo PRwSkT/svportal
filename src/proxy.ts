@@ -1,6 +1,9 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { isSystemAdmin } from '@/lib/constants/auth';
+import { isNetlifyDbActive } from '@/lib/db/netlify-bridge';
+import { createPgPostgrestClient } from '@/lib/db/pg-postgrest-adapter';
+import { verifyStaffSessionToken, STAFF_SESSION_COOKIE } from '@/lib/auth/staff-session';
 
 export async function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
@@ -27,47 +30,6 @@ export async function proxy(request: NextRequest) {
   });
   response.headers.set('Content-Security-Policy', cspHeader);
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) {
-    return response;
-  }
-
-  const supabase = createServerClient(
-    url,
-    anonKey,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value));
-          response = NextResponse.next({
-            request: {
-              headers: requestHeaders,
-            },
-          });
-          response.headers.set('Content-Security-Policy', cspHeader);
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
-  function redirectWithCookies(targetUrl: URL): NextResponse {
-    const redirectResponse = NextResponse.redirect(targetUrl);
-    response.cookies.getAll().forEach(cookie => {
-      redirectResponse.cookies.set(cookie.name, cookie.value, cookie);
-    });
-    return redirectResponse;
-  }
-
-  // This will refresh session if expired
-  const { data: { user } } = await supabase.auth.getUser();
-
   // Host-based routing for Parents Portal subdomain (parents.portal.somkidvittaya.ac.th)
   const rawHost = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
   const hostname = rawHost.toLowerCase().split(':')[0];
@@ -92,26 +54,13 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // Handle public route (root welcome page & login)
-  if (request.nextUrl.pathname === '/' || request.nextUrl.pathname.startsWith('/login')) {
-    if (request.nextUrl.searchParams.get('logout') === 'true') {
-      return response;
-    }
-    if (user) {
-      // Allow logged-in users to access login page if their domain is wrong, so they can sign out or switch accounts.
-      if (user.email?.endsWith('@somkidvittaya.ac.th') || isSystemAdmin(user.email)) {
-        return redirectWithCookies(new URL('/home', request.url));
-      }
-    }
-    return response;
-  }
-
   // Redirect legacy /website routes to the official school website to prevent confusion
   if (request.nextUrl.pathname.startsWith('/website')) {
     return NextResponse.redirect('https://somkidvittaya.ac.th', { status: 307 });
   }
 
   // Bypass auth for forms, webhooks/cron, auth callbacks, PWA sw & subscribe, and Parents Portal PWA routes
+  // Checked BEFORE initializing Supabase client or calling auth.getUser() to save Edge & Auth invocations
   if (
     request.nextUrl.pathname === '/sw.js' ||
     request.nextUrl.pathname === '/manifest.json' ||
@@ -126,6 +75,8 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/api/auth') ||
     request.nextUrl.pathname.startsWith('/api/cron') ||
     request.nextUrl.pathname.startsWith('/api/webhook') ||
+    request.nextUrl.pathname.startsWith('/api/blobs') ||
+    request.nextUrl.pathname.startsWith('/api/db/bridge') ||
     request.nextUrl.pathname.startsWith('/post-assistant') ||
     request.nextUrl.pathname === '/api/admin/website/sync-post' ||
     request.nextUrl.pathname === '/api/health' ||
@@ -153,8 +104,86 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // Bypass auth for screenshot preview when SV_PREVIEW_MODE is enabled
-  if (process.env.SV_PREVIEW_MODE === 'true') {
+  // Bypass auth for screenshot preview when SV_PREVIEW_MODE is enabled in development
+  if (process.env.NODE_ENV === 'development' && process.env.SV_PREVIEW_MODE === 'true') {
+    return response;
+  }
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  function redirectWithCookies(targetUrl: URL): NextResponse {
+    const redirectResponse = NextResponse.redirect(targetUrl);
+    response.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value, cookie);
+    });
+    return redirectResponse;
+  }
+
+  let user: { id: string; email?: string; user_metadata?: { full_name?: string } } | null = null;
+  let supabaseClient: any = null;
+
+  // 1. Check dual-mode sv_staff_session cookie first
+  const staffCookie = request.cookies.get(STAFF_SESSION_COOKIE)?.value;
+  if (staffCookie) {
+    const staffSession = verifyStaffSessionToken(staffCookie);
+    if (staffSession) {
+      user = {
+        id: staffSession.id,
+        email: staffSession.email,
+        user_metadata: { full_name: staffSession.full_name },
+      };
+    }
+  }
+
+  // 2. If no staff cookie, check Supabase session if configured
+  if (!user && url && anonKey) {
+    const supabase = createServerClient(
+      url,
+      anonKey,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+            response = NextResponse.next({
+              request: {
+                headers: requestHeaders,
+              },
+            });
+            response.headers.set('Content-Security-Policy', cspHeader);
+            cookiesToSet.forEach(({ name, value, options }) =>
+              response.cookies.set(name, value, options)
+            );
+          },
+        },
+      }
+    );
+    supabaseClient = supabase;
+    const { data: { user: sbUser } } = await supabase.auth.getUser();
+    if (sbUser) {
+      user = sbUser;
+    }
+  }
+
+  // If no user found and neither Netlify DB nor Supabase is active, bypass
+  if (!user && !isNetlifyDbActive() && (!url || !anonKey)) {
+    return response;
+  }
+
+  // Handle public route (root welcome page & login)
+  if (request.nextUrl.pathname === '/' || request.nextUrl.pathname.startsWith('/login')) {
+    if (request.nextUrl.searchParams.get('logout') === 'true') {
+      return response;
+    }
+    if (user) {
+      // Allow logged-in users to access login page if their domain is wrong, so they can sign out or switch accounts.
+      if (user.email?.endsWith('@somkidvittaya.ac.th') || isSystemAdmin(user.email)) {
+        return redirectWithCookies(new URL('/home', request.url));
+      }
+    }
     return response;
   }
 
@@ -190,9 +219,19 @@ export async function proxy(request: NextRequest) {
     }
 
     // Retrieve user record from app_users
-    const { data: appUserData } = await supabase.rpc('get_app_user_by_id', {
-      target_user_id: user.id,
-    });
+    let appUserData: any = null;
+    if (isNetlifyDbActive() || !supabaseClient) {
+      const pgClient = createPgPostgrestClient();
+      const { data } = await pgClient.rpc('get_app_user_by_id', {
+        target_user_id: user.id,
+      });
+      appUserData = data;
+    } else {
+      const { data } = await supabaseClient.rpc('get_app_user_by_id', {
+        target_user_id: user.id,
+      });
+      appUserData = data;
+    }
 
     const userRole = appUserData?.role;
     // Admins and Executives have full access
@@ -324,6 +363,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|css|js|ttf|woff|woff2)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/signage|api/health(?:$|[/?])|.*\\.(?:svg|png|jpg|jpeg|gif|webp|css|js|ttf|woff|woff2)$).*)',
   ],
 };

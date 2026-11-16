@@ -174,7 +174,7 @@ export function createInitialPipelineState(): BidirectionalPipelineState {
   // Real Guardian: นายศักดิ์ชัย อุ่นอบ (บิดาของน้องมีฟา และน้องจั๊มเปอร์)
   const guardian: GuardianProfile = {
     id: "fe4c7c15-7aff-4729-853a-57fca16021a3",
-    citizen_id: "3210500016626",
+    citizen_id: "3-2105-XXXXX-26-6",
     prefix: "นาย",
     first_name: "ศักดิ์ชัย",
     last_name: "อุ่นอบ",
@@ -196,7 +196,7 @@ export function createInitialPipelineState(): BidirectionalPipelineState {
     {
       id: "10103",
       public_uid: "c1a9f103-1010-4000-8000-000000010103",
-      learner_id: "3210500016626-1",
+      learner_id: "3-2105-XXXXX-26-1",
       prefix: "ด.ญ.",
       first_name: "ธัญพร",
       last_name: "อุ่นอบ",
@@ -223,7 +223,7 @@ export function createInitialPipelineState(): BidirectionalPipelineState {
     {
       id: "9775",
       public_uid: "c1a9f977-9775-4000-8000-000000009775",
-      learner_id: "3210500016626-2",
+      learner_id: "3-2105-XXXXX-26-2",
       prefix: "ด.ช.",
       first_name: "ชณธร",
       last_name: "อุ่นอบ",
@@ -250,7 +250,7 @@ export function createInitialPipelineState(): BidirectionalPipelineState {
     {
       id: "10264",
       public_uid: "c1a9f264-1026-4000-8000-000000010264",
-      learner_id: "1219800206562-1",
+      learner_id: "1-2198-XXXXX-62-1",
       prefix: "ด.ช.",
       first_name: "ฐิติวัฒน์",
       last_name: "ธนโชติกิจพงศ์",
@@ -277,7 +277,7 @@ export function createInitialPipelineState(): BidirectionalPipelineState {
     {
       id: "10247",
       public_uid: "c1a9f247-1024-4000-8000-000000010247",
-      learner_id: "3210100435397-1",
+      learner_id: "3-2101-XXXXX-97-1",
       prefix: "ด.ญ.",
       first_name: "ฐิติชญา",
       last_name: "เจริญรัตน์",
@@ -304,7 +304,7 @@ export function createInitialPipelineState(): BidirectionalPipelineState {
     {
       id: "10161",
       public_uid: "c1a9f161-1016-4000-8000-000000010161",
-      learner_id: "1210100552194-1",
+      learner_id: "1-2101-XXXXX-94-1",
       prefix: "ด.ช.",
       first_name: "กิตติ์พิพัฒน์",
       last_name: "พรมมีเดช",
@@ -1354,6 +1354,7 @@ export function recordMedicationAdministered(input: {
 
   savePipelineState(state);
   syncToBackend("ADMINISTER_MEDICATION", {
+    medication_id: input.medication_id,
     request_id: input.medication_id,
     nurse_name: input.administered_by,
     nurse_note: input.nurse_note,
@@ -1391,6 +1392,10 @@ export function acknowledgeStudentIncident(incidentId: string): StudentIncident 
   });
 
   savePipelineState(state);
+  syncToBackend("ACK_INCIDENT", {
+    incident_id: incidentId,
+    guardian_name: state.guardian.full_name,
+  });
   return updated;
 }
 
@@ -1423,6 +1428,12 @@ export function signFree15YSubsidyReceipt(subsidyId: string): Free15YSubsidyItem
   });
 
   savePipelineState(state);
+  syncToBackend("SIGN_FREE15Y", {
+    subsidy_id: subsidyId,
+    student_id: updated.student_id,
+    guardian_name: state.guardian.full_name,
+    signature_data: "DIGITAL_SIGNATURE_PARENT_PORTAL",
+  });
   return updated;
 }
 
@@ -1491,6 +1502,12 @@ export function payFeeInvoiceFromParent(invoiceId: string): ParentFeeInvoiceItem
   });
 
   savePipelineState(state);
+  syncToBackend("PAY_INVOICE", {
+    invoice_id: invoiceId,
+    student_id: updated.student_id,
+    amount: updated.amount,
+    payment_method: updated.payment_method,
+  });
   return updated;
 }
 
@@ -1653,6 +1670,11 @@ export function updateGuardianLinkPermissions(
   });
 
   savePipelineState(state);
+  syncToBackend("UPDATE_GUARDIAN_PERMS", {
+    link_id: linkId,
+    patch,
+    staff_name: staffName,
+  });
   return updated;
 }
 
@@ -1684,6 +1706,13 @@ export function createGuardianInviteCode(input: {
 
   state.invitations = [inv, ...(state.invitations || [])];
   savePipelineState(state);
+  syncToBackend("CREATE_INVITE_CODE", {
+    student_id: input.student_id,
+    guardian_name: input.guardian_name,
+    guardian_phone: input.guardian_phone,
+    invite_code: code,
+    expires_at: inv.expires_at,
+  });
   return inv;
 }
 
@@ -1801,7 +1830,7 @@ export function acknowledgeEarlyYearsDropoffNote(
   });
 
   savePipelineState(state);
-  syncToBackend("ACKNOWLEDGE_DROPOFF_NOTE", {
+  syncToBackend("ACK_DROPOFF_NOTE", {
     note_id: noteId,
     teacher_name: teacherName,
   });
@@ -1865,6 +1894,18 @@ export function createOrUpdateAssignment(input: {
   });
 
   savePipelineState(state);
+  syncToBackend("UPSERT_ASSIGNMENT", {
+    id: item.id,
+    class_id: item.class_id,
+    grade_level: item.grade_level,
+    subject_name: item.subject_name,
+    title_th: item.title_th,
+    title_en: item.title_en,
+    description: item.description,
+    due_date: item.due_date,
+    max_score: item.max_score,
+    assigned_by: item.assigned_by,
+  });
   return item;
 }
 

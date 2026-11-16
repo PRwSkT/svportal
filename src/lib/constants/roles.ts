@@ -112,6 +112,7 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
   // งานการเงินและงบประมาณ
   { id: 'dashboard', name: 'แดชบอร์ดสรุปยอด', category: 'งานการเงิน', href: '/dashboard' },
   { id: 'pos_fees', name: 'ชำระค่าเทอม', category: 'งานการเงิน', href: '/pos/fees' },
+  { id: 'admin_fees', name: 'ระบบผ่อนชำระ 5 เดือน / ค่าปรับ & ใบเสร็จคู่', category: 'งานการเงิน', href: '/admin/fees' },
   { id: 'admin_reports', name: 'รายงานการเงิน', category: 'งานการเงิน', href: '/admin/reports' },
   { id: 'subsidy_free15y', name: 'เงินอุดหนุนเรียนฟรี 15 ปี (อร.1/1)', category: 'งานการเงิน', href: '/admin/subsidy/free15y' },
   // งานร้านค้าสหกรณ์
@@ -124,7 +125,7 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
   { id: 'student_attendance', name: 'เช็กชื่อนักเรียน & อนุมัติใบลา', category: 'งานทะเบียน & ดูแลนักเรียน', href: '/admin/students/attendance' },
   { id: 'pickup_dismissal', name: 'จุดรับ-ส่งเด็ก & ตรวจสอบผู้มารับ (Pickup)', category: 'งานทะเบียน & ดูแลนักเรียน', href: '/admin/safety/pickup' },
   { id: 'pastoral_care', name: 'ดูแลช่วยเหลือนักเรียน 360° (SDQ & เยี่ยมบ้าน)', category: 'งานทะเบียน & ดูแลนักเรียน', href: '/admin/students/pastoral' },
-  { id: 'student_nutrition', name: 'โภชนาการ & บัญชีนมโรงเรียน', category: 'งานทะเบียน & ดูแลนักเรียน', href: '/admin/students/nutrition' },
+  { id: 'student_nutrition', name: 'โรงครัวภายใน & ภาวะโภชนาการ', category: 'งานทะเบียน & ดูแลนักเรียน', href: '/admin/students/nutrition' },
   { id: 'van_safety', name: 'ความปลอดภัยรถรับ-ส่งนักเรียน', category: 'งานทะเบียน & ดูแลนักเรียน', href: '/admin/safety/van' },
   { id: 'school_infirmary', name: 'ห้องพยาบาล & เฝ้าระวังโรคระบาด', category: 'งานทะเบียน & ดูแลนักเรียน', href: '/admin/health/infirmary' },
   // งานวิชาการและงานวัดผล

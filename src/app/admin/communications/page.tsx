@@ -52,16 +52,29 @@ export default function ParentCommunicationsPage() {
   const [isSending, setIsSending] = useState<boolean>(false);
   const [activeRightTab, setActiveRightTab] = useState<'details' | 'audit_events'>('audit_events');
 
-  const syncPipeline = useCallback(() => {
+  const syncPipeline = useCallback(async () => {
+    try {
+      const res = await fetch('/api/pipeline');
+      const json = await res.json();
+      if (json.success && json.state) {
+        setPipeline(json.state);
+        return;
+      }
+    } catch {
+      // Fallback
+    }
     setPipeline({ ...getPipelineState() });
   }, []);
 
   useEffect(() => {
     syncPipeline();
+    const interval = setInterval(syncPipeline, 10000);
+
     const handleUpdate = () => syncPipeline();
     window.addEventListener(PIPELINE_EVENT_NAME, handleUpdate);
     window.addEventListener('storage', handleUpdate);
     return () => {
+      clearInterval(interval);
       window.removeEventListener(PIPELINE_EVENT_NAME, handleUpdate);
       window.removeEventListener('storage', handleUpdate);
     };
@@ -91,33 +104,66 @@ export default function ParentCommunicationsPage() {
     ? messages.filter((m) => m.thread_id === activeThread.id)
     : [];
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!replyText.trim() || !activeThread) return;
 
     setIsSending(true);
+    const staffName = activeThread.teacher_name || 'ครูประจำชั้นโรงเรียนสมคิดวิทยา';
+    const textToSend = replyText.trim();
+    const needsAck = requireAck;
+
+    // Optimistic local update
     try {
-      const staffName = activeThread.teacher_name || 'ครูประจำชั้นโรงเรียนสมคิดวิทยา';
-      const msg = sendParentTeacherMessage({
+      sendParentTeacherMessage({
         thread_id: activeThread.id,
         sender_type: 'STAFF',
         sender_name: staffName,
-        body_th: replyText.trim(),
-        require_acknowledgement: requireAck,
+        body_th: textToSend,
+        require_acknowledgement: needsAck,
       });
+    } catch (e) {
+      console.warn('Local message store update error:', e);
+    }
 
-      if (msg) {
+    try {
+      const res = await fetch('/api/pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'SEND_MESSAGE',
+          payload: {
+            thread_id: activeThread.id,
+            student_id: activeThread.student_id,
+            sender_type: 'STAFF',
+            sender_name: staffName,
+            body_th: textToSend,
+            require_acknowledgement: needsAck,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
         toast.success(
           isThai
-            ? `ส่งข้อความสำเร็จและซิงค์ไปยัง Parents Portal แล้ว`
+            ? `ส่งข้อความสำเร็จและซิงค์ฐานข้อมูล Parents Portal แล้ว`
             : `Message sent & synced to Parents Portal`
         );
         setReplyText('');
         setRequireAck(false);
+        syncPipeline();
+      } else {
+        toast.error(data.error || 'ส่งข้อความไม่สำเร็จ');
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to send message';
-      toast.error(msg);
+      toast.warning(
+        isThai
+          ? `บันทึกข้อความแบบออฟไลน์เรียบร้อยแล้ว`
+          : `Message saved locally (offline fallback)`
+      );
+      setReplyText('');
+      setRequireAck(false);
     } finally {
       setIsSending(false);
     }

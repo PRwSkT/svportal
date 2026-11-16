@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   FileText, 
   X, 
@@ -26,7 +26,12 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
-  ImagePlus
+  ImagePlus,
+  ClipboardPaste,
+  ShieldCheck,
+  AlertCircle,
+  AlertTriangle,
+  RotateCcw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AcademicCourse, AcademicExam, AcademicExamQuestion, ChoiceOption, ExamQuestionType, ExamStatus } from '@/types/academic';
@@ -39,6 +44,12 @@ import {
   isImageChoice, 
   parseChoiceContent 
 } from '@/lib/academic/exam-image-utils';
+import { SmartPasteModal } from '@/components/academic/SmartPasteModal';
+import { ExamPreFlightDrawer } from '@/components/academic/ExamPreFlightDrawer';
+import { SubjectiveModeSelector } from '@/components/academic/SubjectiveModeSelector';
+import { QuestionNavigatorSidebar } from '@/components/academic/QuestionNavigatorSidebar';
+import { validateExamPreFlight, PreFlightReport } from '@/lib/academic/preflight-validator';
+import { isPinnedOption } from '@/lib/academic/exam-engine';
 
 interface ExamAuthoringModalProps {
   isOpen: boolean;
@@ -100,6 +111,183 @@ export function ExamAuthoringModal({
   // Single Question AI Adjuster & Subjective Rubric
   const [adjustingQIdx, setAdjustingQIdx] = useState<number | null>(null);
   const [generatingRubricIdx, setGeneratingRubricIdx] = useState<number | null>(null);
+
+  // UX / UI Responsive States (Phase 20)
+  const [isMetadataCollapsed, setIsMetadataCollapsed] = useState(false);
+  const [isLatexProMode, setIsLatexProMode] = useState(false);
+
+  // Phase 1 enhancements states
+  const [isSmartPasteOpen, setIsSmartPasteOpen] = useState(false);
+  const [isPreFlightDrawerOpen, setIsPreFlightDrawerOpen] = useState(false);
+  const [preFlightDrawerTab, setPreFlightDrawerTab] = useState<'preflight' | 'ai_audit'>('preflight');
+  const [generatingDistractorIdx, setGeneratingDistractorIdx] = useState<number | null>(null);
+  const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
+  const [confirmSaveWarnings, setConfirmSaveWarnings] = useState(false);
+
+  // Autosave and localStorage draft recovery
+  const draftKey = `sv_exam_draft_${examId || 'new'}`;
+  const [lastAutosavedTime, setLastAutosavedTime] = useState<string | null>(null);
+  const [showDraftRestorePrompt, setShowDraftRestorePrompt] = useState(false);
+  const [pendingDraft, setPendingDraft] = useState<any | null>(null);
+  const [isRestoringDraft, setIsRestoringDraft] = useState(false);
+  const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Pre-Flight Quality Validator Live Memo
+  const preFlightReport: PreFlightReport = useMemo(() => {
+    return validateExamPreFlight(questions, {
+      total_score: Number(maxScore),
+      duration_minutes: Number(durationMinutes)
+    });
+  }, [questions, maxScore, durationMinutes]);
+
+  // Check for saved draft on open
+  useEffect(() => {
+    if (isOpen) {
+      try {
+        const rawDraft = localStorage.getItem(draftKey);
+        if (rawDraft) {
+          const draft = JSON.parse(rawDraft);
+          if (draft && (draft.title || (draft.questions && draft.questions.length > 0))) {
+            setPendingDraft(draft);
+            setShowDraftRestorePrompt(true);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to parse draft from localStorage', e);
+      }
+    }
+  }, [isOpen, draftKey]);
+
+  // Debounced autosave to localStorage
+  useEffect(() => {
+    if (!isOpen || loading || isRestoringDraft) return;
+
+    if (autosaveTimeoutRef.current) {
+      clearTimeout(autosaveTimeoutRef.current);
+    }
+
+    autosaveTimeoutRef.current = setTimeout(() => {
+      try {
+        if (title.trim() || questions.length > 0) {
+          const draftData = {
+            timestamp: Date.now(),
+            savedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+            title,
+            courseId,
+            gradebookId,
+            academicYear,
+            term,
+            examType,
+            status,
+            durationMinutes,
+            maxScore,
+            instructions,
+            questions
+          };
+          localStorage.setItem(draftKey, JSON.stringify(draftData));
+          setLastAutosavedTime(draftData.savedAt);
+        }
+      } catch (err) {
+        console.warn('Autosave failed', err);
+      }
+    }, 1200);
+
+    return () => {
+      if (autosaveTimeoutRef.current) {
+        clearTimeout(autosaveTimeoutRef.current);
+      }
+    };
+  }, [isOpen, loading, isRestoringDraft, title, courseId, gradebookId, academicYear, term, examType, status, durationMinutes, maxScore, instructions, questions, draftKey]);
+
+  const handleRestoreDraft = () => {
+    if (!pendingDraft) return;
+    setIsRestoringDraft(true);
+    if (pendingDraft.title !== undefined) setTitle(pendingDraft.title);
+    if (pendingDraft.courseId !== undefined) setCourseId(pendingDraft.courseId);
+    if (pendingDraft.gradebookId !== undefined) setGradebookId(pendingDraft.gradebookId);
+    if (pendingDraft.academicYear !== undefined) setAcademicYear(pendingDraft.academicYear);
+    if (pendingDraft.term !== undefined) setTerm(pendingDraft.term);
+    if (pendingDraft.examType !== undefined) setExamType(pendingDraft.examType);
+    if (pendingDraft.status !== undefined) setStatus(pendingDraft.status);
+    if (pendingDraft.durationMinutes !== undefined) setDurationMinutes(pendingDraft.durationMinutes);
+    if (pendingDraft.maxScore !== undefined) setMaxScore(pendingDraft.maxScore);
+    if (pendingDraft.instructions !== undefined) setInstructions(pendingDraft.instructions);
+    if (pendingDraft.questions && Array.isArray(pendingDraft.questions)) {
+      setQuestions(pendingDraft.questions);
+    }
+    setShowDraftRestorePrompt(false);
+    toast.success('กู้คืนแบบร่างจากเครื่องของคุณสำเร็จ');
+    setTimeout(() => setIsRestoringDraft(false), 300);
+  };
+
+  const handleDiscardDraft = () => {
+    localStorage.removeItem(draftKey);
+    setPendingDraft(null);
+    setShowDraftRestorePrompt(false);
+    toast.info('ละทิ้งแบบร่างเรียบร้อย');
+  };
+
+  const handleAutoFixPinAll = () => {
+    let fixCount = 0;
+    setQuestions(prev => {
+      return prev.map(q => {
+        if (q.question_type !== 'subjective') {
+          const isD = isPinnedOption(q.choice_d);
+          const isE = q.choice_e ? isPinnedOption(q.choice_e) : false;
+          if ((isD || isE) && !q.pin_choice_position) {
+            fixCount++;
+            return {
+              ...q,
+              pin_choice_position: true,
+              pinned_choice_index: isE ? 'E' : 'D'
+            };
+          }
+        }
+        return q;
+      });
+    });
+    toast.success(`ล็อกตำแหน่งตัวเลือก 'ถูกทุกข้อ/ไม่มีข้อถูก' สำเร็จ ${fixCount} ข้อ`);
+  };
+
+  const handleAutoFixPinQuestion = (qNum: number) => {
+    setQuestions(prev => {
+      return prev.map(q => {
+        if (q.question_number === qNum || prev.indexOf(q) === qNum - 1) {
+          return {
+            ...q,
+            pin_choice_position: true,
+            pinned_choice_index: q.choice_e ? 'E' : 'D'
+          };
+        }
+        return q;
+      });
+    });
+    toast.success(`ล็อกตำแหน่งข้อที่ ${qNum} เรียบร้อยแล้ว`);
+  };
+
+  const handleJumpToQuestion = (qNum: number) => {
+    const targetIdx = qNum - 1;
+    setActiveQuestionIndex(targetIdx);
+    const element = document.getElementById(`question-card-${qNum}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      element.classList.add('ring-2', 'ring-primary', 'transition-all');
+      setTimeout(() => {
+        element.classList.remove('ring-2', 'ring-primary');
+      }, 1500);
+    }
+  };
+
+  const handleSmartPasteImport = (importedQuestions: AcademicExamQuestion[], importMode: 'append' | 'replace') => {
+    if (importMode === 'replace') {
+      setQuestions(importedQuestions.map((q, idx) => ({ ...q, question_number: idx + 1 })));
+    } else {
+      setQuestions(prev => {
+        const nextQuestions = [...prev, ...importedQuestions];
+        return nextQuestions.map((q, idx) => ({ ...q, question_number: idx + 1 }));
+      });
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -409,7 +597,8 @@ export function ExamAuthoringModal({
           choice_c: adj.choice_c || updated[idx].choice_c,
           choice_d: adj.choice_d || updated[idx].choice_d,
           correct_choice: adj.correct_choice || updated[idx].correct_choice,
-          pin_choice_position: adj.pin_choice_position ?? updated[idx].pin_choice_position
+          pin_choice_position: adj.pin_choice_position ?? updated[idx].pin_choice_position,
+          question_meta: adj.question_meta || updated[idx].question_meta
         };
         return updated;
       });
@@ -466,6 +655,101 @@ export function ExamAuthoringModal({
     }
   };
 
+  // Single Question AI Diagnostic Distractors (Solve-First Verification)
+  const handleAiGenerateDistractors = async (idx: number) => {
+    const q = questions[idx];
+    if (!q) return;
+
+    if (!q.question_text || q.question_text.trim() === '') {
+      toast.error('กรุณากรอกข้อความโจทย์ก่อน เพื่อให้น้องฟ้านำไปคิดตัวเลือกหลอก');
+      return;
+    }
+
+    // Determine correct answer slot
+    const correctSlot = (q.correct_choice || 'A').toUpperCase();
+    const slotFieldMap: Record<string, keyof AcademicExamQuestion> = {
+      A: 'choice_a',
+      B: 'choice_b',
+      C: 'choice_c',
+      D: 'choice_d',
+      E: 'choice_e'
+    };
+    const correctFieldName = slotFieldMap[correctSlot] || 'choice_a';
+    const correctAnswerText = String(q[correctFieldName] || '').trim();
+
+    if (!correctAnswerText) {
+      toast.error(`กรุณาระบุข้อความคำตอบที่ถูกต้องในข้อ ${correctSlot} ก่อน เพื่อให้น้องฟ้าคิดตัวลวงวินิจฉัย`);
+      return;
+    }
+
+    try {
+      setGeneratingDistractorIdx(idx);
+      const currentCourse = courses.find(c => c.id === courseId);
+      const res = await fetch('/api/academic/exams/ai-draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generate_distractors',
+          question_text: q.question_text,
+          correct_answer: correctAnswerText,
+          subject_name: currentCourse?.name_th || 'วิชาทั่วไป',
+          grade_level: currentCourse?.grade_level || 'P3'
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success || !Array.isArray(data.distractors)) {
+        throw new Error(data.error || 'ไม่สามารถสร้างตัวลวงได้ กรุณาลองใหม่อีกครั้ง');
+      }
+
+      const distractors = data.distractors;
+      setQuestions(prev => {
+        const updated = [...prev];
+        const currentQ = { ...updated[idx] };
+        const meta = { ...(currentQ.question_meta || {}) };
+        const diagTags: Record<string, string> = { ...(meta.diagnostic_tags || {}) };
+
+        if (correctSlot === 'A') {
+          currentQ.choice_b = distractors[0]?.choice_text || currentQ.choice_b;
+          currentQ.choice_c = distractors[1]?.choice_text || currentQ.choice_c;
+          currentQ.choice_d = distractors[2]?.choice_text || currentQ.choice_d;
+          diagTags.B = distractors[0]?.misconception || 'ความเข้าใจคลาดเคลื่อน';
+          diagTags.C = distractors[1]?.misconception || 'ความเข้าใจคลาดเคลื่อน';
+          diagTags.D = distractors[2]?.misconception || 'ความเข้าใจคลาดเคลื่อน';
+        } else {
+          const availableSlots: ('choice_a' | 'choice_b' | 'choice_c' | 'choice_d')[] = ['choice_a', 'choice_b', 'choice_c', 'choice_d'];
+          const nonCorrectSlots = availableSlots.filter(s => s !== correctFieldName);
+          nonCorrectSlots.forEach((slot, dIdx) => {
+            if (distractors[dIdx]) {
+              (currentQ as any)[slot] = distractors[dIdx].choice_text;
+              const slotLetter = slot.replace('choice_', '').toUpperCase();
+              diagTags[slotLetter] = distractors[dIdx].misconception;
+            }
+          });
+        }
+
+        if (data.diagnostic_tags) {
+          Object.assign(diagTags, data.diagnostic_tags);
+        }
+
+        currentQ.question_meta = {
+          ...meta,
+          diagnostic_tags: diagTags,
+          distractor_rationale: data.explanation || 'สร้างตัวลวงวินิจฉัยโดย Nong Fah AI 2.0 Solve-First'
+        };
+
+        updated[idx] = currentQ;
+        return updated;
+      });
+
+      toast.success('น้องฟ้าสร้างตัวเลือกหลอกเชิงวินิจฉัยและบันทึก Diagnostic Tags เรียบร้อยแล้ว');
+    } catch (err: any) {
+      toast.error(err?.message || 'เกิดข้อผิดพลาดในการสร้างตัวลวงวินิจฉัย');
+    } finally {
+      setGeneratingDistractorIdx(null);
+    }
+  };
+
   // AI Batch Draft
   const handleAiBatchDraft = async () => {
     try {
@@ -508,6 +792,10 @@ export function ExamAuthoringModal({
         points: q.points || (aiQuestionType === 'subjective' ? 5 : 1),
         pin_choice_position: q.pin_choice_position ?? false,
         pinned_choice_index: q.pin_choice_position ? 'D' : null,
+        question_meta: q.question_meta || (q.diagnostic_tags || q.step_by_step_solution ? {
+          step_by_step_solution: q.step_by_step_solution,
+          diagnostic_tags: q.diagnostic_tags
+        } : undefined),
         created_at: new Date().toISOString()
       }));
 
@@ -522,7 +810,7 @@ export function ExamAuthoringModal({
   };
 
   // Submit Save
-  const handleSaveExam = async () => {
+  const handleSaveExam = async (skipWarningCheck: boolean = false) => {
     if (!title.trim()) {
       toast.error('กรุณาระบุชื่อการสอบ');
       return;
@@ -535,6 +823,24 @@ export function ExamAuthoringModal({
       toast.error('ต้องมีข้อสอบอย่างน้อย 1 ข้อ');
       return;
     }
+
+    // Pre-Flight Quality Validation
+    const report = validateExamPreFlight(questions, {
+      total_score: Number(maxScore),
+      duration_minutes: Number(durationMinutes)
+    });
+
+    if (report.errorCount > 0) {
+      setIsPreFlightDrawerOpen(true);
+      toast.error(`ไม่สามารถบันทึกได้: พบข้อผิดพลาดร้ายแรง ${report.errorCount} จุด กรุณาแก้ไขก่อนบันทึก`);
+      return;
+    }
+
+    if (report.warningCount > 0 && !skipWarningCheck && !confirmSaveWarnings) {
+      setConfirmSaveWarnings(true);
+      return;
+    }
+    setConfirmSaveWarnings(false);
 
     try {
       setSaving(true);
@@ -565,7 +871,8 @@ export function ExamAuthoringModal({
           indicator_code: q.indicator_code,
           points: q.points,
           pin_choice_position: q.pin_choice_position,
-          pinned_choice_index: q.pinned_choice_index
+          pinned_choice_index: q.pinned_choice_index,
+          question_meta: q.question_meta || {}
         }))
       };
 
@@ -581,6 +888,14 @@ export function ExamAuthoringModal({
 
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'ไม่สามารถบันทึกข้อสอบได้');
+      }
+
+      // Clear local autosave draft
+      try {
+        localStorage.removeItem(draftKey);
+        setPendingDraft(null);
+      } catch (e) {
+        // ignore
       }
 
       toast.success(mode === 'edit' ? 'บันทึกการแก้ไขข้อสอบเรียบร้อยแล้ว' : 'สร้างข้อสอบและชุด A/B/C สำเร็จ');
@@ -599,234 +914,448 @@ export function ExamAuthoringModal({
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-2 sm:p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-150">
       <div className="bg-white rounded-2xl shadow-2xl border border-stone-200 w-full max-w-6xl overflow-hidden flex flex-col max-h-[94vh]">
         {/* Header */}
-        <div className="px-6 py-3.5 bg-stone-900 text-white flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/20 text-rose-300 flex items-center justify-center font-bold">
+        <div className="px-6 py-3 bg-stone-900 text-white flex items-center justify-between shrink-0 gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-primary/20 text-rose-300 flex items-center justify-center font-bold shrink-0">
               <FileText className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-base sm:text-lg leading-tight">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-sm sm:text-base leading-tight truncate">
                   {mode === 'edit' ? 'สตูดิโอแก้ไขข้อสอบ (Edit Exam Studio)' : 'สตูดิโอออกข้อสอบมาตรฐานระดับสูง (Next-Gen Exam Studio)'}
                 </h3>
-                <span className="px-2.5 py-0.5 text-[11px] rounded-full font-semibold bg-primary/30 text-rose-200 border border-primary/40">
+                <span className="px-2.5 py-0.5 text-[10px] rounded-full font-semibold bg-primary/30 text-rose-200 border border-primary/40 shrink-0">
                   {status === 'draft' ? 'ร่างข้อสอบ' : status === 'review' ? 'รอตรวจสอบ' : status === 'archived' ? 'จัดเก็บในคลัง' : 'พร้อมจัดสอบ'}
                 </span>
               </div>
-              <p className="text-xs text-stone-400">
-                รองรับสมการเวกเตอร์ KaTeX, แผนภาพ In-Studio SVG, ปัญญาประดิษฐ์น้องฟ้า และการพิมพ์ A4 มาตรฐาน
+              <p className="text-[11px] text-stone-400 hidden sm:block truncate">
+                รองรับสมการ KaTeX, ภาพวาด Goodnotes Ink, ตรวจคุณภาพ Pre-Flight และ 9 โหมดข้อสอบอัตนัย
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-stone-300 hover:text-white px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center gap-1 text-xs font-semibold"
-            title="ปิดหน้าต่าง"
-          >
-            <X className="w-4 h-4" />
-            <span>ปิด</span>
-          </button>
-        </div>
 
-        {/* Top Control Bar: Metadata */}
-        <div className="p-3.5 bg-stone-50 border-b border-stone-200 grid grid-cols-2 md:grid-cols-12 gap-2.5 shrink-0 text-xs">
-          <div className="col-span-2 md:col-span-4">
-            <label className="block text-stone-600 font-semibold mb-1">ชื่อการสอบ / รหัสชุดข้อสอบ</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="เช่น การสอบกลางภาค วิชาคณิตศาสตร์พื้นฐาน ป.3"
-              className="w-full px-3 py-1.5 border border-stone-300 rounded-lg font-medium text-stone-900 bg-white focus:ring-1 focus:ring-primary"
-            />
-          </div>
-
-          <div className="col-span-2 md:col-span-4">
-            <label className="block text-stone-600 font-semibold mb-1">รายวิชา</label>
-            <select
-              value={courseId}
-              onChange={(e) => setCourseId(e.target.value)}
-              className="w-full px-2.5 py-1.5 border border-stone-300 rounded-lg text-stone-900 bg-white"
-            >
-              <option value="">-- เลือกรายวิชา --</option>
-              {courses.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.course_code} - {c.name_th} ({c.grade_level})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="col-span-1 md:col-span-2">
-            <label className="block text-stone-600 font-semibold mb-1">สมุด ปพ.5 ที่เชื่อมโยง</label>
-            <select
-              value={gradebookId}
-              onChange={(e) => setGradebookId(e.target.value)}
-              className="w-full px-2 py-1.5 border border-stone-300 rounded-lg text-stone-900 bg-white"
-            >
-              <option value="">-- ไม่เชื่อมโยง ปพ.5 --</option>
-              {gradebooks.map(g => (
-                <option key={g.id} value={g.id}>
-                  ห้อง {g.class?.name || 'ไม่ระบุ'} ({g.course?.course_code || ''})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="col-span-1 md:col-span-2">
-            <label className="block text-stone-600 font-semibold mb-1">ประเภทการสอบ</label>
-            <select
-              value={examType}
-              onChange={(e) => setExamType(e.target.value)}
-              className="w-full px-2 py-1.5 border border-stone-300 rounded-lg text-stone-900 bg-white"
-            >
-              <option value="midterm">สอบกลางภาค</option>
-              <option value="final">สอบปลายภาค</option>
-              <option value="unit_test">สอบท้ายหน่วย</option>
-              <option value="quiz">ควิซย่อย</option>
-            </select>
-          </div>
-
-          <div className="col-span-2 md:col-span-6">
-            <label className="block text-stone-600 font-semibold mb-1">คำชี้แจงบนหัวกระดาษข้อสอบ</label>
-            <input
-              type="text"
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-              placeholder="เช่น ให้นักเรียนเลือกคำตอบที่ถูกต้องที่สุดเพียงข้อเดียว..."
-              className="w-full px-3 py-1.5 border border-stone-300 rounded-lg text-stone-800 bg-white focus:ring-1 focus:ring-primary"
-            />
-          </div>
-
-          <div className="col-span-1 md:col-span-2">
-            <label className="block text-stone-600 font-semibold mb-1">เวลาสอบ (นาที)</label>
-            <input
-              type="number"
-              min={5}
-              max={300}
-              value={durationMinutes}
-              onChange={(e) => setDurationMinutes(Math.max(5, parseInt(e.target.value) || 60))}
-              className="w-full px-2.5 py-1.5 border border-stone-300 rounded-lg text-stone-900 bg-white font-semibold"
-            />
-          </div>
-
-          <div className="col-span-1 md:col-span-2">
-            <label className="block text-stone-600 font-semibold mb-1">คะแนนเต็ม</label>
-            <input
-              type="number"
-              min={1}
-              max={500}
-              value={maxScore}
-              onChange={(e) => setMaxScore(Math.max(1, parseInt(e.target.value) || 20))}
-              className="w-full px-2.5 py-1.5 border border-stone-300 rounded-lg text-stone-900 bg-white font-semibold"
-            />
-          </div>
-
-          <div className="col-span-2 md:col-span-2">
-            <label className="block text-stone-600 font-semibold mb-1">สถานะข้อสอบ</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as ExamStatus)}
-              className="w-full px-2 py-1.5 border border-stone-300 rounded-lg font-semibold text-stone-900 bg-white"
-            >
-              <option value="draft">ร่าง (Draft)</option>
-              <option value="review">รอตรวจสอบ (Review)</option>
-              <option value="ready">พร้อมสอบ (Ready)</option>
-              <option value="conducted">จัดสอบแล้ว (Conducted)</option>
-              <option value="archived">จัดเก็บในคลัง (Archived)</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Main Workspace (Questions list) */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 bg-stone-100/50">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center p-12 text-stone-500">
-              <Loader2 className="w-8 h-8 animate-spin text-primary mb-2" />
-              <p className="text-sm">กำลังโหลดข้อมูลข้อสอบ...</p>
-            </div>
-          ) : (
-            <>
-              {/* Question Tools Toolbar */}
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-xl border border-stone-200 shadow-xs">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-stone-700 uppercase tracking-wider">
-                    จำนวนข้อสอบทั้งหมด: {questions.length} ข้อ
-                  </span>
-                  <span className="text-stone-300">|</span>
-                  <span className="text-xs text-stone-500">
-                    คะแนนรวม: {questions.reduce((sum, q) => sum + (Number(q.points) || 1), 0)} คะแนน
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  {/* AI Batch Draft Button */}
-                  <button
-                    onClick={() => {
-                      const selectedCourse = courses.find(c => c.id === courseId);
-                      if (selectedCourse) {
-                        setAiSubject(selectedCourse.name_th);
-                      }
-                      setIsAiDraftModalOpen(true);
-                    }}
-                    className="px-3.5 py-1.5 text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
-                  >
-                    <Wand2 className="w-4 h-4 text-purple-600" />
-                    ให้น้องฟ้าร่างข้อสอบอัตโนมัติ
-                  </button>
-
-                  {/* Add Standard MCQ */}
-                  <button
-                    onClick={() => handleAddQuestion('mcq')}
-                    className="px-3 py-1.5 text-xs font-semibold text-stone-700 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors flex items-center gap-1"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    เพิ่มข้อปรนัย (MCQ)
-                  </button>
-
-                  {/* Add Matching */}
-                  <button
-                    onClick={() => handleAddQuestion('matching')}
-                    className="px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors flex items-center gap-1"
-                  >
-                    <ArrowRightLeft className="w-3.5 h-3.5" />
-                    เพิ่มข้อโยงเส้นจับคู่
-                  </button>
-
-                  {/* Add True/False */}
-                  <button
-                    onClick={() => handleAddQuestion('true_false')}
-                    className="px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors flex items-center gap-1"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                    เพิ่มข้อถูก/ผิด
-                  </button>
-
-                  {/* Add Subjective */}
-                  <button
-                    onClick={() => handleAddQuestion('subjective')}
-                    className="px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors flex items-center gap-1"
-                  >
-                    <PenTool className="w-3.5 h-3.5" />
-                    เพิ่มข้ออัตนัย (เขียนตอบ)
-                  </button>
-                </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Live Autosave Indicator */}
+            {lastAutosavedTime && (
+              <div className="hidden xl:flex items-center gap-1.5 text-[11px] text-stone-300 bg-white/10 px-2.5 py-1 rounded-lg border border-white/10">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>บันทึกร่างอัตโนมัติ {lastAutosavedTime} น.</span>
               </div>
+            )}
 
-              {/* Questions Loop */}
-              <div className="space-y-4">
-                {questions.map((q, idx) => (
-                  <div 
-                    key={q.id || idx} 
-                    tabIndex={0}
-                    onPaste={(e) => handleCardPaste(e, idx)}
-                    onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
-                    onDrop={(e) => handleCardDrop(e, idx)}
-                    className="bg-white rounded-2xl border border-stone-200 p-5 shadow-xs transition-shadow hover:shadow-md space-y-4 focus:ring-1 focus:ring-primary/40 outline-none"
-                  >
+            {/* Clickable Pre-Flight Quality Badge */}
+            <button
+              type="button"
+              onClick={() => {
+                setPreFlightDrawerTab('preflight');
+                setIsPreFlightDrawerOpen(true);
+              }}
+              className={`px-3 py-1 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition-all shadow-2xs hover:scale-105 cursor-pointer ${
+                preFlightReport.errorCount > 0
+                  ? 'bg-rose-500/25 text-rose-200 border-rose-500/50 hover:bg-rose-500/40'
+                  : preFlightReport.warningCount > 0
+                  ? 'bg-amber-500/25 text-amber-200 border-amber-500/50 hover:bg-amber-500/40'
+                  : 'bg-emerald-500/25 text-emerald-200 border-emerald-500/50 hover:bg-emerald-500/40'
+              }`}
+              title="คลิกเพื่อตรวจรายงานคุณภาพข้อสอบ (Pre-Flight Quality Inspector)"
+            >
+              {preFlightReport.errorCount > 0 ? (
+                <>
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-400 animate-pulse shrink-0" />
+                  <span>ตรวจคุณภาพ: พบ {preFlightReport.errorCount} ปัญหา</span>
+                </>
+              ) : preFlightReport.warningCount > 0 ? (
+                <>
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>ตรวจคุณภาพ: {preFlightReport.warningCount} เตือน</span>
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>ตรวจคุณภาพ: สมบูรณ์ 100%</span>
+                </>
+              )}
+            </button>
+
+            {/* Clickable AI Pedagogy Audit Badge */}
+            <button
+              type="button"
+              onClick={() => {
+                setPreFlightDrawerTab('ai_audit');
+                setIsPreFlightDrawerOpen(true);
+              }}
+              className="px-2.5 py-1 rounded-xl text-xs font-bold border border-purple-400/40 bg-purple-500/25 hover:bg-purple-500/40 text-purple-200 flex items-center gap-1.5 transition-all shadow-2xs hover:scale-105 cursor-pointer"
+              title="ให้น้องฟ้าตรวจวิเคราะห์เชิงลึก (Pedagogy & Curriculum Audit)"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-purple-300" />
+              <span className="hidden sm:inline">AI Pedagogy Audit</span>
+            </button>
+
+            <button
+              onClick={onClose}
+              className="text-stone-300 hover:text-white px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center gap-1 text-xs font-semibold"
+              title="ปิดหน้าต่าง"
+            >
+              <X className="w-4 h-4" />
+              <span className="hidden sm:inline">ปิด</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Top Control Bar: Metadata (Collapsible for maximum vertical screen space) */}
+        {isMetadataCollapsed ? (
+          <div className="px-4 py-2 bg-stone-50 border-b border-stone-200 flex flex-wrap items-center justify-between gap-2 text-xs shrink-0 animate-in fade-in duration-100">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <span className="font-bold text-stone-900 truncate max-w-[280px]">
+                {title || '(ยังไม่ได้ระบุชื่อการสอบ)'}
+              </span>
+              {courseId && (
+                <span className="px-2 py-0.5 rounded-md bg-stone-200/80 text-stone-800 text-[11px] font-semibold">
+                  {courses.find(c => c.id === courseId)?.course_code} - {courses.find(c => c.id === courseId)?.name_th}
+                </span>
+              )}
+              <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 text-[11px] font-semibold">
+                {examType === 'midterm' ? 'กลางภาค' : examType === 'final' ? 'ปลายภาค' : examType === 'unit_test' ? 'ท้ายหน่วย' : 'ควิซ'}
+              </span>
+              <span className="text-stone-500 text-[11px]">
+                เวลา: <strong>{durationMinutes} นาที</strong> | คะแนนเต็ม: <strong>{maxScore} คะแนน</strong>
+              </span>
+              <span className="px-2 py-0.5 rounded-md bg-stone-100 text-stone-600 text-[11px] font-medium border border-stone-200">
+                สถานะ: {status === 'draft' ? 'ร่าง' : status === 'review' ? 'รอตรวจ' : status === 'ready' ? 'พร้อมสอบ' : status === 'conducted' ? 'สอบแล้ว' : 'คลัง'}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsMetadataCollapsed(false)}
+              className="px-2.5 py-1 text-xs text-stone-700 hover:text-stone-900 bg-white hover:bg-stone-100 border border-stone-300 rounded-lg flex items-center gap-1 font-semibold transition-colors shadow-2xs cursor-pointer ml-auto"
+              title="ขยายรายละเอียดหัวข้อสอบ"
+            >
+              <ChevronDown className="w-3.5 h-3.5 text-stone-500" />
+              <span>แสดงรายละเอียดหัวข้อสอบ</span>
+            </button>
+          </div>
+        ) : (
+          <div className="p-3.5 bg-stone-50 border-b border-stone-200 grid grid-cols-2 md:grid-cols-12 gap-2.5 shrink-0 text-xs relative animate-in fade-in duration-100">
+            <div className="col-span-2 md:col-span-4">
+              <label className="block text-stone-600 font-semibold mb-1">ชื่อการสอบ / รหัสชุดข้อสอบ</label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="เช่น การสอบกลางภาค วิชาคณิตศาสตร์พื้นฐาน ป.3"
+                className="w-full px-3 py-1.5 border border-stone-300 rounded-lg font-medium text-stone-900 bg-white focus:ring-1 focus:ring-primary"
+              />
+            </div>
+
+            <div className="col-span-2 md:col-span-4">
+              <label className="block text-stone-600 font-semibold mb-1">รายวิชา</label>
+              <select
+                value={courseId}
+                onChange={(e) => setCourseId(e.target.value)}
+                className="w-full px-2.5 py-1.5 border border-stone-300 rounded-lg text-stone-900 bg-white"
+              >
+                <option value="">-- เลือกรายวิชา --</option>
+                {courses.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.course_code} - {c.name_th} ({c.grade_level})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="col-span-1 md:col-span-2">
+              <label className="block text-stone-600 font-semibold mb-1">สมุด ปพ.5 ที่เชื่อมโยง</label>
+              <select
+                value={gradebookId}
+                onChange={(e) => setGradebookId(e.target.value)}
+                className="w-full px-2 py-1.5 border border-stone-300 rounded-lg text-stone-900 bg-white"
+              >
+                <option value="">-- ไม่เชื่อมโยง ปพ.5 --</option>
+                {gradebooks.map(g => (
+                  <option key={g.id} value={g.id}>
+                    ห้อง {g.class?.name || 'ไม่ระบุ'} ({g.course?.course_code || ''})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="col-span-1 md:col-span-2">
+              <label className="block text-stone-600 font-semibold mb-1">ประเภทการสอบ</label>
+              <select
+                value={examType}
+                onChange={(e) => setExamType(e.target.value)}
+                className="w-full px-2 py-1.5 border border-stone-300 rounded-lg text-stone-900 bg-white"
+              >
+                <option value="midterm">สอบกลางภาค</option>
+                <option value="final">สอบปลายภาค</option>
+                <option value="unit_test">สอบท้ายหน่วย</option>
+                <option value="quiz">ควิซย่อย</option>
+              </select>
+            </div>
+
+            <div className="col-span-2 md:col-span-6">
+              <label className="block text-stone-600 font-semibold mb-1">คำชี้แจงบนหัวกระดาษข้อสอบ</label>
+              <input
+                type="text"
+                value={instructions}
+                onChange={(e) => setInstructions(e.target.value)}
+                placeholder="เช่น ให้นักเรียนเลือกคำตอบที่ถูกต้องที่สุดเพียงข้อเดียว..."
+                className="w-full px-3 py-1.5 border border-stone-300 rounded-lg text-stone-800 bg-white focus:ring-1 focus:ring-primary"
+              />
+            </div>
+
+            <div className="col-span-1 md:col-span-2">
+              <label className="block text-stone-600 font-semibold mb-1">เวลาสอบ (นาที)</label>
+              <input
+                type="number"
+                min={5}
+                max={300}
+                value={durationMinutes}
+                onChange={(e) => setDurationMinutes(Math.max(5, parseInt(e.target.value) || 60))}
+                className="w-full px-2.5 py-1.5 border border-stone-300 rounded-lg text-stone-900 bg-white font-semibold"
+              />
+            </div>
+
+            <div className="col-span-1 md:col-span-2">
+              <label className="block text-stone-600 font-semibold mb-1">คะแนนเต็ม</label>
+              <input
+                type="number"
+                min={1}
+                max={500}
+                value={maxScore}
+                onChange={(e) => setMaxScore(Math.max(1, parseInt(e.target.value) || 20))}
+                className="w-full px-2.5 py-1.5 border border-stone-300 rounded-lg text-stone-900 bg-white font-semibold"
+              />
+            </div>
+
+            <div className="col-span-2 md:col-span-2">
+              <label className="block text-stone-600 font-semibold mb-1">สถานะข้อสอบ</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as ExamStatus)}
+                className="w-full px-2 py-1.5 border border-stone-300 rounded-lg font-semibold text-stone-900 bg-white"
+              >
+                <option value="draft">ร่าง (Draft)</option>
+                <option value="review">รอตรวจสอบ (Review)</option>
+                <option value="ready">พร้อมสอบ (Ready)</option>
+                <option value="conducted">จัดสอบแล้ว (Conducted)</option>
+                <option value="archived">จัดเก็บในคลัง (Archived)</option>
+              </select>
+            </div>
+
+            {/* Quick Collapse Button */}
+            <div className="col-span-2 md:col-span-12 flex justify-end pt-1 border-t border-stone-200/60">
+              <button
+                type="button"
+                onClick={() => setIsMetadataCollapsed(true)}
+                className="text-stone-500 hover:text-stone-800 text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                title="ย่อข้อมูลเพื่อเพิ่มพื้นที่หน้าต่างออกข้อสอบ"
+              >
+                <ChevronUp className="w-3.5 h-3.5" />
+                <span>ย่อข้อมูลหัวข้อสอบ (ประหยัดพื้นที่แนวตั้ง)</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Autosave Draft Restore Prompt Banner */}
+        {showDraftRestorePrompt && pendingDraft && (
+          <div className="px-6 py-2.5 bg-gradient-to-r from-amber-50 via-amber-100/70 to-amber-50 border-b border-amber-300 flex flex-wrap items-center justify-between gap-3 text-xs animate-in slide-in-from-top duration-200">
+            <div className="flex items-center gap-2 text-amber-950 font-medium">
+              <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                พบแบบร่างข้อสอบที่บันทึกอัตโนมัติไว้ในเครื่องนี้เมื่อ{' '}
+                <strong>{new Date(pendingDraft.timestamp || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.</strong>{' '}
+                ({pendingDraft.questions?.length || 0} ข้อ: "{pendingDraft.title || 'ไม่มีชื่อ'}")
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleRestoreDraft}
+                className="px-3.5 py-1 bg-amber-700 hover:bg-amber-800 text-white font-bold rounded-lg text-xs transition-colors shadow-2xs"
+              >
+                กู้คืนแบบร่างนี้
+              </button>
+              <button
+                type="button"
+                onClick={handleDiscardDraft}
+                className="px-3 py-1 bg-white hover:bg-stone-100 text-stone-600 font-medium rounded-lg border border-stone-300 text-xs transition-colors"
+              >
+                ละทิ้งแบบร่าง
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Main Workspace (Questions list with Question Navigator Sidebar) */}
+        <div className="flex-1 overflow-hidden flex flex-col lg:flex-row bg-stone-100/50 min-h-0">
+          {/* Question Navigator Sidebar (Desktop Left Pane & Mobile Sticky Bar) */}
+          <QuestionNavigatorSidebar
+            questions={questions}
+            activeIndex={activeQuestionIndex}
+            onSelectQuestion={handleJumpToQuestion}
+            onAddQuestion={handleAddQuestion}
+            onOpenSmartPaste={() => setIsSmartPasteOpen(true)}
+            report={preFlightReport}
+          />
+
+          {/* Main Scrollable Question Cards Area */}
+          <div 
+            id="questions-scroll-container"
+            className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6"
+          >
+            {loading ? (
+              <div className="flex flex-col items-center justify-center p-12 text-stone-500">
+                <Loader2 className="w-8 h-8 animate-spin text-primary mb-2" />
+                <p className="text-sm">กำลังโหลดข้อมูลข้อสอบ...</p>
+              </div>
+            ) : (
+              <>
+                {/* Question Tools Toolbar */}
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-xl border border-stone-200 shadow-xs">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-stone-700 uppercase tracking-wider">
+                      จำนวนข้อสอบทั้งหมด: {questions.length} ข้อ
+                    </span>
+                    <span className="text-stone-300">|</span>
+                    <span className="text-xs text-stone-500">
+                      คะแนนรวม: {questions.reduce((sum, q) => sum + (Number(q.points) || 1), 0)} คะแนน
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* LaTeX Pro Mode Toggle Button */}
+                    <button
+                      type="button"
+                      onClick={() => setIsLatexProMode(prev => !prev)}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 border shadow-2xs cursor-pointer ${
+                        isLatexProMode
+                          ? 'bg-amber-600 text-white border-amber-700 shadow-xs ring-2 ring-amber-400/40'
+                          : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                      }`}
+                      title="เปิด/ปิดโหมด LaTeX Pro พร้อม Live KaTeX Split Preview สำหรับครูคณิต/วิทย์"
+                    >
+                      <Calculator className="w-3.5 h-3.5" />
+                      <span>{isLatexProMode ? '⚡ โหมด LaTeX Pro (เปิด)' : 'โหมด LaTeX Pro (Live KaTeX)'}</span>
+                    </button>
+
+                    {/* Smart Paste Button */}
+                    <button
+                      type="button"
+                      onClick={() => setIsSmartPasteOpen(true)}
+                      className="px-3.5 py-1.5 text-xs font-bold text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-300 rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                    >
+                      <ClipboardPaste className="w-4 h-4 text-purple-600" />
+                      <span>Smart Paste วางโจทย์</span>
+                    </button>
+
+                    {/* Pre-Flight Quality Quick Trigger Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreFlightDrawerTab('preflight');
+                        setIsPreFlightDrawerOpen(true);
+                      }}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 border cursor-pointer ${
+                        preFlightReport.errorCount > 0
+                          ? 'bg-rose-50 text-rose-800 border-rose-300 hover:bg-rose-100'
+                          : preFlightReport.warningCount > 0
+                          ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
+                          : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                      }`}
+                    >
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>ตรวจคุณภาพ ({preFlightReport.errorCount + preFlightReport.warningCount})</span>
+                    </button>
+
+                    {/* AI Pedagogy Deep Audit Quick Trigger Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreFlightDrawerTab('ai_audit');
+                        setIsPreFlightDrawerOpen(true);
+                      }}
+                      className="px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-800 shadow-2xs cursor-pointer"
+                      title="ให้น้องฟ้าตรวจวิเคราะห์เชิงลึก (Pedagogy & Curriculum Audit)"
+                    >
+                      <Sparkles className="w-4 h-4 text-purple-600" />
+                      <span>ตรวจวิเคราะห์เชิงลึก (AI Pedagogy Audit)</span>
+                    </button>
+
+                    {/* AI Batch Draft Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const selectedCourse = courses.find(c => c.id === courseId);
+                        if (selectedCourse) {
+                          setAiSubject(selectedCourse.name_th);
+                        }
+                        setIsAiDraftModalOpen(true);
+                      }}
+                      className="px-3.5 py-1.5 text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
+                    >
+                      <Wand2 className="w-4 h-4 text-purple-600" />
+                      ให้น้องฟ้าร่างข้อสอบอัตโนมัติ
+                    </button>
+
+                    {/* Add Standard MCQ */}
+                    <button
+                      type="button"
+                      onClick={() => handleAddQuestion('mcq')}
+                      className="px-3 py-1.5 text-xs font-semibold text-stone-700 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      เพิ่มข้อปรนัย (MCQ)
+                    </button>
+
+                    {/* Add Matching */}
+                    <button
+                      type="button"
+                      onClick={() => handleAddQuestion('matching')}
+                      className="px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors flex items-center gap-1"
+                    >
+                      <ArrowRightLeft className="w-3.5 h-3.5" />
+                      เพิ่มข้อจับคู่
+                    </button>
+
+                    {/* Add True/False */}
+                    <button
+                      type="button"
+                      onClick={() => handleAddQuestion('true_false')}
+                      className="px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors flex items-center gap-1"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      เพิ่มข้อถูก/ผิด
+                    </button>
+
+                    {/* Add Subjective */}
+                    <button
+                      type="button"
+                      onClick={() => handleAddQuestion('subjective')}
+                      className="px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors flex items-center gap-1"
+                    >
+                      <PenTool className="w-3.5 h-3.5" />
+                      เพิ่มข้ออัตนัย (เขียนตอบ)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Questions Loop */}
+                <div className="space-y-4">
+                  {questions.map((q, idx) => (
+                    <div 
+                      key={q.id || idx} 
+                      id={`question-card-${idx + 1}`}
+                      tabIndex={0}
+                      onPaste={(e) => handleCardPaste(e, idx)}
+                      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
+                      onDrop={(e) => handleCardDrop(e, idx)}
+                      className="bg-white rounded-2xl border border-stone-200 p-5 shadow-xs transition-shadow hover:shadow-md space-y-4 focus:ring-1 focus:ring-primary/40 outline-none scroll-mt-4"
+                    >
                     {/* Question Header */}
-                    <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-                      <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-between pb-3 border-b border-stone-100 flex-wrap gap-2">
+                      <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                         <span className="w-7 h-7 rounded-lg bg-stone-900 text-white font-bold text-xs flex items-center justify-center">
                           {idx + 1}
                         </span>
@@ -841,6 +1370,15 @@ export function ExamAuthoringModal({
                            q.question_type === 'subjective' ? 'อัตนัย (เขียนตอบ / แสดงวิธีทำ)' : 
                            'ปรนัย 4-5 ตัวเลือก'}
                         </span>
+
+                        {/* Goodnotes Ink Attached Badge */}
+                        {q.diagram_svg && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-300 flex items-center gap-1 shadow-2xs">
+                            <PenTool className="w-3 h-3 text-indigo-600" />
+                            <span>มีภาพวาด Goodnotes Ink</span>
+                          </span>
+                        )}
+
                         <input
                           type="text"
                           value={q.indicator_code || ''}
@@ -861,7 +1399,7 @@ export function ExamAuthoringModal({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 ml-auto">
                         {/* Adjust with Nong Fah */}
                         <div className="relative group">
                           <button
@@ -963,20 +1501,32 @@ export function ExamAuthoringModal({
                           <button
                             type="button"
                             onClick={() => setMathTarget({ qIdx: idx, field: 'question_text' })}
-                            className="px-2.5 py-1 text-xs bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-md font-medium flex items-center gap-1"
+                            className="px-2.5 py-1 text-xs bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-md font-medium flex items-center gap-1 cursor-pointer"
                           >
                             <Calculator className="w-3.5 h-3.5 text-amber-600" />
                             สูตรคณิต (KaTeX)
                           </button>
 
-                          {/* In-Studio Diagram Button */}
+                          {/* Spoken Math to KaTeX Button */}
+                          <button
+                            type="button"
+                            onClick={() => setMathTarget({ qIdx: idx, field: 'question_text' })}
+                            className="px-2.5 py-1 text-xs bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 rounded-md font-medium flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                            title='ให้น้องฟ้าแปลงภาษาพูด/ข้อความเป็น LaTeX (เช่น "สแควรูทเอกซ์บวกหนึ่งส่วนสอง")'
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                            <span>แปลงภาษาพูดเป็น LaTeX</span>
+                          </button>
+
+                          {/* Freehand Canvas (Goodnotes Ink) Button */}
                           <button
                             type="button"
                             onClick={() => setDiagramTargetIdx(idx)}
-                            className="px-2.5 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-md font-medium flex items-center gap-1"
+                            className="px-2.5 py-1 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-md font-medium flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+                            title="เปิดผืนผ้าวาดโจทย์ ลายเส้นอิสระ และรูปทรงเรขาคณิตสไตล์ Goodnotes"
                           >
-                            <Shapes className="w-3.5 h-3.5 text-blue-600" />
-                            สร้างแผนภาพ (Canva Studio)
+                            <PenTool className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>วาดโจทย์/แผนภาพอิสระ (Goodnotes Ink)</span>
                           </button>
 
                           {/* Nano Banana AI Image Generator */}
@@ -986,7 +1536,7 @@ export function ExamAuthoringModal({
                               setAiDiagramTargetIdx(idx);
                               setAiDiagramPrompt(q.question_text || '');
                             }}
-                            className="px-2.5 py-1 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-md font-medium flex items-center gap-1"
+                            className="px-2.5 py-1 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-md font-medium flex items-center gap-1 cursor-pointer"
                           >
                             <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
                             Nano Banana (AI Diagram)
@@ -994,19 +1544,65 @@ export function ExamAuthoringModal({
                         </div>
                       </div>
 
-                      <textarea
-                        value={q.question_text}
-                        onFocus={() => setActiveSymbolField({ qIdx: idx, field: 'question_text' })}
-                        onChange={(e) => updateQuestionField(idx, 'question_text', e.target.value)}
-                        rows={2}
-                        className="w-full px-3 py-2 text-sm border border-stone-300 rounded-xl focus:ring-1 focus:ring-primary"
-                        placeholder="พิมพ์ข้อความโจทย์..."
-                      />
+                      {/* Question Text Input Area (Split Preview if LaTeX Pro is enabled) */}
+                      {isLatexProMode ? (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-[11px] font-mono text-stone-500">
+                              <span className="font-bold text-amber-900">LaTeX / ข้อความโจทย์ (Edit):</span>
+                              <span>ครอบ $...$ หรือ $$...$$</span>
+                            </div>
+                            <textarea
+                              value={q.question_text}
+                              onFocus={() => setActiveSymbolField({ qIdx: idx, field: 'question_text' })}
+                              onChange={(e) => updateQuestionField(idx, 'question_text', e.target.value)}
+                              rows={4}
+                              className="w-full px-3 py-2 text-xs font-mono border-2 border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 bg-amber-50/20 text-stone-900 leading-relaxed"
+                              placeholder="เช่น กำหนดสมการ $\frac{3x - 5}{2} = 14$ และ $\sqrt{y} = 9$ จงหาค่าของ $x + y$..."
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-[11px] text-emerald-800 font-bold">
+                              <span className="flex items-center gap-1">
+                                <Sparkles className="w-3 h-3 text-emerald-600" />
+                                Live KaTeX Pro Preview (ผลลัพธ์จัดรูปเรียลไทม์):
+                              </span>
+                              <span className="text-[10px] text-stone-400 font-normal">พร้อมพิมพ์</span>
+                            </div>
+                            <div className="min-h-[92px] p-3.5 bg-gradient-to-br from-white to-stone-50/80 border border-stone-200 rounded-xl text-xs text-stone-900 flex items-center justify-center overflow-x-auto shadow-2xs">
+                              {q.question_text ? (
+                                <KaTeXInline content={q.question_text} className="text-sm font-medium" />
+                              ) : (
+                                <span className="text-xs text-stone-400 italic">พิมพ์สูตรคณิตในช่องด้านซ้ายเพื่อดูพรีวิว KaTeX ทันที</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <textarea
+                            value={q.question_text}
+                            onFocus={() => setActiveSymbolField({ qIdx: idx, field: 'question_text' })}
+                            onChange={(e) => updateQuestionField(idx, 'question_text', e.target.value)}
+                            rows={2}
+                            className="w-full px-3 py-2 text-sm border border-stone-300 rounded-xl focus:ring-1 focus:ring-primary"
+                            placeholder="พิมพ์ข้อความโจทย์..."
+                          />
+
+                          {/* Live Equation / Math Preview if present */}
+                          {q.question_text && (q.question_text.includes('$') || q.question_text.includes('\\')) && (
+                            <div className="p-2.5 bg-stone-50 border border-stone-200 rounded-lg text-xs">
+                              <span className="text-stone-400 block text-[10px] mb-1 font-semibold">พรีวิวสูตร KaTeX อัตโนมัติ:</span>
+                              <KaTeXInline content={q.question_text} />
+                            </div>
+                          )}
+                        </>
+                      )}
 
                       {/* Quick Math & Science Symbol Chip Bar */}
                       <div className="flex flex-wrap items-center gap-1 pt-0.5">
-                        <span className="text-[10px] font-semibold text-stone-400 mr-1">
-                          แทรกสัญลักษณ์ด่วน ({activeSymbolField?.qIdx === idx && activeSymbolField.field !== 'question_text' ? `ช้อยส์ ${activeSymbolField.field.replace('choice_', '').toUpperCase()}` : 'โจทย์'}):
+                        <span className="text-[10px] font-semibold text-stone-500 mr-1">
+                          แทรกสูตรด่วน ({activeSymbolField?.qIdx === idx && activeSymbolField.field !== 'question_text' ? `ช้อยส์ ${activeSymbolField.field.replace('choice_', '').toUpperCase()}` : 'โจทย์'}):
                         </span>
                         {[
                           { label: '+', insert: ' + ' },
@@ -1023,12 +1619,23 @@ export function ExamAuthoringModal({
                           { label: '²', insert: '²' },
                           { label: '³', insert: '³' },
                           { label: 'π', insert: 'π' },
-                          { label: '√x', insert: '$\\sqrt{x}$' },
                           { label: 'a/b', insert: '$\\frac{a}{b}$' },
+                          { label: '√x', insert: '$\\sqrt{x}$' },
+                          { label: 'ⁿ√x', insert: '$\\sqrt[n]{x}$' },
                           { label: 'xⁿ', insert: '$x^{n}$' },
+                          { label: 'xᵢ', insert: '$x_{i}$' },
+                          { label: '∫', insert: '$\\int_{a}^{b} f(x) \\, dx$' },
+                          { label: '∑', insert: '$\\sum_{i=1}^{n}$' },
+                          { label: 'lim', insert: '$\\lim_{x \\to 0}$' },
+                          { label: 'θ', insert: '$\\theta$' },
+                          { label: 'α', insert: '$\\alpha$' },
+                          { label: 'β', insert: '$\\beta$' },
+                          { label: 'Δ', insert: '$\\Delta$' },
+                          { label: 'λ', insert: '$\\lambda$' },
                           { label: 'Ω', insert: 'Ω' },
                           { label: 'µ', insert: 'µ' },
                           { label: '→', insert: ' → ' },
+                          { label: '∞', insert: '$\\infty$' },
                         ].map((sym) => (
                           <button
                             key={sym.label}
@@ -1036,9 +1643,9 @@ export function ExamAuthoringModal({
                             onClick={() => {
                               const targetField = activeSymbolField?.qIdx === idx ? activeSymbolField.field : 'question_text';
                               const currentVal = String((q as any)[targetField] || '');
-                              updateQuestionField(idx, targetField as any, currentVal + sym.insert);
+                              updateQuestionField(idx, targetField as any, currentVal ? `${currentVal} ${sym.insert}` : sym.insert);
                             }}
-                            className="px-1.5 py-0.5 text-[11px] font-mono font-medium bg-stone-100 hover:bg-amber-100 text-stone-700 hover:text-amber-900 border border-stone-200 rounded transition-colors"
+                            className="px-1.5 py-0.5 text-[11px] font-mono font-medium bg-stone-100 hover:bg-amber-100 text-stone-700 hover:text-amber-900 border border-stone-200 rounded transition-colors cursor-pointer"
                             title={`แทรก ${sym.insert}`}
                           >
                             {sym.label}
@@ -1046,29 +1653,21 @@ export function ExamAuthoringModal({
                         ))}
                       </div>
 
-                      {/* Live Equation / Math Preview if present */}
-                      {q.question_text && (q.question_text.includes('$') || q.question_text.includes('\\')) && (
-                        <div className="p-2.5 bg-stone-50 border border-stone-200 rounded-lg text-xs">
-                          <span className="text-stone-400 block text-[10px] mb-1">พรีวิวสมการ:</span>
-                          <KaTeXInline content={q.question_text} />
-                        </div>
-                      )}
-
                       {/* Attached Diagram (SVG) Preview */}
                       {q.diagram_svg && (
-                        <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 flex flex-col items-center relative group">
+                        <div className="p-3 bg-indigo-50/40 rounded-xl border border-indigo-200 flex flex-col items-center relative group">
                           <div className="absolute top-2 right-2 flex items-center gap-1.5">
                             <button
                               type="button"
                               onClick={() => setDiagramTargetIdx(idx)}
-                              className="px-2 py-1 bg-white hover:bg-blue-50 text-blue-700 text-xs font-semibold rounded-md border border-stone-200 shadow-2xs flex items-center gap-1"
+                              className="px-2.5 py-1 bg-white hover:bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-md border border-indigo-200 shadow-2xs flex items-center gap-1.5 cursor-pointer"
                             >
-                              <Shapes className="w-3 h-3 text-blue-600" />
-                              แก้ไขใน Canva Studio
+                              <PenTool className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>แก้ไขใน Goodnotes Ink Studio</span>
                             </button>
                             <button
                               onClick={() => updateQuestionField(idx, 'diagram_svg', null)}
-                              className="p-1 bg-white hover:bg-rose-50 text-rose-600 rounded-md border border-stone-200 shadow-2xs"
+                              className="p-1 bg-white hover:bg-rose-50 text-rose-600 rounded-md border border-stone-200 shadow-2xs cursor-pointer"
                               title="ลบแผนภาพนี้"
                             >
                               <X className="w-4 h-4" />
@@ -1078,7 +1677,9 @@ export function ExamAuthoringModal({
                             className="py-2 flex items-center justify-center [&>svg]:max-h-[220px] [&>svg]:w-auto [&>svg]:mx-auto"
                             dangerouslySetInnerHTML={{ __html: q.diagram_svg }} 
                           />
-                          <span className="text-[11px] text-stone-400 mt-1">แผนภาพเวกเตอร์ Canva Studio ประจำข้อนี้</span>
+                          <span className="text-[11px] text-indigo-700 font-medium mt-1">
+                            ✓ แผนภาพเวกเตอร์ Goodnotes Ink ประจำข้อนี้ (พร้อมพิมพ์ข้อสอบ)
+                          </span>
                         </div>
                       )}
 
@@ -1192,10 +1793,27 @@ export function ExamAuthoringModal({
                     {/* Choices Section */}
                     {q.question_type !== 'matching' && q.question_type !== 'subjective' && (
                       <div className="space-y-3 pt-2 border-t border-stone-100">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-stone-700">
-                            ตัวเลือกคำตอบและการกำหนดเฉลย
-                          </span>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-semibold text-stone-700">
+                              ตัวเลือกคำตอบและการกำหนดเฉลย
+                            </span>
+                            {/* 1-Click AI Diagnostic Distractors Button */}
+                            <button
+                              type="button"
+                              onClick={() => handleAiGenerateDistractors(idx)}
+                              disabled={generatingDistractorIdx === idx}
+                              className="px-2.5 py-1 text-xs font-semibold text-purple-700 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200/80 rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+                              title="ให้น้องฟ้าคิดตัวลวงวินิจฉัย (AI Diagnostic Distractors) พร้อมบันทึกป้ายกำกับความเข้าใจผิดลงใน question_meta.diagnostic_tags"
+                            >
+                              {generatingDistractorIdx === idx ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600" />
+                              ) : (
+                                <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                              )}
+                              <span>ให้น้องฟ้าคิดตัวลวงวินิจฉัย (AI Diagnostic Distractors)</span>
+                            </button>
+                          </div>
                           <div className="flex items-center gap-3">
                             {/* Toggle 5th Choice */}
                             <button
@@ -1316,10 +1934,33 @@ export function ExamAuthoringModal({
                                         />
                                       </label>
                                     </div>
-                                    {rawVal && (rawVal.includes('$') || rawVal.includes('\\')) && (
-                                      <div className="px-2 py-1 bg-white/90 border border-stone-200 rounded text-[11px] text-stone-700">
-                                        <KaTeXInline content={rawVal} />
+                                    {(isLatexProMode || (rawVal && (rawVal.includes('$') || rawVal.includes('\\')))) && rawVal && (
+                                      <div className="px-2.5 py-1 bg-amber-50/70 border border-amber-200/80 rounded-lg text-[11px] text-stone-800 flex items-center gap-1.5 shadow-2xs">
+                                        <span className="text-[10px] font-bold text-amber-800 shrink-0">KaTeX:</span>
+                                        <div className="overflow-x-auto flex-1">
+                                          <KaTeXInline content={rawVal.startsWith('$') ? rawVal : (rawVal.includes('\\') ? `$${rawVal}$` : rawVal)} />
+                                        </div>
                                       </div>
+                                    )}
+
+                                    {/* Diagnostic Tag Badge for this choice if diagnosed by Nong Fah */}
+                                    {q.question_meta?.diagnostic_tags && (
+                                      (() => {
+                                        const tags = q.question_meta.diagnostic_tags;
+                                        const tag = tags[choice.key] || 
+                                                    tags[`distractor_${choice.key.toLowerCase()}`] ||
+                                                    (choice.key === 'B' ? tags['distractor_1'] :
+                                                     choice.key === 'C' ? tags['distractor_2'] :
+                                                     choice.key === 'D' ? tags['distractor_3'] : null);
+                                        if (!tag) return null;
+                                        return (
+                                          <div className="px-2 py-0.5 bg-purple-50/90 border border-purple-200/80 rounded-md text-[10px] text-purple-900 flex items-center gap-1 shadow-2xs mt-0.5">
+                                            <Sparkles className="w-3 h-3 text-purple-600 shrink-0" />
+                                            <span className="font-semibold text-purple-700">วินิจฉัยความเข้าใจผิด:</span>
+                                            <span className="truncate">{tag}</span>
+                                          </div>
+                                        );
+                                      })()
                                     )}
                                   </div>
                                 )}
@@ -1388,93 +2029,16 @@ export function ExamAuthoringModal({
                       </div>
                     )}
 
-                    {/* Subjective Question Layout */}
+                    {/* Subjective Question Layout (9 Subjective Modes) */}
                     {q.question_type === 'subjective' && (
-                      <div className="p-4 bg-amber-50/40 rounded-xl border border-amber-200 space-y-3.5">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5">
-                            <PenTool className="w-4 h-4 text-amber-700" />
-                            <span className="text-xs font-bold text-amber-900">
-                              การกำหนดเกณฑ์และพื้นที่เขียนตอบ (ข้อสอบอัตนัย)
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            disabled={generatingRubricIdx === idx}
-                            onClick={() => handleGenerateRubricWithAi(idx)}
-                            className="px-2.5 py-1 text-xs font-semibold text-amber-800 bg-white border border-amber-300 hover:bg-amber-100 rounded-lg flex items-center gap-1 transition-colors shadow-2xs"
-                          >
-                            {generatingRubricIdx === idx ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" />
-                            ) : (
-                              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                            )}
-                            ให้น้องฟ้าร่างแนวคำตอบและเกณฑ์รูบริก
-                          </button>
-                        </div>
-
-                        {/* Model Answer (choice_a) */}
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="text-xs font-semibold text-stone-700">
-                              แนวคำตอบที่ถูกต้องและคีย์เวิร์ดสำคัญ (Model Answer & Key Concepts)
-                            </label>
-                            <span className="text-[10px] text-stone-400">สำหรับเป็นเฉลยให้ครูผู้ตรวจ</span>
-                          </div>
-                          <textarea
-                            rows={3}
-                            value={q.choice_a || ''}
-                            onChange={(e) => updateQuestionField(idx, 'choice_a', e.target.value)}
-                            placeholder="ระบุแนวคำตอบที่ถูกต้อง คีย์เวิร์ดที่ต้องมี หรือขั้นตอนการคำนวณ..."
-                            className="w-full px-3 py-2 text-xs border border-stone-300 rounded-lg bg-white text-stone-800 focus:ring-1 focus:ring-amber-500"
-                          />
-                        </div>
-
-                        {/* Format & Rubric Row */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          {/* Answer Space Format (choice_b) */}
-                          <div className="md:col-span-1">
-                            <label className="text-xs font-semibold text-stone-700 block mb-1">
-                              รูปแบบพื้นที่ตอบในกระดาษข้อสอบ
-                            </label>
-                            <select
-                              value={q.choice_b || 'lines_5'}
-                              onChange={(e) => updateQuestionField(idx, 'choice_b', e.target.value)}
-                              className="w-full px-2.5 py-2 text-xs border border-stone-300 rounded-lg bg-white font-medium text-stone-800"
-                            >
-                              <option value="lines_3">เส้นประเขียนตอบ 3 บรรทัด (ตอบสั้น)</option>
-                              <option value="lines_5">เส้นประเขียนตอบ 5 บรรทัด (มาตรฐาน)</option>
-                              <option value="lines_8">เส้นประเขียนตอบ 8 บรรทัด (อธิบายยาว)</option>
-                              <option value="blank_box">กรอบว่างขนาดใหญ่ (แสดงวิธีทำ/วาดรูป)</option>
-                              <option value="grid_box">กรอบตารางกราฟพิกัด (คณิตศาสตร์/ฟิสิกส์)</option>
-                            </select>
-                          </div>
-
-                          {/* Rubric Criteria (choice_c) */}
-                          <div className="md:col-span-2">
-                            <label className="text-xs font-semibold text-stone-700 block mb-1">
-                              เกณฑ์การให้คะแนนรูบริก (Scoring Rubric)
-                            </label>
-                            <input
-                              type="text"
-                              value={q.choice_c || ''}
-                              onChange={(e) => updateQuestionField(idx, 'choice_c', e.target.value)}
-                              placeholder="เช่น แสดงวิธีทำถูกต้องได้ 3 คะแนน, สรุปคำตอบพร้อมหน่วยได้ 2 คะแนน (รวม 5 คะแนน)"
-                              className="w-full px-3 py-2 text-xs border border-stone-300 rounded-lg bg-white text-stone-800"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Notice Strip */}
-                        <div className="p-2.5 bg-amber-100/50 rounded-lg border border-amber-200/80 text-[11px] text-amber-900 flex items-center justify-between">
-                          <span>
-                            ข้อสอบอัตนัยจะพิมพ์ใน <strong>ตอนที่ 2 ท้ายกระดาษข้อสอบ A4</strong> พร้อมพื้นที่เขียนตอบและช่องคะแนนสำหรับครูผู้ตรวจ
-                          </span>
-                          <span className="font-semibold text-amber-800">
-                            คะแนนข้อนี้: {q.points ?? 5} คะแนน
-                          </span>
-                        </div>
-                      </div>
+                      <SubjectiveModeSelector
+                        question={q}
+                        questionIndex={idx}
+                        onUpdateQuestion={(field, val) => updateQuestionField(idx, field, val)}
+                        onGenerateRubric={() => handleGenerateRubricWithAi(idx)}
+                        isGeneratingRubric={generatingRubricIdx === idx}
+                        onOpenDiagramBuilder={() => setDiagramTargetIdx(idx)}
+                      />
                     )}
                   </div>
                 ))}
@@ -1482,6 +2046,7 @@ export function ExamAuthoringModal({
             </>
           )}
         </div>
+      </div>
 
         {/* Footer Actions */}
         <div className="px-6 py-4 bg-stone-50 border-t border-stone-200 flex items-center justify-between shrink-0">
@@ -1499,7 +2064,7 @@ export function ExamAuthoringModal({
             </span>
             <button
               type="button"
-              onClick={handleSaveExam}
+              onClick={() => handleSaveExam(false)}
               disabled={saving}
               className="px-6 py-2.5 text-xs font-semibold text-white bg-primary hover:bg-primary/90 disabled:opacity-50 rounded-xl transition-colors shadow-sm flex items-center gap-2"
             >
@@ -1714,6 +2279,74 @@ export function ExamAuthoringModal({
               >
                 {isDraftingAi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
                 เริ่มร่างข้อสอบ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sub-Modal: Smart Paste Parser */}
+      <SmartPasteModal
+        isOpen={isSmartPasteOpen}
+        onClose={() => setIsSmartPasteOpen(false)}
+        onImport={handleSmartPasteImport}
+        existingQuestionsCount={questions.length}
+      />
+
+      {/* Sub-Modal: Pre-Flight Quality Inspector Drawer */}
+      <ExamPreFlightDrawer
+        isOpen={isPreFlightDrawerOpen}
+        onClose={() => setIsPreFlightDrawerOpen(false)}
+        report={preFlightReport}
+        examConfig={{
+          total_score: Number(maxScore),
+          duration_minutes: Number(durationMinutes)
+        }}
+        onJumpToQuestion={handleJumpToQuestion}
+        onAutoFixPinAll={handleAutoFixPinAll}
+        onAutoFixPinQuestion={handleAutoFixPinQuestion}
+        questions={questions}
+        subjectName={courses.find(c => c.id === courseId)?.name_th || 'วิชาทั่วไป'}
+        gradeLevel={courses.find(c => c.id === courseId)?.grade_level || 'P3'}
+        examTitle={title}
+        initialTab={preFlightDrawerTab}
+      />
+
+      {/* Confirm Save with Pre-Flight Warnings Dialog */}
+      {confirmSaveWarnings && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-stone-200 w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-bold text-sm text-stone-900">
+                  ตรวจพบข้อควรระวัง {preFlightReport.warningCount} รายการ
+                </h4>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  ข้อสอบไม่มีข้อผิดพลาดร้ายแรง แต่อาจมีตัวเลือก "ถูกทุกข้อ" ที่ยังไม่ได้ล็อก หรือสัดส่วนเฉลยยังไม่สมดุล
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-stone-100 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmSaveWarnings(false);
+                  setIsPreFlightDrawerOpen(true);
+                }}
+                className="px-4 py-2 font-semibold text-stone-700 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors"
+              >
+                ตรวจสอบก่อน
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSaveExam(true)}
+                className="px-4 py-2 font-bold text-white bg-primary hover:bg-primary/90 rounded-xl transition-colors shadow-xs"
+              >
+                ยืนยันบันทึกข้อสอบ
               </button>
             </div>
           </div>

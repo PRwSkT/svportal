@@ -42,6 +42,7 @@ export default function AcademicDocumentsPage() {
   const [students, setStudents] = useState<any[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string>('10073');
   const [studentSearch, setStudentSearch] = useState<string>('');
+  const [selectedGradeFilter, setSelectedGradeFilter] = useState<string>('all');
 
   // Loaded document states
   const [pp1Data, setPp1Data] = useState<any | null>(null);
@@ -64,12 +65,20 @@ export default function AcademicDocumentsPage() {
 
   const fetchStudentsList = async () => {
     try {
-      const res = await fetch('/api/academic/documents/pp3?mode=data');
+      // Fetch all students across all grade levels (Nursery to P.6)
+      const res = await fetch('/api/academic/documents/students');
       const data = await res.json();
-      if (data.success && data.summary?.records) {
-        setStudents(data.summary.records);
-        if (data.summary.records.length > 0 && !selectedStudentId) {
-          setSelectedStudentId(data.summary.records[0].studentId);
+      if (data.success && data.records) {
+        setStudents(data.records);
+        if (data.records.length > 0 && !selectedStudentId) {
+          setSelectedStudentId(data.records[0].studentId);
+        }
+      } else {
+        // Fallback to pp3 if students route has an issue
+        const fallbackRes = await fetch('/api/academic/documents/pp3?mode=data');
+        const fallbackData = await fallbackRes.json();
+        if (fallbackData.success && fallbackData.summary?.records) {
+          setStudents(fallbackData.summary.records);
         }
       }
     } catch (err) {
@@ -122,9 +131,13 @@ export default function AcademicDocumentsPage() {
   };
 
   const filteredStudents = students.filter(s => {
+    if (selectedGradeFilter !== 'all') {
+      const g = (s.grade || '').toLowerCase();
+      if (!g.includes(selectedGradeFilter.toLowerCase())) return false;
+    }
     if (!studentSearch) return true;
     const q = studentSearch.toLowerCase();
-    return s.fullName.toLowerCase().includes(q) || s.studentId.includes(q);
+    return (s.fullName || '').toLowerCase().includes(q) || (s.studentId || '').includes(q);
   });
 
   return (
@@ -242,11 +255,30 @@ export default function AcademicDocumentsPage() {
         {/* Student Selector Bar (for PP1, PP2, PP6) */}
         {(activeTab === 'pp1' || activeTab === 'pp2' || activeTab === 'pp6') && (
           <div className="no-print bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <span className="text-xs font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">
                 เลือกนักเรียน:
               </span>
-              <div className="relative min-w-[240px]">
+
+              <select
+                value={selectedGradeFilter}
+                onChange={(e) => setSelectedGradeFilter(e.target.value)}
+                className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-1 focus:ring-[#7B1C3E]"
+              >
+                <option value="all">ทุกระดับชั้น (เนอสเซอรี่ - ป.6)</option>
+                <option value="เนอส">เนอสเซอรี่</option>
+                <option value="อ.1">อนุบาล 1</option>
+                <option value="อ.2">อนุบาล 2</option>
+                <option value="อ.3">อนุบาล 3</option>
+                <option value="ป.1">ประถมศึกษาปีที่ 1</option>
+                <option value="ป.2">ประถมศึกษาปีที่ 2</option>
+                <option value="ป.3">ประถมศึกษาปีที่ 3</option>
+                <option value="ป.4">ประถมศึกษาปีที่ 4</option>
+                <option value="ป.5">ประถมศึกษาปีที่ 5</option>
+                <option value="ป.6">ประถมศึกษาปีที่ 6</option>
+              </select>
+
+              <div className="relative min-w-[200px]">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
                 <input
                   type="text"
@@ -260,13 +292,17 @@ export default function AcademicDocumentsPage() {
               <select
                 value={selectedStudentId}
                 onChange={(e) => setSelectedStudentId(e.target.value)}
-                className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs font-medium focus:ring-1 focus:ring-[#7B1C3E]"
+                className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs font-medium focus:ring-1 focus:ring-[#7B1C3E] max-w-xs"
               >
-                {filteredStudents.map(s => (
-                  <option key={s.studentId} value={s.studentId}>
-                    {s.studentId} - {s.fullName} (GPAX: {s.gpax.toFixed(2)})
-                  </option>
-                ))}
+                {filteredStudents.length === 0 ? (
+                  <option value="">ไม่พบนักเรียนตามเงื่อนไข</option>
+                ) : (
+                  filteredStudents.map(s => (
+                    <option key={s.studentId} value={s.studentId}>
+                      {s.studentId} - {s.fullName} {s.grade ? `(${s.grade}${s.classroom ? `/${s.classroom}` : ''})` : ''} {typeof s.gpax === 'number' && s.gpax > 0 ? `[GPAX: ${s.gpax.toFixed(2)}]` : ''}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
 

@@ -92,6 +92,7 @@ export function AppNav() {
     // Finance & Accounting
     { id: 'dashboard', href: '/dashboard', label: dict.nav.dashboard, category: dict.nav.financeAccounting, icon: FileBarChart, colorClass: 'text-blue-600 bg-blue-50 border-blue-200' },
     { id: 'pos_fees', href: '/pos/fees', label: dict.nav.posFees, category: dict.nav.financeAccounting, icon: CreditCard, colorClass: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
+    { id: 'admin_fees', href: '/admin/fees', label: language === 'th' ? 'ระบบผ่อนชำระ 5 เดือน & ค่าปรับ' : 'Installments & Late Fees', category: dict.nav.financeAccounting, icon: CreditCard, colorClass: 'text-rose-600 bg-rose-50 border-rose-200' },
     { id: 'admin_reports', href: '/admin/reports', label: dict.nav.adminReports, category: dict.nav.financeAccounting, icon: DollarSign, colorClass: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
     { id: 'subsidy_free15y', href: '/admin/subsidy/free15y', label: language === 'th' ? 'เงินอุดหนุนเรียนฟรี 15 ปี (อร.11)' : '15Y Free Education Subsidy', category: dict.nav.financeAccounting, icon: HandCoins, colorClass: 'text-teal-600 bg-teal-50 border-teal-200' },
     // Co-op Store
@@ -104,11 +105,12 @@ export function AppNav() {
     { id: 'student_attendance', href: '/admin/students/attendance', label: language === 'th' ? 'เช็กชื่อนักเรียน & ใบลา 360°' : 'Attendance & Leave 360°', category: dict.nav.registrar, icon: UserCheck, colorClass: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
     { id: 'pickup_dismissal', href: '/admin/safety/pickup', label: language === 'th' ? 'จุดรับ-ส่งเด็ก (Smart Pickup)' : 'Smart Pickup Kiosk', category: dict.nav.registrar, icon: QrCode, colorClass: 'text-[#7B1C3E] bg-[#7B1C3E]/10 border-[#7B1C3E]/20' },
     { id: 'pastoral_care', href: '/pastoral', label: language === 'th' ? 'ดูแลช่วยเหลือนักเรียน (SDQ & เยี่ยมบ้าน)' : 'Pastoral Care 360', category: dict.nav.registrar, icon: HeartHandshake, colorClass: 'text-rose-600 bg-rose-50 border-rose-200' },
-    { id: 'student_nutrition', href: '/admin/students/nutrition', label: language === 'th' ? 'ภาวะโภชนาการ & นมโรงเรียน' : 'Nutrition & School Milk', category: dict.nav.registrar, icon: Apple, colorClass: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
+    { id: 'student_nutrition', href: '/admin/students/nutrition', label: language === 'th' ? 'โรงครัวภายใน & โภชนาการ' : 'In-House Kitchen & Nutrition', category: dict.nav.registrar, icon: Apple, colorClass: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
     { id: 'van_safety', href: '/admin/safety/van', label: language === 'th' ? 'ความปลอดภัยรถตู้รับ-ส่ง' : 'School Van Safety', category: dict.nav.registrar, icon: Bus, colorClass: 'text-amber-600 bg-amber-50 border-amber-200' },
     { id: 'school_infirmary', href: '/admin/health/infirmary', label: language === 'th' ? 'ห้องพยาบาล & แจ้งเตือนแพ้ยา' : 'School Infirmary', category: dict.nav.registrar, icon: Stethoscope, colorClass: 'text-red-600 bg-red-50 border-red-200' },
     // HR & Administration
     { id: 'admin_forms', href: '/admin/forms', label: dict.nav.adminForms, category: dict.nav.hrAdmin, icon: FileText, colorClass: 'text-rose-600 bg-rose-50 border-rose-200' },
+    { id: 'admin_staff_cards', href: '/admin/personnel/cards', label: language === 'th' ? 'บัตรประจำตัวบุคลากร (Digital ID)' : 'Staff Digital ID Cards', category: dict.nav.hrAdmin, icon: ShieldCheck, colorClass: 'text-[#183e66] bg-sky-50 border-sky-200' },
     { id: 'admin_kpi', href: '/admin/kpi', label: dict.nav.adminKpi, category: dict.nav.hrAdmin, icon: Award, colorClass: 'text-[#7B1C3E] bg-[#7B1C3E]/10 border-[#7B1C3E]/20' },
     { id: 'admin_attendance', href: '/admin/attendance', label: dict.nav.adminAttendance, category: dict.nav.hrAdmin, icon: Clock, colorClass: 'text-purple-600 bg-purple-50 border-purple-200' },
     { id: 'admin_users', href: '/admin/users', label: dict.nav.adminUsers, category: dict.nav.hrAdmin, icon: Users, colorClass: 'text-violet-600 bg-violet-50 border-violet-200' },
@@ -146,7 +148,7 @@ export function AppNav() {
   const accessibleModules = allModules.filter((item) => {
     if (isAdmin) return true;
     if (assignedFeatures.includes(item.id)) return true;
-    if (role === 'cashier' && ['pos_shop', 'pos_fees', 'pos_wallet_topup'].includes(item.id)) return true;
+    if (role === 'cashier' && ['pos_shop', 'pos_fees', 'admin_fees', 'pos_wallet_topup'].includes(item.id)) return true;
     return false;
   });
 
@@ -292,6 +294,16 @@ export function AppNav() {
 
           {/* Right Controls (Desktop Profile & Sign Out) */}
           <div className="hidden md:flex items-center gap-3">
+            {/* My Staff ID Card Quick Launch */}
+            <Link
+              href="/staff/id-card"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-sky-50 hover:bg-sky-100 text-[#183e66] border border-sky-200/80 shadow-xs transition-all"
+              title="เปิดบัตรประจำตัวบุคลากรออนไลน์ (My Digital Staff ID)"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-sky-600" />
+              <span>{language === 'th' ? 'บัตรของฉัน' : 'My ID'}</span>
+            </Link>
+
             {/* Parents Portal PWA Quick Launch */}
             <Link
               href="/parents"
@@ -375,18 +387,33 @@ export function AppNav() {
 
           {/* Mobile Navigation Links */}
           <div className="p-4 space-y-5">
-            <Link
-              href="/home"
-              onClick={() => setIsMobileDrawerOpen(false)}
-              className={`flex items-center gap-3 p-3 rounded-xl font-bold text-sm transition-all ${
-                pathname === '/home'
-                  ? 'bg-[#7B1C3E] text-white shadow-sm'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-slate-200'
-              }`}
-            >
-              <Home className="w-5 h-5" />
-              <span>{language === 'th' ? 'หน้าหลัก (Home)' : 'Home'}</span>
-            </Link>
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                href="/home"
+                onClick={() => setIsMobileDrawerOpen(false)}
+                className={`flex items-center gap-2.5 p-3 rounded-xl font-bold text-xs transition-all ${
+                  pathname === '/home'
+                    ? 'bg-[#7B1C3E] text-white shadow-sm'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-slate-200'
+                }`}
+              >
+                <Home className="w-4 h-4" />
+                <span>{language === 'th' ? 'หน้าหลัก' : 'Home'}</span>
+              </Link>
+
+              <Link
+                href="/staff/id-card"
+                onClick={() => setIsMobileDrawerOpen(false)}
+                className={`flex items-center gap-2.5 p-3 rounded-xl font-bold text-xs transition-all ${
+                  pathname === '/staff/id-card'
+                    ? 'bg-[#183e66] text-white shadow-sm'
+                    : 'bg-sky-50 dark:bg-sky-950/50 text-[#183e66] dark:text-sky-300 hover:bg-sky-100 border border-sky-200/80'
+                }`}
+              >
+                <ShieldCheck className="w-4 h-4 text-sky-600" />
+                <span>{language === 'th' ? 'บัตรของฉัน' : 'My ID'}</span>
+              </Link>
+            </div>
 
             {categories.map((category) => {
               const items = accessibleModules.filter((m) => m.category === category);

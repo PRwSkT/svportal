@@ -103,10 +103,42 @@ export function generateQrToken(roomCode: string, dateStr: string, bookingId?: s
 }
 
 /**
- * Retrieves all configured rooms in SV Portal
+ * Retrieves all configured rooms in SV Portal (from relational room_configs with signage_settings fallback)
  */
 export async function getAllRooms(): Promise<RoomDisplayConfig[]> {
   const supabase = getAdminClient();
+
+  // 1. Try relational table room_configs
+  try {
+    const { data: dbRooms, error } = await supabase
+      .from('room_configs')
+      .select('*')
+      .eq('is_active', true)
+      .order('room_code', { ascending: true });
+
+    if (!error && dbRooms && dbRooms.length > 0) {
+      return dbRooms.map((r: any) => ({
+        room_code: r.room_code,
+        room_name: r.room_name,
+        room_number: r.room_number || r.room_code,
+        building: r.building || '',
+        capacity: r.capacity || 30,
+        logo_url: normalizeLogoUrl(r.logo_url),
+        logo_style: r.logo_style || 'rounded',
+        open_time: r.open_time || '07:30',
+        close_time: r.close_time || '17:00',
+        active_days: Array.isArray(r.active_days) ? r.active_days : [1, 2, 3, 4, 5],
+        checkin_grace_minutes: r.checkin_grace_minutes || 15,
+        subtitle: r.subtitle || '',
+        is_active: r.is_active ?? true,
+        updated_at: r.updated_at || new Date().toISOString(),
+      }));
+    }
+  } catch {
+    // fallback below
+  }
+
+  // 2. Fallback to signage_settings
   const { data: dirRow } = await supabase
     .from('signage_settings')
     .select('value')
@@ -167,6 +199,38 @@ export async function getAllRooms(): Promise<RoomDisplayConfig[]> {
 export async function getRoomConfig(roomCode = 'LLC'): Promise<RoomDisplayConfig> {
   const cleanCode = (roomCode || 'LLC').trim().toUpperCase();
   const supabase = getAdminClient();
+
+  // 1. Try relational table room_configs
+  try {
+    const { data: r, error } = await supabase
+      .from('room_configs')
+      .select('*')
+      .eq('room_code', cleanCode)
+      .maybeSingle();
+
+    if (!error && r) {
+      return {
+        room_code: r.room_code,
+        room_name: r.room_name,
+        room_number: r.room_number || r.room_code,
+        building: r.building || '',
+        capacity: r.capacity || 30,
+        logo_url: normalizeLogoUrl(r.logo_url),
+        logo_style: r.logo_style || 'rounded',
+        open_time: r.open_time || '07:30',
+        close_time: r.close_time || '17:00',
+        active_days: Array.isArray(r.active_days) ? r.active_days : [1, 2, 3, 4, 5],
+        checkin_grace_minutes: r.checkin_grace_minutes || 15,
+        subtitle: r.subtitle || '',
+        is_active: r.is_active ?? true,
+        updated_at: r.updated_at || new Date().toISOString(),
+      };
+    }
+  } catch {
+    // fallback below
+  }
+
+  // 2. Fallback to signage_settings
   const key = `room_config:${cleanCode}`;
   const { data } = await supabase
     .from('signage_settings')
@@ -216,7 +280,29 @@ export async function saveRoomConfig(
     updated_at: new Date().toISOString(),
   };
 
-  // Save room config
+  // 1. Relational upsert to room_configs
+  try {
+    await supabase.from('room_configs').upsert({
+      room_code: cleanCode,
+      room_name: updated.room_name,
+      room_number: updated.room_number,
+      building: updated.building,
+      capacity: updated.capacity,
+      logo_url: updated.logo_url,
+      logo_style: updated.logo_style,
+      open_time: updated.open_time,
+      close_time: updated.close_time,
+      active_days: updated.active_days,
+      checkin_grace_minutes: updated.checkin_grace_minutes,
+      subtitle: updated.subtitle,
+      is_active: updated.is_active ?? true,
+      updated_at: updated.updated_at,
+    });
+  } catch (err) {
+    console.warn('[RoomBooking] relational room_configs upsert failed, continuing fallback:', err);
+  }
+
+  // 2. Mirror to signage_settings for backward compatibility
   const key = `room_config:${cleanCode}`;
   await supabase.from('signage_settings').upsert({
     key,
@@ -243,6 +329,15 @@ export async function deleteRoomConfig(roomCode: string): Promise<void> {
     throw new Error('ไม่สามารถลบห้องหลัก (LLC) ได้ แต่สามารถแก้ไขชื่อและข้อมูลห้องได้');
   }
   const supabase = getAdminClient();
+
+  // 1. Relational delete
+  try {
+    await supabase.from('room_configs').delete().eq('room_code', cleanCode);
+  } catch (err) {
+    console.warn('[RoomBooking] relational room_configs delete failed:', err);
+  }
+
+  // 2. Signage directory update
   const existingRooms = await getAllRooms();
   const remaining = existingRooms
     .map((r) => r.room_code.toUpperCase())
@@ -258,6 +353,41 @@ export async function deleteRoomConfig(roomCode: string): Promise<void> {
 export async function getAllRoomBookings(roomCode = 'LLC'): Promise<RoomBookingItem[]> {
   const cleanCode = (roomCode || 'LLC').trim().toUpperCase();
   const supabase = getAdminClient();
+
+  // 1. Try relational table room_bookings
+  try {
+    const { data: dbRows, error } = await supabase
+      .from('room_bookings')
+      .select('*')
+      .eq('room_code', cleanCode)
+      .order('date', { ascending: true })
+      .order('start_time', { ascending: true });
+
+    if (!error && dbRows && dbRows.length > 0) {
+      return dbRows.map((b: any) => ({
+        id: String(b.id),
+        room_code: b.room_code,
+        date: typeof b.date === 'string' ? b.date.slice(0, 10) : b.date,
+        start_time: b.start_time,
+        end_time: b.end_time,
+        title: b.title,
+        booker_type: b.booker_type,
+        booker_id: b.booker_id,
+        booker_name: b.booker_name,
+        booker_role_label: b.booker_role_label || '',
+        participants_count: Number(b.participants_count) || 1,
+        notes: b.notes || '',
+        status: b.status,
+        checked_in_at: b.checked_in_at || null,
+        checked_in_by: b.checked_in_by || null,
+        created_at: b.created_at || new Date().toISOString(),
+      }));
+    }
+  } catch {
+    // fallback below
+  }
+
+  // 2. Fallback to signage_settings
   const key = `room_bookings:${cleanCode}`;
   const { data } = await supabase
     .from('signage_settings')
@@ -282,7 +412,6 @@ export async function saveAllRoomBookings(
 ): Promise<void> {
   const cleanCode = (roomCode || 'LLC').trim().toUpperCase();
   const supabase = getAdminClient();
-  const key = `room_bookings:${cleanCode}`;
   const cutoffDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const trimmed = bookings
     .filter((b) => b.date >= cutoffDate)
@@ -291,6 +420,40 @@ export async function saveAllRoomBookings(
       return a.start_time.localeCompare(b.start_time);
     });
 
+  // 1. Relational upsert to room_bookings
+  try {
+    await supabase.from('room_configs').upsert({
+      room_code: cleanCode,
+      room_name: `ห้อง ${cleanCode}`,
+      is_active: true,
+    }, { onConflict: 'room_code' });
+
+    for (const b of trimmed) {
+      await supabase.from('room_bookings').upsert({
+        id: b.id,
+        room_code: cleanCode,
+        date: b.date,
+        start_time: b.start_time,
+        end_time: b.end_time,
+        title: b.title,
+        booker_type: b.booker_type,
+        booker_id: b.booker_id,
+        booker_name: b.booker_name,
+        booker_role_label: b.booker_role_label,
+        participants_count: b.participants_count,
+        notes: b.notes,
+        status: b.status,
+        checked_in_at: b.checked_in_at ? new Date().toISOString() : null,
+        checked_in_by: b.checked_in_by,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+    }
+  } catch (err) {
+    console.warn('[RoomBooking] relational room_bookings save failed:', err);
+  }
+
+  // 2. Mirror to signage_settings
+  const key = `room_bookings:${cleanCode}`;
   await supabase.from('signage_settings').upsert({
     key,
     value: JSON.stringify(trimmed),

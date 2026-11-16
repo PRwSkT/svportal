@@ -44,12 +44,19 @@ export interface HealthAssessmentResult {
     bgClass: string;
     textClass: string;
   };
-  lunchSubsidy: {
-    isEligible: boolean;
-    reason: string;
-    criteriaMet: string[];
-    priority: 'high' | 'medium' | 'none';
-  };
+  /**
+   * เฝ้าระวังโภชนาการสำหรับโรงครัวภายใน (อาหารกลางวันรวมในค่าเทอม ไม่มีเงินอุดหนุนอาหารกลางวันจากรัฐ)
+   */
+  nutritionWatch: NutritionWatchResult;
+}
+
+export interface NutritionWatchResult {
+  needsAttention: boolean;
+  reason: string;
+  criteriaMet: string[];
+  priority: 'high' | 'medium' | 'none';
+  /** คำแนะนำให้โรงครัว เช่น เพิ่มโปรตีน/ลดอาหารหวาน */
+  kitchenAdvice: string;
 }
 
 /**
@@ -501,81 +508,76 @@ export function evaluateWeightForAge(
 }
 
 /**
- * Screen Student for Lunch Subsidy (คัดกรองเงินอาหารกลางวัน)
- * Official OPEC & Ministry of Education criteria:
- * 1. Malnourished (ภาวะทุพโภชนาการ: ผอม หรือ ผอมมาก)
- * 2. Financial Need (ขาดแคลน / รายได้ครอบครัว < 40,000 บาท/ปี)
- * 3. Special criteria (นักเรียนพิการ หรือด้อยโอกาส)
+ * คัดกรองนักเรียนที่ต้องเฝ้าระวังด้านโภชนาการสำหรับโรงครัวภายในโรงเรียน
+ * โรงเรียนสมคิดวิทยาจัดอาหารกลางวันเองและรวมอยู่ในค่าเทอม (ไม่รับเงินอุดหนุนอาหารกลางวัน 27 บ./วัน จากรัฐ)
+ * เกณฑ์: ผอม/ผอมมาก, ท้วม/เริ่มอ้วน/อ้วน, และนักเรียนที่มีข้อจำกัดด้านอาหาร (แพ้อาหาร/โรคประจำตัว)
  */
-export function screenLunchSubsidy(
+export function screenNutritionWatch(
   student: any,
   measurement?: { height?: number | null; weight?: number | null }
+): NutritionWatchResult {
+  const height = measurement?.height ?? student.height;
+  const weight = measurement?.weight ?? student.weight;
+  const criteriaMet: string[] = [];
+  const advice: string[] = [];
+
+  const wfh = evaluateWeightForHeight(student.gender, height, weight);
+  if (wfh.status === 'ผอมมาก') {
+    criteriaMet.push('ภาวะทุพโภชนาการขั้นรุนแรง (ผอมมาก)');
+    advice.push('เพิ่มโปรตีนและพลังงาน เติมนมหรือไข่เสริมตามแผนของพยาบาล');
+  } else if (wfh.status === 'ผอม') {
+    criteriaMet.push('น้ำหนักตามเกณฑ์ส่วนสูง: ผอม');
+    advice.push('เพิ่มปริมาณโปรตีนและผลไม้ในมื้อกลางวัน');
+  } else if (wfh.status === 'เริ่มอ้วน' || wfh.status === 'อ้วน') {
+    criteriaMet.push(`น้ำหนักตามเกณฑ์ส่วนสูง: ${wfh.status}`);
+    advice.push('ควบคุมปริมาณข้าวและของหวาน เพิ่มผักผลไม้');
+  } else if (wfh.status === 'ท้วม') {
+    criteriaMet.push('น้ำหนักตามเกณฑ์ส่วนสูง: ท้วม (เฝ้าระวัง)');
+    advice.push('เฝ้าระวังปริมาณอาหารหวานและน้ำหวาน');
+  }
+
+  const allergies = String(student.allergies || '').trim();
+  if (allergies && !/^(-|ไม่มี|ไม่แพ้|none|n\/a|no)$/i.test(allergies)) {
+    criteriaMet.push(`แพ้อาหาร/ยา: ${allergies}`);
+    advice.push('จัดถาดอาหารแยกพร้อมป้ายชื่อตามใบสั่งผลิตรายวัน');
+  }
+
+  if (criteriaMet.length === 0) {
+    return {
+      needsAttention: false,
+      reason: 'โภชนาการปกติ รับประทานเมนูมาตรฐานของโรงครัว',
+      criteriaMet: [],
+      priority: 'none',
+      kitchenAdvice: '',
+    };
+  }
+
+  const isHigh = wfh.status === 'ผอมมาก' || wfh.status === 'อ้วน' || criteriaMet.length >= 2;
+  return {
+    needsAttention: true,
+    reason: criteriaMet.join(' + '),
+    criteriaMet,
+    priority: isHigh ? 'high' : 'medium',
+    kitchenAdvice: advice.join(' / '),
+  };
+}
+
+/**
+ * @deprecated โรงเรียนไม่รับเงินอุดหนุนอาหารกลางวันจากรัฐ (อาหารกลางวันรวมในค่าเทอมและจัดโดยโรงครัวภายใน)
+ * คงไว้เพื่อความเข้ากันได้ของ signature: คืนค่า isEligible = false เสมอ
+ */
+export function screenLunchSubsidy(
+  _student: any,
+  _measurement?: { height?: number | null; weight?: number | null }
 ): {
   isEligible: boolean;
   reason: string;
   criteriaMet: string[];
   priority: 'high' | 'medium' | 'none';
 } {
-  const height = measurement?.height ?? student.height;
-  const weight = measurement?.weight ?? student.weight;
-  const criteriaMet: string[] = [];
-
-  // 0. Kindergarten Universal Criterion (ตามประกาศ สช. นักเรียนอนุบาล 1-3 ได้รับจัดสรร 100%)
-  const gradeStr = String(student.grade || '').trim();
-  if (gradeStr.startsWith('อ.') || gradeStr.startsWith('อนุบาล')) {
-    criteriaMet.push('นักเรียนระดับก่อนประถมศึกษา (อนุบาล 1-3 ได้รับจัดสรรทุกคนตามเกณฑ์ สช.)');
-  }
-
-  // 1. Nutritional Criterion
-  const wfh = evaluateWeightForHeight(student.gender, height, weight);
-  if (wfh.status === 'ผอมมาก') {
-    criteriaMet.push('ภาวะทุพโภชนาการขั้นรุนแรง (ผอมมาก)');
-  } else if (wfh.status === 'ผอม') {
-    criteriaMet.push('ภาวะทุพโภชนาการ (ผอมตามเกณฑ์)');
-  }
-
-  // 2. Financial Criterion (Parents Salary / Income < 40,000 THB/year)
-  const parents = Array.isArray(student.student_parents)
-    ? student.student_parents
-    : (student.student_parents ? [student.student_parents] : []);
-
-  let totalMonthlySalary = 0;
-  let hasSalaryInfo = false;
-
-  parents.forEach((p: any) => {
-    if (p.salary) {
-      const salaryNum = parseFloat(String(p.salary).replace(/[^0-9.]/g, ''));
-      if (!isNaN(salaryNum) && salaryNum > 0) {
-        totalMonthlySalary += salaryNum;
-        hasSalaryInfo = true;
-      }
-    }
-  });
-
-  const estimatedAnnualIncome = totalMonthlySalary * 12;
-  if (hasSalaryInfo && estimatedAnnualIncome > 0 && estimatedAnnualIncome <= 40000) {
-    criteriaMet.push(`ครอบครัวยากจน/ขาดแคลน (รายได้เฉลี่ย ${estimatedAnnualIncome.toLocaleString()} บาท/ปี < 40,000 บาท)`);
-  }
-
-  // 3. Disability / Special Needs Criterion
-  const disability = String(student.disability || '').trim();
-  if (disability && disability !== 'ไม่พิการ' && disability !== '-' && disability !== 'ปกติ') {
-    criteriaMet.push(`นักเรียนพิการ/ความต้องการพิเศษ (${disability})`);
-  }
-
-  if (criteriaMet.length > 0) {
-    const isHighPriority = wfh.status === 'ผอมมาก' || criteriaMet.length >= 2;
-    return {
-      isEligible: true,
-      reason: criteriaMet.join(' + '),
-      criteriaMet,
-      priority: isHighPriority ? 'high' : 'medium',
-    };
-  }
-
   return {
     isEligible: false,
-    reason: 'ไม่เข้าเกณฑ์รับเงินอุดหนุนอาหารกลางวัน',
+    reason: 'โรงเรียนไม่รับเงินอุดหนุนอาหารกลางวัน: อาหารกลางวันรวมอยู่ในค่าเทอมและจัดโดยโรงครัวภายใน',
     criteriaMet: [],
     priority: 'none',
   };
@@ -594,7 +596,7 @@ export function evaluateStudentHealth(student: any): HealthAssessmentResult {
   const weightForHeight = evaluateWeightForHeight(genderCode, height, weight);
   const heightForAge = evaluateHeightForAge(genderCode, age.totalMonths, height);
   const weightForAge = evaluateWeightForAge(genderCode, age.totalMonths, weight);
-  const lunchSubsidy = screenLunchSubsidy(student, { height, weight });
+  const nutritionWatch = screenNutritionWatch(student, { height, weight });
 
   const studentName = student.name || `${student.prefix || ''}${student.first_name || ''} ${student.last_name || ''}`.trim();
 
@@ -609,7 +611,7 @@ export function evaluateStudentHealth(student: any): HealthAssessmentResult {
     weightForHeight,
     heightForAge,
     weightForAge,
-    lunchSubsidy,
+    nutritionWatch,
   };
 }
 
@@ -625,10 +627,10 @@ export function aggregateNutritionBatch(students: any[]) {
   let overweightCount = 0; // ท้วม + เริ่มอ้วน + อ้วน
   let stuntedCount = 0; // เตี้ย + ค่อนข้างเตี้ย
 
-  let lunchSubsidyEligibleCount = 0;
+  let nutritionWatchCount = 0;
 
   const results: HealthAssessmentResult[] = [];
-  const classBreakdown: Record<string, { total: number; measured: number; normal: number; malnourished: number; overweight: number; subsidy: number }> = {};
+  const classBreakdown: Record<string, { total: number; measured: number; normal: number; malnourished: number; overweight: number; watch: number }> = {};
 
   students.forEach(student => {
     const res = evaluateStudentHealth(student);
@@ -636,7 +638,7 @@ export function aggregateNutritionBatch(students: any[]) {
 
     const grade = student.grade || 'ไม่ระบุห้อง';
     if (!classBreakdown[grade]) {
-      classBreakdown[grade] = { total: 0, measured: 0, normal: 0, malnourished: 0, overweight: 0, subsidy: 0 };
+      classBreakdown[grade] = { total: 0, measured: 0, normal: 0, malnourished: 0, overweight: 0, watch: 0 };
     }
     classBreakdown[grade].total++;
 
@@ -662,9 +664,9 @@ export function aggregateNutritionBatch(students: any[]) {
       unmeasured++;
     }
 
-    if (res.lunchSubsidy.isEligible) {
-      lunchSubsidyEligibleCount++;
-      classBreakdown[grade].subsidy++;
+    if (res.nutritionWatch.needsAttention) {
+      nutritionWatchCount++;
+      classBreakdown[grade].watch++;
     }
   });
 
@@ -685,7 +687,7 @@ export function aggregateNutritionBatch(students: any[]) {
     overweightPct,
     stuntedCount,
     stuntedPct,
-    lunchSubsidyEligibleCount,
+    nutritionWatchCount,
     classBreakdown,
     results,
   };

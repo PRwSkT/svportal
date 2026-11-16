@@ -75,6 +75,25 @@ function EarlyYearsAssessmentContent() {
     };
   }, [syncPipeline]);
 
+  useEffect(() => {
+    async function loadRemotePipeline() {
+      try {
+        const res = await fetch('/api/pipeline');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.state) {
+            if (data.state.early_years_care && data.state.early_years_care.length > 0) {
+              setCareDrafts(data.state.early_years_care);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Remote pipeline fetch note:', e);
+      }
+    }
+    loadRemotePipeline();
+  }, []);
+
   const handleCareDraftChange = <K extends keyof EarlyYearsDailyCare>(
     studentId: string,
     field: K,
@@ -87,9 +106,21 @@ function EarlyYearsAssessmentContent() {
     );
   };
 
-  const handlePublishSingleCare = (record: EarlyYearsDailyCare) => {
+  const handlePublishSingleCare = async (record: EarlyYearsDailyCare) => {
     saveEarlyYearsDailyCare(record);
     syncPipeline();
+    try {
+      await fetch('/api/pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'SAVE_DAILY_CARE',
+          care: record
+        })
+      });
+    } catch (e) {
+      console.warn('Pipeline server sync error:', e);
+    }
     toast.success(
       isThai
         ? `บันทึกและส่งรายงานประจำวันของ ${record.nickname} ไปยัง Parents Portal เรียบร้อยแล้ว!`
@@ -97,11 +128,27 @@ function EarlyYearsAssessmentContent() {
     );
   };
 
-  const handleBatchPublishAllCare = () => {
+  const handleBatchPublishAllCare = async () => {
     careDrafts.forEach((rec) => {
       saveEarlyYearsDailyCare(rec);
     });
     syncPipeline();
+    try {
+      await Promise.all(
+        careDrafts.map((rec) =>
+          fetch('/api/pipeline', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'SAVE_DAILY_CARE',
+              care: rec
+            })
+          })
+        )
+      );
+    } catch (e) {
+      console.warn('Batch pipeline server sync error:', e);
+    }
     toast.success(
       isThai
         ? 'บันทึกและส่งสมุดพกอนุบาลประจำวันครบทุกคนไปยัง Parents Portal เรียบร้อยแล้ว!'
@@ -109,9 +156,22 @@ function EarlyYearsAssessmentContent() {
     );
   };
 
-  const handleAcknowledgeDropoff = (noteId: string, studentName: string) => {
+  const handleAcknowledgeDropoff = async (noteId: string, studentName: string) => {
     acknowledgeEarlyYearsDropoffNote(noteId, 'ครูนภัสสร ใจดี (ครูแนน)');
     syncPipeline();
+    try {
+      await fetch('/api/pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'ACK_DROPOFF_NOTE',
+          note_id: noteId,
+          acknowledged_by: 'ครูนภัสสร ใจดี (ครูแนน)'
+        })
+      });
+    } catch (e) {
+      console.warn('Dropoff note ack sync error:', e);
+    }
     toast.success(
       isThai
         ? `ครูรับทราบบันทึกส่งน้องตอนเช้าของ ${studentName} แล้ว (แจ้งผู้ปกครองทันที)`
@@ -150,21 +210,44 @@ function EarlyYearsAssessmentContent() {
     }
   }, [paramTerm]);
 
+  function calculateChildAgeYears(birthDateStr?: string | null): number {
+    if (!birthDateStr) return 4;
+    const b = new Date(birthDateStr);
+    if (isNaN(b.getTime())) return 4;
+    const now = new Date();
+    let years = now.getFullYear() - b.getFullYear();
+    const m = now.getMonth() - b.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < b.getDate())) {
+      years--;
+    }
+    return Math.max(1, Math.min(7, years));
+  }
+
   useEffect(() => {
     async function loadClasses() {
       try {
         const res = await fetch(
-          `/api/academic/classes?year=${DEFAULT_ACADEMIC_YEAR}&department=kindergarten`
+          `/api/academic/classes?year=${DEFAULT_ACADEMIC_YEAR}`
         );
         if (res.ok) {
           const d = await res.json();
-          const clsList = d.classes || [];
-          setClasses(clsList);
-          if (clsList.length > 0) {
+          const allList = d.classes || [];
+          // Include Kindergarten and Nursery classes
+          const earlyYearsList = allList.filter((c: any) =>
+            c.department === 'kindergarten' ||
+            c.department === 'nursery' ||
+            c.grade_level === 'Nursery' ||
+            c.name.includes('เนอสเซอรี่') ||
+            c.name.includes('บริบาล') ||
+            c.name.includes('เตรียม') ||
+            c.name.startsWith('อ.')
+          );
+          setClasses(earlyYearsList);
+          if (earlyYearsList.length > 0) {
             const defaultId =
-              paramClassId && clsList.some((c: any) => c.id === paramClassId)
+              paramClassId && earlyYearsList.some((c: any) => c.id === paramClassId)
                 ? paramClassId
-                : clsList[0].id;
+                : earlyYearsList[0].id;
             setSelectedClassId(defaultId);
           }
         }
@@ -196,9 +279,11 @@ function EarlyYearsAssessmentContent() {
         const existing = evalMap.get(enr.student_id) as any;
         const w = existing?.weight_kg || 16;
         const h = existing?.height_cm || 105;
+        const studentDob = enr.student?.birth_date || enr.student?.dob || null;
+        const childAge = calculateChildAgeYears(studentDob);
         const growth = evaluateEarlyYearsGrowth({
           gender: enr.student?.gender || 'male',
-          ageYears: 4,
+          ageYears: childAge,
           weightKg: w,
           heightCm: h,
         });
@@ -210,6 +295,8 @@ function EarlyYearsAssessmentContent() {
           roll_number: enr.roll_number,
           student_name: enr.student?.name || 'นักเรียน',
           student_gender: enr.student?.gender || 'male',
+          student_dob: studentDob,
+          student_age_years: childAge,
           physical_score: existing?.physical_score ?? 3,
           emotional_score: existing?.emotional_score ?? 3,
           social_score: existing?.social_score ?? 3,
@@ -245,7 +332,7 @@ function EarlyYearsAssessmentContent() {
     if (field === 'weight_kg' || field === 'height_cm') {
       const growth = evaluateEarlyYearsGrowth({
         gender: item.student_gender,
-        ageYears: 4,
+        ageYears: item.student_age_years || 4,
         weightKg: Number(item.weight_kg) || 16,
         heightCm: Number(item.height_cm) || 105,
       });

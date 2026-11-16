@@ -25,9 +25,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith('image/') || file.type === 'image/svg+xml') {
       return NextResponse.json(
-        { success: false, error: 'อนุญาตให้อัปโหลดเฉพาะไฟล์รูปภาพเท่านั้น (JPG, PNG, WebP, GIF, SVG)' },
+        { success: false, error: 'อนุญาตให้อัปโหลดเฉพาะไฟล์รูปภาพราสเตอร์เท่านั้น (JPG, PNG, WebP, GIF) ไม่อนุญาตไฟล์ SVG' },
         { status: 400 }
       );
     }
@@ -42,7 +42,13 @@ export async function POST(req: NextRequest) {
     }
 
     const rawExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-    const allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'];
+    if (rawExt === 'svg') {
+      return NextResponse.json(
+        { success: false, error: 'ไม่อนุญาตให้อัปโหลดไฟล์ SVG เพื่อความปลอดภัยของระบบ' },
+        { status: 400 }
+      );
+    }
+    const allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
     const ext = allowedExts.includes(rawExt) ? rawExt : 'jpg';
 
     const safeFormId = formId.replace(/[^a-zA-Z0-9_-]/g, '') || 'common';

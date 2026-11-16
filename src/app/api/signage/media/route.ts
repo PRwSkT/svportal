@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase/admin';
+import { requireAuth } from '@/lib/auth';
 import crypto from 'crypto';
 
 export async function GET() {
@@ -19,6 +20,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireAuth('admin', 'admin_signage');
+    if (auth.error) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     const title = (formData.get('title') as string) || file?.name || 'Untitled Media';

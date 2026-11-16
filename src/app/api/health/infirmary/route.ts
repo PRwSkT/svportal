@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { requireAuth } from '@/lib/auth';
+import { getBangkokDate, getBangkokTimeString } from '@/lib/utils';
 import { 
   detectOutbreakClusters, 
   checkMedicationAllergy, 
@@ -22,10 +23,10 @@ export async function GET(request: Request) {
 
     const supabase = getAdminClient();
 
-    // Calculate start date for query
+    // Calculate start date for query using Bangkok timezone
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
-    const startDateStr = startDate.toISOString().split('T')[0];
+    const startDateStr = getBangkokDate(startDate);
 
     // 1. Fetch visits
     let query = supabase
@@ -106,10 +107,12 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
+    const todayBangkok = getBangkokDate();
+    const timeBangkok = getBangkokTimeString();
     const {
       student_id,
-      visit_date = new Date().toISOString().split('T')[0],
-      visit_time = new Date().toTimeString().slice(0, 5),
+      visit_date = todayBangkok,
+      visit_time = timeBangkok,
       symptoms = [],
       temperature_celsius,
       treatment_given = '',
@@ -151,6 +154,8 @@ export async function POST(request: Request) {
       }
     }
 
+    const reporter = nurse_teacher_name || auth.appUser?.full_name || auth.user?.email || 'ครูพยาบาล';
+
     const recordToInsert = {
       student_id,
       visit_date,
@@ -162,7 +167,7 @@ export async function POST(request: Request) {
       diagnosed_contagious_disease,
       rest_in_bed: Boolean(rest_in_bed),
       time_left: time_left || null,
-      nurse_teacher_name: nurse_teacher_name || auth.user?.email || 'ครูพยาบาล',
+      nurse_teacher_name: reporter,
       parent_contacted: Boolean(parent_contacted),
       notes
     };
@@ -176,6 +181,59 @@ export async function POST(request: Request) {
     if (error) {
       console.error('Error logging infirmary visit:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Auto-create student_incidents entry and update student_dietary_profiles if contagious or high fever or rest in bed
+    const tempNum = temperature_celsius ? Number(temperature_celsius) : null;
+    const isContagious = diagnosed_contagious_disease && diagnosed_contagious_disease !== 'NONE';
+    const isHighFever = tempNum !== null && tempNum >= 37.8;
+    const isVeryHighFever = tempNum !== null && tempNum >= 38.5;
+    const symptomsArr = Array.isArray(symptoms) ? symptoms : [];
+    const isGISymptom = symptomsArr.some((s: string) => /ท้องเสีย|ปวดท้อง|อาเจียน|คลื่นไส้/i.test(s));
+
+    if (isContagious || isHighFever || rest_in_bed) {
+      const severity = (isContagious || isVeryHighFever) ? 'HIGH' : 'MEDIUM';
+      const incidentDesc = isContagious
+        ? `พบโรคติดต่อ: ${diagnosed_contagious_disease} (อุณหภูมิ ${tempNum ?? '-'} °C, อาการ: ${symptomsArr.join(', ') || 'ไม่มี'})`
+        : `มีไข้สูง ${tempNum ?? '-'} °C พักรักษาห้องพยาบาล (อาการ: ${symptomsArr.join(', ') || 'ไม่มี'})`;
+
+      try {
+        await supabase.from('student_incidents').insert({
+          student_id,
+          incident_date: visit_date,
+          incident_time: visit_time,
+          location: 'ห้องพยาบาลโรงเรียนสมคิดวิทยา',
+          severity,
+          description: incidentDesc,
+          first_aid_given: treatment_given || medication_given || 'ปฐมพยาบาลและให้นอนพักผ่อนห้องพยาบาล',
+          hospital_referred: Boolean(tempNum && tempNum >= 39.5),
+          reported_by: reporter,
+          parent_acknowledged: Boolean(parent_contacted)
+        });
+      } catch (incErr) {
+        console.warn('Failed to auto-create student_incident:', incErr);
+      }
+    }
+
+    // Auto-sync to In-House Kitchen dietary profile: switch student to soft congee / diet today
+    if (isHighFever || isGISymptom) {
+      try {
+        await supabase
+          .from('student_dietary_profiles')
+          .upsert({
+            student_id,
+            diet_type: 'MEDICAL_SOFT',
+            medical_note: `ห้องพยาบาลแจ้ง (${visit_date}): มีไข้ ${tempNum ?? '-'}°C / อาการทางเดินอาหาร ปรับเป็นอาหารอ่อน/ข้าวต้มวันนี้`,
+            verified_by_nurse: true,
+            verified_at: new Date().toISOString(),
+            updated_by: reporter,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'student_id'
+          });
+      } catch (dietErr) {
+        console.warn('Failed to auto-update student_dietary_profiles:', dietErr);
+      }
     }
 
     return NextResponse.json({
@@ -225,6 +283,18 @@ export async function PATCH(request: Request) {
     if (error) {
       console.error('Error updating infirmary visit:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (updates.parent_contacted !== undefined && data?.student_id && data?.visit_date) {
+      try {
+        await supabase
+          .from('student_incidents')
+          .update({ parent_acknowledged: Boolean(updates.parent_contacted) })
+          .eq('student_id', data.student_id)
+          .eq('incident_date', data.visit_date);
+      } catch (err) {
+        console.warn('Failed to sync parent_acknowledged to student_incidents:', err);
+      }
     }
 
     return NextResponse.json({

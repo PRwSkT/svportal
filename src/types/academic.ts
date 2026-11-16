@@ -306,6 +306,8 @@ export interface AcademicExamQuestion {
   points: number;
   pin_choice_position: boolean; // if true, choice e.g. ถูกทุกข้อ cannot be shuffled
   pinned_choice_index: string | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  question_meta?: Record<string, any>;
   created_at: string;
 }
 
@@ -329,7 +331,8 @@ export interface AcademicExamSubmission {
   exam_id: string;
   student_id: string;
   set_name: string;
-  student_answers: Record<string, ChoiceOption>; // { "1": "A", "2": "B", ... }
+  student_answers: Record<string, ChoiceOption | number | string>; // { "1": "A", "2": "B", ..., "21": 4 }
+  subjective_scores?: Record<string, number>; // { "1": 4, "2": 5 } or { "21": 4, "22": 5 }
   raw_score: number;
   total_score: number;
   status: 'GRADED' | 'FLAGGED_AMBIGUOUS' | 'MANUAL_OVERRIDE';
@@ -363,7 +366,8 @@ export interface OMRSheetScanResult {
   examId: string;
   studentId: string;
   setName: string;
-  answers: Record<string, ChoiceOption>;
+  answers: Record<string, ChoiceOption | number | string>;
+  subjectiveScores?: Record<string, number>; // Optical teacher bubble scores (0-5 per subjective item)
   flaggedAmbiguousQuestions: number[];
   isDamagedOrSpill: boolean;
   rawScore: number;

@@ -29,6 +29,17 @@ function LoginForm() {
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     setError(null);
+
+    if (process.env.NEXT_PUBLIC_DB_PROVIDER === 'netlify' && !process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      setError(
+        language === 'th'
+          ? 'ระบบทำงานในโหมด Netlify Database กรุณาเข้าสู่ระบบด้วยอีเมลโรงเรียนและรหัสผ่านด้านล่าง'
+          : 'Netlify Database mode active. Please sign in with school credentials below.'
+      );
+      setIsLoading(false);
+      return;
+    }
+
     const supabase = createClient();
     const { error: signInError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -51,23 +62,53 @@ function LoginForm() {
     setIsLoading(true);
     setError(null);
 
-    const supabase = createClient();
     const loginEmail = email.trim();
-    
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: loginEmail,
-      password,
-    });
+    let loginSuccess = false;
+    let authError: string | null = null;
 
-    if (signInError) {
-      setIsLoading(false);
-      if (signInError.message.includes('Invalid login credentials')) {
-        setError(dict.login.invalidCredentials);
+    // 1. Try createClient().auth.signInWithPassword
+    try {
+      const supabase = createClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password,
+      });
+
+      if (!signInError) {
+        loginSuccess = true;
       } else {
-        setError(signInError.message);
+        authError = signInError.message;
       }
-    } else {
-      // successful login, navigate to Launchpad
+    } catch (clientErr: any) {
+      authError = clientErr?.message || null;
+    }
+
+    // 2. If client signInWithPassword failed, try /api/auth/staff-login
+    if (!loginSuccess) {
+      try {
+        const res = await fetch('/api/auth/staff-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: loginEmail, password }),
+        });
+
+        if (res.ok) {
+          loginSuccess = true;
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          const errMsg = errData.error || authError || dict.login.invalidCredentials;
+          setError(errMsg.includes('credentials') ? dict.login.invalidCredentials : errMsg);
+          setIsLoading(false);
+          return;
+        }
+      } catch (err: any) {
+        setError(authError || err?.message || dict.login.invalidCredentials);
+        setIsLoading(false);
+        return;
+      }
+    }
+
+    if (loginSuccess) {
       window.location.href = '/home';
     }
   };

@@ -115,6 +115,18 @@ export async function recordTeacherConversation(entry: {
             updated_at: new Date().toISOString(),
           })
           .eq('id', existing[0].id);
+      } else {
+        const topicName = prompt.length > 40 ? prompt.slice(0, 37) + '...' : prompt;
+        await supabase
+          .from('nongfah_collective_memory')
+          .insert({
+            category,
+            topic: topicName,
+            content: entry.aiResponse ? entry.aiResponse.slice(0, 500) : prompt,
+            source_teacher: entry.userName || entry.userEmail || 'คุณครู',
+            frequency_count: 1,
+            updated_at: new Date().toISOString(),
+          });
       }
     }
   } catch (err) {

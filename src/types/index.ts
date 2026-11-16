@@ -237,6 +237,15 @@ export type Personnel = {
   bio_th: string | null;
   bio_en: string | null;
   email?: string | null;
+  phone?: string | null;
+  line_id?: string | null;
+  facebook_url?: string | null;
+  instagram_url?: string | null;
+  tiktok_url?: string | null;
+  linkedin_url?: string | null;
+  office_room?: string | null;
+  card_bio?: string | null;
+  social_links?: Record<string, string> | null;
   user_id?: string | null;
   sort_order: number;
   is_active: boolean;

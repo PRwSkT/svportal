@@ -3,10 +3,16 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { isSystemAdmin } from '@/lib/constants/auth';
 import { AppUser } from '@/types';
+import { isNetlifyDbActive } from '@/lib/db/netlify-bridge';
+import { createPgPostgrestClient } from '@/lib/db/pg-postgrest-adapter';
+import { getStaffSessionFromCookies } from '@/lib/auth/staff-session';
 
 export const dynamic = 'force-dynamic';
 
 function getServiceRoleClient() {
+  if (isNetlifyDbActive()) {
+    return createPgPostgrestClient() as any;
+  }
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return null;
@@ -16,7 +22,19 @@ function getServiceRoleClient() {
 export async function GET() {
   try {
     const supabase = await createClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    let { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (!user) {
+      const session = await getStaffSessionFromCookies();
+      if (session) {
+        user = {
+          id: session.id,
+          email: session.email,
+          user_metadata: { full_name: session.full_name },
+        } as any;
+        userError = null;
+      }
+    }
 
     if (userError || !user) {
       if (process.env.SV_PREVIEW_MODE === 'true') {

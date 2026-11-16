@@ -79,20 +79,54 @@ export async function POST(
 
     const answerKey = setRecord?.answer_key || {};
 
-    // Fetch questions to calculate points mapping per set
+    // Fetch questions to calculate points mapping per set and map subjective questions
     const { data: questions } = await supabase
       .from('academic_exam_questions')
-      .select('question_number, points')
-      .eq('exam_id', id);
+      .select('question_number, points, question_type')
+      .eq('exam_id', id)
+      .order('question_number', { ascending: true });
 
     const { buildSetPointsMap } = await import('@/lib/academic/exam-engine');
     const pointsMap = questions && questions.length > 0
       ? buildSetPointsMap(setRecord, questions)
       : undefined;
 
+    // Process and ingest Teacher Subjective Scores (0-5 per subjective question)
+    const subjQuestions = (questions || []).filter(q => q.question_type === 'subjective');
+    const rawSubj = body.subjective_scores || body.teacher_subjective_scores || body.subjectiveScores || body.teacher_scores || {};
+    const normalizedSubjScores: Record<string, number> = {};
+
+    subjQuestions.forEach((q, idx) => {
+      const qNumStr = String(q.question_number);
+      const itemIdxStr = String(idx + 1);
+      const thaiItemKey = `อ.${idx + 1}`;
+
+      let val: any = undefined;
+      if (rawSubj[qNumStr] !== undefined) val = rawSubj[qNumStr];
+      else if (rawSubj[itemIdxStr] !== undefined) val = rawSubj[itemIdxStr];
+      else if (rawSubj[thaiItemKey] !== undefined) val = rawSubj[thaiItemKey];
+      else if (student_answers[qNumStr] !== undefined && typeof student_answers[qNumStr] === 'number') {
+        val = student_answers[qNumStr];
+      }
+
+      if (val !== undefined && val !== null && val !== '') {
+        const num = Number(val);
+        if (!isNaN(num)) {
+          const maxPts = Number(q.points ?? 5);
+          normalizedSubjScores[qNumStr] = Math.min(Math.max(num, 0), maxPts);
+        }
+      }
+    });
+
+    // Merge subjective scores into student_answers for scoring
+    const mergedAnswers: Record<string, any> = { ...student_answers };
+    Object.entries(normalizedSubjScores).forEach(([k, score]) => {
+      mergedAnswers[k] = score;
+    });
+
     // 2. Score the answers
     const scoreResult = scoreExamAnswers(
-      student_answers,
+      mergedAnswers,
       answerKey,
       pointsMap,
       Number(exam.max_score)
@@ -103,7 +137,8 @@ export async function POST(
       exam_id: id,
       student_id,
       set_name,
-      student_answers,
+      student_answers: mergedAnswers,
+      subjective_scores: normalizedSubjScores,
       raw_score: scoreResult.rawScore,
       total_score: scoreResult.totalScore,
       status: status || 'GRADED',

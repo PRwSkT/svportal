@@ -50,9 +50,24 @@ export function NotificationBell() {
     loadNotifications();
     checkSubscription();
 
-    // Auto-refresh notifications every 60 seconds
-    const interval = setInterval(loadNotifications, 60000);
-    return () => clearInterval(interval);
+    // Auto-refresh notifications every 2 minutes only when tab is visible
+    const interval = setInterval(() => {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+        loadNotifications();
+      }
+    }, 120000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadNotifications();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [user]);
 
   // Close on outside click
