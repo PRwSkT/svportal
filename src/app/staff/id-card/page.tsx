@@ -324,15 +324,15 @@ export default function StaffIdCardSelfServicePage() {
               <div className="py-2 border-b border-slate-100 dark:border-slate-700/60 grid grid-cols-3 gap-2 text-center bg-slate-50 dark:bg-slate-700/40 p-2 rounded-xl">
                 <div>
                   <span className="block text-[10px] text-slate-400">ปีการศึกษา</span>
-                  <span className="font-bold text-[#183e66] dark:text-sky-300 text-xs">{personnel?.academic_year || '2567'}</span>
+                  <span className="font-bold text-[#183e66] dark:text-sky-300 text-xs">{personnel?.academic_year || '2569'}</span>
                 </div>
                 <div>
                   <span className="block text-[10px] text-slate-400">วันออกบัตร</span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-300 text-[11px]">{personnel?.card_issue_date || '16 พ.ค. 2567'}</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300 text-[11px]">{personnel?.card_issue_date || '16 พ.ค. 2569'}</span>
                 </div>
                 <div>
                   <span className="block text-[10px] text-slate-400">วันหมดอายุ</span>
-                  <span className="font-bold text-rose-600 dark:text-rose-400 text-[11px]">{personnel?.card_expire_date || '15 พ.ค. 2569'}</span>
+                  <span className="font-bold text-rose-600 dark:text-rose-400 text-[11px]">{personnel?.card_expire_date || '15 พ.ค. 2571'}</span>
                 </div>
               </div>
 

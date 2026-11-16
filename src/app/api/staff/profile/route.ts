@@ -98,9 +98,9 @@ export async function PUT(request: Request) {
         card_bio: card_bio !== undefined ? card_bio?.trim() : null,
         education_history: body.education_history !== undefined ? body.education_history?.trim() : null,
         experience_history: body.experience_history !== undefined ? body.experience_history?.trim() : null,
-        academic_year: body.academic_year !== undefined ? body.academic_year?.trim() : '2567',
-        card_issue_date: body.card_issue_date !== undefined ? body.card_issue_date?.trim() : '16 พ.ค. 2567',
-        card_expire_date: body.card_expire_date !== undefined ? body.card_expire_date?.trim() : '15 พ.ค. 2569',
+        academic_year: body.academic_year !== undefined ? body.academic_year?.trim() : '2569',
+        card_issue_date: body.card_issue_date !== undefined ? body.card_issue_date?.trim() : '16 พ.ค. 2569',
+        card_expire_date: body.card_expire_date !== undefined ? body.card_expire_date?.trim() : '15 พ.ค. 2571',
         image_url: body.image_url !== undefined ? (body.image_url?.trim() || null) : null,
         is_active: true,
       };

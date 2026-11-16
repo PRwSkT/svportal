@@ -45,9 +45,9 @@ export function StaffContactEditModal({
     card_bio: '',
     education_history: '',
     experience_history: '',
-    academic_year: '2567',
-    card_issue_date: '16 พ.ค. 2567',
-    card_expire_date: '15 พ.ค. 2569',
+    academic_year: '2569',
+    card_issue_date: '16 พ.ค. 2569',
+    card_expire_date: '15 พ.ค. 2571',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -67,9 +67,9 @@ export function StaffContactEditModal({
         card_bio: personnel.card_bio || '',
         education_history: personnel.education_history || '',
         experience_history: personnel.experience_history || '',
-        academic_year: personnel.academic_year || '2567',
-        card_issue_date: personnel.card_issue_date || '16 พ.ค. 2567',
-        card_expire_date: personnel.card_expire_date || '15 พ.ค. 2569',
+        academic_year: personnel.academic_year || '2569',
+        card_issue_date: personnel.card_issue_date || '16 พ.ค. 2569',
+        card_expire_date: personnel.card_expire_date || '15 พ.ค. 2571',
       });
     }
   }, [personnel, isOpen]);

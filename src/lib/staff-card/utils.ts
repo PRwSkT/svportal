@@ -15,8 +15,8 @@ export function formatStaffName(nameEn?: string | null, nameTh?: string | null):
   let rawEn = (nameEn || '').trim();
   const rawTh = (nameTh || '').trim();
 
-  // Strip English prefixes
-  rawEn = rawEn.replace(/^(miss|mrs\.?|mr\.?|ms\.?|dr\.?|prof\.?|ajarn|kru)\s+/i, '').trim();
+  // Strip English prefixes (handles "MR.NATTAWAT", "Mr. Nattawat", "Miss ...", etc.)
+  rawEn = rawEn.replace(/^(?:(?:miss|mrs|mr|ms|dr|prof|ajarn|kru)(?:\.|\s)+)+/i, '').trim();
 
   const parts = rawEn.split(/\s+/).filter(Boolean);
 

@@ -31,7 +31,7 @@ export const SCHOOL_INFO = {
 /**
  * Default fallback academic year and term
  */
-export const DEFAULT_ACADEMIC_YEAR = '2568';
+export const DEFAULT_ACADEMIC_YEAR = '2569';
 export const DEFAULT_TERM = '2';
 
 /**

@@ -249,6 +249,7 @@ export function GlobalNongFahBot() {
     (!user && !isParentAuthenticated) ||
     pathname === '/' ||
     pathname === '/login' ||
+    pathname.startsWith('/verify') ||
     pathname.startsWith('/forms') ||
     pathname.startsWith('/admin/forms') ||
     pathname.startsWith('/academic/timetable');

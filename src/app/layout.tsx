@@ -3,8 +3,8 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AppNav } from "@/components/AppNav";
 import { GlobalNongFahBot } from "@/components/nongfah/GlobalNongFahBot";
+import { GlobalWatermark, GlobalMainContainer } from "@/components/GlobalWatermark";
 import { Toaster } from "sonner";
-import Image from "next/image";
 import { headers } from "next/headers";
 import "./globals.css";
 
@@ -50,11 +50,8 @@ export default async function RootLayout({
       className="h-full antialiased"
     >
       <body className="min-h-full flex flex-col bg-background text-foreground relative overflow-x-hidden print:overflow-x-visible">
-        {/* Global Watermark Logos */}
-        <div className="fixed bottom-4 md:bottom-8 right-4 md:right-8 opacity-25 pointer-events-none flex flex-col md:flex-row items-end md:items-center gap-4 md:gap-6 z-0 transition-all duration-500 print:opacity-[0.10] print:z-[-1]">
-          <Image src="/logo2.png" alt="School Logo" width={640} height={360} className="h-20 md:h-32 w-auto drop-shadow-lg print:drop-shadow-none" />
-          <Image src="/SV-Portal.png" alt="SVPortal" width={240} height={60} className="w-40 md:w-56 h-auto drop-shadow-lg print:drop-shadow-none" />
-        </div>
+        {/* Global Watermark Logos (hidden on standalone public pages like /verify) */}
+        <GlobalWatermark />
 
         <Toaster position="top-right" richColors />
         <LanguageProvider>
@@ -62,9 +59,9 @@ export default async function RootLayout({
             <div className="sticky top-0 z-40">
               <AppNav />
             </div>
-            <main className="flex-1 relative pb-24 md:pb-10">
+            <GlobalMainContainer>
               {children}
-            </main>
+            </GlobalMainContainer>
             <GlobalNongFahBot />
           </AuthProvider>
         </LanguageProvider>

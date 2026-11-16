@@ -207,82 +207,53 @@ export function StaffIdCard({
               </span>
             </div>
 
-            {/* Layer 4: Foreground Typography (First Name, Last Name, Position) */}
+            {/* Layer 4: Foreground Typography (Left-aligned First Name, Last Name, Position) */}
             <div 
-              className="absolute inset-x-0 bottom-0 z-10 pointer-events-none"
+              className="absolute inset-x-0 bottom-0 z-10 pointer-events-none text-left"
               style={{
                 paddingLeft: `${Math.round(width * 0.0726)}px`,
                 paddingRight: `${Math.round(width * 0.0726)}px`,
                 paddingBottom: `${Math.round(height * 0.065)}px`,
               }}
             >
-              {nameInfo.lastName ? (
-                <div className="flex flex-col">
-                  {/* First Name (Large Bold Navy) */}
-                  <h1 
-                    className="font-bold tracking-tight text-[#183e66] leading-[0.9] uppercase drop-shadow-xs"
+              <div className="flex flex-col items-start">
+                {/* First Name (Large Bold Navy) */}
+                <h1 
+                  className="font-bold tracking-tight text-[#183e66] leading-[0.92] uppercase drop-shadow-xs"
+                  style={{
+                    fontSize: `${Math.round(width * 0.12)}px`,
+                    fontFamily: '"Sukhumvit Set", sans-serif',
+                  }}
+                >
+                  {nameInfo.firstName}
+                </h1>
+
+                {/* Last Name (Medium Navy, Left Aligned) */}
+                {nameInfo.lastName && (
+                  <h2 
+                    className="font-medium text-[#183e66] leading-tight uppercase drop-shadow-xs mt-0.5"
                     style={{
-                      fontSize: `${Math.round(width * 0.126)}px`,
+                      fontSize: `${Math.round(width * 0.068)}px`,
                       fontFamily: '"Sukhumvit Set", sans-serif',
                     }}
                   >
-                    {nameInfo.firstName}
-                  </h1>
+                    {nameInfo.lastName}
+                  </h2>
+                )}
 
-                  {/* Last Name (Medium Navy, Right Indented) */}
-                  <div className="flex justify-end -mt-1 sm:-mt-1.5">
-                    <h2 
-                      className="font-medium text-[#183e66] leading-none uppercase drop-shadow-xs"
-                      style={{
-                        fontSize: `${Math.round(width * 0.071)}px`,
-                        fontFamily: '"Sukhumvit Set", sans-serif',
-                      }}
-                    >
-                      {nameInfo.lastName}
-                    </h2>
-                  </div>
-
-                  {/* Position with matching underline */}
-                  <div className="flex justify-end items-center mt-1">
-                    <div className="flex flex-col items-end">
-                      <span 
-                        className="text-[#183e66] font-bold tracking-wider uppercase opacity-95"
-                        style={{
-                          fontSize: `${Math.max(9, Math.round(width * 0.024))}px`,
-                        }}
-                      >
-                        {positionEn}
-                      </span>
-                      <div className="w-full h-[1.5px] bg-[#183e66] opacity-80 mt-0.5 rounded-full" />
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col">
-                  {/* Single Name (e.g. Workspace Admin) */}
-                  <h1 
-                    className="font-bold tracking-tight text-[#183e66] leading-[0.9] uppercase drop-shadow-xs"
+                {/* Position with matching underline, Left Aligned */}
+                <div className="flex flex-col items-start mt-1.5">
+                  <span 
+                    className="text-[#183e66] font-bold tracking-wider uppercase opacity-95"
                     style={{
-                      fontSize: `${Math.round(width * 0.126)}px`,
-                      fontFamily: '"Sukhumvit Set", sans-serif',
+                      fontSize: `${Math.max(9, Math.round(width * 0.024))}px`,
                     }}
                   >
-                    {nameInfo.firstName}
-                  </h1>
-
-                  <div className="flex items-center justify-between mt-1 pt-1 border-t border-[#183e66]/20">
-                    <span 
-                      className="text-[#183e66] font-bold tracking-wider uppercase opacity-95"
-                      style={{
-                        fontSize: `${Math.max(9, Math.round(width * 0.024))}px`,
-                      }}
-                    >
-                      {positionEn}
-                    </span>
-                    <div className="w-12 h-[1.5px] bg-[#183e66] opacity-80 rounded-full" />
-                  </div>
+                    {positionEn}
+                  </span>
+                  <div className="w-full h-[1.5px] bg-[#183e66] opacity-80 mt-0.5 rounded-full" />
                 </div>
-              )}
+              </div>
             </div>
 
             {/* Hologram Light Sheen (Simulates Physical Card Lamination Reflection) */}
@@ -296,11 +267,11 @@ export function StaffIdCard({
           </div>
 
           {/* ======================================================== */}
-          {/* BACK SIDE (หลังบัตร - ดีไซน์สไตล์สถาบันทรงคุณค่า เรียบหรู)    */}
+          {/* BACK SIDE (หลังบัตร - ดีไซน์เดียวกับด้านหน้า ขาว-กรมท่า #183e66) */}
           {/* ======================================================== */}
           <div
             ref={backRef as any}
-            className="absolute inset-0 w-full h-full rounded-[28px] sm:rounded-[32px] overflow-hidden bg-gradient-to-b from-white via-[#fcfbf9] to-[#f8f6f0] text-slate-800 shadow-2xl border border-slate-200/90 p-5 sm:p-6 flex flex-col justify-between"
+            className="absolute inset-0 w-full h-full rounded-[28px] sm:rounded-[32px] overflow-hidden bg-white text-[#183e66] shadow-2xl border border-slate-200/80 p-6 flex flex-col justify-between"
             style={{
               backfaceVisibility: 'hidden',
               WebkitBackfaceVisibility: 'hidden',
@@ -311,100 +282,82 @@ export function StaffIdCard({
               transition: 'opacity 0.25s ease-out',
             }}
           >
-            {/* Inner Luxury Gold Hairline Frame */}
-            <div className="absolute inset-3 rounded-[20px] sm:rounded-[24px] border border-[#b89058]/35 pointer-events-none z-0" />
+            {/* Subtle Architectural Sketch Watermark matching the front */}
+            <div 
+              className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none opacity-[0.08]"
+              style={{ backgroundImage: "url('/staff-card/card-bg.png')" }}
+            />
 
-            {/* Header: School Identity */}
-            <div className="relative z-10 flex items-center justify-between border-b border-[#b89058]/25 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg p-0.5 flex items-center justify-center shrink-0">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img 
-                    src="/SV-Portal.png" 
-                    alt="Logo" 
-                    className="w-full h-full object-contain" 
-                  />
-                </div>
-                <div>
-                  <h3 className="text-xs font-bold text-[#183e66] tracking-wide leading-tight">
-                    โรงเรียนสมคิดวิทยา
-                  </h3>
-                  <p className="text-[9px] tracking-widest text-[#b89058] font-bold uppercase">
-                    Somkidvittaya School
-                  </p>
-                </div>
-              </div>
-
-              <div className="text-right">
-                <span className="inline-block px-2 py-0.5 rounded-full text-[8px] font-bold tracking-wider uppercase bg-[#183e66]/5 text-[#183e66] border border-[#183e66]/15">
-                  FACULTY CARD
-                </span>
-              </div>
+            {/* Top: Official School Crest & Wordmark (same as front) */}
+            <div className="relative z-10 flex flex-col items-center pt-1 pb-3 border-b border-[#183e66]/10">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img 
+                src="/staff-card/school-logo-navy.png" 
+                alt="Somkidvittaya School" 
+                className="h-12 sm:h-14 w-auto object-contain" 
+              />
             </div>
 
-            {/* Middle: QR Code & Staff Identity */}
-            <div className="relative z-10 flex flex-col items-center justify-center my-auto py-1">
-              {/* QR Code Container */}
-              <div className="p-2.5 bg-white rounded-2xl shadow-sm border border-[#b89058]/40 flex flex-col items-center">
+            {/* Middle: Crisp Navy QR Code & Left-Aligned Staff Info */}
+            <div className="relative z-10 flex flex-col items-center justify-center my-auto py-2 w-full">
+              <div className="p-2.5 bg-white rounded-2xl border border-[#183e66]/15 shadow-xs flex flex-col items-center">
                 {qrCodeDataUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={qrCodeDataUrl}
                     alt="Staff Verification QR"
-                    className="w-28 h-28 sm:w-32 sm:h-32 object-contain"
+                    className="w-32 h-32 sm:w-36 sm:h-36 object-contain"
                   />
                 ) : (
-                  <div className="w-28 h-28 sm:w-32 sm:h-32 flex items-center justify-center bg-slate-100 rounded-xl">
-                    <QrIcon className="w-8 h-8 text-slate-400 animate-pulse" />
+                  <div className="w-32 h-32 sm:w-36 sm:h-36 flex items-center justify-center bg-slate-50 rounded-xl">
+                    <QrIcon className="w-8 h-8 text-[#183e66]/40 animate-pulse" />
                   </div>
                 )}
-                <span className="text-[8px] font-bold text-[#183e66]/80 tracking-widest uppercase mt-1">
-                  Scan to Verify &amp; Connect
-                </span>
               </div>
 
-              {/* Cardholder Details */}
-              <div className="mt-2 text-center space-y-0.5">
-                <p className="text-xs sm:text-sm font-bold text-[#183e66] tracking-wide">
+              {/* Left-aligned Staff Details (matching front card alignment) */}
+              <div className="w-full mt-4 text-left px-1">
+                <p 
+                  className="text-sm font-bold text-[#183e66] leading-snug"
+                  style={{ fontFamily: '"Sukhumvit Set", sans-serif' }}
+                >
                   {nameInfo.fullNameTh || personnel.name_th || nameInfo.fullNameEn}
                 </p>
-                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+                <p 
+                  className="text-xs font-bold text-[#183e66]/85 uppercase tracking-wide mt-0.5"
+                  style={{ fontFamily: '"Sukhumvit Set", sans-serif' }}
+                >
                   {nameInfo.fullNameEn}
                 </p>
-                <p className="text-[10px] font-bold text-[#b89058] tracking-wide">
+                <p className="text-[11px] font-medium text-slate-500 mt-0.5">
                   {personnel.position_th || positionEn}
                 </p>
               </div>
             </div>
 
-            {/* Credential Dates Block (Academic Year, Valid From, Expires) */}
-            <div className="relative z-10 w-full grid grid-cols-3 gap-1 py-1.5 px-2 rounded-xl bg-white/80 border border-[#b89058]/30 text-center shadow-2xs">
-              <div>
-                <span className="block text-[7.5px] font-bold text-slate-400 uppercase tracking-wider">ปีการศึกษา</span>
-                <span className="text-[10.5px] font-bold text-[#183e66]">{personnel.academic_year || '2567'}</span>
+            {/* Bottom: Validity Dates & Official School Footer */}
+            <div className="relative z-10 space-y-2.5 pt-3 border-t border-[#183e66]/15">
+              <div className="grid grid-cols-3 gap-2 text-left">
+                <div>
+                  <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-wider">ปีการศึกษา</span>
+                  <span className="text-[11px] font-bold text-[#183e66]">{personnel.academic_year || '2569'}</span>
+                </div>
+                <div>
+                  <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-wider">VALID FROM</span>
+                  <span className="text-[10px] font-semibold text-[#183e66]">{personnel.card_issue_date || '16 พ.ค. 2569'}</span>
+                </div>
+                <div>
+                  <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-wider">EXPIRES</span>
+                  <span className="text-[10px] font-semibold text-[#183e66]">{personnel.card_expire_date || '15 พ.ค. 2571'}</span>
+                </div>
               </div>
-              <div className="border-x border-[#b89058]/20">
-                <span className="block text-[7.5px] font-bold text-slate-400 uppercase tracking-wider">ออกบัตร (ISSUED)</span>
-                <span className="text-[9.5px] font-semibold text-slate-700">{personnel.card_issue_date || '16 พ.ค. 2567'}</span>
-              </div>
-              <div>
-                <span className="block text-[7.5px] font-bold text-slate-400 uppercase tracking-wider">หมดอายุ (EXPIRES)</span>
-                <span className="text-[9.5px] font-bold text-rose-700">{personnel.card_expire_date || '15 พ.ค. 2569'}</span>
-              </div>
-            </div>
 
-            {/* Footer: Legal Notice & Tap to flip hint */}
-            <div className="relative z-10 space-y-1 border-t border-[#b89058]/25 pt-2 text-center">
-              <p className="text-[8px] text-slate-500 leading-snug">
-                โรงเรียนสมคิดวิทยา อ.เมืองระยอง จ.ระยอง • โทร. 038-611251
-              </p>
-              <p className="text-[8.5px] font-bold text-[#183e66]">
-                www.somkidvittaya.ac.th
-              </p>
-
-              <div className="pt-0.5 flex items-center justify-center gap-1 text-[8px] text-slate-400">
-                <RotateCw className="w-2 h-2" />
-                <span>แตะที่บัตรเพื่อพลิกกลับด้านหน้า</span>
+              <div className="flex items-center justify-between text-[8.5px] text-slate-500 pt-1.5 border-t border-slate-100">
+                <span>โทร. 038-611251 • www.somkidvittaya.ac.th</span>
+                <span className="inline-flex items-center gap-1 text-[#183e66]/60">
+                  <RotateCw className="w-2.5 h-2.5" />
+                  <span>พลิกบัตร</span>
+                </span>
               </div>
             </div>
           </div>
