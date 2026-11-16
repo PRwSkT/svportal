@@ -94,6 +94,11 @@ export default function StaffIdCardSelfServicePage() {
         useCORS: true,
         allowTaint: true,
         backgroundColor: null,
+        onclone: (_, element) => {
+          element.style.transform = 'none';
+          element.style.opacity = '1';
+          element.style.visibility = 'visible';
+        },
       });
 
       const dataUrl = canvas.toDataURL('image/png');

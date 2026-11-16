@@ -123,6 +123,11 @@ export function StaffIdCard({
             style={{
               backfaceVisibility: 'hidden',
               WebkitBackfaceVisibility: 'hidden',
+              transform: 'rotateY(0deg) translateZ(1px)',
+              zIndex: isFlipped ? 1 : 2,
+              pointerEvents: isFlipped ? 'none' : 'auto',
+              opacity: isFlipped ? 0 : 1,
+              transition: 'opacity 0.25s ease-out',
             }}
           >
             {/* Layer 1: Background Template (Building sketch + Top/Bottom logos) */}
@@ -135,9 +140,9 @@ export function StaffIdCard({
             <div 
               className="absolute inset-0 w-full h-full flex items-center justify-center pointer-events-none"
               style={{
-                // Mask the bottom of the photo so it smoothly dissolves into the card
-                maskImage: 'linear-gradient(to top, transparent 0%, transparent 12%, rgba(0,0,0,0.5) 24%, black 35%, black 100%)',
-                WebkitMaskImage: 'linear-gradient(to top, transparent 0%, transparent 12%, rgba(0,0,0,0.5) 24%, black 35%, black 100%)',
+                // Mask the bottom of the photo so it smoothly dissolves into the card without letting the building show through clothes
+                maskImage: 'linear-gradient(to top, transparent 0%, transparent 4%, rgba(0,0,0,0.85) 16%, black 28%, black 100%)',
+                WebkitMaskImage: 'linear-gradient(to top, transparent 0%, transparent 4%, rgba(0,0,0,0.85) 16%, black 28%, black 100%)',
               }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -224,7 +229,11 @@ export function StaffIdCard({
             style={{
               backfaceVisibility: 'hidden',
               WebkitBackfaceVisibility: 'hidden',
-              transform: 'rotateY(180deg)',
+              transform: 'rotateY(180deg) translateZ(1px)',
+              zIndex: isFlipped ? 2 : 1,
+              pointerEvents: isFlipped ? 'auto' : 'none',
+              opacity: isFlipped ? 1 : 0,
+              transition: 'opacity 0.25s ease-out',
             }}
           >
             {/* Header: School Info */}

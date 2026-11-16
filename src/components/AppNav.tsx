@@ -31,7 +31,6 @@ import {
   ChevronDown,
   Menu,
   X,
-  User as UserIcon,
   Bell,
   BookOpen,
   CalendarDays,
@@ -68,14 +67,19 @@ export function AppNav() {
   const { user, role, appUser, isLoading, signOut } = useAuth();
   const { language, dict } = useLanguage();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close desktop dropdown on click outside
+  // Close dropdowns on click outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsMenuOpen(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -85,6 +89,7 @@ export function AppNav() {
   // Close menus on route change
   useEffect(() => {
     setIsMenuOpen(false);
+    setIsUserMenuOpen(false);
     setIsMobileDrawerOpen(false);
   }, [pathname]);
 
@@ -138,7 +143,7 @@ export function AppNav() {
     { id: 'calendar', href: '/calendar', label: language === 'th' ? 'ปฏิทินปฏิบัติงาน & เวรครู' : 'Operational Calendar', category: language === 'th' ? 'งานวิชาการ' : 'Academic Affairs', icon: CalendarDays, colorClass: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
   ], [dict, language]);
 
-  if (pathname === '/' || pathname === '/login' || pathname.startsWith('/website') || pathname.startsWith('/forms/') || pathname.startsWith('/parents') || pathname.startsWith('/room-checkin')) return null;
+  if (pathname === '/' || pathname === '/login' || pathname.startsWith('/website') || pathname.startsWith('/forms/') || pathname.startsWith('/parents') || pathname.startsWith('/room-checkin') || pathname.startsWith('/verify')) return null;
   if (isLoading || !user) return null;
 
   const isAdmin = role === 'admin' || appUser?.role === 'admin' || isSystemAdmin(user?.email);
@@ -148,6 +153,8 @@ export function AppNav() {
   const accessibleModules = allModules.filter((item) => {
     if (isAdmin) return true;
     if (assignedFeatures.includes(item.id)) return true;
+    if (role === 'teacher' && ['academic_hub', 'academic_gradebook', 'academic_early_years', 'academic_assignments', 'academic_exams', 'academic_timetable', 'calendar', 'pastoral_care', 'student_attendance', 'parent_communications', 'admin_forms', 'admin_kpi'].includes(item.id)) return true;
+    if (role === 'academic staff' && ['academic_hub', 'academic_gradebook', 'academic_early_years', 'academic_assignments', 'academic_exams', 'academic_timetable', 'academic_documents', 'academic_opec', 'admin_academic', 'calendar', 'student_attendance', 'admin_students', 'parent_communications', 'admin_forms'].includes(item.id)) return true;
     if (role === 'cashier' && ['pos_shop', 'pos_fees', 'admin_fees', 'pos_wallet_topup'].includes(item.id)) return true;
     return false;
   });
@@ -166,77 +173,71 @@ export function AppNav() {
   const displayName = appUser?.full_name || (user.email ? user.email.split('@')[0] : 'ผู้ใช้งาน');
 
   return (
-    <header className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 shadow-sm sticky top-0 z-50 transition-all">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-4">
+    <header className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 shadow-xs sticky top-0 z-50 transition-all">
+      <div className="max-w-7xl mx-auto px-3 sm:px-5 lg:px-8">
+        <div className="flex items-center justify-between h-16 gap-2 sm:gap-4">
           
-          {/* Left Brand: SV Portal Logo Only */}
-          <div className="flex items-center gap-6">
+          {/* ======================================================== */}
+          {/* Left: Brand Logo & Desktop Navigation                     */}
+          {/* ======================================================== */}
+          <div className="flex items-center gap-2 sm:gap-4 lg:gap-6 min-w-0">
             <Link
               href="/home"
-              className="flex items-center gap-2 group focus:outline-none flex-shrink-0"
+              className="flex items-center gap-2 group focus:outline-none shrink-0"
               title="SV Portal - หน้าหลัก"
             >
               <Image
                 src="/SV-Portal.png"
                 alt="SV Portal"
-                width={135}
-                height={36}
-                className="h-8 md:h-9 w-auto object-contain transition-transform group-hover:scale-105"
+                width={128}
+                height={34}
+                className="h-7 sm:h-8 w-auto object-contain transition-transform group-hover:scale-105"
                 priority
               />
             </Link>
 
             {/* Desktop Navigation Links */}
-            <nav className="hidden md:flex items-center gap-1.5">
+            <nav className="hidden md:flex items-center gap-1 sm:gap-1.5 min-w-0">
               <Link
                 href="/home"
-                className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
                   pathname === '/home'
-                    ? 'bg-[#7B1C3E] text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+                    ? 'bg-[#7B1C3E] text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-slate-800'
                 }`}
               >
-                <Home className="w-4 h-4" />
-                <span>{language === 'th' ? 'หน้าหลัก' : 'Home'}</span>
+                <Home className="w-4 h-4 shrink-0" />
+                <span className="hidden lg:inline">{language === 'th' ? 'หน้าหลัก' : 'Home'}</span>
               </Link>
 
-              {/* Active Module Indicator Tab (if not on /home) */}
-              {pathname !== '/home' && currentActiveModule && (
-                <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold bg-[#7B1C3E]/10 text-[#7B1C3E] border border-[#7B1C3E]/20">
-                  <currentActiveModule.icon className="w-4 h-4" />
-                  <span>{currentActiveModule.label}</span>
-                </div>
-              )}
-
               {/* Dropdown: เมนูระบบ (All Modules Menu) */}
-              <div className="relative" ref={dropdownRef}>
+              <div className="relative shrink-0" ref={dropdownRef}>
                 <button
                   type="button"
                   onClick={() => setIsMenuOpen(!isMenuOpen)}
-                  className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold border transition-all ${
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold border transition-all ${
                     isMenuOpen
-                      ? 'bg-slate-100 text-slate-900 border-slate-300 shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border-slate-200'
+                      ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white border-slate-300 dark:border-slate-600 shadow-xs'
+                      : 'text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700'
                   }`}
                   aria-expanded={isMenuOpen}
                 >
-                  <LayoutGrid className="w-4 h-4 text-[#7B1C3E]" />
-                  <span>{language === 'th' ? 'เมนูระบบ' : 'System Menu'}</span>
+                  <LayoutGrid className="w-4 h-4 text-[#7B1C3E] dark:text-pink-400 shrink-0" />
+                  <span>{language === 'th' ? 'เมนูระบบ' : 'Menu'}</span>
                   <ChevronDown
                     className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
-                      isMenuOpen ? 'rotate-180 text-slate-700' : ''
+                      isMenuOpen ? 'rotate-180 text-slate-700 dark:text-slate-200' : ''
                     }`}
                   />
                 </button>
 
                 {/* Desktop Dropdown Panel */}
                 {isMenuOpen && (
-                  <div className="absolute left-0 mt-2 w-[540px] bg-white rounded-2xl shadow-2xl border border-slate-200/90 p-5 z-50 animate-in fade-in zoom-in-95 duration-150">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                  <div className="absolute left-0 mt-2 w-[480px] lg:w-[540px] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200/90 dark:border-slate-800 p-4 lg:p-5 z-50 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-3">
                       <div className="flex items-center gap-2">
-                        <LayoutGrid className="w-4 h-4 text-[#7B1C3E]" />
-                        <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        <LayoutGrid className="w-4 h-4 text-[#7B1C3E] dark:text-pink-400" />
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                           {dict.nav.navigationMenu}
                         </span>
                       </div>
@@ -245,7 +246,7 @@ export function AppNav() {
                       </span>
                     </div>
 
-                    <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+                    <div className="space-y-4 max-h-[68vh] overflow-y-auto pr-1">
                       {categories.map((category) => {
                         const items = accessibleModules.filter((m) => m.category === category);
                         return (
@@ -264,16 +265,16 @@ export function AppNav() {
                                     key={item.id}
                                     href={item.href}
                                     onClick={() => setIsMenuOpen(false)}
-                                    className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all ${
+                                    className={`flex items-center gap-2.5 p-2 rounded-xl border transition-all ${
                                       isItemActive
-                                        ? 'bg-[#7B1C3E]/10 border-[#7B1C3E]/30 text-[#7B1C3E] font-semibold'
-                                        : 'bg-slate-50/60 hover:bg-slate-100 border-slate-100 hover:border-slate-200 text-slate-700'
+                                        ? 'bg-[#7B1C3E]/10 border-[#7B1C3E]/30 text-[#7B1C3E] dark:text-pink-300 font-semibold'
+                                        : 'bg-slate-50/60 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-100 dark:border-slate-700/80 text-slate-700 dark:text-slate-200'
                                     }`}
                                   >
                                     <div
-                                      className={`w-8 h-8 rounded-lg flex items-center justify-center border shrink-0 ${item.colorClass}`}
+                                      className={`w-7 h-7 rounded-lg flex items-center justify-center border shrink-0 ${item.colorClass}`}
                                     >
-                                      <ItemIcon className="w-4 h-4" />
+                                      <ItemIcon className="w-3.5 h-3.5" />
                                     </div>
                                     <span className="text-xs font-medium truncate">
                                       {item.label}
@@ -289,67 +290,194 @@ export function AppNav() {
                   </div>
                 )}
               </div>
+
+              {/* Active Module Indicator Tab (Only on extra wide screens to avoid clutter) */}
+              {pathname !== '/home' && currentActiveModule && (
+                <div className="hidden 2xl:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#7B1C3E]/10 text-[#7B1C3E] dark:text-pink-300 border border-[#7B1C3E]/20 max-w-[220px] truncate shrink-0">
+                  <currentActiveModule.icon className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{currentActiveModule.label}</span>
+                </div>
+              )}
             </nav>
           </div>
 
-          {/* Right Controls (Desktop Profile & Sign Out) */}
-          <div className="hidden md:flex items-center gap-3">
-            {/* My Staff ID Card Quick Launch */}
+          {/* ======================================================== */}
+          {/* Right: Actions & Responsive User Profile Menu            */}
+          {/* ======================================================== */}
+          <div className="hidden md:flex items-center gap-2 lg:gap-2.5 shrink-0">
+            {/* Quick Launch: My Staff ID Card (Only on xl+ screens) */}
             <Link
               href="/staff/id-card"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-sky-50 hover:bg-sky-100 text-[#183e66] border border-sky-200/80 shadow-xs transition-all"
+              className={`hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                pathname === '/staff/id-card'
+                  ? 'bg-[#183e66] text-white border-[#183e66] shadow-xs'
+                  : 'bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 dark:hover:bg-sky-900/40 text-[#183e66] dark:text-sky-300 border-sky-200/80 dark:border-sky-800/80'
+              }`}
               title="เปิดบัตรประจำตัวบุคลากรออนไลน์ (My Digital Staff ID)"
             >
-              <ShieldCheck className="w-3.5 h-3.5 text-sky-600" />
+              <ShieldCheck className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
               <span>{language === 'th' ? 'บัตรของฉัน' : 'My ID'}</span>
-            </Link>
-
-            {/* Parents Portal PWA Quick Launch */}
-            <Link
-              href="/parents"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 shadow-xs transition-all"
-              title="เปิดระบบ Parents Portal PWA (parents.portal.somkidvittaya.ac.th)"
-            >
-              <Smartphone className="w-3.5 h-3.5 text-amber-600" />
-              <span>{language === 'th' ? 'Parents Portal' : 'Parents PWA'}</span>
             </Link>
 
             {/* Notification Bell */}
             <NotificationBell />
 
             {/* Language Switcher */}
-            <LanguageSwitcher size="sm" showIcon />
+            <LanguageSwitcher size="sm" />
 
-            <div className="flex items-center gap-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 px-3 py-1.5 rounded-xl">
-              <div className="w-7 h-7 rounded-lg bg-[#7B1C3E]/15 text-[#7B1C3E] dark:text-pink-300 flex items-center justify-center font-bold text-xs uppercase shrink-0">
-                {displayName.charAt(0)}
-              </div>
-              <div className="flex flex-col text-left">
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-100 max-w-[130px] truncate" title={displayName}>
+            {/* Vertical Separator */}
+            <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
+
+            {/* Unified User Profile Menu Dropdown */}
+            <div className="relative" ref={userMenuRef}>
+              <button
+                type="button"
+                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                className={`flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-2xl border transition-all ${
+                  isUserMenuOpen
+                    ? 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 shadow-xs ring-2 ring-slate-200/80 dark:ring-slate-700'
+                    : 'bg-slate-50/80 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-200/80 dark:border-slate-700'
+                }`}
+                aria-expanded={isUserMenuOpen}
+                aria-label="User Profile Menu"
+              >
+                {/* User Avatar Initial */}
+                <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-[#7B1C3E] to-[#9B2C4E] text-white flex items-center justify-center font-bold text-xs uppercase shadow-xs shrink-0">
+                  {displayName.charAt(0)}
+                </div>
+
+                {/* Display Name (Shown on lg+ screens) */}
+                <span className="hidden lg:inline-block text-xs font-semibold text-slate-800 dark:text-slate-100 max-w-[110px] truncate" title={displayName}>
                   {displayName}
                 </span>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 max-w-[130px] truncate" title={user.email || ''}>
-                  {user.email}
-                </span>
-              </div>
-              <span className={`ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${roleBadge.badgeClass}`}>
-                {language === 'th' ? roleBadge.labelTh : roleBadge.labelEn}
-              </span>
-            </div>
 
-            <button
-              type="button"
-              onClick={signOut}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-100 transition-colors"
-              title={dict.nav.logout}
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>{language === 'th' ? 'ออก' : 'Exit'}</span>
-            </button>
+                {/* Role Badge (Shown on xl+ screens) */}
+                <span className={`hidden xl:inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold border ${roleBadge.badgeClass}`}>
+                  {language === 'th' ? roleBadge.labelTh : roleBadge.labelEn}
+                </span>
+
+                <ChevronDown
+                  className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
+                    isUserMenuOpen ? 'rotate-180 text-slate-700 dark:text-slate-200' : ''
+                  }`}
+                />
+              </button>
+
+              {/* User Dropdown Panel */}
+              {isUserMenuOpen && (
+                <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200/90 dark:border-slate-800 p-3 z-50 animate-in fade-in zoom-in-95 duration-150">
+                  {/* User Profile Header */}
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-800 mb-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#7B1C3E] text-white flex items-center justify-center font-bold text-sm uppercase shrink-0 shadow-xs">
+                        {displayName.charAt(0)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-slate-900 dark:text-white truncate" title={displayName}>
+                          {displayName}
+                        </p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate" title={user.email || ''}>
+                          {user.email}
+                        </p>
+                        <div className="mt-1">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${roleBadge.badgeClass}`}>
+                            {language === 'th' ? roleBadge.labelTh : roleBadge.labelEn}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quick Action Links */}
+                  <div className="space-y-1">
+                    {/* My Staff ID Card */}
+                    <Link
+                      href="/staff/id-card"
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className="flex items-center justify-between p-2.5 rounded-xl hover:bg-sky-50 dark:hover:bg-sky-950/40 text-slate-700 dark:text-slate-200 hover:text-[#183e66] dark:hover:text-sky-300 transition-colors group"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-7 h-7 rounded-lg bg-sky-100 dark:bg-sky-900/50 text-[#183e66] dark:text-sky-300 flex items-center justify-center shrink-0">
+                          <ShieldCheck className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold leading-tight truncate">
+                            {language === 'th' ? 'บัตรประจำตัวบุคลากร' : 'Staff ID Card'}
+                          </p>
+                          <p className="text-[10px] text-slate-400 truncate">
+                            {language === 'th' ? 'นามบัตรดิจิทัล & NFC' : 'Digital ID & NFC'}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold text-sky-600 bg-sky-100/80 dark:bg-sky-900/60 dark:text-sky-300 px-2 py-0.5 rounded-md shrink-0">
+                        Active
+                      </span>
+                    </Link>
+
+                    {/* Parents Portal Link */}
+                    <Link
+                      href="/parents"
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-amber-50 dark:hover:bg-amber-950/40 text-slate-700 dark:text-slate-200 hover:text-amber-800 dark:hover:text-amber-300 transition-colors"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300 flex items-center justify-center shrink-0">
+                        <Smartphone className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold leading-tight truncate">
+                          Parents Portal (PWA)
+                        </p>
+                        <p className="text-[10px] text-slate-400 truncate">
+                          {language === 'th' ? 'ระบบผู้ปกครอง' : 'Parent Web App'}
+                        </p>
+                      </div>
+                    </Link>
+
+                    {/* If Admin: User Management */}
+                    {isAdmin && (
+                      <Link
+                        href="/admin/users"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors"
+                      >
+                        <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center shrink-0">
+                          <Users className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold leading-tight truncate">
+                            {language === 'th' ? 'จัดการผู้ใช้งาน' : 'User Management'}
+                          </p>
+                          <p className="text-[10px] text-slate-400 truncate">
+                            {language === 'th' ? 'สิทธิ์และบทบาท' : 'Roles & Permissions'}
+                          </p>
+                        </div>
+                      </Link>
+                    )}
+                  </div>
+
+                  {/* Sign Out Button */}
+                  <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        signOut();
+                      }}
+                      className="w-full flex items-center gap-2 p-2 rounded-xl text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>{dict.nav.logout}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Mobile Right Controls: Notification Bell + Language Switcher + Hamburger */}
-          <div className="flex md:hidden items-center gap-2">
+          {/* ======================================================== */}
+          {/* Mobile Right Controls: Bell + Language + Hamburger       */}
+          {/* ======================================================== */}
+          <div className="flex md:hidden items-center gap-1.5 sm:gap-2 shrink-0">
             <NotificationBell />
             <LanguageSwitcher size="sm" />
             <button
@@ -358,59 +486,61 @@ export function AppNav() {
               className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               aria-label="เมนูหลัก"
             >
-              {isMobileDrawerOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {isMobileDrawerOpen ? <X className="w-5 h-5 sm:w-6 sm:h-6" /> : <Menu className="w-5 h-5 sm:w-6 sm:h-6" />}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Mobile Drawer (Responsive Overlay) */}
+      {/* ======================================================== */}
+      {/* Mobile Drawer (Responsive Overlay)                       */}
+      {/* ======================================================== */}
       {isMobileDrawerOpen && (
         <div className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl animate-in slide-in-from-top-2 duration-200 max-h-[85vh] overflow-y-auto">
           {/* User Profile Card */}
           <div className="p-4 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#7B1C3E] text-white flex items-center justify-center font-bold text-sm uppercase">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-[#7B1C3E] text-white flex items-center justify-center font-bold text-sm uppercase shrink-0">
                 {displayName.charAt(0)}
               </div>
-              <div>
-                <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight">{displayName}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[170px]">{user.email}</p>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">{displayName}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[190px]">{user.email}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${roleBadge.badgeClass}`}>
+            <div className="shrink-0 ml-2">
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${roleBadge.badgeClass}`}>
                 {language === 'th' ? roleBadge.labelTh : roleBadge.labelEn}
               </span>
             </div>
           </div>
 
-          {/* Mobile Navigation Links */}
-          <div className="p-4 space-y-5">
+          {/* Quick Action Navigation Grid */}
+          <div className="p-4 space-y-4">
             <div className="grid grid-cols-2 gap-2">
               <Link
                 href="/home"
                 onClick={() => setIsMobileDrawerOpen(false)}
-                className={`flex items-center gap-2.5 p-3 rounded-xl font-bold text-xs transition-all ${
+                className={`flex items-center gap-2 p-2.5 rounded-xl font-bold text-xs transition-all ${
                   pathname === '/home'
-                    ? 'bg-[#7B1C3E] text-white shadow-sm'
+                    ? 'bg-[#7B1C3E] text-white shadow-xs'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-slate-200'
                 }`}
               >
-                <Home className="w-4 h-4" />
+                <Home className="w-4 h-4 shrink-0" />
                 <span>{language === 'th' ? 'หน้าหลัก' : 'Home'}</span>
               </Link>
 
               <Link
                 href="/staff/id-card"
                 onClick={() => setIsMobileDrawerOpen(false)}
-                className={`flex items-center gap-2.5 p-3 rounded-xl font-bold text-xs transition-all ${
+                className={`flex items-center gap-2 p-2.5 rounded-xl font-bold text-xs transition-all ${
                   pathname === '/staff/id-card'
-                    ? 'bg-[#183e66] text-white shadow-sm'
+                    ? 'bg-[#183e66] text-white shadow-xs'
                     : 'bg-sky-50 dark:bg-sky-950/50 text-[#183e66] dark:text-sky-300 hover:bg-sky-100 border border-sky-200/80'
                 }`}
               >
-                <ShieldCheck className="w-4 h-4 text-sky-600" />
+                <ShieldCheck className="w-4 h-4 text-sky-600 shrink-0" />
                 <span>{language === 'th' ? 'บัตรของฉัน' : 'My ID'}</span>
               </Link>
             </div>
@@ -433,7 +563,7 @@ export function AppNav() {
                           key={item.id}
                           href={item.href}
                           onClick={() => setIsMobileDrawerOpen(false)}
-                          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border text-xs font-medium transition-all ${
+                          className={`flex items-center gap-3 px-3 py-2 rounded-xl border text-xs font-medium transition-all ${
                             isItemActive
                               ? 'bg-[#7B1C3E]/10 border-[#7B1C3E]/30 text-[#7B1C3E] font-bold'
                               : 'bg-white dark:bg-slate-800 hover:bg-slate-50 border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-200'
@@ -442,7 +572,7 @@ export function AppNav() {
                           <div className={`w-7 h-7 rounded-lg flex items-center justify-center border shrink-0 ${item.colorClass}`}>
                             <ItemIcon className="w-3.5 h-3.5" />
                           </div>
-                          <span>{item.label}</span>
+                          <span className="truncate">{item.label}</span>
                         </Link>
                       );
                     })}
@@ -455,7 +585,7 @@ export function AppNav() {
               <button
                 type="button"
                 onClick={signOut}
-                className="w-full flex items-center justify-center gap-2 p-3 rounded-xl text-sm font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors"
+                className="w-full flex items-center justify-center gap-2 p-2.5 rounded-xl text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors"
               >
                 <LogOut className="w-4 h-4" />
                 <span>{dict.nav.logout}</span>
