@@ -83,10 +83,10 @@ export default function StaffVerificationView({ personnel, requestedId }: StaffV
   const nameInfo = formatStaffName(personnel.name_en, personnel.name_th);
 
   const eyebrowLabel = personnel.category === 'executive'
-    ? 'SCHOOL EXECUTIVE'
+    ? 'คณะผู้บริหารโรงเรียน'
     : personnel.category === 'staff'
-    ? 'SCHOOL STAFF'
-    : 'FACULTY MEMBER';
+    ? 'บุคลากรโรงเรียนสมคิดวิทยา'
+    : 'คณาจารย์โรงเรียนสมคิดวิทยา';
 
   const handleDownloadContact = () => {
     downloadVCard(personnel);
@@ -176,9 +176,9 @@ export default function StaffVerificationView({ personnel, requestedId }: StaffV
         {/* Right: Clean Architectural Profile matching somkidvittaya.ac.th */}
         <div className="w-full max-w-lg space-y-6">
           
-          {/* Identity Header */}
+          {/* Identity Header (consistent Thai) */}
           <div className="border-b border-[#091b30]/15 pb-4">
-            <p className="text-[11px] font-bold tracking-[0.14em] uppercase text-[#8b1d32] mb-1">
+            <p className="text-xs font-bold text-[#8b1d32] mb-1">
               {eyebrowLabel}
             </p>
             
@@ -186,19 +186,9 @@ export default function StaffVerificationView({ personnel, requestedId }: StaffV
               {personnel.name_th || nameInfo.fullNameEn}
             </h1>
 
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5 text-xs">
-              <span className="font-bold text-[#12395f]">
-                {personnel.position_th || personnel.position_en}
-              </span>
-              {personnel.position_en && personnel.position_th && (
-                <>
-                  <span className="text-[#091b30]/30">•</span>
-                  <span className="text-[#5c6872] font-medium">
-                    {personnel.position_en}
-                  </span>
-                </>
-              )}
-            </div>
+            <p className="mt-1 text-sm font-bold text-[#12395f]">
+              {personnel.position_th || personnel.position_en}
+            </p>
           </div>
 
           {/* Primary Action Button (Somkid Crimson #8b1d32) */}
@@ -209,7 +199,7 @@ export default function StaffVerificationView({ personnel, requestedId }: StaffV
               className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-[8px] text-xs sm:text-sm font-bold bg-[#8b1d32] hover:bg-[#701627] text-white shadow-sm transition-all hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
             >
               <Contact className="w-4 h-4" />
-              <span>บันทึกลงสมุดโทรศัพท์ (Save to Contacts)</span>
+              <span>บันทึกลงสมุดโทรศัพท์</span>
             </button>
           </div>
 

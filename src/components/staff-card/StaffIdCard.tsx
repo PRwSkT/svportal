@@ -302,17 +302,17 @@ export function StaffIdCard({
               style={{ backgroundImage: "url('/staff-card/building-bg.png')" }}
             />
 
-            {/* Top: Official School Crest & Wordmark (same as front) */}
+            {/* Top: Official School Crest & Wordmark (using uncropped logo2.png) */}
             <div className="relative z-10 flex flex-col items-center pt-1 pb-3 border-b border-[#183e66]/10">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
-                src="/staff-card/school-logo-navy.png" 
+                src="/logo2.png" 
                 alt="Somkidvittaya School" 
-                className="h-12 sm:h-14 w-auto object-contain" 
+                className="h-14 sm:h-16 w-auto object-contain" 
               />
             </div>
 
-            {/* Middle: Crisp Navy QR Code & Left-Aligned Staff Info */}
+            {/* Middle: Crisp Navy QR Code & Center-Aligned Thai Staff Info */}
             <div className="relative z-10 flex flex-col items-center justify-center my-auto py-2 w-full">
               <div className="p-2.5 bg-white rounded-2xl border border-[#183e66]/15 shadow-xs flex flex-col items-center">
                 {qrCodeDataUrl ? (
@@ -329,39 +329,33 @@ export function StaffIdCard({
                 )}
               </div>
 
-              {/* Right-aligned Staff Details */}
-              <div className="w-full mt-4 text-right px-1">
+              {/* Center-aligned Staff Details in consistent Thai */}
+              <div className="w-full mt-4 text-center px-2">
                 <p 
-                  className="text-sm font-bold text-[#183e66] leading-snug"
+                  className="text-sm sm:text-base font-bold text-[#183e66] leading-snug"
                   style={{ fontFamily: '"Sukhumvit Set", sans-serif' }}
                 >
                   {nameInfo.fullNameTh || personnel.name_th || nameInfo.fullNameEn}
                 </p>
-                <p 
-                  className="text-xs font-bold text-[#183e66]/85 uppercase tracking-wide mt-0.5"
-                  style={{ fontFamily: '"Sukhumvit Set", sans-serif' }}
-                >
-                  {nameInfo.fullNameEn}
-                </p>
-                <p className="text-[11px] font-medium text-slate-500 mt-0.5">
+                <p className="text-xs font-medium text-slate-600 mt-0.5">
                   {personnel.position_th || positionEn}
                 </p>
               </div>
             </div>
 
-            {/* Bottom: Validity Dates & Official School Footer */}
+            {/* Bottom: Validity Dates (consistent Thai) & Official School Footer */}
             <div className="relative z-10 space-y-2.5 pt-3 border-t border-[#183e66]/15">
-              <div className="grid grid-cols-3 gap-2 text-left">
+              <div className="grid grid-cols-3 gap-2 text-center">
                 <div>
-                  <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-wider">ปีการศึกษา</span>
+                  <span className="block text-[8.5px] font-bold text-slate-400">ปีการศึกษา</span>
                   <span className="text-[11px] font-bold text-[#183e66]">{personnel.academic_year || '2569'}</span>
                 </div>
                 <div>
-                  <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-wider">VALID FROM</span>
+                  <span className="block text-[8.5px] font-bold text-slate-400">วันออกบัตร</span>
                   <span className="text-[10px] font-semibold text-[#183e66]">{personnel.card_issue_date || '16 พ.ค. 2569'}</span>
                 </div>
                 <div>
-                  <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-wider">EXPIRES</span>
+                  <span className="block text-[8.5px] font-bold text-slate-400">วันหมดอายุ</span>
                   <span className="text-[10px] font-semibold text-[#183e66]">{personnel.card_expire_date || '15 พ.ค. 2571'}</span>
                 </div>
               </div>
