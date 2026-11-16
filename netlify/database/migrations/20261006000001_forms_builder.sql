@@ -66,10 +66,10 @@ ALTER TABLE public.form_fields ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.form_responses ENABLE ROW LEVEL SECURITY;
 
 -- Storage bucket for form attachments
-DO 68539
+DO $$
 BEGIN
   INSERT INTO storage.buckets (id, name, public) 
   VALUES ('form-attachments', 'form-attachments', true)
   ON CONFLICT (id) DO NOTHING;
 EXCEPTION WHEN OTHERS THEN NULL;
-END 68539;
+END $$;
