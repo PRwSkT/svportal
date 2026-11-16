@@ -95,11 +95,11 @@ CREATE POLICY "Allow admin full access on personnel"
   WITH CHECK (public.get_user_role() = 'admin');
 
 -- 7. MAKE FORM ATTACHMENTS BUCKET PRIVATE
-DO 68504
+DO $$
 BEGIN
   UPDATE storage.buckets SET public = false WHERE id = 'form-attachments';
 EXCEPTION WHEN OTHERS THEN NULL;
-END 68504;
+END $$;
 
 -- 8. REVISE checkout_shop_transaction RPC: SERVER-SIDE PRICE & TOTAL VERIFICATION
 CREATE OR REPLACE FUNCTION public.checkout_shop_transaction(payload jsonb)
