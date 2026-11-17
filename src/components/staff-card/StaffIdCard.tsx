@@ -18,7 +18,7 @@ import {
   Award
 } from 'lucide-react';
 import { Personnel } from '@/types';
-import { formatStaffName, formatStaffPosition, getStaffVerificationUrl } from '@/lib/staff-card/utils';
+import { formatStaffName, formatStaffPosition, getStaffVerificationUrl, getAutoCardValidity } from '@/lib/staff-card/utils';
 import { SCHOOL_INFO, DEFAULT_ACADEMIC_YEAR } from '@/lib/constants/school';
 
 interface StaffIdCardProps {
@@ -51,6 +51,7 @@ export function StaffIdCard({
 
   const nameInfo = formatStaffName(personnel.name_en, personnel.name_th);
   const positionEn = formatStaffPosition(personnel.position_en, personnel.position_th);
+  const validity = getAutoCardValidity(personnel);
 
   // Height based on 720:1140 aspect ratio
   const height = Math.round(width * (1140 / 720));
@@ -348,15 +349,15 @@ export function StaffIdCard({
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div>
                   <span className="block text-[8.5px] font-bold text-slate-400">ปีการศึกษา</span>
-                  <span className="text-[11px] font-bold text-[#183e66]">{personnel.academic_year || '2569'}</span>
+                  <span className="text-[11px] font-bold text-[#183e66]">{validity.academicYear}</span>
                 </div>
                 <div>
                   <span className="block text-[8.5px] font-bold text-slate-400">วันออกบัตร</span>
-                  <span className="text-[10px] font-semibold text-[#183e66]">{personnel.card_issue_date || '16 พ.ค. 2569'}</span>
+                  <span className="text-[10px] font-semibold text-[#183e66]">{validity.issueDate}</span>
                 </div>
                 <div>
                   <span className="block text-[8.5px] font-bold text-slate-400">วันหมดอายุ</span>
-                  <span className="text-[10px] font-semibold text-[#183e66]">{personnel.card_expire_date || '15 พ.ค. 2571'}</span>
+                  <span className={`text-[10px] font-semibold ${validity.isActive ? 'text-[#183e66]' : 'text-rose-600'}`}>{validity.expireDate}</span>
                 </div>
               </div>
 

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getRealAuthUser } from '@/lib/auth';
 import { isSystemAdmin } from '@/lib/constants/auth';
+import { getAutoCardValidity } from '@/lib/staff-card/utils';
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -80,6 +81,8 @@ export async function PUT(request: Request) {
           ? appUserData.full_name.trim().toUpperCase() 
           : (authUser.email?.split('@')[0]?.toUpperCase() || 'STAFF'));
 
+      const autoValidity = getAutoCardValidity({ is_active: true });
+
       const newPersonnel = {
         user_id: authUser.id,
         name_th: appUserData?.full_name || authUser.email?.split('@')[0] || 'บุคลากร',
@@ -98,9 +101,9 @@ export async function PUT(request: Request) {
         card_bio: card_bio !== undefined ? card_bio?.trim() : null,
         education_history: body.education_history !== undefined ? body.education_history?.trim() : null,
         experience_history: body.experience_history !== undefined ? body.experience_history?.trim() : null,
-        academic_year: body.academic_year !== undefined ? body.academic_year?.trim() : '2569',
-        card_issue_date: body.card_issue_date !== undefined ? body.card_issue_date?.trim() : '16 พ.ค. 2569',
-        card_expire_date: body.card_expire_date !== undefined ? body.card_expire_date?.trim() : '15 พ.ค. 2571',
+        academic_year: autoValidity.academicYear,
+        card_issue_date: autoValidity.issueDate,
+        card_expire_date: autoValidity.expireDate,
         image_url: body.image_url !== undefined ? (body.image_url?.trim() || null) : null,
         is_active: true,
       };
@@ -133,9 +136,6 @@ export async function PUT(request: Request) {
       card_bio: card_bio !== undefined ? card_bio?.trim() : undefined,
       education_history: body.education_history !== undefined ? body.education_history?.trim() : undefined,
       experience_history: body.experience_history !== undefined ? body.experience_history?.trim() : undefined,
-      academic_year: body.academic_year !== undefined ? body.academic_year?.trim() : undefined,
-      card_issue_date: body.card_issue_date !== undefined ? body.card_issue_date?.trim() : undefined,
-      card_expire_date: body.card_expire_date !== undefined ? body.card_expire_date?.trim() : undefined,
       name_en: body.name_en !== undefined ? body.name_en?.trim()?.toUpperCase() : undefined,
       image_url: body.image_url !== undefined ? (body.image_url?.trim() || null) : undefined,
       updated_at: new Date().toISOString(),

@@ -1,6 +1,6 @@
 import QRCode from 'qrcode';
 import { Personnel } from '@/types';
-import { formatStaffName, formatStaffPosition, getStaffVerificationUrl } from './utils';
+import { formatStaffName, formatStaffPosition, getStaffVerificationUrl, getAutoCardValidity } from './utils';
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -228,11 +228,12 @@ export async function renderStaffCardToDataUrl(
     ctx.fillStyle = 'rgba(24, 62, 102, 0.15)';
     ctx.fillRect(padX, footerTopY, W - padX * 2, 2);
 
+    const validity = getAutoCardValidity(personnel);
     const colW = (W - padX * 2) / 3;
     const cols = [
-      { label: 'ปีการศึกษา', value: personnel.academic_year || '2569' },
-      { label: 'วันออกบัตร', value: personnel.card_issue_date || '16 พ.ค. 2569' },
-      { label: 'วันหมดอายุ', value: personnel.card_expire_date || '15 พ.ค. 2571' },
+      { label: 'ปีการศึกษา', value: validity.academicYear },
+      { label: 'วันออกบัตร', value: validity.issueDate },
+      { label: 'วันหมดอายุ', value: validity.expireDate },
     ];
 
     cols.forEach((col, i) => {

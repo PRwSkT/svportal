@@ -1,4 +1,39 @@
 import { Personnel } from '@/types';
+import { getCurrentAcademicYear } from '@/lib/constants/school';
+
+export interface CardValidityInfo {
+  academicYear: string;
+  issueDate: string;
+  expireDate: string;
+  isActive: boolean;
+}
+
+/**
+ * Automatically computes Academic Year, Valid From, and Expire Date.
+ * Auto-renews every Thai academic year (May 16) as long as the staff member
+ * remains active (`is_active !== false`) in the system.
+ */
+export function getAutoCardValidity(personnel?: Partial<Personnel> | null): CardValidityInfo {
+  const academicYear = getCurrentAcademicYear();
+  const nextYear = (Number(academicYear) + 1).toString();
+  const isActive = personnel?.is_active !== false;
+
+  if (!isActive) {
+    return {
+      academicYear,
+      issueDate: '-',
+      expireDate: 'พ้นสภาพบุคลากร',
+      isActive: false,
+    };
+  }
+
+  return {
+    academicYear,
+    issueDate: `16 พ.ค. ${academicYear}`,
+    expireDate: `15 พ.ค. ${nextYear}`,
+    isActive: true,
+  };
+}
 
 export interface FormattedStaffName {
   firstName: string;

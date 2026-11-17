@@ -18,6 +18,7 @@ import {
 import { FacebookIcon, InstagramIcon, LinkedInIcon } from './SocialIcons';
 import { toast } from 'sonner';
 import { Personnel } from '@/types';
+import { getAutoCardValidity } from '@/lib/staff-card/utils';
 
 interface StaffContactEditModalProps {
   personnel: Partial<Personnel> | null;
@@ -45,9 +46,6 @@ export function StaffContactEditModal({
     card_bio: '',
     education_history: '',
     experience_history: '',
-    academic_year: '2569',
-    card_issue_date: '16 พ.ค. 2569',
-    card_expire_date: '15 พ.ค. 2571',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -67,14 +65,13 @@ export function StaffContactEditModal({
         card_bio: personnel.card_bio || '',
         education_history: personnel.education_history || '',
         experience_history: personnel.experience_history || '',
-        academic_year: personnel.academic_year || '2569',
-        card_issue_date: personnel.card_issue_date || '16 พ.ค. 2569',
-        card_expire_date: personnel.card_expire_date || '15 พ.ค. 2571',
       });
     }
   }, [personnel, isOpen]);
 
   if (!isOpen || !personnel) return null;
+
+  const validity = getAutoCardValidity(personnel);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -332,46 +329,35 @@ export function StaffContactEditModal({
               </div>
             </div>
 
-            {/* Card Validity & Academic Year */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-2xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40">
-              <div>
-                <label className="block text-xs font-bold text-amber-900 dark:text-amber-200 mb-1">
-                  ปีการศึกษา
-                </label>
-                <input
-                  type="text"
-                  placeholder="เช่น 2567"
-                  value={formData.academic_year}
-                  onChange={(e) => setFormData({ ...formData, academic_year: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-amber-200 dark:border-amber-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/20 font-bold"
-                />
+            {/* Card Validity & Auto-Renew Status (Read-Only) */}
+            <div className="p-3.5 rounded-2xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-amber-900 dark:text-amber-200">
+                  อายุบัตรประจำตัว (จัดการโดยระบบอัตโนมัติ)
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300">
+                  Auto-Renew
+                </span>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-amber-900 dark:text-amber-200 mb-1">
-                  วันออกบัตร (Valid From)
-                </label>
-                <input
-                  type="text"
-                  placeholder="เช่น 16 พ.ค. 2567"
-                  value={formData.card_issue_date}
-                  onChange={(e) => setFormData({ ...formData, card_issue_date: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-amber-200 dark:border-amber-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
-                />
+              <div className="grid grid-cols-3 gap-2 text-center bg-white/80 dark:bg-slate-900/70 p-2.5 rounded-xl border border-amber-200/50 dark:border-amber-800/30">
+                <div>
+                  <span className="block text-[10px] text-slate-400">ปีการศึกษา</span>
+                  <span className="text-xs font-bold text-[#183e66] dark:text-sky-300">{validity.academicYear}</span>
+                </div>
+                <div className="border-x border-amber-200/50 dark:border-amber-800/30">
+                  <span className="block text-[10px] text-slate-400">วันออกบัตร</span>
+                  <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">{validity.issueDate}</span>
+                </div>
+                <div>
+                  <span className="block text-[10px] text-slate-400">วันหมดอายุ</span>
+                  <span className="text-[11px] font-bold text-[#183e66] dark:text-sky-300">{validity.expireDate}</span>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-amber-900 dark:text-amber-200 mb-1">
-                  วันหมดอายุ (Expires)
-                </label>
-                <input
-                  type="text"
-                  placeholder="เช่น 15 พ.ค. 2569"
-                  value={formData.card_expire_date}
-                  onChange={(e) => setFormData({ ...formData, card_expire_date: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-amber-200 dark:border-amber-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
-                />
-              </div>
+              <p className="text-[10px] text-amber-800/80 dark:text-amber-300/80 leading-relaxed">
+                ระบบจะต่ออายุบัตรให้อัตโนมัติทุกปีการศึกษาตราบใดที่ยังมีชื่อปฏิบัติงานอยู่ในระบบโรงเรียน (ไม่สามารถแก้ไขด้วยตนเองได้)
+              </p>
             </div>
 
             {/* Buttons */}
