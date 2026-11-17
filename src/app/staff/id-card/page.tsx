@@ -25,7 +25,7 @@ import {
   FileText
 } from 'lucide-react';
 import { FacebookIcon, InstagramIcon, LinkedInIcon } from '@/components/staff-card/SocialIcons';
-import { exportCardToPng } from '@/lib/staff-card/export-image';
+import { exportStaffCardToPng, shareOrDownloadDataUrl } from '@/lib/staff-card/export-image';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { StaffIdCard } from '@/components/staff-card/StaffIdCard';
@@ -83,8 +83,7 @@ export default function StaffIdCardSelfServicePage() {
   };
 
   const handleDownloadImage = async (side: 'front' | 'back') => {
-    const targetRef = side === 'front' ? frontRef.current : backRef.current;
-    if (!targetRef) return;
+    if (!personnel) return;
 
     setIsExporting(true);
     const sideTitle = side === 'front' ? 'หน้าบัตร' : 'หลังบัตร';
@@ -93,13 +92,13 @@ export default function StaffIdCardSelfServicePage() {
     try {
       const cleanName = (nameInfo.fullNameEn || 'staff').toLowerCase().replace(/\s+/g, '_');
       const filename = `somkid_card_${cleanName}_${side}.png`;
-      const dataUrl = await exportCardToPng(targetRef, filename);
+      const dataUrl = await exportStaffCardToPng(personnel, side, filename);
       
       // Also open in image preview modal for easy tap-and-hold saving on mobile
       setPreviewImage({ url: dataUrl, title: `รูปภาพ${sideTitle}` });
-      toast.success(`ดาวน์โหลดรูปบัตร (${sideTitle}) สำเร็จ!`, { 
+      toast.success(`สร้างรูปบัตร (${sideTitle}) สำเร็จ!`, { 
         id: toastId, 
-        description: 'หากต้องการบันทึกลงแกลเลอรี่ สามารถแตะค้างที่รูปภาพแล้วเลือก "บันทึกรูปภาพ" ได้เลยครับ' 
+        description: 'หากยังไม่บันทึกลงแกลเลอรี่ กดปุ่ม "บันทึก / แชร์รูปภาพ" หรือแตะค้างที่รูปภาพด้านล่างได้เลยครับ' 
       });
     } catch (err: any) {
       toast.error('เกิดข้อผิดพลาดในการดาวน์โหลด', { id: toastId, description: err.message });
@@ -401,17 +400,17 @@ export default function StaffIdCardSelfServicePage() {
             </div>
 
             <div className="w-full flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-              <a
-                href={previewImage.url}
-                download={`somkid_${previewImage.title}.png`}
-                className="flex-1 py-2.5 px-3 rounded-xl text-xs font-bold bg-[#183e66] hover:bg-[#122f4d] text-white text-center shadow-xs transition-colors"
+              <button
+                type="button"
+                onClick={() => shareOrDownloadDataUrl(previewImage.url, `somkid_${previewImage.title}.png`)}
+                className="flex-1 py-2.5 px-3 rounded-xl text-xs font-bold bg-[#183e66] hover:bg-[#122f4d] text-white text-center shadow-xs transition-colors cursor-pointer"
               >
-                ดาวน์โหลดไฟล์
-              </a>
+                บันทึก / แชร์รูปภาพ
+              </button>
               <button
                 type="button"
                 onClick={() => setPreviewImage(null)}
-                className="py-2.5 px-4 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
+                className="py-2.5 px-4 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
               >
                 ปิด
               </button>

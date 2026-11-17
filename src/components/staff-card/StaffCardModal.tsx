@@ -16,7 +16,7 @@ import {
   Contact,
   Edit3
 } from 'lucide-react';
-import { exportCardToPng } from '@/lib/staff-card/export-image';
+import { exportStaffCardToPng } from '@/lib/staff-card/export-image';
 import { toast } from 'sonner';
 import { Personnel } from '@/types';
 import { StaffIdCard } from './StaffIdCard';
@@ -59,11 +59,7 @@ export function StaffCardModal({ personnel, isOpen, onClose, onUpdated }: StaffC
   };
 
   const handleDownloadImage = async (side: 'front' | 'back') => {
-    const targetRef = side === 'front' ? frontRef.current : backRef.current;
-    if (!targetRef) {
-      toast.error('ไม่พบส่วนแสดงผลบัตร');
-      return;
-    }
+    if (!personnel) return;
 
     setIsExporting(true);
     const toastId = toast.loading(`กำลังบันทึกรูปบัตร (${side === 'front' ? 'ด้านหน้า' : 'ด้านหลัง'})...`);
@@ -71,7 +67,7 @@ export function StaffCardModal({ personnel, isOpen, onClose, onUpdated }: StaffC
     try {
       const cleanName = (nameInfo.fullNameEn || 'staff').toLowerCase().replace(/\s+/g, '_');
       const filename = `somkid_card_${cleanName}_${side}.png`;
-      await exportCardToPng(targetRef, filename);
+      await exportStaffCardToPng(personnel, side, filename);
       toast.success(`ดาวน์โหลดรูปบัตร (${side === 'front' ? 'ด้านหน้า' : 'ด้านหลัง'}) สำเร็จ!`, { id: toastId });
     } catch (err: any) {
       console.error('Download error:', err);
