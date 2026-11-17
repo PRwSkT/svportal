@@ -257,12 +257,24 @@ export async function renderStaffCardToDataUrl(
   return canvas.toDataURL('image/png');
 }
 
+function dataUrlToBlob(dataUrl: string): Blob {
+  const parts = dataUrl.split(',');
+  const mimeMatch = parts[0].match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+  const binaryStr = atob(parts[1]);
+  const len = binaryStr.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryStr.charCodeAt(i);
+  }
+  return new Blob([bytes], { type: mime });
+}
+
 /**
  * Triggers native Share Sheet (iOS Save Image to Photos) or standard file download.
  */
 export async function shareOrDownloadDataUrl(dataUrl: string, filename: string): Promise<void> {
-  const res = await fetch(dataUrl);
-  const blob = await res.blob();
+  const blob = dataUrlToBlob(dataUrl);
   const file = new File([blob], filename, { type: 'image/png' });
 
   if (
@@ -281,12 +293,14 @@ export async function shareOrDownloadDataUrl(dataUrl: string, filename: string):
     }
   }
 
+  const blobUrl = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = dataUrl;
+  a.href = blobUrl;
   a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
 }
 
 export async function exportStaffCardToPng(
