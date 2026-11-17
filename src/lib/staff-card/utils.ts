@@ -11,14 +11,14 @@ export interface CardValidityInfo {
 /**
  * Automatically computes Academic Year, Valid From, and Expire Date.
  * Auto-renews every Thai academic year (May 16) as long as the staff member
- * remains active (`is_active !== false`) in the system.
+ * still has a record in the system (regardless of website visibility `is_active`).
  */
 export function getAutoCardValidity(personnel?: Partial<Personnel> | null): CardValidityInfo {
   const academicYear = getCurrentAcademicYear();
   const nextYear = (Number(academicYear) + 1).toString();
-  const isActive = personnel?.is_active !== false;
+  const existsInSystem = Boolean(personnel && (personnel.id || personnel.name_th || personnel.name_en));
 
-  if (!isActive) {
+  if (!existsInSystem) {
     return {
       academicYear,
       issueDate: '-',
