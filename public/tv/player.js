@@ -13,10 +13,28 @@ const CONFIG = {
   offHoursSyncIntervalMs: 5 * 60 * 1000, // Every 5 minutes during off-hours (19:00 - 06:00)
   heartbeatIntervalMs: 60 * 1000,      // Unified with sync interval
   defaultImageDuration: 10 * 1000,     // 10s default
-  ecoRestEnabled: true,                // Hourly screen rest to cool TV hardware
-  ecoRestDurationMinutes: 10,          // 10 minutes rest every hour
+  ecoRestEnabled: false,               // Set false to keep continuous signage without disruptive daytime blackouts
+  ecoRestDurationMinutes: 10,          // 10 minutes rest every hour (if enabled)
   ecoRestStartMinute: 50,              // Starts at :50 of every hour (50 to 59)
 };
+
+// Authoritative Server Time Synchronization (Prevents TV RTC clock drift)
+let serverTimeOffsetMs = 0;
+
+function syncServerTime(serverTimestampOrHeader) {
+  if (!serverTimestampOrHeader) return;
+  try {
+    const serverTime = new Date(serverTimestampOrHeader).getTime();
+    if (!isNaN(serverTime) && serverTime > 0) {
+      serverTimeOffsetMs = serverTime - Date.now();
+      console.log(`[TimeSync] Server time offset adjusted: ${(serverTimeOffsetMs / 1000).toFixed(1)}s`);
+    }
+  } catch (e) {}
+}
+
+function getAccurateNow() {
+  return new Date(Date.now() + serverTimeOffsetMs);
+}
 
 // State
 let deviceId = 'tv-lobby-01';
@@ -190,7 +208,7 @@ function startLiveClock() {
   if (!clockEl && !dateEl) return;
 
   function updateClock() {
-    const now = new Date();
+    const now = getAccurateNow();
     if (clockEl) {
       clockEl.textContent = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
     }
@@ -198,7 +216,7 @@ function startLiveClock() {
   }
 
   function getSlideContent(slideIndex) {
-    const now = new Date();
+    const now = getAccurateNow();
     const dayNamesTh = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสฯ', 'ศุกร์', 'เสาร์'];
     const monthNamesTh = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
     const dayNamesEn = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -316,8 +334,20 @@ document.addEventListener('DOMContentLoaded', () => {
   startHealthWatchdog();
   startLiveClock();
   
+  // Proactively fetch server time header on boot to immediately correct local clock drift
+  fetch('/api/health', { cache: 'no-store' }).then(res => {
+    const serverDateHeader = res.headers.get('date');
+    if (serverDateHeader) {
+      syncServerTime(serverDateHeader);
+      const clockEl = document.getElementById('header-clock');
+      if (clockEl) {
+        clockEl.textContent = getAccurateNow().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+      }
+    }
+  }).catch(() => {});
+
   // Check initial eco rest schedule on boot
-  checkEcoRestSchedule(new Date());
+  checkEcoRestSchedule(getAccurateNow());
 
   // Start Unified Heartbeat & Sync Loop (adaptive day/night interval)
   runUnifiedSync();
@@ -325,7 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function getAdaptiveSyncIntervalMs() {
-  const hour = new Date().getHours();
+  const hour = getAccurateNow().getHours();
   // Active school hours: 06:00 - 18:59 (60s), Off-hours: 19:00 - 05:59 (5 mins)
   return (hour >= 6 && hour < 19) ? CONFIG.syncIntervalMs : CONFIG.offHoursSyncIntervalMs;
 }
@@ -497,9 +527,17 @@ function setupEcoRestListeners() {
   });
 }
 
-function checkEcoRestSchedule(now = new Date()) {
+function checkEcoRestSchedule(now = getAccurateNow()) {
   if (!CONFIG.ecoRestEnabled) {
     if (isEcoRestMode) exitEcoRestMode();
+    if (ecoRestScreen) {
+      ecoRestScreen.classList.remove('active');
+      ecoRestScreen.style.display = 'none';
+    }
+    if (diagEco) {
+      diagEco.textContent = 'DISABLED (Continuous 24/7)';
+      diagEco.style.color = '#94a3b8';
+    }
     return;
   }
 
@@ -568,7 +606,7 @@ function enterEcoRestMode(currentHour, currentMinute, now) {
 function exitEcoRestMode(isManual = false) {
   console.log(`[EcoRest] Exiting rest mode (${isManual ? 'MANUAL OVERRIDE' : 'SCHEDULED RESUME'}).`);
   if (isManual) {
-    manualWakeHour = new Date().getHours();
+    manualWakeHour = getAccurateNow().getHours();
   }
 
   isEcoRestMode = false;
@@ -633,9 +671,14 @@ function applyPlaylistData(newPlaylist) {
 async function syncPlaylist() {
   try {
     autoHealFullyKiosk();
-    document.getElementById('diag-sync').textContent = new Date().toLocaleTimeString();
+    document.getElementById('diag-sync').textContent = getAccurateNow().toLocaleTimeString('th-TH');
     const res = await fetch(`/api/signage/devices/${deviceId}/playlist`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const serverDateHeader = res.headers.get('date');
+    if (serverDateHeader) {
+      syncServerTime(serverDateHeader);
+    }
 
     const json = await res.json();
     if (!json.success || !json.data) return;
@@ -987,12 +1030,12 @@ async function sendHeartbeat(includePlaylist = false) {
     const payload = {
       current_media_id: currentItem ? currentItem.id : null,
       free_storage_mb: 8192, // Simulated available storage
-      app_version: '1.3.0-web',
+      app_version: '1.3.1-web',
       current_fps: currentFps,
       dropped_frames: recentDropped,
       ip_address: clientIp || undefined,
       include_playlist: includePlaylist,
-      timestamp: new Date().toISOString()
+      timestamp: getAccurateNow().toISOString()
     };
 
     const res = await fetch(`/api/signage/devices/${deviceId}/heartbeat`, {
@@ -1002,7 +1045,11 @@ async function sendHeartbeat(includePlaylist = false) {
     });
 
     if (res.ok) {
-      const nowStr = new Date().toLocaleTimeString();
+      const serverDateHeader = res.headers.get('date');
+      if (serverDateHeader) {
+        syncServerTime(serverDateHeader);
+      }
+      const nowStr = getAccurateNow().toLocaleTimeString('th-TH');
       document.getElementById('diag-ping').textContent = nowStr;
       if (includePlaylist) {
         const json = await res.json();
