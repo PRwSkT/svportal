@@ -25,6 +25,48 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
     }
 
+    const reqContentType = request.headers.get('content-type') || '';
+
+    // Mode 1: JSON metadata registration after direct-to-Supabase Signed URL upload (supports large files > 6MB)
+    if (reqContentType.includes('application/json')) {
+      const body = await request.json();
+      const title = (typeof body?.title === 'string' && body.title.trim()) || 'Untitled Media';
+      const filePath = typeof body?.file_path === 'string' ? body.file_path.trim() : '';
+      const fileUrl = typeof body?.file_url === 'string' ? body.file_url.trim() : '';
+      const type = body?.type === 'video' ? 'video' : 'image';
+      const duration = parseInt(String(body?.duration_seconds), 10) || 10;
+      const fileSize = parseInt(String(body?.file_size_bytes), 10) || 0;
+      const checksum = typeof body?.checksum_sha256 === 'string' ? body.checksum_sha256 : null;
+
+      if (!filePath || !fileUrl) {
+        return NextResponse.json(
+          { success: false, error: 'file_path and file_url are required' },
+          { status: 400 }
+        );
+      }
+
+      const supabase = getAdminClient();
+      const id = 'med_' + crypto.randomBytes(4).toString('hex');
+      const { data: created, error: dbError } = await supabase
+        .from('signage_media')
+        .insert({
+          id,
+          title,
+          type,
+          file_path: filePath,
+          file_url: fileUrl,
+          checksum_sha256: checksum,
+          duration_seconds: duration,
+          file_size_bytes: fileSize,
+        })
+        .select()
+        .single();
+
+      if (dbError) throw dbError;
+      return NextResponse.json({ success: true, data: created });
+    }
+
+    // Mode 2: Legacy multipart/form-data upload (for small files <= 6MB)
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     const title = (formData.get('title') as string) || file?.name || 'Untitled Media';

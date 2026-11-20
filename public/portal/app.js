@@ -722,6 +722,34 @@ function toggleMediaPickerCard(id) {
   }
 }
 
+function uploadFileWithProgress(signedUrl, file, contentType, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', signedUrl, true);
+    xhr.setRequestHeader('Content-Type', contentType || 'application/octet-stream');
+    xhr.setRequestHeader('x-upsert', 'true');
+    xhr.setRequestHeader('cache-control', 'max-age=3600');
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && typeof onProgress === 'function') {
+        const pct = Math.min(99, Math.round((e.loaded / e.total) * 100));
+        onProgress(pct);
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+      } else {
+        reject(new Error(`Storage upload failed (HTTP ${xhr.status}): ${xhr.responseText || xhr.statusText}`));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error('Network error while uploading directly to storage'));
+    xhr.send(file);
+  });
+}
+
 async function handleUploadMedia(event) {
   event.preventDefault();
   const fileInput = document.getElementById('media-file-input');
@@ -734,27 +762,60 @@ async function handleUploadMedia(event) {
     return;
   }
 
-  const formData = new FormData();
-  formData.append('file', fileInput.files[0]);
-  formData.append('title', titleInput.value || fileInput.files[0].name);
-  formData.append('duration_seconds', durationInput.value || '10');
+  const file = fileInput.files[0];
+  const title = (titleInput.value || '').trim() || file.name;
+  const durationSeconds = parseInt(durationInput.value, 10) || 10;
 
   btn.disabled = true;
-  btn.innerHTML = `<span>กำลังอัปโหลด...</span>`;
+  btn.innerHTML = `<span>กำลังเตรียมอัปโหลด...</span>`;
 
   try {
-    const res = await fetch(`${API_BASE}/media`, {
+    // Step 1: Request one-time Signed Upload URL from server (bypasses Netlify 6MB payload limit)
+    const signRes = await fetch(`${API_BASE}/media/upload-url`, {
       method: 'POST',
-      body: formData
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileName: file.name,
+        contentType: file.type,
+        fileSize: file.size
+      })
     });
-    const json = await res.json();
-    if (json.success) {
+    const signJson = await signRes.json();
+    if (!signRes.ok || !signJson.success || !signJson.data) {
+      throw new Error(signJson.error || 'ไม่สามารถสร้างลิงก์อัปโหลดได้');
+    }
+
+    const { signedUrl, path, publicUrl, type, contentType } = signJson.data;
+
+    // Step 2: Upload file directly to Supabase Storage with live progress
+    btn.innerHTML = `<span>กำลังอัปโหลด... 0%</span>`;
+    await uploadFileWithProgress(signedUrl, file, contentType, (pct) => {
+      btn.innerHTML = `<span>กำลังอัปโหลด... ${pct}%</span>`;
+    });
+
+    // Step 3: Save metadata to signage_media table
+    btn.innerHTML = `<span>กำลังบันทึกข้อมูล...</span>`;
+    const saveRes = await fetch(`${API_BASE}/media`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title,
+        type,
+        file_path: path,
+        file_url: publicUrl,
+        duration_seconds: durationSeconds,
+        file_size_bytes: file.size
+      })
+    });
+    const saveJson = await saveRes.json();
+
+    if (saveJson.success) {
       showToast('อัปโหลดไฟล์สื่อสำเร็จ!');
       fileInput.value = '';
       titleInput.value = '';
       loadMedia();
     } else {
-      showToast('เกิดข้อผิดพลาด: ' + json.error, 'error');
+      showToast('เกิดข้อผิดพลาด: ' + saveJson.error, 'error');
     }
   } catch (err) {
     showToast('Upload failed: ' + err.message, 'error');
