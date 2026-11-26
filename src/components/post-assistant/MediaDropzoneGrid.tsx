@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Upload,
+  Image as ImageIcon,
   Plus,
   Trash2,
   Star,
@@ -113,13 +114,15 @@ export function MediaDropzoneGrid({
   };
 
   return (
-    <div className="bg-white/95 border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+    <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-xs space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
         <div className="flex items-center gap-2">
-          <span className="w-6 h-6 rounded-full bg-[#7B1C3E] text-white text-xs font-bold flex items-center justify-center">
-            2
-          </span>
-          <h2 className="font-bold text-slate-900 text-sm sm:text-base">
+          {mediaMode === 'photo' ? (
+            <ImageIcon className="w-4 h-4 text-slate-500" />
+          ) : (
+            <Film className="w-4 h-4 text-slate-500" />
+          )}
+          <h2 className="font-semibold text-slate-900 text-sm sm:text-base">
             {mediaMode === 'photo'
               ? isThai
                 ? `จัดการรูปภาพ (${activePhotos.length} พร้อมโพสต์)`

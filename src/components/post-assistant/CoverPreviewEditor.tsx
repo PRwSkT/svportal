@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Image as ImageIcon, Sparkles, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { Image as ImageIcon, Info, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { BRAND_PROFILES } from '@/lib/post-assistant/brand-glossary';
 import {
   BrandId,
@@ -40,11 +40,11 @@ export function CoverPreviewEditor({
   const [showInsights, setShowInsights] = useState(false);
 
   return (
-    <div className="bg-white/95 border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+    <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-xs space-y-4">
       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
         <div className="flex items-center gap-2">
-          <ImageIcon className="w-4 h-4 text-[#7B1C3E]" />
-          <h2 className="font-bold text-slate-900 text-sm sm:text-base">
+          <ImageIcon className="w-4 h-4 text-slate-500" />
+          <h2 className="font-semibold text-slate-900 text-sm sm:text-base">
             {isThai ? 'พรีวิวภาพปก & พาดหัว' : 'Cover Preview & Headline'}
           </h2>
         </div>
@@ -136,18 +136,18 @@ export function CoverPreviewEditor({
         </div>
       )}
 
-      {/* AI Cover Reason, Micro-Moments & Quality Badges (Collapsible) */}
+      {/* Editorial Notes & Quality Check (Collapsible) */}
       {(coverReasonTh || (observedMoments && observedMoments.length > 0) || quality) && (
-        <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3 space-y-2">
+        <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 space-y-2">
           <button
             type="button"
             onClick={() => setShowInsights((v) => !v)}
-            className="w-full flex items-center justify-between text-xs font-semibold text-[#1B3A6B]"
+            className="w-full flex items-center justify-between text-xs font-semibold text-slate-800"
           >
             <span className="inline-flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-[#7B1C3E]" />
+              <Info className="w-3.5 h-3.5 text-slate-500" />
               <span>
-                {isThai ? 'เหตุผลของ AI & คะแนนคุณภาพ' : 'AI Visual Insights & Quality Score'}
+                {isThai ? 'หมายเหตุการเลือกภาพ & ตรวจสอบคุณภาพ' : 'Editorial Notes & Quality Check'}
                 {quality ? ` (${quality.overall}/100)` : ''}
               </span>
             </span>
@@ -163,7 +163,7 @@ export function CoverPreviewEditor({
               )}
               {observedMoments && observedMoments.length > 0 && (
                 <div>
-                  <strong>{isThai ? 'รายละเอียดจริงที่ AI เห็นในภาพ:' : 'Observed Micro-Moments:'}</strong>
+                  <strong>{isThai ? 'รายละเอียดที่ตรวจพบในภาพ:' : 'Observed Details:'}</strong>
                   <ul className="list-disc pl-4 mt-0.5 space-y-0.5 text-slate-600">
                     {observedMoments.map((m, idx) => (
                       <li key={idx}>{m}</li>

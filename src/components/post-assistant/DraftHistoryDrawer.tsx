@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { X, Star, Trash2, ExternalLink, Loader2, FolderOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { BRAND_PROFILES } from '@/lib/post-assistant/brand-glossary';
+import { safeReadJson } from '@/lib/post-assistant/client-fetch';
 import { SocialPostRecord } from '@/lib/post-assistant/types';
 
 interface DraftHistoryDrawerProps {
@@ -35,13 +36,13 @@ export function DraftHistoryDrawer({
       try {
         const qs = goldOnly ? '?gold=true' : '';
         const res = await fetch(`/api/post-assistant/drafts${qs}`);
-        const json = await res.json();
+        const parsed = await safeReadJson<{ drafts?: SocialPostRecord[] }>(res);
         if (cancelled) return;
-        if (!res.ok) {
-          setWarningMsg(json?.error || 'Unable to load drafts');
+        if (!parsed.ok) {
+          setWarningMsg(parsed.errorMessage || 'Unable to load drafts');
           setDrafts([]);
         } else {
-          setDrafts(json.drafts || []);
+          setDrafts(parsed.data?.drafts || []);
         }
       } catch (err: unknown) {
         if (!cancelled) {

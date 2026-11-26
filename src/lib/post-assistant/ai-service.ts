@@ -20,7 +20,7 @@ import {
   WebsiteEditorialContent,
 } from './types';
 
-const POST_ASSISTANT_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash'] as const;
+const POST_ASSISTANT_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite'] as const;
 
 const VALID_HOOK_ARCHETYPES: HookArchetype[] = [
   'micro_moment',
@@ -71,69 +71,93 @@ function extractAnswerText(data: GeminiCandidateEnvelope): string {
   return raw.replace(/```json/gi, '').replace(/```/g, '').trim();
 }
 
+function buildPayloadForModel(
+  payload: Record<string, unknown>,
+  model: (typeof POST_ASSISTANT_MODELS)[number]
+): Record<string, unknown> {
+  if (model !== 'gemini-3.5-flash-lite') return payload;
+  const rawGenConfig = payload.generationConfig as Record<string, unknown> | undefined;
+  if (!rawGenConfig || !('thinkingConfig' in rawGenConfig)) return payload;
+  const restGenConfig = { ...rawGenConfig };
+  delete restGenConfig.thinkingConfig;
+  return {
+    ...payload,
+    generationConfig: restGenConfig,
+  };
+}
+
 async function callGeminiWithFallback(params: {
   payload: Record<string, unknown>;
   timeoutMs?: number;
+  maxTotalMs?: number;
 }): Promise<{ json: JsonObject; modelUsed: string }> {
   const apiKey = getGeminiApiKey();
-  const timeoutMs = params.timeoutMs ?? 12000;
+  const maxTotalMs = params.maxTotalMs ?? 24000;
+  const deadline = Date.now() + maxTotalMs;
   let lastError = 'Gemini API unavailable';
 
-  for (const model of POST_ASSISTANT_MODELS) {
-    for (let attempt = 0; attempt < 2; attempt++) {
+  for (let modelIdx = 0; modelIdx < POST_ASSISTANT_MODELS.length; modelIdx++) {
+    const model = POST_ASSISTANT_MODELS[modelIdx];
+    const remainingMs = deadline - Date.now();
+    if (remainingMs < 2000) {
+      break;
+    }
+
+    let perModelTimeout: number;
+    if (modelIdx === 0) {
+      perModelTimeout = Math.min(8000, Math.max(3500, remainingMs - 10000), remainingMs);
+    } else if (modelIdx === 1) {
+      perModelTimeout = Math.min(9500, Math.max(4000, remainingMs - 6500), remainingMs);
+    } else {
+      perModelTimeout = Math.min(remainingMs, 10000);
+    }
+
+    const requestPayload = buildPayloadForModel(params.payload, model);
+
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+          },
+          body: JSON.stringify(requestPayload),
+          signal: AbortSignal.timeout(perModelTimeout),
+        }
+      );
+
+      const rawText = await res.text();
+      let parsedEnvelope: GeminiCandidateEnvelope;
       try {
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-goog-api-key': apiKey,
-            },
-            body: JSON.stringify(params.payload),
-            signal: AbortSignal.timeout(timeoutMs),
-          }
-        );
-
-        const rawText = await res.text();
-        let parsedEnvelope: GeminiCandidateEnvelope;
-        try {
-          parsedEnvelope = JSON.parse(rawText) as GeminiCandidateEnvelope;
-        } catch {
-          lastError = `${model}: non-JSON response (${res.status})`;
-          continue;
-        }
-
-        if (res.status === 503 || res.status === 429) {
-          lastError = `${model} (${res.status}): ${parsedEnvelope?.error?.message || 'Service busy'}`;
-          if (attempt === 0) {
-            await new Promise((r) => setTimeout(r, 400));
-            continue;
-          }
-          break; // Try next fallback model
-        }
-
-        if (!res.ok || parsedEnvelope?.error) {
-          lastError = `${model} (${res.status}): ${parsedEnvelope?.error?.message || 'API error'}`;
-          break;
-        }
-
-        const answerText = extractAnswerText(parsedEnvelope);
-        if (!answerText) {
-          lastError = `${model}: Empty response`;
-          break;
-        }
-
-        const json = JSON.parse(answerText) as JsonObject;
-        return { json, modelUsed: model };
-      } catch (err: unknown) {
-        const errObj = err as { message?: string; name?: string } | null;
-        lastError = `${model}: ${errObj?.message || 'Request failed'}`;
-        if (attempt === 0 && !String(errObj?.name || '').includes('Timeout')) {
-          continue;
-        }
-        break;
+        parsedEnvelope = JSON.parse(rawText) as GeminiCandidateEnvelope;
+      } catch {
+        lastError = `${model}: non-JSON response (${res.status})`;
+        continue;
       }
+
+      if (res.status === 503 || res.status === 429) {
+        lastError = `${model} (${res.status}): ${parsedEnvelope?.error?.message || 'Service busy'}`;
+        continue;
+      }
+
+      if (!res.ok || parsedEnvelope?.error) {
+        lastError = `${model} (${res.status}): ${parsedEnvelope?.error?.message || 'API error'}`;
+        continue;
+      }
+
+      const answerText = extractAnswerText(parsedEnvelope);
+      if (!answerText) {
+        lastError = `${model}: Empty response`;
+        continue;
+      }
+
+      const json = JSON.parse(answerText) as JsonObject;
+      return { json, modelUsed: model };
+    } catch (err: unknown) {
+      const errObj = err as { message?: string } | null;
+      lastError = `${model}: ${errObj?.message || 'Request failed'}`;
     }
   }
 
@@ -176,9 +200,13 @@ async function runConditionalSearchGrounding(brief: ActivityBrief): Promise<stri
           body: JSON.stringify({
             contents: [{ role: 'user', parts: [{ text: searchPrompt }] }],
             tools: [{ google_search: {} }],
-            generationConfig: { temperature: 0.2, maxOutputTokens: 400 },
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: 400,
+              thinkingConfig: { thinkingLevel: 'LOW' },
+            },
           }),
-          signal: AbortSignal.timeout(4000),
+          signal: AbortSignal.timeout(3500),
         }
       );
       if (!res.ok) continue;
@@ -667,7 +695,8 @@ export async function generatePostWithAI(params: {
     brand === 'main' ? buildMainPhotoSystemInstruction() : buildSubBrandSystemInstruction(brand);
 
   const { json, modelUsed } = await callGeminiWithFallback({
-    timeoutMs: 18000,
+    timeoutMs: 11000,
+    maxTotalMs: 24000,
     payload: {
       systemInstruction: { parts: [{ text: systemInstruction }] },
       contents: [{ role: 'user', parts }],
@@ -677,6 +706,7 @@ export async function generatePostWithAI(params: {
         temperature: 0.6,
         topP: 0.95,
         maxOutputTokens: 4096,
+        thinkingConfig: { thinkingLevel: 'LOW' },
       },
     },
   });
@@ -754,7 +784,8 @@ Output valid JSON matching the schema.
     .join('\n\n');
 
   const { json, modelUsed } = await callGeminiWithFallback({
-    timeoutMs: 11000,
+    timeoutMs: 10000,
+    maxTotalMs: 21000,
     payload: {
       systemInstruction: { parts: [{ text: systemInstruction }] },
       contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
@@ -763,6 +794,7 @@ Output valid JSON matching the schema.
         responseSchema: schema,
         temperature: 0.2,
         maxOutputTokens: 2500,
+        thinkingConfig: { thinkingLevel: 'LOW' },
       },
     },
   });
@@ -834,6 +866,7 @@ ${params.brand !== 'main' ? 'This is a Thai-only sub-brand: only populate "fb_th
 
   const { json, modelUsed } = await callGeminiWithFallback({
     timeoutMs: 10000,
+    maxTotalMs: 21000,
     payload: {
       systemInstruction: { parts: [{ text: systemInstruction }] },
       contents: [
@@ -851,6 +884,7 @@ ${params.brand !== 'main' ? 'This is a Thai-only sub-brand: only populate "fb_th
         responseSchema: schema,
         temperature: 0.45,
         maxOutputTokens: 2048,
+        thinkingConfig: { thinkingLevel: 'LOW' },
       },
     },
   });

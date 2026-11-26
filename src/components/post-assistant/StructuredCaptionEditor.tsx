@@ -4,11 +4,11 @@ import React, { useState } from 'react';
 import {
   Copy,
   Languages,
-  Sparkles,
+  FileText,
+  SlidersHorizontal,
   Loader2,
   Eye,
   Globe,
-  Wand2,
 } from 'lucide-react';
 
 function FacebookIcon({ className }: { className?: string }) {
@@ -69,11 +69,11 @@ const CATEGORIES: PostCategory[] = [
 ];
 
 const REFINE_PRESETS: Array<{ id: RefinePreset; labelTh: string; labelEn: string }> = [
-  { id: 'warm', labelTh: '✨ อบอุ่นจับใจพ่อแม่', labelEn: '✨ Warmer' },
-  { id: 'prestige', labelTh: '🎓 ทรงภูมิแบบอินเตอร์', labelEn: '🎓 Prestigious' },
-  { id: 'punchy_ig', labelTh: '⚡ คมกระชับสไตล์ IG', labelEn: '⚡ Punchier IG' },
-  { id: 'admissions', labelTh: '🎯 เน้นชวนเยี่ยมชม รร.', labelEn: '🎯 Tour CTA' },
-  { id: 'new_hooks', labelTh: '🪝 เปลี่ยน Hook ใหม่', labelEn: '🪝 Fresh Hooks' },
+  { id: 'warm', labelTh: 'โทนอบอุ่น', labelEn: 'Warmer' },
+  { id: 'prestige', labelTh: 'โทนทางการ', labelEn: 'Formal' },
+  { id: 'punchy_ig', labelTh: 'กระชับ (IG)', labelEn: 'Concise IG' },
+  { id: 'admissions', labelTh: 'ชวนเยี่ยมชมโรงเรียน', labelEn: 'Campus Visit' },
+  { id: 'new_hooks', labelTh: 'เปลี่ยนประโยคเปิด', labelEn: 'New Opening' },
 ];
 
 function replaceOpeningLine(body: string, newHook: string): string {
@@ -138,11 +138,11 @@ export function StructuredCaptionEditor({
   };
 
   return (
-    <div className="bg-white/95 border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+    <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-xs space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
         <div className="flex items-center gap-2">
-          <Wand2 className="w-4 h-4 text-[#7B1C3E]" />
-          <h2 className="font-bold text-slate-900 text-sm sm:text-base">
+          <FileText className="w-4 h-4 text-slate-500" />
+          <h2 className="font-semibold text-slate-900 text-sm sm:text-base">
             {isThai ? 'ปรับแต่งแคปชั่น & เนื้อหาเว็บไซต์' : 'Editorial Caption & Website Copy'}
           </h2>
         </div>
@@ -153,7 +153,7 @@ export function StructuredCaptionEditor({
               type="button"
               disabled={isTranslating || !social.fb_th.trim()}
               onClick={onTranslateFromThai}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#1B3A6B] text-white hover:bg-[#142d54] disabled:opacity-45 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1B3A6B] text-white hover:bg-[#142d54] disabled:opacity-45 transition-colors"
             >
               {isTranslating ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -166,7 +166,7 @@ export function StructuredCaptionEditor({
           <button
             type="button"
             onClick={() => handleCopy(assembledFb, 'แคปชั่น FB')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
           >
             <Copy className="w-3.5 h-3.5" />
             <span>{isThai ? 'คัดลอก FB' : 'Copy FB'}</span>
@@ -175,7 +175,7 @@ export function StructuredCaptionEditor({
             <button
               type="button"
               onClick={() => handleCopy(assembledIg, 'แคปชั่น IG')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
             >
               <Copy className="w-3.5 h-3.5" />
               <span>{isThai ? 'คัดลอก IG' : 'Copy IG'}</span>
@@ -186,11 +186,11 @@ export function StructuredCaptionEditor({
 
       {/* Hook Alternatives & Quick-Refine Chips */}
       {((captions.hook_alternatives && captions.hook_alternatives.length > 0) || social.fb_th.trim()) && (
-        <div className="space-y-2 bg-slate-50/80 border border-slate-200/70 rounded-xl p-3">
+        <div className="space-y-2 bg-slate-50 border border-slate-200 rounded-lg p-3">
           {captions.hook_alternatives && captions.hook_alternatives.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-bold text-slate-600 mr-1">
-                {isThai ? 'สลับประโยคเปิด (3 แนว):' : 'Hook Options:'}
+              <span className="text-[11px] font-semibold text-slate-600 mr-1">
+                {isThai ? 'สลับประโยคเปิด:' : 'Opening Options:'}
               </span>
               {captions.hook_alternatives.map((alt, i) => (
                 <button
@@ -198,7 +198,7 @@ export function StructuredCaptionEditor({
                   type="button"
                   onClick={() => applyHookAlternative(alt)}
                   title={alt.hook_th || alt.hook_en}
-                  className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-white border border-slate-200 hover:border-[#7B1C3E] hover:text-[#7B1C3E] text-slate-700 transition-colors"
+                  className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-white border border-slate-200 hover:border-[#1B3A6B] hover:text-[#1B3A6B] text-slate-700 transition-colors"
                 >
                   {alt.label_th}
                 </button>
@@ -208,9 +208,9 @@ export function StructuredCaptionEditor({
 
           {social.fb_th.trim() && (
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-bold text-slate-600 mr-1 inline-flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-[#7B1C3E]" />
-                <span>{isThai ? 'ปรับโทน 1 คลิก:' : 'Quick Refine:'}</span>
+              <span className="text-[11px] font-semibold text-slate-600 mr-1 inline-flex items-center gap-1">
+                <SlidersHorizontal className="w-3 h-3 text-slate-500" />
+                <span>{isThai ? 'ปรับโทนข้อความ:' : 'Tone Adjustments:'}</span>
               </span>
               {REFINE_PRESETS.filter((p) => profile.supportsInstagram || p.id !== 'punchy_ig').map((preset) => {
                 const busy = refiningPreset === preset.id;
@@ -220,7 +220,7 @@ export function StructuredCaptionEditor({
                     type="button"
                     disabled={refiningPreset !== null}
                     onClick={() => onRefinePreset(preset.id)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-white border border-slate-200 hover:bg-[#1B3A6B] hover:text-white hover:border-[#1B3A6B] disabled:opacity-50 text-slate-700 transition-colors"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-white border border-slate-200 hover:bg-[#1B3A6B] hover:text-white hover:border-[#1B3A6B] disabled:opacity-50 text-slate-700 transition-colors"
                   >
                     {busy && <Loader2 className="w-3 h-3 animate-spin" />}
                     <span>{isThai ? preset.labelTh : preset.labelEn}</span>
@@ -253,7 +253,7 @@ export function StructuredCaptionEditor({
             onClick={() => setActiveTab('instagram')}
             className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold border-b-2 transition-colors ${
               activeTab === 'instagram'
-                ? 'border-[#7B1C3E] text-[#7B1C3E]'
+                ? 'border-[#1B3A6B] text-[#1B3A6B]'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -267,7 +267,7 @@ export function StructuredCaptionEditor({
           onClick={() => setActiveTab('website')}
           className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold border-b-2 transition-colors ${
             activeTab === 'website'
-              ? 'border-[#8b1d32] text-[#8b1d32]'
+              ? 'border-[#1B3A6B] text-[#1B3A6B]'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -280,7 +280,7 @@ export function StructuredCaptionEditor({
           onClick={() => setActiveTab('preview')}
           className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold border-b-2 transition-colors ${
             activeTab === 'preview'
-              ? 'border-emerald-700 text-emerald-700'
+              ? 'border-[#1B3A6B] text-[#1B3A6B]'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >

@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Globe, ShieldAlert, ShieldCheck, Sparkles, Loader2 } from 'lucide-react';
+import { Globe, ShieldAlert, ShieldCheck, PenLine, Loader2 } from 'lucide-react';
 import { ACTIVITY_TAGS, CAPTION_TONES } from '@/lib/post-assistant/brand-glossary';
+import { safeReadJson } from '@/lib/post-assistant/client-fetch';
 import { ActivityBrief, MediaMode } from '@/lib/post-assistant/types';
 
 interface PdpaStatus {
@@ -47,9 +48,9 @@ export function ActivityBriefForm({
         const res = await fetch(`/api/post-assistant/pdpa-check${qs}`, {
           signal: controller.signal,
         });
-        if (res.ok) {
-          const json = await res.json();
-          setPdpa(json);
+        const parsed = await safeReadJson<PdpaStatus>(res);
+        if (parsed.ok && parsed.data) {
+          setPdpa(parsed.data);
         }
       } catch {
         // ignore abort/network error
@@ -73,18 +74,13 @@ export function ActivityBriefForm({
   const canGenerate = Boolean(brief.activityName.trim()) && mediaCount > 0 && !isGenerating;
 
   return (
-    <div className="bg-white/95 border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+    <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-xs space-y-4">
       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-        <div className="flex items-center gap-2">
-          <span className="w-6 h-6 rounded-full bg-[#7B1C3E] text-white text-xs font-bold flex items-center justify-center">
-            1
-          </span>
-          <h2 className="font-bold text-slate-900 text-sm sm:text-base">
-            {isThai ? 'ข้อมูลกิจกรรม (Activity Brief)' : 'Activity Information'}
-          </h2>
-        </div>
+        <h2 className="font-semibold text-slate-900 text-sm sm:text-base">
+          {isThai ? 'ข้อมูลกิจกรรม' : 'Activity Details'}
+        </h2>
         <span className="text-[11px] text-slate-400">
-          {isThai ? '* ยิ่งรายละเอียดชัด AI ยิ่งเขียนตรงจุด' : '* Richer context yields sharper copy'}
+          {isThai ? '* ระบุรายละเอียดให้ครบถ้วนเพื่อความถูกต้องของเนื้อหา' : '* Include key details for accurate copy'}
         </span>
       </div>
 
@@ -102,7 +98,7 @@ export function ActivityBriefForm({
               ? 'เช่น กิจกรรม Stem Robotics, วันไหว้ครู, กีฬาสีสมคิดวิทยา 2569'
               : 'e.g. STEM Robotics Showcase, Sports Day 2026'
           }
-          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#7B1C3E]/30 focus:border-[#7B1C3E]"
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]/15 focus:border-[#1B3A6B]"
         />
       </div>
 
@@ -117,7 +113,7 @@ export function ActivityBriefForm({
             type="date"
             value={brief.eventDate}
             onChange={(e) => onChange({ ...brief, eventDate: e.target.value })}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#7B1C3E]/30 focus:border-[#7B1C3E]"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]/15 focus:border-[#1B3A6B]"
           />
         </div>
         <div>
@@ -134,7 +130,7 @@ export function ActivityBriefForm({
                 ? 'เช่น เตรียมอนุบาล (Prep School), อ.1–อ.3, ป.4–ป.6'
                 : 'e.g. Prep School, K.1–K.3, G.4–G.6'
             }
-            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#7B1C3E]/30 focus:border-[#7B1C3E]"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]/15 focus:border-[#1B3A6B]"
           />
         </div>
       </div>
@@ -142,7 +138,7 @@ export function ActivityBriefForm({
       {/* PDPA Advisory Banner */}
       {pdpa && (
         <div
-          className={`rounded-xl px-3 py-2 text-xs flex items-start gap-2 border ${
+          className={`rounded-lg px-3 py-2 text-xs flex items-start gap-2 border ${
             pdpa.optedOutCount > 0
               ? 'bg-amber-50 border-amber-200 text-amber-900'
               : 'bg-emerald-50/70 border-emerald-200 text-emerald-800'
@@ -201,7 +197,7 @@ export function ActivityBriefForm({
               ? '- เด็ก ๆ ลงมือประดิษฐ์หุ่นยนต์ด้วยตัวเอง\n- คุณครูคอยให้คำแนะนำอย่างใกล้ชิด'
               : '- Students designed prototypes hands-on\n- Teachers mentored collaborative problem-solving'
           }
-          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#7B1C3E]/30 focus:border-[#7B1C3E]"
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]/15 focus:border-[#1B3A6B]"
         />
       </div>
 
@@ -216,7 +212,7 @@ export function ActivityBriefForm({
             value={brief.objective}
             onChange={(e) => onChange({ ...brief, objective: e.target.value })}
             placeholder={isThai ? 'เช่น ฝึกคิดวิเคราะห์และความกล้าแสดงออก' : 'e.g. Build creative confidence'}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#7B1C3E]/30 focus:border-[#7B1C3E]"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]/15 focus:border-[#1B3A6B]"
           />
         </div>
         <div>
@@ -228,7 +224,7 @@ export function ActivityBriefForm({
             value={brief.desiredHashtags}
             onChange={(e) => onChange({ ...brief, desiredHashtags: e.target.value })}
             placeholder="#Somkidvittaya #ActiveLearning"
-            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#7B1C3E]/30 focus:border-[#7B1C3E]"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]/15 focus:border-[#1B3A6B]"
           />
         </div>
       </div>
@@ -260,7 +256,7 @@ export function ActivityBriefForm({
       </div>
 
       {/* Conditional Google Search Grounding Switch */}
-      <label className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 cursor-pointer">
+      <label className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 cursor-pointer">
         <div className="flex items-center gap-2 text-xs text-slate-700">
           <Globe className="w-4 h-4 text-[#1B3A6B] shrink-0" />
           <span>
@@ -282,18 +278,18 @@ export function ActivityBriefForm({
         type="button"
         disabled={!canGenerate}
         onClick={onGenerate}
-        className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-[#7B1C3E] to-[#1B3A6B] hover:opacity-95 disabled:opacity-45 disabled:cursor-not-allowed shadow-md transition-all"
+        className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold text-sm text-white bg-[#7B1C3E] hover:bg-[#641632] disabled:opacity-45 disabled:cursor-not-allowed shadow-xs transition-colors"
       >
         {isGenerating ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin" />
             <span>
-              {isThai ? 'AI กำลังวิเคราะห์ภาพและร่างโพสต์ระดับ Global...' : 'Analyzing & crafting post...'}
+              {isThai ? 'กำลังร่างเนื้อหา...' : 'Drafting content...'}
             </span>
           </>
         ) : (
           <>
-            <Sparkles className="w-4 h-4" />
+            <PenLine className="w-4 h-4" />
             <span>
               {mediaCount === 0 || !brief.activityName.trim()
                 ? isThai
@@ -301,11 +297,11 @@ export function ActivityBriefForm({
                   : 'Enter activity name and upload media'
                 : mediaMode === 'photo'
                 ? isThai
-                  ? `ให้ AI วิเคราะห์ภาพและสร้างโพสต์ (${mediaCount} รูป)`
-                  : `Analyze & Generate Post (${mediaCount} photos)`
+                  ? `สร้างร่างโพสต์ (${mediaCount} รูป)`
+                  : `Draft Post (${mediaCount} photos)`
                 : isThai
-                ? 'ให้ AI สร้างแคปชั่นวิดีโอ / Reels'
-                : 'Generate Video / Reels Post'}
+                ? 'สร้างร่างแคปชั่นวิดีโอ'
+                : 'Draft Video Caption'}
             </span>
           </>
         )}

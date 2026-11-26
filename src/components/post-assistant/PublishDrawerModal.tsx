@@ -42,6 +42,7 @@ import {
   assembleFacebookCaption,
   assembleInstagramCaption,
 } from '@/lib/post-assistant/brand-glossary';
+import { safeReadJson } from '@/lib/post-assistant/client-fetch';
 import {
   renderCleanOgCoverJpeg,
   renderCleanWebsiteWebP,
@@ -105,12 +106,15 @@ async function uploadBlobViaSignedUrl(params: {
       fileSizeBytes: params.blob.size,
     }),
   });
-  const mintJson = await mintRes.json();
-  if (!mintRes.ok || !mintJson?.data?.signedUrl) {
-    throw new Error(mintJson?.error || 'Failed to get signed upload URL');
+  const mintParsed = await safeReadJson<{
+    data?: { signedUrl?: string; storagePath?: string; publicUrl?: string };
+  }>(mintRes);
+  if (!mintParsed.ok || !mintParsed.data?.data?.signedUrl) {
+    throw new Error(mintParsed.errorMessage || 'Failed to get signed upload URL');
   }
 
-  const putRes = await fetch(mintJson.data.signedUrl, {
+  const signedData = mintParsed.data.data;
+  const putRes = await fetch(signedData.signedUrl as string, {
     method: 'PUT',
     headers: {
       'Content-Type': params.contentType,
@@ -124,8 +128,8 @@ async function uploadBlobViaSignedUrl(params: {
   }
 
   return {
-    storagePath: mintJson.data.storagePath,
-    publicUrl: mintJson.data.publicUrl,
+    storagePath: signedData.storagePath || '',
+    publicUrl: signedData.publicUrl || '',
   };
 }
 
@@ -274,10 +278,10 @@ export function PublishDrawerModal({
                 pdpaAttested: true,
               }),
             });
-            const fbJson = await fbRes.json();
-            if (!fbRes.ok) throw new Error(fbJson?.error || 'Facebook publish failed');
+            const fbParsed = await safeReadJson<{ permalink?: string }>(fbRes);
+            if (!fbParsed.ok) throw new Error(fbParsed.errorMessage || 'Facebook publish failed');
             setFbState('done');
-            setResultLinks((prev) => ({ ...prev, fb: fbJson.permalink }));
+            setResultLinks((prev) => ({ ...prev, fb: fbParsed.data?.permalink }));
           } catch (err: unknown) {
             setFbState('error');
             setChannelError((prev) => ({ ...prev, facebook: toErrMessage(err, 'FB error') }));
@@ -320,13 +324,18 @@ export function PublishDrawerModal({
                 pdpaAttested: true,
               }),
             });
-            const igJson = await igRes.json();
-            if (!igRes.ok) throw new Error(igJson?.error || 'Instagram create failed');
+            const igParsed = await safeReadJson<{
+              alreadyPublished?: boolean;
+              permalink?: string;
+              containerId?: string;
+            }>(igRes);
+            if (!igParsed.ok) throw new Error(igParsed.errorMessage || 'Instagram create failed');
+            const igJson = igParsed.data;
 
-            if (igJson.alreadyPublished) {
+            if (igJson?.alreadyPublished) {
               setIgState('done');
               setResultLinks((prev) => ({ ...prev, ig: igJson.permalink }));
-            } else {
+            } else if (igJson?.containerId) {
               // Poll status safely (up to 15 x 2s = 30s)
               let published = false;
               for (let poll = 0; poll < 15; poll++) {
@@ -337,18 +346,28 @@ export function PublishDrawerModal({
                     igJson.containerId
                   )}&draftId=${encodeURIComponent(resolvedDraftId)}`
                 );
-                const stJson = await stRes.json();
-                if (stJson.statusCode === 'PUBLISHED') {
+                const stParsed = await safeReadJson<{
+                  statusCode?: string;
+                  permalink?: string;
+                  error?: string;
+                }>(stRes);
+                if (!stParsed.ok && !stParsed.data) {
+                  throw new Error(stParsed.errorMessage || 'Failed to check Instagram status');
+                }
+                const stJson = stParsed.data;
+                if (stJson?.statusCode === 'PUBLISHED') {
                   published = true;
                   setResultLinks((prev) => ({ ...prev, ig: stJson.permalink }));
                   break;
                 }
-                if (stJson.statusCode === 'ERROR') {
+                if (stJson?.statusCode === 'ERROR') {
                   throw new Error(stJson.error || 'Instagram failed to process media');
                 }
               }
               if (!published) throw new Error('Instagram container processing timed out');
               setIgState('done');
+            } else {
+              throw new Error('Missing Instagram container ID');
             }
           } catch (err: unknown) {
             setIgState('error');
@@ -427,10 +446,10 @@ export function PublishDrawerModal({
                 pdpaAttested: true,
               }),
             });
-            const webJson = await webRes.json();
-            if (!webRes.ok) throw new Error(webJson?.error || 'Website sync failed');
+            const webParsed = await safeReadJson<{ data?: { slug?: string } }>(webRes);
+            if (!webParsed.ok) throw new Error(webParsed.errorMessage || 'Website sync failed');
             setWebState('done');
-            setResultLinks((prev) => ({ ...prev, webSlug: webJson?.data?.slug }));
+            setResultLinks((prev) => ({ ...prev, webSlug: webParsed.data?.data?.slug }));
           } catch (err: unknown) {
             setWebState('error');
             setChannelError((prev) => ({ ...prev, website: toErrMessage(err, 'Website error') }));
@@ -464,10 +483,10 @@ export function PublishDrawerModal({
                 pdpaAttested: true,
               }),
             });
-            const json = await res.json();
-            if (!res.ok) throw new Error(json?.error || 'FB Video failed');
+            const parsed = await safeReadJson<{ permalink?: string }>(res);
+            if (!parsed.ok) throw new Error(parsed.errorMessage || 'FB Video failed');
             setFbState('done');
-            setResultLinks((prev) => ({ ...prev, fb: json.permalink }));
+            setResultLinks((prev) => ({ ...prev, fb: parsed.data?.permalink }));
           } catch (err: unknown) {
             setFbState('error');
             setChannelError((prev) => ({ ...prev, facebook: toErrMessage(err, 'FB video error') }));
@@ -489,8 +508,8 @@ export function PublishDrawerModal({
                 pdpaAttested: true,
               }),
             });
-            const json = await res.json();
-            if (!res.ok) throw new Error(json?.error || 'IG Reels failed');
+            const parsed = await safeReadJson(res);
+            if (!parsed.ok) throw new Error(parsed.errorMessage || 'IG Reels failed');
             setIgState('done');
           } catch (err: unknown) {
             setIgState('error');
@@ -532,10 +551,10 @@ export function PublishDrawerModal({
                 pdpaAttested: true,
               }),
             });
-            const webJson = await webRes.json();
-            if (!webRes.ok) throw new Error(webJson?.error || 'Website video sync failed');
+            const webParsed = await safeReadJson<{ data?: { slug?: string } }>(webRes);
+            if (!webParsed.ok) throw new Error(webParsed.errorMessage || 'Website video sync failed');
             setWebState('done');
-            setResultLinks((prev) => ({ ...prev, webSlug: webJson?.data?.slug }));
+            setResultLinks((prev) => ({ ...prev, webSlug: webParsed.data?.data?.slug }));
           } catch (err: unknown) {
             setWebState('error');
             setChannelError((prev) => ({ ...prev, website: toErrMessage(err, 'Website error') }));
@@ -808,7 +827,7 @@ export function PublishDrawerModal({
               (!channels.facebook && !channels.instagram && !channels.website)
             }
             onClick={() => runPublishFlow(false)}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-[#7B1C3E] to-[#1B3A6B] hover:opacity-95 disabled:opacity-45 shadow-md"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs sm:text-sm font-semibold text-white bg-[#1B3A6B] hover:bg-[#142d54] disabled:opacity-45 shadow-xs transition-colors"
           >
             {isPublishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             <span>{isThai ? 'ยืนยันเผยแพร่ตอนนี้' : 'Publish Now'}</span>

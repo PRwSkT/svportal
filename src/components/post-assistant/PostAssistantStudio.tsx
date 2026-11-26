@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Send, Download, Sparkles, Loader2 } from 'lucide-react';
+import { Send, Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '@/contexts/LanguageContext';
 import {
@@ -14,6 +14,7 @@ import {
   renderAiThumbnail,
   renderBrandCoverPreviews,
 } from '@/lib/post-assistant/canvas-renderer';
+import { safeReadJson } from '@/lib/post-assistant/client-fetch';
 import {
   clearLocalAutosave,
   loadLocalAutosave,
@@ -28,6 +29,7 @@ import {
   FocalPoint,
   MediaMode,
   RefinePreset,
+  SocialCaptions,
   SocialPostRecord,
   StructuredCaptions,
   TargetChannelsConfig,
@@ -160,9 +162,9 @@ export function PostAssistantStudio() {
   // Load Meta API health & restore IndexedDB autosave
   useEffect(() => {
     fetch('/api/post-assistant/meta/health')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((json) => {
-        if (json?.data) setMetaHealth(json.data);
+      .then((r) => safeReadJson<{ data?: MetaHealthStatus }>(r))
+      .then((parsed) => {
+        if (parsed.ok && parsed.data?.data) setMetaHealth(parsed.data.data);
       })
       .catch(() => {});
 
@@ -293,12 +295,12 @@ export function PostAssistantStudio() {
         target_channels: channels,
       }),
     });
-    const json = await res.json();
-    if (!res.ok || !json?.id) {
-      throw new Error(json?.error || 'Failed to create server draft');
+    const parsed = await safeReadJson<{ id?: string }>(res);
+    if (!parsed.ok || !parsed.data?.id) {
+      throw new Error(parsed.errorMessage || 'Failed to create server draft');
     }
-    setDraftId(json.id);
-    return json.id as string;
+    setDraftId(parsed.data.id);
+    return parsed.data.id;
   }, [draftId, brand, mediaMode, brief, coverHeadline, captions, channels]);
 
   const handleSelectBrand = (nextBrand: BrandId) => {
@@ -439,12 +441,12 @@ export function PostAssistantStudio() {
           enableResearch,
         }),
       });
-      const json = await res.json();
-      if (!res.ok || !json?.data) {
-        throw new Error(json?.error || 'AI generation failed');
+      const parsed = await safeReadJson<{ data?: AIGenerateResponse }>(res);
+      if (!parsed.ok || !parsed.data?.data) {
+        throw new Error(parsed.errorMessage || 'AI generation failed');
       }
 
-      const data = json.data as AIGenerateResponse;
+      const data = parsed.data.data;
 
       if (data.cover_headline) {
         setCoverHeadline(data.cover_headline);
@@ -531,11 +533,21 @@ export function PostAssistantStudio() {
           websiteBodyTh: captions.website.body.th,
         }),
       });
-      const json = await res.json();
-      if (!res.ok || !json?.data) {
-        throw new Error(json?.error || 'Translation failed');
+      const parsed = await safeReadJson<{
+        data?: {
+          en?: string;
+          zh?: string;
+          ig_en?: string;
+          website_title_en?: string;
+          website_title_zh?: string;
+          website_body_en?: string;
+          website_body_zh?: string;
+        };
+      }>(res);
+      if (!parsed.ok || !parsed.data?.data) {
+        throw new Error(parsed.errorMessage || 'Translation failed');
       }
-      const d = json.data;
+      const d = parsed.data.data;
       setCaptions((prev) => ({
         ...prev,
         social: {
@@ -579,13 +591,14 @@ export function PostAssistantStudio() {
           brief,
         }),
       });
-      const json = await res.json();
-      if (!res.ok || !json?.data?.social) {
-        throw new Error(json?.error || 'Refinement failed');
+      const parsed = await safeReadJson<{ data?: { social?: SocialCaptions } }>(res);
+      if (!parsed.ok || !parsed.data?.data?.social) {
+        throw new Error(parsed.errorMessage || 'Refinement failed');
       }
+      const nextSocial = parsed.data.data.social;
       setCaptions((prev) => ({
         ...prev,
-        social: json.data.social,
+        social: nextSocial,
       }));
       toast.success(isThai ? 'ปรับโทนข้อความเรียบร้อย' : 'Caption refined');
     } catch (err: unknown) {
@@ -779,9 +792,8 @@ export function PostAssistantStudio() {
           />
 
           {/* Bottom Publish & Export Bar */}
-          <div className="bg-white/95 border border-slate-200/80 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
-            <div className="text-xs text-slate-500 flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-[#7B1C3E]" />
+          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
+            <div className="text-xs text-slate-500">
               <span>
                 {isThai
                   ? 'พร้อมส่งออก .zip หรือเผยแพร่ตรงสู่ FB · IG · somkidvittaya.ac.th'
@@ -795,7 +807,7 @@ export function PostAssistantStudio() {
                   type="button"
                   disabled={isQuickZipExporting || activePhotos.length === 0}
                   onClick={handleQuickZip}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-45 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs sm:text-sm font-semibold bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 disabled:opacity-45 transition-colors"
                 >
                   {isQuickZipExporting ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -810,7 +822,7 @@ export function PostAssistantStudio() {
                 type="button"
                 disabled={mediaCount === 0 && !captions.social.fb_th.trim()}
                 onClick={() => setIsPublishOpen(true)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-[#7B1C3E] to-[#1B3A6B] hover:opacity-95 disabled:opacity-45 shadow-md transition-all"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs sm:text-sm font-semibold text-white bg-[#1B3A6B] hover:bg-[#142d54] disabled:opacity-45 shadow-xs transition-colors"
               >
                 <Send className="w-4 h-4" />
                 <span>{isThai ? 'ตรวจสอบ & เผยแพร่โพสต์' : 'Review & Publish'}</span>
