@@ -18,7 +18,7 @@ export const SCHOOL_INFO = {
   licenseNo: 'รย. 01/2545',
   taxId: '0994000164891',
   phone: '038-611251',
-  email: 'info@somkidvittaya.ac.th',
+  email: 'mail@somkidvittaya.ac.th',
   websiteUrl: 'https://somkidvittaya.ac.th',
   staffPortalUrl: 'https://sv-portal.somkidvittaya.ac.th',
   parentsPortalUrl: 'https://parents.portal.somkidvittaya.ac.th',

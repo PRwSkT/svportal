@@ -1,5 +1,6 @@
 import React from 'react';
 import { Metadata } from 'next';
+import { LegacyBetaBanner } from '@/components/post-assistant/LegacyBetaBanner';
 
 export const metadata: Metadata = {
   title: 'Social Post Assistant | SV Portal',
@@ -8,10 +9,11 @@ export const metadata: Metadata = {
 
 export default function PostAssistantPage() {
   return (
-    <div className="w-full h-[calc(100vh-4rem)] bg-background">
-      <iframe 
-        src="/post-assistant.html" 
-        className="w-full h-full border-none"
+    <div className="w-full h-[calc(100dvh-4rem)] flex flex-col bg-background">
+      <LegacyBetaBanner />
+      <iframe
+        src="/post-assistant.html"
+        className="w-full flex-1 border-none"
         title="Social Post Assistant"
       />
     </div>

@@ -107,12 +107,22 @@ function runWorkerTask(action, payload) {
 // ==========================================
 function showToast(message, type = 'success') {
     const container = document.getElementById('toast-container');
+    if (!container) return;
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
-    
-    const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
-    toast.innerHTML = `<i class="fas ${icon} toast-icon"></i> <span>${message}</span>`;
-    
+
+    const iconName = type === 'success'
+        ? 'fa-check-circle'
+        : type === 'warning'
+            ? 'fa-exclamation-triangle'
+            : 'fa-exclamation-circle';
+    const iconEl = document.createElement('i');
+    iconEl.className = `fas ${iconName} toast-icon`;
+    const textEl = document.createElement('span');
+    textEl.textContent = String(message ?? '');
+
+    toast.appendChild(iconEl);
+    toast.appendChild(textEl);
     container.appendChild(toast);
     
     // Trigger animation
@@ -837,8 +847,12 @@ function resetAll() {
         document.getElementById('cc-detail').innerText='0 / 1000';
         document.querySelectorAll('#tag-group .tag-btn').forEach(b=>b.classList.remove('selected'));
         document.querySelectorAll('#tone-group .tag-btn').forEach((b,i)=>{ b.classList.toggle('selected', i===0); });
-        uploadZone.classList.remove('has-files');
-        document.getElementById('upload-label').innerText='คลิกหรือลากไฟล์มาวางที่นี่';
+        if (photoZone) photoZone.classList.remove('has-files');
+        if (videoZone) videoZone.classList.remove('has-files');
+        const lblPhoto = document.getElementById('upload-label-photo');
+        if (lblPhoto) lblPhoto.innerText = I18N[currentLang].upload_title;
+        const lblVideo = document.getElementById('upload-label-video');
+        if (lblVideo) lblVideo.innerText = I18N[currentLang].upload_video_title;
         document.getElementById('result-area').style.display='none';
         document.getElementById('photo-selector').style.display='none';
         document.getElementById('photo-grid').innerHTML='';
@@ -1084,47 +1098,53 @@ async function confirmPublish() {
                 btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังจบการอัปโหลด FB...';
                 await callStep({ action: 'videoStepFB', step: 'finish', sessionId: startData.sessionId, fbCaption });
 
-                // --- Step 2: โพสต์ Instagram Reels ---
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> เริ่มเตรียมอัปโหลด Instagram Reels...';
-                const igCreate = await callStep({ action: 'videoStepIG', step: 'create', igCaption });
-                const igContainerId = igCreate.containerId;
-                
-                let igOff = 0;
-                let igChunkNum = 1;
-                while (igOff < fileSize) {
-                    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> IG Upload chunk ${igChunkNum}...`;
-                    const actualEnd = Math.min(igOff + CHUNK_SIZE, fileSize);
-                    const base64Chunk = await readSliceBase64(videoFile, igOff, actualEnd);
-                    
-                    const igTrans = await callStep({
-                        action: 'videoStepIG', step: 'transfer',
-                        uploadUri: igCreate.uploadUri,
-                        offset: igOff.toString(), fileSize: fileSize.toString(),
-                        chunkBase64: base64Chunk
-                    });
-                    igOff = parseInt(igTrans.nextOffset);
-                    igChunkNum++;
+                // --- Step 2-4: โพสต์ Instagram Reels (เฉพาะเพจหลัก main) ---
+                if (targetPage === 'main') {
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> เริ่มเตรียมอัปโหลด Instagram Reels...';
+                    const igCreate = await callStep({ action: 'videoStepIG', step: 'create', igCaption });
+                    const igContainerId = igCreate.containerId;
+
+                    let igOff = 0;
+                    let igChunkNum = 1;
+                    while (igOff < fileSize) {
+                        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> IG Upload chunk ${igChunkNum}...`;
+                        const actualEnd = Math.min(igOff + CHUNK_SIZE, fileSize);
+                        const base64Chunk = await readSliceBase64(videoFile, igOff, actualEnd);
+
+                        const igTrans = await callStep({
+                            action: 'videoStepIG', step: 'transfer',
+                            uploadUri: igCreate.uploadUri,
+                            offset: igOff.toString(), fileSize: fileSize.toString(),
+                            chunkBase64: base64Chunk
+                        });
+                        igOff = parseInt(igTrans.nextOffset);
+                        igChunkNum++;
+                    }
+
+                    // --- Step 3: รอ IG ประมวลผล ---
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> รอ Instagram ประมวลผล...';
+                    let igReady = false;
+                    for (let attempt = 0; attempt < 30; attempt++) {
+                        await new Promise(r => setTimeout(r, 5000));
+                        const status = await callStep({ action: 'videoCheckIG', containerId: igContainerId });
+                        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> รอ IG ประมวลผล (${attempt + 1}/30)...`;
+                        if (status.status === 'FINISHED') { igReady = true; break; }
+                        if (status.status === 'ERROR') throw new Error('Instagram ประมวลผลล้มเหลว');
+                    }
+                    if (!igReady) throw new Error('Instagram ประมวลผลหมดเวลา');
+
+                    // --- Step 4: เผยแพร่ IG Reel ---
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> เผยแพร่ Instagram Reels...';
+                    await callStep({ action: 'videoPublishIG', containerId: igContainerId });
                 }
 
-                // --- Step 3: รอ IG ประมวลผล ---
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> รอ Instagram ประมวลผล...';
-                let igReady = false;
-                for (let attempt = 0; attempt < 30; attempt++) {
-                    await new Promise(r => setTimeout(r, 5000));
-                    const status = await callStep({ action: 'videoCheckIG', containerId: igContainerId });
-                    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> รอ IG ประมวลผล (${attempt + 1}/30)...`;
-                    if (status.status === 'FINISHED') { igReady = true; break; }
-                    if (status.status === 'ERROR') throw new Error('Instagram ประมวลผลล้มเหลว');
-                }
-                if (!igReady) throw new Error('Instagram ประมวลผลหมดเวลา');
-
-                // --- Step 4: เผยแพร่ IG Reel ---
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> เผยแพร่ Instagram Reels...';
-                await callStep({ action: 'videoPublishIG', containerId: igContainerId });
-
-                await syncToWebsite(hl, fbCaption, activeFiles);
-
-                showToast("โพสต์วิดีโอสำเร็จทั้ง Facebook และ Instagram!", "success");
+                // Legacy sync-post accepts images only; skip raw MP4 upload to prevent 400/413
+                showToast(
+                    targetPage === 'main'
+                        ? "โพสต์วิดีโอสำเร็จทั้ง Facebook และ Instagram!"
+                        : "โพสต์วิดีโอลง Facebook สำเร็จ!",
+                    "success"
+                );
                 closePublishModal();
 
             } catch(videoErr) {
@@ -1355,8 +1375,13 @@ function setLang(lang) {
     });
 
     if (hasFiles) {
-        document.getElementById('upload-label').textContent =
-            `${t.files_selected} ${uploadedFiles.length} ${t.files_unit}`;
+        const lblPhoto = document.getElementById('upload-label-photo');
+        const lblVideo = document.getElementById('upload-label-video');
+        if (mediaMode === 'photo' && lblPhoto) {
+            lblPhoto.textContent = `${t.files_selected} ${uploadedFiles.length} ${t.files_unit}`;
+        } else if (mediaMode === 'video' && lblVideo) {
+            lblVideo.textContent = `${t.files_selected} ${uploadedFiles.length} ${t.files_unit}`;
+        }
     }
 
     document.querySelectorAll('.thumb-badge').forEach(b => b.textContent = t.cover_badge);
@@ -1375,15 +1400,25 @@ async function syncToWebsite(hl, fbCaption, activeFiles) {
         console.log("Skipping website sync for non-main page.");
         return;
     }
+    const imageFiles = (activeFiles || []).filter(f => f && typeof f.type === 'string' && f.type.startsWith('image/'));
+    if (imageFiles.length === 0 && mediaMode === 'video') {
+        console.log("Skipping legacy multipart sync-post in video mode.");
+        return;
+    }
     try {
         const btn = document.getElementById('btn-confirm-publish');
         if(btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ซิงค์ขึ้นหน้าเว็บไซต์...';
-        
+
+        const activityName = document.getElementById('f-activity-name')?.value?.trim() || '';
+        const titleStr = (hl && typeof hl === 'object')
+            ? (hl.headline || activityName || 'ข่าวสารใหม่')
+            : (typeof hl === 'string' && hl.trim() && hl !== '[object Object]' ? hl.trim() : (activityName || 'ข่าวสารใหม่'));
+
         const formData = new FormData();
-        formData.append('hl', hl || 'ข่าวสารใหม่');
+        formData.append('hl', titleStr);
         formData.append('fbCaption', fbCaption || '');
-        
-        for (let f of activeFiles) {
+
+        for (let f of imageFiles) {
             formData.append('files', f);
         }
         

@@ -4,9 +4,9 @@ import { cookies } from 'next/headers';
 import { isNetlifyDbActive } from '@/lib/db/netlify-bridge';
 import { createPgPostgrestClient } from '@/lib/db/pg-postgrest-adapter';
 
-export async function createClient(): Promise<SupabaseClient<any, 'public', any>> {
+export async function createClient(): Promise<SupabaseClient> {
   if (isNetlifyDbActive()) {
-    return createPgPostgrestClient() as any;
+    return createPgPostgrestClient() as unknown as SupabaseClient;
   }
 
   const cookieStore = await cookies();
@@ -19,7 +19,10 @@ export async function createClient(): Promise<SupabaseClient<any, 'public', any>
 
   const allCookies = cookieStore.getAll();
   const hasAuthCookie = allCookies.some((c) => c.name.startsWith('sb-') && c.name.includes('-auth-token'));
-  const isPreviewWithoutSession = process.env.SV_PREVIEW_MODE === 'true' && !hasAuthCookie;
+  const isPreviewWithoutSession =
+    process.env.NODE_ENV === 'development' &&
+    process.env.SV_PREVIEW_MODE === 'true' &&
+    !hasAuthCookie;
   const effectiveKey = (isPreviewWithoutSession && process.env.SUPABASE_SERVICE_ROLE_KEY)
     ? process.env.SUPABASE_SERVICE_ROLE_KEY
     : anonKey;
@@ -37,7 +40,7 @@ export async function createClient(): Promise<SupabaseClient<any, 'public', any>
             cookiesToSet.forEach(({ name, value, options }) => {
               cookieStore.set(name, value, options);
             });
-          } catch (error) {
+          } catch {
             // The `set` method was called from a Server Component.
             // This can be ignored if you have middleware refreshing
             // user sessions.

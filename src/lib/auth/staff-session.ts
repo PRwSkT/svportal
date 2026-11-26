@@ -9,13 +9,29 @@ export interface StaffSessionPayload {
   exp: number;
 }
 
+interface CookieReaderLike {
+  cookies?: { get?: (name: string) => { value?: string } | undefined };
+  get?: (name: string) => { value?: string } | undefined;
+}
+
+interface CookieWritableResponse {
+  cookies?: {
+    set: (name: string, value: string, options: Record<string, unknown>) => void;
+  };
+}
+
 function getSessionSecret(): string {
-  return (
+  const configured =
     process.env.STAFF_SESSION_SECRET ||
     process.env.PARENT_SESSION_SECRET ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    'svportal-staff-session-hmac-secret-salt'
-  );
+    process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!configured) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Missing STAFF_SESSION_SECRET in production environment');
+    }
+    return 'svportal-staff-session-hmac-secret-salt';
+  }
+  return configured;
 }
 
 function toBase64Url(uint8Array: Uint8Array): string {
@@ -29,13 +45,14 @@ function toBase64Url(uint8Array: Uint8Array): string {
     .replace(/=+$/, '');
 }
 
-function fromBase64Url(base64Url: string): Uint8Array {
+function fromBase64Url(base64Url: string): Uint8Array<ArrayBuffer> {
   let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
   while (base64.length % 4 !== 0) {
     base64 += '=';
   }
   const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
+  const buffer = new ArrayBuffer(binary.length);
+  const bytes = new Uint8Array(buffer);
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
   }
@@ -113,7 +130,7 @@ export async function verifyStaffSessionToken(token: string): Promise<StaffSessi
  * Reads and verifies the staff session cookie from next/headers cookies() or passed request/store.
  */
 export async function getStaffSessionFromCookies(
-  reqOrCookieStore?: any
+  reqOrCookieStore?: CookieReaderLike
 ): Promise<StaffSessionPayload | null> {
   let token: string | undefined;
 
@@ -163,8 +180,9 @@ export async function attachStaffSessionCookie(
     maxAge: 7 * 24 * 60 * 60,
   };
 
-  if (res instanceof NextResponse || ('cookies' in res && typeof (res as any).cookies?.set === 'function')) {
-    (res as any).cookies.set(STAFF_SESSION_COOKIE, token, cookieOptions);
+  const cookieTarget = res as NextResponse & CookieWritableResponse;
+  if (res instanceof NextResponse || typeof cookieTarget.cookies?.set === 'function') {
+    cookieTarget.cookies?.set(STAFF_SESSION_COOKIE, token, cookieOptions);
   } else {
     const secureFlag = process.env.NODE_ENV === 'production' ? '; Secure' : '';
     res.headers.append(
@@ -178,8 +196,9 @@ export async function attachStaffSessionCookie(
  * Clears the sv_staff_session cookie.
  */
 export function clearStaffSessionCookie(res: NextResponse | Response): void {
-  if (res instanceof NextResponse || ('cookies' in res && typeof (res as any).cookies?.set === 'function')) {
-    (res as any).cookies.set(STAFF_SESSION_COOKIE, '', {
+  const cookieTarget = res as NextResponse & CookieWritableResponse;
+  if (res instanceof NextResponse || typeof cookieTarget.cookies?.set === 'function') {
+    cookieTarget.cookies?.set(STAFF_SESSION_COOKIE, '', {
       path: '/',
       maxAge: 0,
       httpOnly: true,

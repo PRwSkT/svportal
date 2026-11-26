@@ -7,10 +7,11 @@ function cleanTranslationResult(text: string, targetLang: 'en' | 'zh'): string {
   let result = (text || '').trim();
   if (targetLang === 'zh') {
     result = result
-      .replace(/松吉威提雅学校/g, 'Somkidvittaya学校')
-      .replace(/松吉学校/g, 'Somkidvittaya学校')
-      .replace(/森吉威提雅学校/g, 'Somkidvittaya学校')
-      .replace(/森吉学校/g, 'Somkidvittaya学校');
+      .replace(/Somkidvittaya学校/g, 'somkidvittaya学校')
+      .replace(/松吉威提雅学校/g, 'somkidvittaya学校')
+      .replace(/松吉学校/g, 'somkidvittaya学校')
+      .replace(/森吉威提雅学校/g, 'somkidvittaya学校')
+      .replace(/森吉学校/g, 'somkidvittaya学校');
   }
   return result;
 }
@@ -28,32 +29,35 @@ async function translateSingle(text: string, targetLang: 'en' | 'zh'): Promise<s
     return trimmed;
   }
 
-  // 1. Try Gemini API if key is available (Primary: gemini-2.5-flash-lite)
+  // 1. Try Gemini API if key is available (Primary: gemini-3.8-flash -> fallback gemini-3.6-flash)
   const geminiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
   if (geminiKey) {
     try {
       const prompt = `You are a professional educational translator for Somkidvittaya School.
 Translate the following text to ${targetLang === 'zh' ? 'Simplified Chinese (中文)' : 'Professional English'}.
 Keep tone formal, friendly, clear, and suitable for school forms and announcements.
-${targetLang === 'zh' ? 'IMPORTANT: When translating or mentioning the school name "โรงเรียนสมคิดวิทยา" into Chinese, ALWAYS use "Somkidvittaya学校" exactly (do NOT transliterate as 松吉 or 森吉).' : ''}
+${targetLang === 'zh' ? 'IMPORTANT: When translating or mentioning the school name "โรงเรียนสมคิดวิทยา" into Chinese, ALWAYS use "somkidvittaya学校" (lowercase s) exactly (do NOT transliterate as 松吉 or 森吉).' : ''}
 Return ONLY the translation without any quotes or explanations.
 
 Text:
 ${trimmed}`;
 
       for (const model of [
+        'gemini-3.8-flash',
+        'gemini-3.6-flash',
         'gemini-3.5-flash-lite',
         'gemini-3.1-flash-lite',
         'gemini-2.5-flash-lite',
-        'gemma-4-26b-a4b-it',
-        'gemma-4-31b-it',
       ]) {
         try {
           const res = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
             {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': geminiKey,
+              },
               body: JSON.stringify({
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
                 generationConfig: { temperature: 0.2 },
@@ -63,9 +67,11 @@ ${trimmed}`;
           );
 
           if (res.ok) {
-            const data = await res.json();
+            const data = (await res.json()) as {
+              candidates?: Array<{ content?: { parts?: Array<{ thought?: boolean; text?: string }> } }>;
+            };
             const parts = data?.candidates?.[0]?.content?.parts || [];
-            const answerPart = parts.find((p: any) => !p.thought) || parts[parts.length - 1];
+            const answerPart = parts.find((p) => !p.thought && typeof p.text === 'string' && p.text.trim()) || parts[parts.length - 1];
             const translated = answerPart?.text?.trim();
             if (translated) return cleanTranslationResult(translated, targetLang);
           }
@@ -111,7 +117,7 @@ ${trimmed}`;
       if (text.startsWith('[') || text.startsWith('{')) {
         const data = JSON.parse(text);
         if (Array.isArray(data) && Array.isArray(data[0])) {
-          const translatedParts = data[0].map((part: any) => part[0]).filter(Boolean);
+          const translatedParts = data[0].map((part: unknown) => (Array.isArray(part) ? part[0] : null)).filter(Boolean);
           if (translatedParts.length > 0) {
             return cleanTranslationResult(translatedParts.join(''), targetLang);
           }

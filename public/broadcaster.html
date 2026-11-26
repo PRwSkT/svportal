@@ -2243,12 +2243,16 @@
 
     initApp();
 
-    // Register Service Worker safely (Only on HTTP/HTTPS localhost/web)
+    // Unregister legacy sv-pickup service-worker.js so root static files never stay stale-cached
     if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js')
-          .then(reg => console.log('Service Worker registered', reg))
-          .catch(err => console.warn('Service Worker register notice:', err));
+        navigator.serviceWorker.getRegistrations()
+          .then(regs => {
+            regs
+              .filter(reg => reg.active?.scriptURL?.includes('service-worker.js') || reg.installing?.scriptURL?.includes('service-worker.js') || reg.waiting?.scriptURL?.includes('service-worker.js'))
+              .forEach(reg => reg.unregister());
+          })
+          .catch(() => {});
       });
     }
   </script>

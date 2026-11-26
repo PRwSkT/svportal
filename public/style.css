@@ -411,11 +411,15 @@ body {
 .toast.error {
     border-left-color: var(--sv-maroon);
 }
+.toast.warning {
+    border-left-color: #d97706;
+}
 .toast-icon {
     font-size: 1.2rem;
 }
 .toast.success .toast-icon { color: var(--sv-success); }
 .toast.error .toast-icon { color: var(--sv-maroon); }
+.toast.warning .toast-icon { color: #d97706; }
 
 /* ── Skeleton Loading ── */
 .skeleton {

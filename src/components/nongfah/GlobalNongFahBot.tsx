@@ -252,7 +252,8 @@ export function GlobalNongFahBot() {
     pathname.startsWith('/verify') ||
     pathname.startsWith('/forms') ||
     pathname.startsWith('/admin/forms') ||
-    pathname.startsWith('/academic/timetable');
+    pathname.startsWith('/academic/timetable') ||
+    pathname.startsWith('/post-assistant');
 
   // Listen for global custom events to open Nong Fah from anywhere
   useEffect(() => {

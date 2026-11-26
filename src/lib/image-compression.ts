@@ -41,22 +41,29 @@ export async function compressImage(file: File, maxWidth = 2048, quality = 0.85)
 
         ctx.drawImage(img, 0, 0, width, height);
 
-        const outputType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              resolve(file);
+        // Convert large PNGs or photos to WebP (with JPEG fallback) to prevent huge lossless PNG uploads
+        const tryMime = file.type === 'image/png' ? 'image/webp' : 'image/jpeg';
+        const handleBlob = (blob: Blob | null, mimeUsed: string) => {
+          if (!blob) {
+            if (mimeUsed === 'image/webp') {
+              canvas.toBlob((jpgBlob) => handleBlob(jpgBlob, 'image/jpeg'), 'image/jpeg', quality);
               return;
             }
-            const ext = outputType === 'image/jpeg' ? '.jpg' : '.png';
-            const baseName = file.name.replace(/\.[^/.]+$/, '');
-            const compressedFile = new File([blob], `${baseName}${ext}`, {
-              type: outputType,
-              lastModified: Date.now(),
-            });
-            resolve(compressedFile);
-          },
-          outputType,
+            resolve(file);
+            return;
+          }
+          const ext = mimeUsed === 'image/webp' ? '.webp' : '.jpg';
+          const baseName = file.name.replace(/\.[^/.]+$/, '');
+          const compressedFile = new File([blob], `${baseName}${ext}`, {
+            type: mimeUsed,
+            lastModified: Date.now(),
+          });
+          resolve(compressedFile);
+        };
+
+        canvas.toBlob(
+          (blob) => handleBlob(blob, tryMime),
+          tryMime,
           quality
         );
       };

@@ -83,7 +83,8 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/api/webhook') ||
     request.nextUrl.pathname.startsWith('/api/blobs') ||
     request.nextUrl.pathname.startsWith('/api/db/bridge') ||
-    request.nextUrl.pathname.startsWith('/post-assistant') ||
+    request.nextUrl.pathname === '/post-assistant' ||
+    request.nextUrl.pathname === '/post-assistant/' ||
     request.nextUrl.pathname === '/api/admin/website/sync-post' ||
     request.nextUrl.pathname === '/api/health' ||
     request.nextUrl.pathname.startsWith('/api/signage') ||
@@ -128,7 +129,7 @@ export async function proxy(request: NextRequest) {
   }
 
   let user: { id: string; email?: string; user_metadata?: { full_name?: string } } | null = null;
-  let supabaseClient: any = null;
+  let supabaseClient: ReturnType<typeof createServerClient> | null = null;
 
   // 1. Check dual-mode sv_staff_session cookie first
   const staffCookie = request.cookies.get(STAFF_SESSION_COOKIE)?.value;
@@ -219,19 +220,21 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/api/admin') ||
     request.nextUrl.pathname.startsWith('/pos') ||
     request.nextUrl.pathname.startsWith('/api/pos') ||
-    request.nextUrl.pathname.startsWith('/audio-remote')
+    request.nextUrl.pathname.startsWith('/audio-remote') ||
+    request.nextUrl.pathname.startsWith('/post-assistant/v2') ||
+    request.nextUrl.pathname.startsWith('/api/post-assistant')
   ) {
     if (isSystemAdmin(user?.email)) {
       return response;
     }
 
     // Retrieve user record from app_users
-    let appUserData: any = null;
+    let appUserData: { role?: string; is_active?: boolean; assigned_features?: string[] } | null = null;
     if (supabaseClient) {
       const { data } = await supabaseClient.rpc('get_app_user_by_id', {
         target_user_id: user.id,
       });
-      appUserData = data;
+      appUserData = (data as typeof appUserData) || null;
     } else {
       try {
         const origin = request.nextUrl.origin;
@@ -254,6 +257,13 @@ export async function proxy(request: NextRequest) {
       } catch (err) {
         console.error('Edge bridge user lookup error:', err);
       }
+    }
+
+    if (appUserData && appUserData.is_active === false) {
+      if (request.nextUrl.pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Account deactivated' }, { status: 403 });
+      }
+      return redirectWithCookies(new URL('/login?error=Account_Disabled', request.url));
     }
 
     const userRole = appUserData?.role;
@@ -348,6 +358,11 @@ export async function proxy(request: NextRequest) {
       requiredFeature = 'admin_kpi';
     } else if (path.startsWith('/audio-remote')) {
       requiredFeature = 'audio_remote';
+    } else if (path.startsWith('/post-assistant/v2') || path.startsWith('/api/post-assistant')) {
+      if (assignedFeatures.includes('post_assistant') || assignedFeatures.includes('admin_website')) {
+        return response;
+      }
+      requiredFeature = 'post_assistant';
     } else if (path.startsWith('/pos/fees') || path.startsWith('/api/pos/fees')) {
       if (userRole === 'cashier' || assignedFeatures.includes('pos_fees')) {
         return response;

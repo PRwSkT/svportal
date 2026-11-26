@@ -1,34 +1,63 @@
+import crypto from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireAuth } from '@/lib/auth';
-import { triggerWebsiteRebuild } from '@/lib/website-sync';
+
+const MIME_EXT_MAP: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+};
+
+function timingSafeMatch(candidate: string, expected: string): boolean {
+  const a = Buffer.from(candidate, 'utf8');
+  const b = Buffer.from(expected, 'utf8');
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+function sanitizeTitleInput(raw: string | null): string {
+  const trimmed = (raw || '').trim();
+  if (!trimmed || trimmed === '[object Object]') {
+    return '';
+  }
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (typeof parsed?.headline === 'string' && parsed.headline.trim()) {
+        return parsed.headline.trim();
+      }
+    } catch {
+      // ignore non-JSON
+    }
+  }
+  return trimmed;
+}
 
 export async function POST(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization') || request.headers.get('x-sync-secret');
-    const syncSecret = process.env.SYNC_SECRET;
+    const authHeader = (request.headers.get('authorization') || request.headers.get('x-sync-secret') || '').trim();
+    const syncSecret = (process.env.SYNC_SECRET || '').trim();
     const isSecretValid = Boolean(
       syncSecret &&
       authHeader &&
-      (authHeader === syncSecret || authHeader === `Bearer ${syncSecret}` || authHeader.includes(syncSecret))
+      (timingSafeMatch(authHeader, syncSecret) || timingSafeMatch(authHeader, `Bearer ${syncSecret}`))
     );
 
     if (!isSecretValid) {
-      const auth = await requireAuth('admin', 'admin_website');
+      const auth = await requireAuth('admin', ['admin_website', 'post_assistant']);
       if (auth.error) {
-        const authPost = await requireAuth('admin', 'post_assistant');
-        if (authPost.error) {
-          return NextResponse.json({ error: auth.error }, { status: auth.status });
-        }
+        return NextResponse.json({ error: auth.error }, { status: auth.status });
       }
     }
 
     const formData = await request.formData();
-    const hl = formData.get('hl') as string;
-    const fbCaption = formData.get('fbCaption') as string;
-    
+    const hl = sanitizeTitleInput(formData.get('hl') as string | null);
+    const fbCaption = ((formData.get('fbCaption') as string) || '').trim();
+
     if (!hl) {
-      return NextResponse.json({ error: 'Title (hl) is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Valid title (hl) is required' }, { status: 400 });
     }
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -41,7 +70,7 @@ export async function POST(request: Request) {
 
     const rawFiles = formData.getAll('files') as File[];
     const MAX_FILE_SIZE = 10 * 1024 * 1024;
-    const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const ALLOWED_MIME = Object.keys(MIME_EXT_MAP);
 
     for (const file of rawFiles) {
       if (!file || typeof file.size !== 'number') continue;
@@ -54,11 +83,11 @@ export async function POST(request: Request) {
     }
 
     const files = rawFiles.filter(file => file && file.size > 0 && ALLOWED_MIME.includes(file.type.toLowerCase()));
-    
+
     // Concurrent Upload using Promise.all
     const uploadPromises = files.map(async (file) => {
-      const fileExt = file.name.split('.').pop() || 'jpg';
-      const fileName = `${crypto.randomUUID()}.${fileExt.toLowerCase()}`;
+      const fileExt = MIME_EXT_MAP[file.type.toLowerCase()] || 'jpg';
+      const fileName = `${crypto.randomUUID()}.${fileExt}`;
       const filePath = `post/${new Date().getFullYear()}/${new Date().getMonth() + 1}/${fileName}`;
 
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -124,8 +153,11 @@ export async function POST(request: Request) {
     // Saved to Supabase. Live website reflects news/albums immediately via client-side hydration.
 
     return NextResponse.json({ success: true, news: newsData, album_id: albumId });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Sync post error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Website sync error' },
+      { status: 500 }
+    );
   }
 }
