@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
 import {
   Camera,
   Video,
@@ -9,7 +8,6 @@ import {
   RotateCcw,
   CheckCircle2,
   AlertTriangle,
-  ExternalLink,
   Save,
 } from 'lucide-react';
 import { BRAND_PROFILES } from '@/lib/post-assistant/brand-glossary';
@@ -131,14 +129,6 @@ export function BrandAndModeBar({
             <RotateCcw className="w-3.5 h-3.5" />
             <span>{isThai ? 'เริ่มใหม่' : 'New Post'}</span>
           </button>
-
-          <Link
-            href="/post-assistant"
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-          >
-            <span>{isThai ? 'เวอร์ชันเดิม' : 'Legacy'}</span>
-            <ExternalLink className="w-3 h-3" />
-          </Link>
         </div>
       </div>
 

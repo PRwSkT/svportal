@@ -83,8 +83,6 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/api/webhook') ||
     request.nextUrl.pathname.startsWith('/api/blobs') ||
     request.nextUrl.pathname.startsWith('/api/db/bridge') ||
-    request.nextUrl.pathname === '/post-assistant' ||
-    request.nextUrl.pathname === '/post-assistant/' ||
     request.nextUrl.pathname === '/api/admin/website/sync-post' ||
     request.nextUrl.pathname === '/api/health' ||
     request.nextUrl.pathname.startsWith('/api/signage') ||
@@ -221,7 +219,7 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/pos') ||
     request.nextUrl.pathname.startsWith('/api/pos') ||
     request.nextUrl.pathname.startsWith('/audio-remote') ||
-    request.nextUrl.pathname.startsWith('/post-assistant/v2') ||
+    request.nextUrl.pathname.startsWith('/post-assistant') ||
     request.nextUrl.pathname.startsWith('/api/post-assistant')
   ) {
     if (isSystemAdmin(user?.email)) {
@@ -358,7 +356,7 @@ export async function proxy(request: NextRequest) {
       requiredFeature = 'admin_kpi';
     } else if (path.startsWith('/audio-remote')) {
       requiredFeature = 'audio_remote';
-    } else if (path.startsWith('/post-assistant/v2') || path.startsWith('/api/post-assistant')) {
+    } else if (path.startsWith('/post-assistant') || path.startsWith('/api/post-assistant')) {
       if (assignedFeatures.includes('post_assistant') || assignedFeatures.includes('admin_website')) {
         return response;
       }

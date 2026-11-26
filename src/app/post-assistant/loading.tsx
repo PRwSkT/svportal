@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function PostAssistantV2Loading() {
+export default function PostAssistantLoading() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-4 animate-pulse">
       <div className="h-24 rounded-2xl bg-white/80 border border-slate-200" />
