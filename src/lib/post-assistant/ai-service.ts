@@ -86,82 +86,149 @@ function buildPayloadForModel(
   };
 }
 
+async function fetchSingleGeminiModel(params: {
+  model: (typeof POST_ASSISTANT_MODELS)[number];
+  payload: Record<string, unknown>;
+  apiKey: string;
+  signal: AbortSignal;
+}): Promise<{ json: JsonObject; modelUsed: string }> {
+  const { model, payload, apiKey, signal } = params;
+  const requestPayload = buildPayloadForModel(payload, model);
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
+      body: JSON.stringify(requestPayload),
+      signal,
+    }
+  );
+
+  const rawText = await res.text();
+  let parsedEnvelope: GeminiCandidateEnvelope;
+  try {
+    parsedEnvelope = JSON.parse(rawText) as GeminiCandidateEnvelope;
+  } catch {
+    throw new Error(`${model}: non-JSON response (${res.status})`);
+  }
+
+  if (res.status === 503 || res.status === 429) {
+    throw new Error(`${model} (${res.status}): ${parsedEnvelope?.error?.message || 'Service busy'}`);
+  }
+
+  if (!res.ok || parsedEnvelope?.error) {
+    throw new Error(`${model} (${res.status}): ${parsedEnvelope?.error?.message || 'API error'}`);
+  }
+
+  const answerText = extractAnswerText(parsedEnvelope);
+  if (!answerText) {
+    throw new Error(`${model}: Empty response`);
+  }
+
+  const json = JSON.parse(answerText) as JsonObject;
+  return { json, modelUsed: model };
+}
+
+/**
+ * Hedged parallel cascade:
+ * - t=0ms: launch primary (gemini-3.8-flash)
+ * - t=3500ms (or sooner if 3.8 fails): hedge launch fallback 1 (gemini-3.6-flash)
+ * - t=7500ms (or sooner if both 3.8 & 3.6 fail): hedge launch emergency fallback (gemini-3.5-flash-lite)
+ * First valid JSON wins immediately and aborts all remaining in-flight requests.
+ */
 async function callGeminiWithFallback(params: {
   payload: Record<string, unknown>;
   timeoutMs?: number;
   maxTotalMs?: number;
 }): Promise<{ json: JsonObject; modelUsed: string }> {
   const apiKey = getGeminiApiKey();
-  const maxTotalMs = params.maxTotalMs ?? 24000;
-  const deadline = Date.now() + maxTotalMs;
-  let lastError = 'Gemini API unavailable';
+  const maxTotalMs = params.maxTotalMs ?? 23500;
+  const hedgeDelaysMs = [0, 3500, 7500];
 
-  for (let modelIdx = 0; modelIdx < POST_ASSISTANT_MODELS.length; modelIdx++) {
-    const model = POST_ASSISTANT_MODELS[modelIdx];
-    const remainingMs = deadline - Date.now();
-    if (remainingMs < 2000) {
-      break;
-    }
+  return await new Promise<{ json: JsonObject; modelUsed: string }>((resolve, reject) => {
+    let settled = false;
+    const totalModels = POST_ASSISTANT_MODELS.length;
+    const launched = new Array<boolean>(totalModels).fill(false);
+    const failed = new Array<boolean>(totalModels).fill(false);
+    const errors: string[] = [];
+    const controllers: AbortController[] = [];
+    const timers: Array<ReturnType<typeof setTimeout>> = [];
 
-    let perModelTimeout: number;
-    if (modelIdx === 0) {
-      perModelTimeout = Math.min(8000, Math.max(3500, remainingMs - 10000), remainingMs);
-    } else if (modelIdx === 1) {
-      perModelTimeout = Math.min(9500, Math.max(4000, remainingMs - 6500), remainingMs);
-    } else {
-      perModelTimeout = Math.min(remainingMs, 10000);
-    }
-
-    const requestPayload = buildPayloadForModel(params.payload, model);
-
-    try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey,
-          },
-          body: JSON.stringify(requestPayload),
-          signal: AbortSignal.timeout(perModelTimeout),
+    const cleanup = () => {
+      for (const t of timers) clearTimeout(t);
+      for (const c of controllers) {
+        try {
+          c.abort();
+        } catch {
+          // ignore
         }
-      );
-
-      const rawText = await res.text();
-      let parsedEnvelope: GeminiCandidateEnvelope;
-      try {
-        parsedEnvelope = JSON.parse(rawText) as GeminiCandidateEnvelope;
-      } catch {
-        lastError = `${model}: non-JSON response (${res.status})`;
-        continue;
       }
+    };
 
-      if (res.status === 503 || res.status === 429) {
-        lastError = `${model} (${res.status}): ${parsedEnvelope?.error?.message || 'Service busy'}`;
-        continue;
+    const overallTimer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      const lastErr = errors[errors.length - 1] || 'Gemini API timed out';
+      reject(new Error(lastErr));
+    }, maxTotalMs);
+    timers.push(overallTimer);
+
+    const launchModel = (idx: number) => {
+      if (settled || idx < 0 || idx >= totalModels || launched[idx]) return;
+      launched[idx] = true;
+
+      const model = POST_ASSISTANT_MODELS[idx];
+      const controller = new AbortController();
+      controllers.push(controller);
+
+      fetchSingleGeminiModel({
+        model,
+        payload: params.payload,
+        apiKey,
+        signal: controller.signal,
+      })
+        .then((result) => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          resolve(result);
+        })
+        .catch((err: unknown) => {
+          if (settled) return;
+          failed[idx] = true;
+          const msg = err instanceof Error ? err.message : `${model}: Request failed`;
+          errors.push(msg);
+
+          if (failed.every(Boolean)) {
+            settled = true;
+            cleanup();
+            reject(new Error(errors[errors.length - 1] || 'Gemini API unavailable'));
+            return;
+          }
+
+          // Immediately trigger next unlaunched model if all preceding models have failed
+          const nextIdx = launched.findIndex((wasLaunched) => !wasLaunched);
+          if (nextIdx !== -1 && failed.slice(0, nextIdx).every(Boolean)) {
+            launchModel(nextIdx);
+          }
+        });
+    };
+
+    // t=0 launch primary + schedule staggered hedges
+    launchModel(0);
+    for (let i = 1; i < totalModels; i++) {
+      const delay = hedgeDelaysMs[i] ?? i * 3500;
+      if (delay < maxTotalMs - 2000) {
+        const timer = setTimeout(() => launchModel(i), delay);
+        timers.push(timer);
       }
-
-      if (!res.ok || parsedEnvelope?.error) {
-        lastError = `${model} (${res.status}): ${parsedEnvelope?.error?.message || 'API error'}`;
-        continue;
-      }
-
-      const answerText = extractAnswerText(parsedEnvelope);
-      if (!answerText) {
-        lastError = `${model}: Empty response`;
-        continue;
-      }
-
-      const json = JSON.parse(answerText) as JsonObject;
-      return { json, modelUsed: model };
-    } catch (err: unknown) {
-      const errObj = err as { message?: string } | null;
-      lastError = `${model}: ${errObj?.message || 'Request failed'}`;
     }
-  }
-
-  throw new Error(lastError);
+  });
 }
 
 function shouldRunSearchGrounding(brief: ActivityBrief, forceEnable?: boolean): boolean {
@@ -187,7 +254,31 @@ async function runConditionalSearchGrounding(brief: ActivityBrief): Promise<stri
     `<activity_context>\n${queryText}\n</activity_context>`,
   ].join('\n');
 
-  for (const model of POST_ASSISTANT_MODELS) {
+  const groundingOrder: Array<(typeof POST_ASSISTANT_MODELS)[number]> = [
+    'gemini-3.5-flash-lite',
+    'gemini-3.8-flash',
+    'gemini-3.6-flash',
+  ];
+  const totalDeadline = Date.now() + 3500;
+
+  for (let i = 0; i < groundingOrder.length; i++) {
+    const model = groundingOrder[i];
+    const remainingMs = totalDeadline - Date.now();
+    if (remainingMs < (i === 0 ? 1000 : 1500)) break;
+
+    const payload = buildPayloadForModel(
+      {
+        contents: [{ role: 'user', parts: [{ text: searchPrompt }] }],
+        tools: [{ google_search: {} }],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 400,
+          thinkingConfig: { thinkingLevel: 'LOW' },
+        },
+      },
+      model
+    );
+
     try {
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -197,16 +288,8 @@ async function runConditionalSearchGrounding(brief: ActivityBrief): Promise<stri
             'Content-Type': 'application/json',
             'x-goog-api-key': apiKey,
           },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: searchPrompt }] }],
-            tools: [{ google_search: {} }],
-            generationConfig: {
-              temperature: 0.2,
-              maxOutputTokens: 400,
-              thinkingConfig: { thinkingLevel: 'LOW' },
-            },
-          }),
-          signal: AbortSignal.timeout(3500),
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(remainingMs),
         }
       );
       if (!res.ok) continue;
@@ -648,7 +731,9 @@ export async function generatePostWithAI(params: {
   const cleanGroup = sanitizeBriefForAI(brief.studentGroup || '').cleanText;
 
   const runSearch = shouldRunSearchGrounding(brief, params.enableResearch);
+  const searchStartMs = Date.now();
   const verifiedFacts = runSearch ? await runConditionalSearchGrounding(brief) : '';
+  const searchElapsedMs = Date.now() - searchStartMs;
 
   const briefXml = [
     '<activity_brief>',
@@ -695,8 +780,7 @@ export async function generatePostWithAI(params: {
     brand === 'main' ? buildMainPhotoSystemInstruction() : buildSubBrandSystemInstruction(brand);
 
   const { json, modelUsed } = await callGeminiWithFallback({
-    timeoutMs: 11000,
-    maxTotalMs: 24000,
+    maxTotalMs: Math.max(17000, 23500 - searchElapsedMs),
     payload: {
       systemInstruction: { parts: [{ text: systemInstruction }] },
       contents: [{ role: 'user', parts }],
