@@ -19,13 +19,16 @@ export async function POST(request: Request) {
   const auth = await requirePostAssistantAuth();
   if (!auth.ok) return auth.response;
 
+  let draftId: unknown = null;
+  let channel: 'facebook' | 'instagram' = 'facebook';
+
   try {
     const body = await request.json();
-    const draftId = body?.draftId;
+    draftId = body?.draftId;
     const brand: BrandId = ['main', 'football', 'swimming', 'tutoring'].includes(body?.brand)
       ? body.brand
       : 'main';
-    const channel: 'facebook' | 'instagram' = body?.channel === 'instagram' ? 'instagram' : 'facebook';
+    channel = body?.channel === 'instagram' ? 'instagram' : 'facebook';
     const storagePath = typeof body?.storagePath === 'string' ? body.storagePath : '';
     const caption = typeof body?.caption === 'string' ? body.caption.trim() : '';
     const title = typeof body?.title === 'string' ? body.title.trim() : undefined;
@@ -135,6 +138,31 @@ export async function POST(request: Request) {
     });
   } catch (err: unknown) {
     console.error('[PostAssistant Publish Video]', err);
-    return NextResponse.json({ error: getErrorMessage(err, 'Video publish failed') }, { status: 500 });
+    const errMessage = getErrorMessage(err, 'Video publish failed');
+    if (isValidUuid(draftId)) {
+      try {
+        const admin = getAdminClient();
+        const { data: existing } = await admin
+          .from('social_posts')
+          .select('channel_errors')
+          .eq('id', draftId)
+          .maybeSingle();
+        await admin
+          .from('social_posts')
+          .update({
+            status: 'partial',
+            channel_errors: {
+              ...(existing?.channel_errors || {}),
+              [channel]: errMessage,
+            },
+            updated_by: auth.user.id,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', draftId);
+      } catch {
+        // best-effort error persistence
+      }
+    }
+    return NextResponse.json({ error: errMessage }, { status: 500 });
   }
 }

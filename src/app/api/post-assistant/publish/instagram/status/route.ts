@@ -22,7 +22,12 @@ export async function GET(request: Request) {
     }
 
     const status = await checkInstagramContainerStatus(containerId);
-    if (status.statusCode === 'ERROR') {
+    if (status.statusCode === 'ERROR' || status.statusCode === 'EXPIRED') {
+      const errorMsg =
+        status.statusDetail ||
+        (status.statusCode === 'EXPIRED'
+          ? 'Instagram container expired'
+          : 'Instagram media processing failed');
       if (isValidUuid(draftId)) {
         const admin = getAdminClient();
         const { data: draft } = await admin
@@ -34,15 +39,33 @@ export async function GET(request: Request) {
           .from('social_posts')
           .update({
             status: 'partial',
-            channel_errors: { ...(draft?.channel_errors || {}), instagram: status.statusDetail || 'Instagram processing error' },
+            channel_errors: { ...(draft?.channel_errors || {}), instagram: errorMsg },
             updated_at: new Date().toISOString(),
           })
           .eq('id', draftId);
       }
       return NextResponse.json({
         success: false,
-        statusCode: 'ERROR',
-        error: status.statusDetail || 'Instagram media processing failed',
+        statusCode: status.statusCode,
+        error: errorMsg,
+      });
+    }
+
+    if (status.statusCode === 'PUBLISHED') {
+      let existingPermalink: string | null = null;
+      if (isValidUuid(draftId)) {
+        const admin = getAdminClient();
+        const { data: draft } = await admin
+          .from('social_posts')
+          .select('ig_permalink')
+          .eq('id', draftId)
+          .maybeSingle();
+        existingPermalink = draft?.ig_permalink || null;
+      }
+      return NextResponse.json({
+        success: true,
+        statusCode: 'PUBLISHED',
+        permalink: existingPermalink,
       });
     }
 
@@ -62,7 +85,7 @@ export async function GET(request: Request) {
           .update({
             ig_media_id: published.mediaId,
             ig_permalink: published.permalink,
-            status: 'published',
+            status: Object.keys(nextErrors).length > 0 ? 'partial' : 'published',
             published_at: new Date().toISOString(),
             channel_errors: nextErrors,
             updated_by: auth.user.id,

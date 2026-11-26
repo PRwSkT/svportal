@@ -133,6 +133,45 @@ async function uploadBlobViaSignedUrl(params: {
   };
 }
 
+async function pollInstagramContainer(params: {
+  containerId: string;
+  draftId: string;
+  maxPolls: number;
+  intervalMs: number;
+  mediaLabel: string;
+  onProgress: (text: string) => void;
+}): Promise<{ permalink?: string }> {
+  const { containerId, draftId, maxPolls, intervalMs, mediaLabel, onProgress } = params;
+  for (let poll = 0; poll < maxPolls; poll++) {
+    onProgress(`รอ Instagram ประมวลผล${mediaLabel} (${poll + 1}/${maxPolls})...`);
+    await new Promise((r) => setTimeout(r, intervalMs));
+    const stRes = await fetch(
+      `/api/post-assistant/publish/instagram/status?containerId=${encodeURIComponent(
+        containerId
+      )}&draftId=${encodeURIComponent(draftId)}`
+    );
+    const stParsed = await safeReadJson<{
+      statusCode?: string;
+      permalink?: string;
+      error?: string;
+    }>(stRes);
+    if (!stParsed.ok && !stParsed.data) {
+      throw new Error(stParsed.errorMessage || 'Failed to check Instagram status');
+    }
+    const stJson = stParsed.data;
+    if (stJson?.statusCode === 'PUBLISHED') {
+      return { permalink: stJson.permalink };
+    }
+    if (stJson?.statusCode === 'ERROR' || stJson?.statusCode === 'EXPIRED') {
+      throw new Error(stJson.error || `Instagram failed to process ${mediaLabel}`);
+    }
+  }
+  const timeoutSec = Math.round((maxPolls * intervalMs) / 1000);
+  throw new Error(
+    `Instagram ประมวลผล${mediaLabel}นานเกินกำหนด (${timeoutSec} วินาที) กรุณาลองกดเผยแพร่เฉพาะ Instagram อีกครั้ง`
+  );
+}
+
 export function PublishDrawerModal({
   isOpen,
   onClose,
@@ -336,35 +375,15 @@ export function PublishDrawerModal({
               setIgState('done');
               setResultLinks((prev) => ({ ...prev, ig: igJson.permalink }));
             } else if (igJson?.containerId) {
-              // Poll status safely (up to 15 x 2s = 30s)
-              let published = false;
-              for (let poll = 0; poll < 15; poll++) {
-                setProgressText(`รอ Instagram ประมวลผลภาพ (${poll + 1}/15)...`);
-                await new Promise((r) => setTimeout(r, 2000));
-                const stRes = await fetch(
-                  `/api/post-assistant/publish/instagram/status?containerId=${encodeURIComponent(
-                    igJson.containerId
-                  )}&draftId=${encodeURIComponent(resolvedDraftId)}`
-                );
-                const stParsed = await safeReadJson<{
-                  statusCode?: string;
-                  permalink?: string;
-                  error?: string;
-                }>(stRes);
-                if (!stParsed.ok && !stParsed.data) {
-                  throw new Error(stParsed.errorMessage || 'Failed to check Instagram status');
-                }
-                const stJson = stParsed.data;
-                if (stJson?.statusCode === 'PUBLISHED') {
-                  published = true;
-                  setResultLinks((prev) => ({ ...prev, ig: stJson.permalink }));
-                  break;
-                }
-                if (stJson?.statusCode === 'ERROR') {
-                  throw new Error(stJson.error || 'Instagram failed to process media');
-                }
-              }
-              if (!published) throw new Error('Instagram container processing timed out');
+              const igPub = await pollInstagramContainer({
+                containerId: igJson.containerId,
+                draftId: resolvedDraftId,
+                maxPolls: 20,
+                intervalMs: 2000,
+                mediaLabel: 'ภาพ',
+                onProgress: setProgressText,
+              });
+              setResultLinks((prev) => ({ ...prev, ig: igPub.permalink }));
               setIgState('done');
             } else {
               throw new Error('Missing Instagram container ID');
@@ -469,6 +488,7 @@ export function PublishDrawerModal({
 
         if (channels.facebook && (!onlyFailed || fbState !== 'done')) {
           setFbState('running');
+          setProgressText('กำลังเผยแพร่วิดีโอสู่ Facebook...');
           try {
             const res = await fetch('/api/post-assistant/publish/video', {
               method: 'POST',
@@ -495,6 +515,7 @@ export function PublishDrawerModal({
 
         if (profile.supportsInstagram && channels.instagram && (!onlyFailed || igState !== 'done')) {
           setIgState('running');
+          setProgressText('กำลังสร้าง Instagram Reels Container...');
           try {
             const res = await fetch('/api/post-assistant/publish/video', {
               method: 'POST',
@@ -508,9 +529,30 @@ export function PublishDrawerModal({
                 pdpaAttested: true,
               }),
             });
-            const parsed = await safeReadJson(res);
+            const parsed = await safeReadJson<{
+              alreadyPublished?: boolean;
+              permalink?: string;
+              containerId?: string;
+            }>(res);
             if (!parsed.ok) throw new Error(parsed.errorMessage || 'IG Reels failed');
-            setIgState('done');
+            const igJson = parsed.data;
+            if (igJson?.alreadyPublished) {
+              setResultLinks((prev) => ({ ...prev, ig: igJson.permalink }));
+              setIgState('done');
+            } else if (igJson?.containerId) {
+              const igPub = await pollInstagramContainer({
+                containerId: igJson.containerId,
+                draftId: resolvedDraftId,
+                maxPolls: 40,
+                intervalMs: 3000,
+                mediaLabel: 'วิดีโอ Reels',
+                onProgress: setProgressText,
+              });
+              setResultLinks((prev) => ({ ...prev, ig: igPub.permalink }));
+              setIgState('done');
+            } else {
+              throw new Error('Missing Instagram Reels container ID');
+            }
           } catch (err: unknown) {
             setIgState('error');
             setChannelError((prev) => ({ ...prev, instagram: toErrMessage(err, 'IG Reels error') }));
@@ -519,6 +561,7 @@ export function PublishDrawerModal({
 
         if (channels.website && (!onlyFailed || webState !== 'done')) {
           setWebState('running');
+          setProgressText('กำลังซิงก์วิดีโอขึ้นเว็บไซต์ somkidvittaya.ac.th...');
           try {
             const payload: WebsitePublishPayload = {
               mode: channels.websiteMode || 'publish',
