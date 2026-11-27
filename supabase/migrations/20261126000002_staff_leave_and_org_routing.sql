@@ -271,6 +271,9 @@ INSERT INTO public.org_responsibility_roles (
 ON CONFLICT (role_key) DO NOTHING;
 
 -- Grant 'admin_leave' feature to Director, Manager, Deputy Manager, and HR Support Staff
+ALTER TABLE IF EXISTS public.app_users
+  ADD COLUMN IF NOT EXISTS assigned_features JSONB DEFAULT '[]'::jsonb;
+
 UPDATE public.app_users
 SET assigned_features = CASE
   WHEN assigned_features IS NULL THEN '["admin_leave"]'::jsonb
