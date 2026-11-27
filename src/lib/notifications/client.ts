@@ -53,7 +53,10 @@ export async function subscribeToPushNotifications(options?: {
     return { success: false, error: 'เบราว์เซอร์ไม่รองรับ Service Worker' };
   }
 
-  const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const rawVapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const vapidPublicKey = rawVapidKey
+    ? rawVapidKey.trim().replace(/^['"]|['"]$/g, '')
+    : '';
   if (!vapidPublicKey) {
     return { success: false, error: 'ระบบยังไม่ได้กำหนด VAPID Public Key บนเซิร์ฟเวอร์' };
   }
@@ -65,21 +68,25 @@ export async function subscribeToPushNotifications(options?: {
       return { success: false, permission, error: 'ผู้ใช้ยังไม่อนุญาตการแจ้งเตือน' };
     }
 
-    // 2. Ensure service worker is ready
+    // 2. Ensure service worker is registered and active before subscribing
     let reg = await navigator.serviceWorker.getRegistration();
     if (!reg) {
-      reg = await registerServiceWorker() || undefined;
+      reg = (await registerServiceWorker()) || undefined;
     }
     if (!reg) {
       return { success: false, error: 'ไม่สามารถเปิดใช้งาน Service Worker ได้' };
     }
+    const readyReg = await navigator.serviceWorker.ready;
 
-    // 3. Subscribe to push manager
+    // 3. Subscribe to push manager (reuse existing subscription if already active)
     const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
-    const subscription = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: convertedVapidKey as any,
-    });
+    const existingSub = await readyReg.pushManager.getSubscription();
+    const subscription =
+      existingSub ||
+      (await readyReg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: convertedVapidKey as any,
+      }));
 
     // 4. Send subscription to SV-Portal backend
     const res = await fetch('/api/notifications/subscribe', {
@@ -99,8 +106,24 @@ export async function subscribeToPushNotifications(options?: {
 
     return { success: true, permission: 'granted' };
   } catch (err: any) {
-    console.error('[WebPush] Subscription error:', err);
-    return { success: false, error: err?.message || 'การสมัครรับการแจ้งเตือนล้มเหลว' };
+    const msg = String(err?.message || '');
+    if (err?.name === 'AbortError' || /push service not available/i.test(msg)) {
+      console.warn('[WebPush] Push service unavailable in this browser/preview:', msg);
+      return {
+        success: false,
+        error:
+          'เบราว์เซอร์/หน้าต่างพรีวิวนี้ไม่รองรับบริการ Push กรุณาเปิดผ่าน Google Chrome, Safari (เพิ่มลงหน้าจอโฮม) หรือ Edge เพื่อเปิดแจ้งเตือน',
+      };
+    }
+    if (err?.name === 'NotAllowedError') {
+      console.warn('[WebPush] Notification permission denied by user');
+      return {
+        success: false,
+        error: 'เบราว์เซอร์บล็อกสิทธิ์การแจ้งเตือนไว้ กรุณาอนุญาตการแจ้งเตือนในตั้งค่าเว็บไซต์',
+      };
+    }
+    console.warn('[WebPush] Subscription failed:', msg);
+    return { success: false, error: msg || 'การสมัครรับการแจ้งเตือนล้มเหลว' };
   }
 }
 

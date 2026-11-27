@@ -142,6 +142,7 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
   // งาน HR และประกันคุณภาพ
   { id: 'admin_users', name: 'จัดการผู้ใช้งาน', category: 'งาน HR & ธรรมาภิบาล', href: '/admin/users' },
   { id: 'admin_attendance', name: 'ข้อมูลการเข้างาน', category: 'งาน HR & ธรรมาภิบาล', href: '/admin/attendance' },
+  { id: 'admin_leave', name: 'แดชบอร์ดแจ้งลา / ไปราชการ & โครงสร้าง', category: 'งาน HR & ธรรมาภิบาล', href: '/admin/leave' },
   { id: 'admin_kpi', name: 'ประเมินผลการปฏิบัติงาน (KPI)', category: 'งาน HR & ธรรมาภิบาล', href: '/admin/kpi' },
   { id: 'esar_governance', name: 'รายงานประเมินตนเอง e-SAR & ธรรมาภิบาล', category: 'งาน HR & ธรรมาภิบาล', href: '/admin/governance' },
   // งานประชาสัมพันธ์และผู้ปกครองสัมพันธ์ (PR & Parents Portal)

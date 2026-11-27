@@ -39,7 +39,8 @@ import {
   Smartphone,
   MessageCircle,
   ClipboardList,
-  Tv
+  Tv,
+  CalendarPlus
 } from 'lucide-react';
 import { getRoleConfig } from '@/lib/constants/roles';
 
@@ -104,6 +105,7 @@ export default function HomeLaunchpad() {
       tools: [
         { id: "admin_users", name: dict.nav.adminUsers, href: "/admin/users", icon: <Users className="w-6 h-6" />, color: "bg-purple-500/20 text-purple-600" },
         { id: "admin_attendance", name: dict.nav.adminAttendance, href: "/admin/attendance", icon: <Clock className="w-6 h-6" />, color: "bg-purple-500/20 text-purple-600" },
+        { id: "admin_leave", name: language === 'th' ? "แดชบอร์ดลา / ไปราชการ" : "Leave & Duty Dashboard", href: "/admin/leave", icon: <CalendarPlus className="w-6 h-6" />, color: "bg-rose-500/20 text-rose-600" },
         { id: "admin_kpi", name: dict.nav.adminKpi, href: "/admin/kpi", icon: <Award className="w-6 h-6" />, color: "bg-[#7B1C3E] text-white" },
         { id: "esar_governance", name: language === 'th' ? "รายงาน e-SAR & ใบอนุญาต" : "e-SAR & Governance", href: "/admin/governance", icon: <ShieldCheck className="w-6 h-6" />, color: "bg-indigo-500/20 text-indigo-600" }
       ]
@@ -152,7 +154,12 @@ export default function HomeLaunchpad() {
   const filteredDepartments = allDepartments.map(dept => {
     return {
       ...dept,
-      tools: dept.tools.filter(tool => isAdmin || showAll || assignedFeatures.includes(tool.id))
+      tools: dept.tools.filter(tool =>
+        isAdmin ||
+        showAll ||
+        assignedFeatures.includes(tool.id) ||
+        (role === 'executive' && tool.id === 'admin_leave')
+      )
     };
   }).filter(dept => dept.tools.length > 0);
 
@@ -214,6 +221,20 @@ export default function HomeLaunchpad() {
                 <span className="font-bold text-sm block leading-tight">Parents Portal PWA</span>
                 <span className="text-[10px] text-amber-100 block">parents.portal.somkidvittaya.ac.th</span>
               </div>
+            </motion.div>
+          </Link>
+          <Link href="/leave">
+            <motion.div 
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              className="flex items-center gap-3 bg-gradient-to-r from-[#7B1C3E] to-[#9B2C4E] text-white px-5 py-3.5 rounded-2xl shadow-md hover:shadow-lg transition-all"
+            >
+              <div className="p-2 bg-white/20 rounded-xl">
+                <CalendarPlus className="w-5 h-5" />
+              </div>
+              <span className="font-bold text-sm md:text-base">
+                {language === 'th' ? 'แจ้งลา / ไปราชการ' : 'Leave & Duty'}
+              </span>
             </motion.div>
           </Link>
           <Link href="/attendance">

@@ -50,6 +50,7 @@ import {
   MessageCircle,
   ClipboardList,
   Tv,
+  CalendarPlus,
 } from 'lucide-react';
 import { NotificationBell } from '@/components/NotificationBell';
 
@@ -118,6 +119,8 @@ export function AppNav() {
     { id: 'admin_staff_cards', href: '/admin/personnel/cards', label: language === 'th' ? 'บัตรประจำตัวบุคลากร (Digital ID)' : 'Staff Digital ID Cards', category: dict.nav.hrAdmin, icon: ShieldCheck, colorClass: 'text-[#183e66] bg-sky-50 border-sky-200' },
     { id: 'admin_kpi', href: '/admin/kpi', label: dict.nav.adminKpi, category: dict.nav.hrAdmin, icon: Award, colorClass: 'text-[#7B1C3E] bg-[#7B1C3E]/10 border-[#7B1C3E]/20' },
     { id: 'admin_attendance', href: '/admin/attendance', label: dict.nav.adminAttendance, category: dict.nav.hrAdmin, icon: Clock, colorClass: 'text-purple-600 bg-purple-50 border-purple-200' },
+    { id: 'admin_leave', href: '/admin/leave', label: language === 'th' ? 'แดชบอร์ดแจ้งลา / ไปราชการ' : 'Leave & Duty Dashboard', category: dict.nav.hrAdmin, icon: CalendarPlus, colorClass: 'text-[#7B1C3E] bg-rose-50 border-rose-200' },
+    { id: 'staff_leave_portal', href: '/leave', label: language === 'th' ? 'แจ้งลา / ไปราชการ (ของฉัน)' : 'My Leave & Duty', category: dict.nav.hrAdmin, icon: FileText, colorClass: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
     { id: 'admin_users', href: '/admin/users', label: dict.nav.adminUsers, category: dict.nav.hrAdmin, icon: Users, colorClass: 'text-violet-600 bg-violet-50 border-violet-200' },
     { id: 'esar_governance', href: '/admin/governance', label: language === 'th' ? 'ธรรมาภิบาล & รายงาน e-SAR' : 'Governance & e-SAR', category: dict.nav.hrAdmin, icon: ShieldCheck, colorClass: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
     // PR & Communications
@@ -151,8 +154,10 @@ export function AppNav() {
 
   // Filter accessible modules based on permissions
   const accessibleModules = allModules.filter((item) => {
+    if (item.id === 'staff_leave_portal') return true;
     if (isAdmin) return true;
     if (assignedFeatures.includes(item.id)) return true;
+    if (role === 'executive' && item.id === 'admin_leave') return true;
     if (role === 'teacher' && ['academic_hub', 'academic_gradebook', 'academic_early_years', 'academic_assignments', 'academic_exams', 'academic_timetable', 'calendar', 'pastoral_care', 'student_attendance', 'parent_communications', 'admin_forms', 'admin_kpi'].includes(item.id)) return true;
     if (role === 'academic staff' && ['academic_hub', 'academic_gradebook', 'academic_early_years', 'academic_assignments', 'academic_exams', 'academic_timetable', 'academic_documents', 'academic_opec', 'admin_academic', 'calendar', 'student_attendance', 'admin_students', 'parent_communications', 'admin_forms'].includes(item.id)) return true;
     if (role === 'cashier' && ['pos_shop', 'pos_fees', 'admin_fees', 'pos_wallet_topup'].includes(item.id)) return true;

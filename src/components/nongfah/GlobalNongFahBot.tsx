@@ -413,24 +413,18 @@ export function GlobalNongFahBot() {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {/* Dynamic Context Speech Bubble Pill (Hidden when chat is open) */}
+        {/* Static Speech Bubble Pill (Hidden when chat is open) */}
         {!isOpen && (
           <motion.div
             initial={{ opacity: 0, x: 12, scale: 0.92 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             transition={{ duration: 0.25 }}
             onClick={() => setIsOpen(true)}
-            className="hidden sm:flex items-center gap-2.5 py-2 px-3.5 bg-white/95 backdrop-blur-md border border-rose-200/80 rounded-2xl shadow-xl shadow-rose-950/10 hover:border-rose-400 hover:shadow-rose-900/15 transition-all text-xs font-semibold text-slate-800"
+            className="hidden sm:flex items-center gap-2 py-2 px-3.5 bg-white/95 backdrop-blur-md border border-rose-200/80 rounded-2xl shadow-xl shadow-rose-950/10 hover:border-rose-400 hover:shadow-rose-900/15 transition-all text-xs font-semibold text-slate-800"
           >
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[12px] font-bold text-[#7B1C3E]">
-                {pageContext.pillText}
-              </span>
-            </div>
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200/60 flex items-center gap-1">
-              <Sparkles className="w-2.5 h-2.5 text-amber-500" />
-              {pageContext.tag}
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[12px] font-bold text-[#7B1C3E]">
+              คุยกับน้องฟ้า
             </span>
           </motion.div>
         )}

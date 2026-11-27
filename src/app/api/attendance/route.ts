@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { getServerUser, requireAuth } from '@/lib/auth';
 import { getBangkokDate } from '@/lib/utils';
+import {
+  MIN_CHECKOUT_ELAPSED_MINUTES,
+  isEarlyCheckOut,
+} from '@/lib/attendance/analytics';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -84,9 +87,9 @@ export async function GET(request: Request) {
     // Default: Fetch today's local date YYYY-MM-DD for current user
     const localISODate = getBangkokDate();
 
-    const supabase = await createClient();
-    // Fetch today's attendance record
-    const { data, error } = await supabase
+    const supabaseAdmin = getAdminClient();
+    // Fetch today's attendance record (using verified userId so both Supabase Auth and sv_staff_session work consistently)
+    const { data, error } = await supabaseAdmin
       .from('attendance_records')
       .select('*')
       .eq('user_id', userId)
@@ -210,7 +213,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const { action, lat, lng } = body;
+    const { action, lat, lng, confirmEarlyCheckout } = body;
 
     if (!['check_in', 'check_out'].includes(action)) {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
@@ -234,10 +237,10 @@ export async function POST(request: Request) {
     // We use a service role key to insert/update the timestamp securely on the server
     const supabaseAdmin = getAdminClient();
 
-    // Check if record exists
+    // Check if record exists (include timestamps to enforce cooldown and prevent duplicate check-out)
     const { data: existingRecord } = await supabaseAdmin
       .from('attendance_records')
-      .select('id')
+      .select('id, check_in_time, check_out_time')
       .eq('user_id', userId)
       .eq('date', localISODate)
       .maybeSingle();
@@ -246,7 +249,7 @@ export async function POST(request: Request) {
 
     if (action === 'check_in') {
       if (existingRecord) {
-        return NextResponse.json({ error: 'You have already checked in today.' }, { status: 400 });
+        return NextResponse.json({ error: 'คุณได้ลงเวลาเข้างานวันนี้เรียบร้อยแล้ว' }, { status: 400 });
       }
 
       const { data, error } = await supabaseAdmin
@@ -266,8 +269,38 @@ export async function POST(request: Request) {
     } 
     
     if (action === 'check_out') {
-      if (!existingRecord) {
-        return NextResponse.json({ error: 'You have not checked in today yet.' }, { status: 400 });
+      if (!existingRecord || !existingRecord.check_in_time) {
+        return NextResponse.json({ error: 'คุณยังไม่ได้ลงเวลาเข้างานวันนี้' }, { status: 400 });
+      }
+
+      if (existingRecord.check_out_time) {
+        return NextResponse.json({ error: 'คุณได้ลงเวลาออกงานเรียบร้อยแล้วสำหรับวันนี้' }, { status: 400 });
+      }
+
+      // Guard 1: Minimum cooldown between check-in and check-out to prevent accidental double-tap
+      const elapsedMs = Date.now() - new Date(existingRecord.check_in_time).getTime();
+      const minCooldownMs = MIN_CHECKOUT_ELAPSED_MINUTES * 60 * 1000;
+      if (elapsedMs < minCooldownMs) {
+        const remainingMinutes = Math.max(1, Math.ceil((minCooldownMs - elapsedMs) / 60000));
+        return NextResponse.json(
+          {
+            error: `เพิ่งลงเวลาเข้างานไปไม่นาน กรุณารออีก ${remainingMinutes} นาทีก่อนลงเวลาออกงาน (ป้องกันการกดซ้ำโดยไม่ตั้งใจ)`,
+            code: 'CHECKOUT_COOLDOWN',
+            remainingMinutes,
+          },
+          { status: 400 }
+        );
+      }
+
+      // Guard 2: Require explicit confirmation when checking out before 17:00 BKK
+      if (isEarlyCheckOut(currentTime) && !confirmEarlyCheckout) {
+        return NextResponse.json(
+          {
+            error: 'ขณะนี้ยังไม่ถึงเวลาเลิกงาน (17:00 น.) กรุณายืนยันก่อนลงเวลาออกงาน',
+            code: 'EARLY_CHECKOUT_CONFIRM_REQUIRED',
+          },
+          { status: 400 }
+        );
       }
 
       const { data, error } = await supabaseAdmin

@@ -45,10 +45,7 @@ type AppUserItem = {
   full_name: string;
 };
 
-// เวลาเข้างานที่กำหนด (HH:MM)
-const LATE_CUTOFF_TIME = "07:30"; 
-// เวลาออกงานที่กำหนด (HH:MM) - ออกก่อนเวลานี้จะถือว่า "ออกก่อนเวลา"
-const EARLY_LEAVE_TIME = "17:00";
+import { LATE_CUTOFF_TIME, EARLY_LEAVE_TIME } from '@/lib/attendance/analytics';
 
 export default function AdminAttendancePage() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
