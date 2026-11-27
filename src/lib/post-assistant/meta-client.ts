@@ -48,7 +48,13 @@ export function getBrandMetaIds(brand: BrandId): { pageId: string; igId: string 
 }
 
 type MetaJsonResponse = Record<string, unknown> & {
-  error?: { message?: string; code?: number };
+  error?: {
+    message?: string;
+    code?: number;
+    error_subcode?: number;
+    error_user_title?: string;
+    error_user_msg?: string;
+  };
   id?: string;
   access_token?: string;
   name?: string;
@@ -72,8 +78,11 @@ async function metaFetch(url: string, init?: RequestInit): Promise<MetaJsonRespo
   }
   if (!res.ok || json?.error) {
     const msg = json?.error?.message || `HTTP ${res.status}`;
-    const code = json?.error?.code ? ` (code ${json.error.code})` : '';
-    throw new Error(`Meta Graph Error${code}: ${msg}`);
+    const codePart = json?.error?.code
+      ? ` (code ${json.error.code}${json.error.error_subcode ? `/${json.error.error_subcode}` : ''})`
+      : '';
+    const detailPart = json?.error?.error_user_msg ? ` — ${json.error.error_user_msg}` : '';
+    throw new Error(`Meta Graph Error${codePart}: ${msg}${detailPart}`);
   }
   return json;
 }
@@ -334,6 +343,34 @@ export async function publishInstagramContainer(containerId: string): Promise<{
   return { mediaId, permalink };
 }
 
+function truncateUtf8Bytes(input: string, maxBytes: number): string {
+  const clean = (input || '').replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!clean || maxBytes <= 0) return '';
+  if (Buffer.byteLength(clean, 'utf8') <= maxBytes) return clean;
+
+  const ellipsis = '…';
+  const ellipsisBytes = Buffer.byteLength(ellipsis, 'utf8');
+  if (maxBytes <= ellipsisBytes) return '';
+  const budget = maxBytes - ellipsisBytes;
+
+  const graphemes: string[] =
+    typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function'
+      ? Array.from(new Intl.Segmenter('th', { granularity: 'grapheme' }).segment(clean), (s) => s.segment)
+      : Array.from(clean);
+
+  let out = '';
+  let usedBytes = 0;
+  for (const g of graphemes) {
+    const gBytes = Buffer.byteLength(g, 'utf8');
+    if (usedBytes + gBytes > budget) break;
+    out += g;
+    usedBytes += gBytes;
+  }
+
+  const trimmed = out.trimEnd();
+  return trimmed ? `${trimmed}${ellipsis}` : '';
+}
+
 export async function publishFacebookVideoByUrl(params: {
   brand: BrandId;
   videoUrl: string;
@@ -348,13 +385,18 @@ export async function publishFacebookVideoByUrl(params: {
     description: params.caption,
   });
   if (params.title) {
-    form.set('title', params.title.slice(0, 200));
+    // Facebook Graph API enforces a 255-byte UTF-8 ceiling on video titles.
+    const safeTitle = truncateUtf8Bytes(params.title, 240);
+    if (safeTitle) {
+      form.set('title', safeTitle);
+    }
   }
   appendAuthParams(form, pageToken);
 
   const res = await metaFetch(`https://graph-video.facebook.com/${version}/${pageId}/videos`, {
     method: 'POST',
     body: form,
+    signal: AbortSignal.timeout(24000),
   });
 
   const videoId = String(res.id);

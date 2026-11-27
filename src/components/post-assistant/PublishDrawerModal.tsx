@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   X,
   Download,
@@ -203,6 +203,7 @@ export function PublishDrawerModal({
   const [webState, setWebState] = useState<StepStatus>('idle');
   const [channelError, setChannelError] = useState<Record<string, string>>({});
   const [resultLinks, setResultLinks] = useState<{ fb?: string; ig?: string; webSlug?: string }>({});
+  const uploadedVideoCacheRef = useRef<{ key: string; storagePath: string } | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -477,14 +478,27 @@ export function PublishDrawerModal({
       } else {
         // Video Mode
         if (!videoFile) throw new Error('กรุณาเลือกไฟล์วิดีโอก่อนเผยแพร่');
-        setProgressText('กำลังอัปโหลดวิดีโอตรงสู่ Supabase Storage...');
-        const uploadedVideo = await uploadBlobViaSignedUrl({
-          draftId: resolvedDraftId,
-          bucket: 'post-media',
-          variant: 'video',
-          blob: videoFile,
-          contentType: videoFile.type || 'video/mp4',
-        });
+        const videoKey = `${resolvedDraftId}:${videoFile.name}:${videoFile.size}:${videoFile.lastModified}`;
+        let uploadedVideoStoragePath =
+          uploadedVideoCacheRef.current?.key === videoKey
+            ? uploadedVideoCacheRef.current.storagePath
+            : '';
+        if (!uploadedVideoStoragePath) {
+          setProgressText('กำลังอัปโหลดวิดีโอตรงสู่ Supabase Storage...');
+          const uploaded = await uploadBlobViaSignedUrl({
+            draftId: resolvedDraftId,
+            bucket: 'post-media',
+            variant: 'video',
+            blob: videoFile,
+            contentType: videoFile.type || 'video/mp4',
+          });
+          uploadedVideoStoragePath = uploaded.storagePath;
+          uploadedVideoCacheRef.current = {
+            key: videoKey,
+            storagePath: uploadedVideoStoragePath,
+          };
+        }
+        const uploadedVideo = { storagePath: uploadedVideoStoragePath };
 
         if (channels.facebook && (!onlyFailed || fbState !== 'done')) {
           setFbState('running');
